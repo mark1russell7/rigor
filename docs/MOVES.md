@@ -30,3 +30,21 @@ A copy with a different algorithm, or with different constants, is not a move. K
 | systems | `packages/service/src/fakes.ts` (`seeded`) | next |
 
 12 repositories, approximately 32 files. When the table has no "next" row, R3 is done. Then the atlas shows no class of mulberry32 across the repositories.
+
+## The statistics copies (rigor-statistics)
+
+The package README has the function for each copy, and the tests prove the numbers are equal to the bit. The steps of a move are the same as above.
+
+| Repository | Files | State |
+| --- | --- | --- |
+| coeval | `packages/core/bench/cases.ts` (`median`) | next |
+| crawler | `packages/site/src/lib/eval-b.ts` (`median`) | next |
+| highways | `src/bench/measures/stats.ts` (`quantile`, `summarize`, `kendallTau`), `src/bench/screen/gap.ts` (`bootstrapMedian`), `src/bench/screen/set.ts` (`signTestPower`), `scripts/queue.ts` (`spearman`, `bootstrap`) | next |
+| lag | `packages/experiments/src/e8-async-context/runner/stats.ts` (`median`, `quantile`), `packages/site/src/lib/stats.ts` (`percentile`) | next |
+| lag-hud | `packages/hud/src/meter.ts` (`quantile`) | next |
+| layout-contract | `packages/joint/src/analysis.ts` (`bootstrap`, `quantileOf`) | next |
+| packing | `src/measures.ts` (`quantile`, `medianRatio`), `bench/promote.ts` (`signTestP`, `bootstrapMedian`), `bench/coverage.ts` (`wilson`), `bench/run.ts` (`median`) | next |
+
+Two copies are not equal to the package. Keep the call as it is, or accept the change in a separate commit with the records:
+- The backtest `bootstrap` of highways does not skip a run with a NaN statistic. The package skips it.
+- `summarize` of highways gives the 0.5 quantile as the median. The package gives the midpoint, which can differ in the last bit.

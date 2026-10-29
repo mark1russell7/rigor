@@ -57,9 +57,10 @@ describe("the build", () => {
   });
 
   it("writes the page with the packages, the links of the site pages and the script", () => {
-    const html = pageHtml(packageRows("0.1.0"), "2026-10-29");
+    const html = pageHtml(packageRows({ generators: "0.1.0", statistics: "0.1.0" }), "2026-10-29");
     expect(html).toMatch(/^<!doctype html>/);
     expect(html).toContain("@mark1russell7/rigor-generators");
+    expect(html).toContain("@mark1russell7/rigor-statistics");
     expect(html).toContain('href="status/"');
     expect(html).toContain('href="releases/"');
     expect(html).toContain('src="page.js"');

@@ -226,6 +226,31 @@ importers:
       '@mark1russell7/rigor-generators':
         specifier: workspace:*
         version: link:../generators
+      '@mark1russell7/rigor-statistics':
+        specifier: workspace:*
+        version: link:../statistics
+    devDependencies:
+      '@mark1russell7/cue':
+        specifier: ^1.0.2
+        version: 1.0.2
+      '@types/node':
+        specifier: ^26.6.5
+        version: 26.6.5
+      tsdown:
+        specifier: ^0.23.1
+        version: 0.23.3(publint@0.3.25)(tsx@4.23.15)(typescript@7.0.2)
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.5(@types/node@26.6.5)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15))
+
+  packages/statistics:
+    dependencies:
+      '@mark1russell7/rigor-generators':
+        specifier: workspace:^
+        version: link:../generators
     devDependencies:
       '@mark1russell7/cue':
         specifier: ^1.0.2

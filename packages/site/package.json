@@ -5,14 +5,15 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "./src/page.ts",
+  "main": "./src/index.ts",
   "scripts": {
     "build:site": "node src/build.ts",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
   },
   "dependencies": {
-    "@mark1russell7/rigor-generators": "workspace:*"
+    "@mark1russell7/rigor-generators": "workspace:*",
+    "@mark1russell7/rigor-statistics": "workspace:*"
   },
   "devDependencies": {
     "@mark1russell7/cue": "^1.0.2",

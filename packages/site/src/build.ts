@@ -14,10 +14,16 @@ export interface PackageRow {
   readonly gives: string;
 }
 
-export function packageRows(generatorsVersion: string): PackageRow[] {
+/** The versions of the built packages. A package with no version here is planned. */
+export interface Versions {
+  readonly generators: string;
+  readonly statistics: string;
+}
+
+export function packageRows(versions: Versions): PackageRow[] {
   return [
-    { name: "@mark1russell7/rigor-generators", state: generatorsVersion, gives: "A seeded generator and its draws: integers, picks, weights, shuffles, samples, normal values and named streams. Next: input families, stratified and Latin hypercube designs, Saltelli designs, shrinking." },
-    { name: "rigor-statistics", state: "planned", gives: "Bootstrap intervals, paired permutation tests, the Holm correction, Wilson intervals, Sobol indices, Brier scores and the noise rule of 5 seeds." },
+    { name: "@mark1russell7/rigor-generators", state: versions.generators, gives: "A seeded generator and its draws: integers, picks, weights, shuffles, samples, normal values and named streams. Next: input families, stratified and Latin hypercube designs, Saltelli designs, shrinking." },
+    { name: "@mark1russell7/rigor-statistics", state: versions.statistics, gives: "Quantiles, bootstrap intervals (also of clusters), the sign test, the paired permutation test, Wilson intervals, the Holm correction, rank correlation, the comparison with a baseline beyond the noise (the 5-seed rule), and Brier scores. Next: Sobol indices." },
     { name: "rigor-gates", state: "planned", gives: "The determinism gate (one input gives one hash), the promotion test and the performance evidence of a release." },
     { name: "rigor-testgen", state: "planned", gives: "Property tests on fast-check, pairwise and covering arrays, and metamorphic relations." },
     { name: "rigor-chaos", state: "planned", gives: "Fault injection, schedules of latency and failure, and load profiles, with their measures." },
@@ -185,8 +191,8 @@ async function main(argv: readonly string[]): Promise<number> {
     minify: true,
     clean: false,
   });
-  const version = (JSON.parse(readFileSync(join(here, "../generators/package.json"), "utf8")) as { version: string }).version;
-  writeFileSync(join(out, "index.html"), pageHtml(packageRows(version), new Date().toISOString().slice(0, 10)));
+  const version = (name: string): string => (JSON.parse(readFileSync(join(here, `../${name}/package.json`), "utf8")) as { version: string }).version;
+  writeFileSync(join(out, "index.html"), pageHtml(packageRows({ generators: version("generators"), statistics: version("statistics") }), new Date().toISOString().slice(0, 10)));
   console.error(`wrote ${join(out, "index.html")} and page.js`);
   return 0;
 }

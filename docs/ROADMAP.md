@@ -8,13 +8,13 @@ This file lists the items of the roadmap of this repository. The status page of 
 | --- | --- | --- | --- |
 | R1 | in progress | P1 | generators 0.1.0: the seeded generator and its draws, byte-equal to each copy of mulberry32 |
 | R2 | in progress | P1 | The site: the packages, and the generator to try in the browser |
+| R4 | in progress | P1 | statistics 0.1.0: quantiles, bootstrap intervals, sign and permutation tests, Wilson, Holm, rank correlation, the comparison beyond the noise and Brier, equal to the bit to each copy |
 
 ## Next
 
 | ID | Status | Priority | Title |
 | --- | --- | --- | --- |
-| R3 | next | P1 | The first moves: each repository with a copy of mulberry32 imports generators, with records that stay equal |
-| R4 | next | P1 | statistics: bootstrap intervals, paired permutation tests, Holm, Wilson, Brier and the noise rule of 5 seeds |
+| R3 | next | P1 | The first moves: each repository with a copy of mulberry32 or of a statistics function imports the package, with records that stay equal |
 | R5 | next | P1 | generators: input families with dimensions and ranges, stratified and Latin hypercube designs, Saltelli designs |
 | R6 | next | P2 | gates: the determinism gate (one input gives one hash), the promotion test and the performance evidence |
 
