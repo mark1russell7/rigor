@@ -1,0 +1,59 @@
+# The public API of @mark1russell7/rigor-generators
+#
+# The names of each entry of the exports field, and the declaration of each name, without comments
+# and private members. The command `api-report check` compares this file with the built .d.ts files.
+# To accept a change of the API, start the build, then `api-report update`, and review the diff.
+
+## . (build/index.d.ts): 9 names
+
+type Random: build/index.d.ts#Random
+type Source: build/index.d.ts#Source
+deriveSeed: build/index.d.ts#deriveSeed
+fnv1a32: build/index.d.ts#fnv1a32
+mulberry32: build/index.d.ts#mulberry32
+random: build/index.d.ts#random
+randomOf: build/index.d.ts#randomOf
+seedOf: build/index.d.ts#seedOf
+seedsFrom: build/index.d.ts#seedsFrom
+
+## Declarations
+
+### build/index.d.ts#Random
+interface Random {
+  readonly seed: number;
+  next(): number;
+  int(min: number, max: number): number;
+  below(n: number): number;
+  range(min: number, max: number): number;
+  chance(p: number): boolean;
+  pick<T>(items: readonly T[]): T;
+  weighted(weights: readonly number[]): number;
+  shuffle<T>(items: readonly T[]): T[];
+  sample<T>(items: readonly T[], k: number): T[];
+  normal(mean?: number, sd?: number): number;
+  fork(label: string): Random;
+}
+
+### build/index.d.ts#Source
+type Source = () => number;
+
+### build/index.d.ts#deriveSeed
+export declare function deriveSeed(seed: number, label: string): number;
+
+### build/index.d.ts#fnv1a32
+export declare function fnv1a32(text: string): number;
+
+### build/index.d.ts#mulberry32
+export declare function mulberry32(seed: number): Source;
+
+### build/index.d.ts#random
+export declare function random(seed: number | string, source?: (seed: number) => Source): Random;
+
+### build/index.d.ts#randomOf
+export declare function randomOf(next: Source, seed: number, source?: (seed: number) => Source): Random;
+
+### build/index.d.ts#seedOf
+export declare function seedOf(seed: number | string): number;
+
+### build/index.d.ts#seedsFrom
+export declare function seedsFrom(given: string | undefined, defaults: readonly number[]): number[];
