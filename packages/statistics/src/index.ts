@@ -1,5 +1,15 @@
 export { type QuantileMethod, type Summary, mean, median, quantile, quantileSorted, sd, sorted, summarize } from "./describe.ts";
-export { type BootstrapOptions, type Interval, bootstrap, bootstrapClusters, bootstrapMedian, bootstrapMedianRatio, bootstrapTwo } from "./bootstrap.ts";
+export {
+  type BootstrapOptions,
+  type Interval,
+  bootstrap,
+  bootstrapClusters,
+  bootstrapLeastSquares,
+  bootstrapMedian,
+  bootstrapMedianRatio,
+  bootstrapTwo,
+} from "./bootstrap.ts";
+export { type LeastSquaresFit, type LeastSquaresOptions, leastSquares } from "./regression.ts";
 export {
   type Corrected,
   type PermutationOptions,

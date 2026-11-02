@@ -3,9 +3,11 @@
  * `floor(next() * n)`), and computes the statistic of the sample. The interval is two quantiles of the statistics.
  * With the same seed, the draws are equal to the draws of the copies in highways, packing and layout-contract.
  * `bootstrapTwo` draws two independent samples in each run: first the items of `a`, then the items of `b`.
+ * `bootstrapLeastSquares` draws whole rows, and gives one interval for each coefficient from the same draws.
  */
 import { type Random, random } from "@mark1russell7/rigor-generators";
 import { type QuantileMethod, median, quantileSorted, sorted } from "./describe.ts";
+import { type LeastSquaresOptions, checkedShape, fitRows } from "./regression.ts";
 
 export interface BootstrapOptions {
   /** The number of samples. The default is 10 000. */
@@ -97,11 +99,47 @@ export function bootstrapMedianRatio(numerator: readonly number[], denominator: 
 }
 
 /**
- * The shared part of each percentile bootstrap. It examines the options, and starts one stream of `random(seed)`.
- * Each run gives the stream to `run`, which draws the samples and returns their statistic. Then `all` gives the
- * estimate. The order of the draws is the order in `run`.
+ * A percentile bootstrap interval of each coefficient of the least-squares fit of `y` on the rows of `x`. Each run
+ * draws `n` row indexes with replacement, and fits the drawn rows and their `y` values. All the intervals come from
+ * the same draws. The estimate of each interval is the coefficient of the fit of all the data. A run with a singular
+ * design gives NaN coefficients, so it does not count. The shape errors are the errors of `leastSquares`.
  */
-function percentile(name: string, options: BootstrapOptions, run: (r: Random) => number, all: () => number): Interval {
+export function bootstrapLeastSquares(
+  x: readonly (readonly number[])[],
+  y: readonly number[],
+  options: BootstrapOptions & LeastSquaresOptions = {},
+): Interval[] {
+  const intercept = options.intercept ?? true;
+  const k = checkedShape("bootstrapLeastSquares", x, y, intercept);
+  const n = x.length;
+  const sampleX = new Array<readonly number[]>(n);
+  const sampleY = new Array<number>(n);
+  return percentiles(
+    "bootstrapLeastSquares",
+    options,
+    k,
+    (r) => {
+      for (let i = 0; i < n; i++) {
+        const row = r.below(n);
+        sampleX[i] = x[row] as readonly number[];
+        sampleY[i] = y[row] as number;
+      }
+      return fitRows(sampleX, sampleY, intercept, k).coefficients;
+    },
+    () => fitRows(x, y, intercept, k).coefficients,
+  );
+}
+
+interface Settings {
+  readonly runs: number;
+  readonly lowEnd: number;
+  readonly highEnd: number;
+  readonly level: number;
+  readonly method: QuantileMethod;
+}
+
+/** This function examines the options of a bootstrap, and gives the defaults. It throws a RangeError for each fault. */
+function settings(name: string, options: BootstrapOptions): Settings {
   const runs = options.runs ?? 10_000;
   if (!Number.isSafeInteger(runs) || runs < 1) throw new RangeError(`${name}: runs is a whole number of 1 or more, not ${runs}.`);
   const tail = (1 - (options.level ?? 0.95)) / 2;
@@ -109,17 +147,47 @@ function percentile(name: string, options: BootstrapOptions, run: (r: Random) =>
   if (!(lowEnd >= 0 && lowEnd < highEnd && highEnd <= 1)) throw new RangeError(`${name}: the ends are 0 <= low < high <= 1, not ${lowEnd} and ${highEnd}.`);
   const level = options.ends ? highEnd - lowEnd : (options.level ?? 0.95);
   if (!(level > 0 && level < 1)) throw new RangeError(`${name}: level is more than 0 and less than 1, not ${level}.`);
+  return { runs, lowEnd, highEnd, level, method: options.method ?? "linear" };
+}
+
+/** The interval of the finite statistics of the runs. When no run is finite, low and high are equal to the estimate. */
+function ends(values: number[], estimate: number, s: Settings, seed: number): Interval {
+  const { runs, level } = s;
+  if (values.length === 0) return { estimate, low: estimate, high: estimate, level, runs, finite: 0, seed };
+  const v = sorted(values);
+  return { estimate, low: quantileSorted(v, s.lowEnd, s.method), high: quantileSorted(v, s.highEnd, s.method), level, runs, finite: v.length, seed };
+}
+
+/**
+ * The shared part of each percentile bootstrap. It examines the options, and starts one stream of `random(seed)`.
+ * Each run gives the stream to `run`, which draws the samples and returns their statistic. Then `all` gives the
+ * estimate. The order of the draws is the order in `run`.
+ */
+function percentile(name: string, options: BootstrapOptions, run: (r: Random) => number, all: () => number): Interval {
+  const s = settings(name, options);
   const r = random(options.seed ?? 1);
   const values: number[] = [];
-  for (let i = 0; i < runs; i++) {
+  for (let i = 0; i < s.runs; i++) {
     const v = run(r);
     if (Number.isFinite(v)) values.push(v);
   }
+  return ends(values, all(), s, r.seed);
+}
+
+/**
+ * The percentile bootstrap of `k` statistics from the same draws. Each run gives `k` statistics. Each statistic
+ * has its own count of finite runs.
+ */
+function percentiles(name: string, options: BootstrapOptions, k: number, run: (r: Random) => readonly number[], all: () => readonly number[]): Interval[] {
+  const s = settings(name, options);
+  const r = random(options.seed ?? 1);
+  const values = Array.from({ length: k }, (): number[] => []);
+  for (let i = 0; i < s.runs; i++) {
+    const v = run(r);
+    for (let j = 0; j < k; j++) if (Number.isFinite(v[j])) (values[j] as number[]).push(v[j] as number);
+  }
   const estimate = all();
-  if (values.length === 0) return { estimate, low: estimate, high: estimate, level, runs, finite: 0, seed: r.seed };
-  const s = sorted(values);
-  const method = options.method ?? "linear";
-  return { estimate, low: quantileSorted(s, lowEnd, method), high: quantileSorted(s, highEnd, method), level, runs, finite: s.length, seed: r.seed };
+  return values.map((list, j) => ends(list, estimate[j] as number, s, r.seed));
 }
 
 /** A bootstrap interval of the median. */
