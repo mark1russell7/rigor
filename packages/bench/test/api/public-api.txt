@@ -1,0 +1,90 @@
+# The public API of @mark1russell7/rigor-bench
+#
+# The names of each entry of the exports field, and the declaration of each name, without comments
+# and private members. The command `api-report check` compares this file with the built .d.ts files.
+# To accept a change of the API, start the build, then `api-report update`, and review the diff.
+
+## . (build/index.d.ts): 13 names
+
+type Arm: build/index.d.ts#Arm
+type Band: build/index.d.ts#Band
+type BandOptions: build/index.d.ts#BandOptions
+type CaseRatio: build/index.d.ts#CaseRatio
+type PairedTime: build/index.d.ts#PairedTime
+type TimeOutcome: build/index.d.ts#TimeOutcome
+type TimeVerdict: build/index.d.ts#TimeVerdict
+type VerdictOptions: build/index.d.ts#VerdictOptions
+aaBand: build/index.d.ts#aaBand
+caseRatios: build/index.d.ts#caseRatios
+checkPairedTime: build/index.d.ts#checkPairedTime
+firstArm: build/index.d.ts#firstArm
+timeVerdict: build/index.d.ts#timeVerdict
+
+## Declarations
+
+### build/index.d.ts#Arm
+type Arm = "a" | "b";
+
+### build/index.d.ts#Band
+interface Band {
+  readonly cases: number;
+  readonly noise: number;
+  readonly low: number;
+  readonly high: number;
+  readonly median: number;
+}
+
+### build/index.d.ts#BandOptions
+interface BandOptions {
+  readonly level?: number;
+  readonly minimum?: number;
+}
+
+### build/index.d.ts#CaseRatio
+interface CaseRatio {
+  readonly case: string;
+  readonly ratio: number;
+  readonly rounds: number;
+}
+
+### build/index.d.ts#PairedTime
+interface PairedTime {
+  readonly case: string;
+  readonly round: number;
+  readonly first: Arm;
+  readonly a: number;
+  readonly b: number;
+}
+
+### build/index.d.ts#TimeOutcome
+type TimeOutcome = "faster" | "slower" | "same" | "cannot decide";
+
+### build/index.d.ts#TimeVerdict
+interface TimeVerdict {
+  readonly outcome: TimeOutcome;
+  readonly reason: string;
+  readonly cases: readonly CaseRatio[];
+  readonly interval: Interval | undefined;
+  readonly band: Band | undefined;
+  readonly comparison: Comparison | undefined;
+}
+
+### build/index.d.ts#VerdictOptions
+interface VerdictOptions extends BandOptions {
+  readonly bootstrap?: BootstrapOptions;
+}
+
+### build/index.d.ts#aaBand
+export declare function aaBand(aa: readonly PairedTime[], options?: BandOptions): Band;
+
+### build/index.d.ts#caseRatios
+export declare function caseRatios(records: readonly PairedTime[]): CaseRatio[];
+
+### build/index.d.ts#checkPairedTime
+export declare function checkPairedTime(record: PairedTime): PairedTime;
+
+### build/index.d.ts#firstArm
+export declare function firstArm(round: number, offset?: number): Arm;
+
+### build/index.d.ts#timeVerdict
+export declare function timeVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[], options?: VerdictOptions): TimeVerdict;
