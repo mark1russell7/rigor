@@ -11,6 +11,7 @@ Many engines make their own copies of these tools. The duplication atlas ([codea
 | Package | State | What it gives |
 | --- | --- | --- |
 | [`@mark1russell7/rigor-generators`](packages/generators) | 0.1.0 | A seeded generator (mulberry32) and its draws: integers, picks, weights, shuffles, samples, normal values and named streams. |
+| [`@mark1russell7/rigor-bench`](packages/bench) | 0.1.0 | The paired-time records of a bench, the order that turns each round, and the time verdict against an A/A arm. |
 | statistics | planned | Bootstrap intervals, paired permutation tests, Holm, Wilson, Sobol, Brier and the noise rule of 5 seeds. |
 | gates | planned | The determinism gate, the promotion test and the performance evidence of a release. |
 | testgen | planned | Property tests on fast-check, pairwise and covering arrays, metamorphic relations. |
