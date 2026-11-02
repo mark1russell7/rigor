@@ -30,6 +30,8 @@ A promotion reads `gains` against `drops` and `effect`. A sign test alone is not
 | `quantile(values, p, method)`, `quantileSorted` | The `p` quantile, with the `"linear"` method (type 7, the default) or the `"nearest-rank"` method (type 1). |
 | `bootstrap(data, statistic, options)` | A percentile bootstrap interval of any statistic. The options are `runs`, `level` or `ends`, `seed` and `method`. |
 | `bootstrapMedian`, `bootstrapClusters` | The interval of the median, and a bootstrap that draws whole clusters (boards, seeds, sites). |
+| `bootstrapTwo(a, b, statistic, options)` | A bootstrap interval of a statistic of two independent samples, for example two arms of a benchmark. Each run draws all of `a`, then all of `b`. |
+| `bootstrapMedianRatio(numerator, denominator, options)` | The interval of `median(numerator) / median(denominator)`. It is the uncertainty of the ratio, not the spread of the samples. |
 | `signTest(better, worse, sides)`, `signTestPower(n, level)` | The sign test, and the fewest wins out of `n` that the test calls significant. |
 | `pairedPermutation(candidate, baseline, options)` | The paired permutation test (random sign flips). It uses the size of each difference. |
 | `wilson(k, n, z)` | The Wilson interval of a proportion. |

@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 38 names
+## . (build/index.d.ts): 40 names
 
 type BootstrapOptions: build/index.d.ts#BootstrapOptions
 type CalibrationLevel: build/index.d.ts#CalibrationLevel
@@ -25,6 +25,8 @@ Z95: build/index.d.ts#Z95
 bootstrap: build/index.d.ts#bootstrap
 bootstrapClusters: build/index.d.ts#bootstrapClusters
 bootstrapMedian: build/index.d.ts#bootstrapMedian
+bootstrapMedianRatio: build/index.d.ts#bootstrapMedianRatio
+bootstrapTwo: build/index.d.ts#bootstrapTwo
 brier: build/index.d.ts#brier
 calibration: build/index.d.ts#calibration
 compareRatios: build/index.d.ts#compareRatios
@@ -176,6 +178,12 @@ export declare function bootstrapClusters<T>(rows: readonly T[], cluster: (row: 
 
 ### build/index.d.ts#bootstrapMedian
 export declare function bootstrapMedian(values: readonly number[], options?: BootstrapOptions): Interval;
+
+### build/index.d.ts#bootstrapMedianRatio
+export declare function bootstrapMedianRatio(numerator: readonly number[], denominator: readonly number[], options?: BootstrapOptions): Interval;
+
+### build/index.d.ts#bootstrapTwo
+export declare function bootstrapTwo<A, B>(a: readonly A[], b: readonly B[], statistic: (a: readonly A[], b: readonly B[]) => number, options?: BootstrapOptions): Interval;
 
 ### build/index.d.ts#brier
 export declare function brier(forecasts: readonly Forecast[]): number;

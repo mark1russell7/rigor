@@ -2,8 +2,9 @@
  * The percentile bootstrap. Each run draws n items with replacement (`below(n)` of rigor-generators, which is
  * `floor(next() * n)`), and computes the statistic of the sample. The interval is two quantiles of the statistics.
  * With the same seed, the draws are equal to the draws of the copies in highways, packing and layout-contract.
+ * `bootstrapTwo` draws two independent samples in each run: first the items of `a`, then the items of `b`.
  */
-import { random } from "@mark1russell7/rigor-generators";
+import { type Random, random } from "@mark1russell7/rigor-generators";
 import { type QuantileMethod, median, quantileSorted, sorted } from "./describe.ts";
 
 export interface BootstrapOptions {
@@ -42,23 +43,79 @@ export interface Interval {
  */
 export function bootstrap<T>(data: readonly T[], statistic: (sample: readonly T[]) => number, options: BootstrapOptions = {}): Interval {
   if (data.length === 0) throw new RangeError("bootstrap: the data is empty.");
-  const runs = options.runs ?? 10_000;
-  if (!Number.isSafeInteger(runs) || runs < 1) throw new RangeError(`bootstrap: runs is a whole number of 1 or more, not ${runs}.`);
-  const tail = (1 - (options.level ?? 0.95)) / 2;
-  const [lowEnd, highEnd] = options.ends ?? [tail, 1 - tail];
-  if (!(lowEnd >= 0 && lowEnd < highEnd && highEnd <= 1)) throw new RangeError(`bootstrap: the ends are 0 <= low < high <= 1, not ${lowEnd} and ${highEnd}.`);
-  const level = options.ends ? highEnd - lowEnd : (options.level ?? 0.95);
-  if (!(level > 0 && level < 1)) throw new RangeError(`bootstrap: level is more than 0 and less than 1, not ${level}.`);
-  const r = random(options.seed ?? 1);
   const n = data.length;
   const sample = new Array<T>(n);
+  return percentile(
+    "bootstrap",
+    options,
+    (r) => {
+      for (let i = 0; i < n; i++) sample[i] = data[r.below(n)] as T;
+      return statistic(sample);
+    },
+    () => statistic(data),
+  );
+}
+
+/**
+ * A percentile bootstrap interval of `statistic` over two independent samples `a` and `b`. Use it when the two
+ * samples are not paired, for example two arms of a benchmark. Each run draws `a.length` items of `a` with
+ * replacement, and then `b.length` items of `b` with replacement. All the draws come from one stream of
+ * `random(seed)`. The statistic reads the two drawn samples. The estimate is the statistic of all of `a` and `b`. A
+ * run whose statistic is not finite does not count. When no run is finite, low and high are equal to the estimate.
+ */
+export function bootstrapTwo<A, B>(
+  a: readonly A[],
+  b: readonly B[],
+  statistic: (a: readonly A[], b: readonly B[]) => number,
+  options: BootstrapOptions = {},
+): Interval {
+  if (a.length === 0) throw new RangeError("bootstrapTwo: the first sample is empty.");
+  if (b.length === 0) throw new RangeError("bootstrapTwo: the second sample is empty.");
+  const na = a.length;
+  const nb = b.length;
+  const sampleA = new Array<A>(na);
+  const sampleB = new Array<B>(nb);
+  return percentile(
+    "bootstrapTwo",
+    options,
+    (r) => {
+      for (let i = 0; i < na; i++) sampleA[i] = a[r.below(na)] as A;
+      for (let i = 0; i < nb; i++) sampleB[i] = b[r.below(nb)] as B;
+      return statistic(sampleA, sampleB);
+    },
+    () => statistic(a, b),
+  );
+}
+
+/**
+ * A bootstrap interval of the ratio `median(numerator) / median(denominator)` of two independent samples. The
+ * interval is the uncertainty of the ratio of the two medians. It is not the spread of the samples. A run whose
+ * denominator median is 0 is not finite, so it does not count.
+ */
+export function bootstrapMedianRatio(numerator: readonly number[], denominator: readonly number[], options: BootstrapOptions = {}): Interval {
+  return bootstrapTwo(numerator, denominator, (a, b) => median(a) / median(b), options);
+}
+
+/**
+ * The shared part of each percentile bootstrap. It examines the options, and starts one stream of `random(seed)`.
+ * Each run gives the stream to `run`, which draws the samples and returns their statistic. Then `all` gives the
+ * estimate. The order of the draws is the order in `run`.
+ */
+function percentile(name: string, options: BootstrapOptions, run: (r: Random) => number, all: () => number): Interval {
+  const runs = options.runs ?? 10_000;
+  if (!Number.isSafeInteger(runs) || runs < 1) throw new RangeError(`${name}: runs is a whole number of 1 or more, not ${runs}.`);
+  const tail = (1 - (options.level ?? 0.95)) / 2;
+  const [lowEnd, highEnd] = options.ends ?? [tail, 1 - tail];
+  if (!(lowEnd >= 0 && lowEnd < highEnd && highEnd <= 1)) throw new RangeError(`${name}: the ends are 0 <= low < high <= 1, not ${lowEnd} and ${highEnd}.`);
+  const level = options.ends ? highEnd - lowEnd : (options.level ?? 0.95);
+  if (!(level > 0 && level < 1)) throw new RangeError(`${name}: level is more than 0 and less than 1, not ${level}.`);
+  const r = random(options.seed ?? 1);
   const values: number[] = [];
-  for (let run = 0; run < runs; run++) {
-    for (let i = 0; i < n; i++) sample[i] = data[r.below(n)] as T;
-    const v = statistic(sample);
+  for (let i = 0; i < runs; i++) {
+    const v = run(r);
     if (Number.isFinite(v)) values.push(v);
   }
-  const estimate = statistic(data);
+  const estimate = all();
   if (values.length === 0) return { estimate, low: estimate, high: estimate, level, runs, finite: 0, seed: r.seed };
   const s = sorted(values);
   const method = options.method ?? "linear";
