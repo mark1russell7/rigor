@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 40 names
+## . (build/index.d.ts): 44 names
 
 type BootstrapOptions: build/index.d.ts#BootstrapOptions
 type CalibrationLevel: build/index.d.ts#CalibrationLevel
@@ -15,6 +15,8 @@ type Effect: build/index.d.ts#Effect
 type Forecast: build/index.d.ts#Forecast
 type Interval: build/index.d.ts#Interval
 KENDALL_EXACT: build/index.d.ts#KENDALL_EXACT
+type LeastSquaresFit: build/index.d.ts#LeastSquaresFit
+type LeastSquaresOptions: build/index.d.ts#LeastSquaresOptions
 type NoiseOptions: build/index.d.ts#NoiseOptions
 type PermutationOptions: build/index.d.ts#PermutationOptions
 type PermutationResult: build/index.d.ts#PermutationResult
@@ -24,6 +26,7 @@ type Summary: build/index.d.ts#Summary
 Z95: build/index.d.ts#Z95
 bootstrap: build/index.d.ts#bootstrap
 bootstrapClusters: build/index.d.ts#bootstrapClusters
+bootstrapLeastSquares: build/index.d.ts#bootstrapLeastSquares
 bootstrapMedian: build/index.d.ts#bootstrapMedian
 bootstrapMedianRatio: build/index.d.ts#bootstrapMedianRatio
 bootstrapTwo: build/index.d.ts#bootstrapTwo
@@ -32,6 +35,7 @@ calibration: build/index.d.ts#calibration
 compareRatios: build/index.d.ts#compareRatios
 holm: build/index.d.ts#holm
 kendallTau: build/index.d.ts#kendallTau
+leastSquares: build/index.d.ts#leastSquares
 mean: build/index.d.ts#mean
 median: build/index.d.ts#median
 noiseFloor: build/index.d.ts#noiseFloor
@@ -125,6 +129,20 @@ interface Interval {
 ### build/index.d.ts#KENDALL_EXACT
 export declare const KENDALL_EXACT = 1500;
 
+### build/index.d.ts#LeastSquaresFit
+interface LeastSquaresFit {
+  readonly coefficients: number[];
+  readonly residualSd: number;
+  readonly r2: number;
+  readonly n: number;
+  readonly k: number;
+}
+
+### build/index.d.ts#LeastSquaresOptions
+interface LeastSquaresOptions {
+  readonly intercept?: boolean;
+}
+
 ### build/index.d.ts#NoiseOptions
 interface NoiseOptions {
   readonly k?: number;
@@ -176,6 +194,9 @@ export declare function bootstrap<T>(data: readonly T[], statistic: (sample: rea
 ### build/index.d.ts#bootstrapClusters
 export declare function bootstrapClusters<T>(rows: readonly T[], cluster: (row: T) => string, statistic: (rows: readonly T[]) => number, options?: BootstrapOptions): Interval;
 
+### build/index.d.ts#bootstrapLeastSquares
+export declare function bootstrapLeastSquares(x: readonly (readonly number[])[], y: readonly number[], options?: BootstrapOptions & LeastSquaresOptions): Interval[];
+
 ### build/index.d.ts#bootstrapMedian
 export declare function bootstrapMedian(values: readonly number[], options?: BootstrapOptions): Interval;
 
@@ -199,6 +220,9 @@ export declare function holm(pValues: readonly number[], level?: number): Correc
 
 ### build/index.d.ts#kendallTau
 export declare function kendallTau(a: readonly number[], b: readonly number[], seed?: number | string): number;
+
+### build/index.d.ts#leastSquares
+export declare function leastSquares(x: readonly (readonly number[])[], y: readonly number[], options?: LeastSquaresOptions): LeastSquaresFit;
 
 ### build/index.d.ts#mean
 export declare function mean(values: readonly number[]): number;
