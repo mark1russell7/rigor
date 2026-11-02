@@ -4,21 +4,26 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 13 names
+## . (build/index.d.ts): 18 names
 
 type Arm: build/index.d.ts#Arm
 type Band: build/index.d.ts#Band
+type BandKind: build/index.d.ts#BandKind
 type BandOptions: build/index.d.ts#BandOptions
 type CaseRatio: build/index.d.ts#CaseRatio
 type PairedTime: build/index.d.ts#PairedTime
+type Power: build/index.d.ts#Power
+type PowerOptions: build/index.d.ts#PowerOptions
 type TimeOutcome: build/index.d.ts#TimeOutcome
 type TimeVerdict: build/index.d.ts#TimeVerdict
 type VerdictOptions: build/index.d.ts#VerdictOptions
+type VerdictRule: build/index.d.ts#VerdictRule
 aaBand: build/index.d.ts#aaBand
 caseRatios: build/index.d.ts#caseRatios
 checkPairedTime: build/index.d.ts#checkPairedTime
 firstArm: build/index.d.ts#firstArm
 timeVerdict: build/index.d.ts#timeVerdict
+verdictPower: build/index.d.ts#verdictPower
 
 ## Declarations
 
@@ -28,16 +33,22 @@ type Arm = "a" | "b";
 ### build/index.d.ts#Band
 interface Band {
   readonly cases: number;
+  readonly kind: BandKind;
   readonly noise: number;
   readonly low: number;
   readonly high: number;
   readonly median: number;
 }
 
+### build/index.d.ts#BandKind
+type BandKind = "case" | "median";
+
 ### build/index.d.ts#BandOptions
 interface BandOptions {
+  readonly kind?: BandKind;
   readonly level?: number;
   readonly minimum?: number;
+  readonly bootstrap?: BootstrapOptions;
 }
 
 ### build/index.d.ts#CaseRatio
@@ -56,6 +67,24 @@ interface PairedTime {
   readonly b: number;
 }
 
+### build/index.d.ts#Power
+interface Power {
+  readonly trials: number;
+  readonly outcomes: Readonly<Record<TimeOutcome, number>>;
+  readonly power: number;
+}
+
+### build/index.d.ts#PowerOptions
+interface PowerOptions {
+  readonly cases: number;
+  readonly rounds?: number;
+  readonly ratio: number;
+  readonly sigma?: number;
+  readonly trials?: number;
+  readonly seed?: number | string;
+  readonly verdict?: VerdictOptions;
+}
+
 ### build/index.d.ts#TimeOutcome
 type TimeOutcome = "faster" | "slower" | "same" | "cannot decide";
 
@@ -64,6 +93,7 @@ interface TimeVerdict {
   readonly outcome: TimeOutcome;
   readonly reason: string;
   readonly cases: readonly CaseRatio[];
+  readonly rule: VerdictRule;
   readonly interval: Interval | undefined;
   readonly band: Band | undefined;
   readonly comparison: Comparison | undefined;
@@ -71,8 +101,12 @@ interface TimeVerdict {
 
 ### build/index.d.ts#VerdictOptions
 interface VerdictOptions extends BandOptions {
-  readonly bootstrap?: BootstrapOptions;
+  readonly rule?: VerdictRule;
+  readonly margin?: number;
 }
+
+### build/index.d.ts#VerdictRule
+type VerdictRule = "band" | "difference";
 
 ### build/index.d.ts#aaBand
 export declare function aaBand(aa: readonly PairedTime[], options?: BandOptions): Band;
@@ -88,3 +122,6 @@ export declare function firstArm(round: number, offset?: number): Arm;
 
 ### build/index.d.ts#timeVerdict
 export declare function timeVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[], options?: VerdictOptions): TimeVerdict;
+
+### build/index.d.ts#verdictPower
+export declare function verdictPower(options: PowerOptions): Power;
