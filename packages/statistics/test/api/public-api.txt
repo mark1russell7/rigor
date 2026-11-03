@@ -190,7 +190,7 @@ interface Proportion {
 }
 
 ### build/index.d.ts#QuantileMethod
-type QuantileMethod = "linear" | "nearest-rank";
+type QuantileMethod = "linear" | "nearest-rank" | "higher";
 
 ### build/index.d.ts#Summary
 interface Summary {

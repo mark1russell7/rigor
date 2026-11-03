@@ -179,6 +179,69 @@ describe("the descriptive statistics", () => {
     for (const v of lists(300, 2)) for (const p of [0, 0.01, 0.5, 0.9, 0.99, 1]) expect(quantile(v, p, "nearest-rank")).toBe(lagQuantile(v, p));
   });
 
+  /** The exact rank ceil(k * (n - 1) / d) of p = k / d, with integer arithmetic only. */
+  const exactRank = (k: number, d: number, n: number): number => {
+    const top = k * (n - 1) + d - 1;
+    return (top - (top % d)) / d;
+  };
+
+  /** The list 0, 1, ..., n - 1. Its value at an index is the index, so a quantile is its own rank. */
+  const ranks = (n: number): number[] => Array.from({ length: n }, (_, i) => i);
+
+  it("gives the higher quantile, sorted[ceil(p * (n - 1))], as NumPy", () => {
+    for (const v of lists(300, 5)) {
+      const s = [...v].sort((a, b) => a - b);
+      for (const k of [0, 1, 25, 50, 55, 75, 90, 99, 100]) {
+        const want = s[exactRank(k, 100, s.length)] as number;
+        expect(bits(quantile(v, k / 100, "higher"))).toBe(bits(want));
+        expect(bits(quantileSorted(s, k / 100, "higher"))).toBe(bits(want));
+      }
+    }
+    expect(quantileSorted([1, 2, 3, 4], 0.25, "higher")).toBe(2);
+    expect(quantileSorted([1, 2, 3, 4], 0.5, "higher")).toBe(3);
+    expect(quantileSorted([1, 2, 3, 4], 1, "higher")).toBe(4);
+    expect(quantileSorted([1, 2, 3, 4], 0, "higher")).toBe(1);
+  });
+
+  it("gives the exact higher rank when p * (n - 1) has a float error above a whole rank", () => {
+    // 0.55 * 100 is 55.00000000000001 and 0.55 * 180 is 99.00000000000001. A plain ceil gives 56 and 100.
+    expect(0.55 * 100).toBeGreaterThan(55);
+    expect(0.55 * 180).toBeGreaterThan(99);
+    expect(quantileSorted(ranks(101), 0.55, "higher")).toBe(55);
+    expect(quantileSorted(ranks(181), 0.55, "higher")).toBe(99);
+  });
+
+  it("gives the exact integer rank ceil(i * (n - 1) / 20) for the computed p = i * 0.05, for n = 1 to 200", () => {
+    let errors = 0;
+    for (let n = 1; n <= 200; n++) {
+      const s = ranks(n);
+      for (let i = 0; i <= 20; i++) {
+        const p = i * 0.05;
+        if (Math.ceil(p * (n - 1)) !== exactRank(i, 20, n)) errors++;
+        expect(quantileSorted(s, p, "higher")).toBe(exactRank(i, 20, n));
+      }
+    }
+    // The grid has float errors, so the test examines the guard.
+    expect(errors).toBeGreaterThan(0);
+  });
+
+  it("gives the upper median sorted[floor(n / 2)] as the 0.5 higher quantile, for n = 1 to 50", () => {
+    const r = random(6);
+    for (let n = 1; n <= 50; n++) {
+      const v = Array.from({ length: n }, () => r.normal(0, 5));
+      const s = [...v].sort((a, b) => a - b);
+      expect(quantile(v, 0.5, "higher")).toBe(s[Math.floor(n / 2)]);
+    }
+  });
+
+  it("throws for the higher method as for the other methods", () => {
+    expect(() => quantile([], 0.5, "higher")).toThrow(RangeError);
+    expect(() => quantile([1, Number.NaN], 0.5, "higher")).toThrow(RangeError);
+    expect(() => quantile([1], -0.1, "higher")).toThrow(RangeError);
+    expect(() => quantile([1], 1.5, "higher")).toThrow(RangeError);
+    expect(() => quantile([1], Number.NaN, "higher")).toThrow(RangeError);
+  });
+
   it("gives the median of the copies in coeval, lag and crawler, to the bit", () => {
     for (const v of lists(300, 3)) expect(bits(median(v))).toBe(bits(coevalMedian(v)));
   });
