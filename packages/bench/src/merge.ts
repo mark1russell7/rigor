@@ -68,7 +68,7 @@ export interface PooledRecords {
 
 /**
  * This function gives the pool of the jobs. `pooledVerdict` and `pooledLimitVerdict` use it.
- * - It refuses two jobs with one label, a record with a different job label, and two jobs with a record of one case and one round.
+ * - It refuses two jobs with one label, and a record with a different job label. It also refuses two jobs with a record of one case and one round.
  * - It removes each case that a job skipped from all jobs, so all jobs have the same cases.
  * - It merges the records of the jobs, and it balances the merged records and the records of each job with `balanceOrders`.
  */
