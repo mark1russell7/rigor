@@ -173,11 +173,11 @@ importers:
         specifier: ^0.2.0
         version: 0.2.0(@swc/core@1.16.20)(dependency-cruiser@18.7.0)
       '@mark1russell7/conventions':
-        specifier: ^0.24.0
-        version: 0.24.1
+        specifier: ^0.25.0
+        version: 0.25.0
       '@mark1russell7/cue':
         specifier: ^2.0.0
-        version: 2.0.0
+        version: 2.1.0
       '@mark1russell7/ste-lint':
         specifier: ^0.1.1
         version: 0.1.2
@@ -214,7 +214,7 @@ importers:
     devDependencies:
       '@mark1russell7/cue':
         specifier: ^2.0.0
-        version: 2.0.0
+        version: 2.1.0
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.6
@@ -232,7 +232,7 @@ importers:
     devDependencies:
       '@mark1russell7/cue':
         specifier: ^2.0.0
-        version: 2.0.0
+        version: 2.1.0
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.6
@@ -260,7 +260,7 @@ importers:
     devDependencies:
       '@mark1russell7/cue':
         specifier: ^2.0.0
-        version: 2.0.0
+        version: 2.1.0
       '@mark1russell7/site-pages':
         specifier: ^0.1.8
         version: 0.1.10
@@ -285,7 +285,7 @@ importers:
     devDependencies:
       '@mark1russell7/cue':
         specifier: ^2.0.0
-        version: 2.0.0
+        version: 2.1.0
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.6
@@ -495,13 +495,13 @@ packages:
       dependency-cruiser:
         optional: true
 
-  '@mark1russell7/conventions@0.24.1':
-    resolution: {integrity: sha512-4FATOd/MOOMHFBZtrRP+ZFeEUHwgannQD9FjWH81wVT6TbMJVNbFNH/uXSb3cP+0f+jM/xV9tT6jZ4ZOPfrMEg==}
+  '@mark1russell7/conventions@0.25.0':
+    resolution: {integrity: sha512-p49TqkjzhugGqhKdWjKq5bXOd2ljkwEHdbkEUVzmHSz8b805t2NhGLvbq63oBHMHMv0lKfJDgU0LMIXmpEgqhA==}
     engines: {node: '>=22'}
     hasBin: true
 
-  '@mark1russell7/cue@2.0.0':
-    resolution: {integrity: sha512-ILRKnaE/Ooe+saWXiQ8BaRTncHIDq7/1xyGEAZs4JzF0gkZ7FNv9e6OKIBERAmprKbb598SEV5gCDgdibYWOqw==}
+  '@mark1russell7/cue@2.1.0':
+    resolution: {integrity: sha512-uFKZNUPqKDQkpE+4mha4rKiRBQe52HRtUCXJEpr1GZHo7JzrzoEGZUHNkURkVsA98dMWoUz2jMpWO98/Ty2fzg==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -1632,9 +1632,9 @@ snapshots:
       '@swc/core': 1.16.20
       dependency-cruiser: 18.7.0
 
-  '@mark1russell7/conventions@0.24.1': {}
+  '@mark1russell7/conventions@0.25.0': {}
 
-  '@mark1russell7/cue@2.0.0': {}
+  '@mark1russell7/cue@2.1.0': {}
 
   '@mark1russell7/site-pages@0.1.10': {}
 
