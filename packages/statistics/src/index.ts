@@ -10,6 +10,7 @@ export {
   bootstrapTwo,
 } from "./bootstrap.ts";
 export { type LeastSquaresFit, type LeastSquaresOptions, leastSquares } from "./regression.ts";
+export { type RidgeOptions, ridgeSolve } from "./ridge.ts";
 export {
   type Corrected,
   type PermutationOptions,
