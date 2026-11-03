@@ -18,12 +18,14 @@ export interface PackageRow {
 export interface Versions {
   readonly generators: string;
   readonly statistics: string;
+  readonly bench: string;
 }
 
 export function packageRows(versions: Versions): PackageRow[] {
   return [
     { name: "@mark1russell7/rigor-generators", state: versions.generators, gives: "A seeded generator and its draws: integers, picks, weights, shuffles, samples, normal values and named streams. Next: input families, stratified and Latin hypercube designs, Saltelli designs, shrinking." },
     { name: "@mark1russell7/rigor-statistics", state: versions.statistics, gives: "Quantiles, bootstrap intervals (also of clusters), the sign test, the paired permutation test, Wilson intervals, the Holm correction, rank correlation, the comparison with a baseline beyond the noise (the 5-seed rule), and Brier scores. Next: Sobol indices." },
+    { name: "@mark1russell7/rigor-bench", state: versions.bench, gives: "The paired-time records of a bench: the order that turns each round, the ratio of each case, and the time verdict against the band of an A/A arm. Next: a fresh process for each case, the CPU model, speed gates." },
     { name: "rigor-gates", state: "planned", gives: "The determinism gate (one input gives one hash), the promotion test and the performance evidence of a release." },
     { name: "rigor-testgen", state: "planned", gives: "Property tests on fast-check, pairwise and covering arrays, and metamorphic relations." },
     { name: "rigor-chaos", state: "planned", gives: "Fault injection, schedules of latency and failure, and load profiles, with their measures." },
@@ -192,7 +194,7 @@ async function main(argv: readonly string[]): Promise<number> {
     clean: false,
   });
   const version = (name: string): string => (JSON.parse(readFileSync(join(here, `../${name}/package.json`), "utf8")) as { version: string }).version;
-  writeFileSync(join(out, "index.html"), pageHtml(packageRows({ generators: version("generators"), statistics: version("statistics") }), new Date().toISOString().slice(0, 10)));
+  writeFileSync(join(out, "index.html"), pageHtml(packageRows({ generators: version("generators"), statistics: version("statistics"), bench: version("bench") }), new Date().toISOString().slice(0, 10)));
   console.error(`wrote ${join(out, "index.html")} and page.js`);
   return 0;
 }
