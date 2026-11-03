@@ -68,6 +68,7 @@ v.cases;                                          // the interval, the bound and
 - The A/A band widens the interval of each case. The bound is the high end of the interval times the high end of the band.
 - A case is `within` when its bound is at most the limit. It is `beyond` when its low end times the low end of the band is above the limit.
 - The verdict is `beyond` when a case is `beyond`, and `within` when each case is `within`.
+- The option `share` permits some cases out of the limit. With `share: 0.95` and 20 cases, 1 case can be other than `within`. The verdict is `within` when that number of cases or fewer are other than `within`. It is `beyond` when more cases are `beyond`. The field `allowed` gives the number.
 
 The verdict has no correction for many cases. Each case has its own interval at the level `caseLevel`. Thus with many cases, a verdict `beyond` can come from noise only. Set `caseLevel` higher when a bench has many cases. A correction of Holm is an option for a later version.
 
