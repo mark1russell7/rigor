@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { caseRatios, timeVerdict, verdictMargin } from "@mark1russell7/rigor-bench";
 import { bundleImports, pageHtml, packageRows, scrollCueCss, verdictSection } from "./build.ts";
@@ -19,7 +20,6 @@ import {
   simulate,
   verdictOptions,
 } from "./explorer.ts";
-import { readProbe } from "./probe-script.ts";
 
 const bench = (id: string) => ({ ...PRESETS.find((p) => p.id === id)!.bench, seed: "42" });
 
@@ -186,19 +186,9 @@ describe("the page of the explorer", () => {
   });
 });
 
-describe("the script of the site probe", () => {
-  const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor as new (...args: string[]) => (...values: unknown[]) => Promise<void>;
-  const script = readProbe();
-
-  it("has no types and no export", () => {
-    expect(script).not.toMatch(/^export /m);
-    expect(script).not.toMatch(/declare const/);
-    expect(script).not.toMatch(/\): string =>/);
-  });
-
-  it("is the body of an async function with the helpers of the site check", () => {
-    expect(() => new AsyncFunction("check", "wait", "until", "$", "$$", "type", "click", script)).not.toThrow();
-  });
+describe("the probe of the site check", () => {
+  // The site check reads check-probe.ts directly (site-pages 0.1.9). This test reads the same source.
+  const script = readFileSync(new URL("./check-probe.ts", import.meta.url), "utf8");
 
   it("sets the presets and checks the band and the interval", () => {
     for (const p of PRESETS) expect(script).toContain(`preset("${p.id}"`);

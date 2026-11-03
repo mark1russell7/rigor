@@ -2,13 +2,11 @@
  * node src/build.ts [--out dist]
  *
  * The build of the site: it bundles src/page.ts (with the generators and the bench) for the browser, and writes index.html.
- * It also writes the probe of the site check to check-probe.js.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { NOISE_RANGE, RATIO_RANGE, START } from "./explorer.ts";
-import { readProbe } from "./probe-script.ts";
 
 /** The packages of rigor: the name, the state and what each one gives. */
 export interface PackageRow {
@@ -307,8 +305,7 @@ async function main(argv: readonly string[]): Promise<number> {
   const version = (name: string): string => (JSON.parse(readFileSync(join(here, `../${name}/package.json`), "utf8")) as { version: string }).version;
   const rows = packageRows({ generators: version("generators"), statistics: version("statistics"), bench: version("bench") });
   writeFileSync(join(out, "index.html"), pageHtml(rows, new Date().toISOString().slice(0, 10), scrollCueCss()));
-  writeFileSync(join(out, "check-probe.js"), readProbe());
-  console.error(`wrote ${join(out, "index.html")}, page.js and check-probe.js`);
+  console.error(`wrote ${join(out, "index.html")} and page.js`);
   return 0;
 }
 
