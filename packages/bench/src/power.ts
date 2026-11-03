@@ -28,7 +28,10 @@ export interface PowerOptions {
 export interface Power {
   readonly trials: number;
   readonly outcomes: Readonly<Record<TimeOutcome, number>>;
-  /** The share of the trials whose outcome is the true one: `faster` for a ratio below 1, `slower` above 1, `same` at 1. */
+  /**
+   * The share of the trials whose outcome is the true one. For the rule `difference`, a ratio in `[exp(-margin), exp(margin)]` has the true outcome `same`.
+   * Out of that margin, and for the rule `band`, the true outcome is `faster` below 1, `slower` above 1 and `same` at 1.
+   */
   readonly power: number;
 }
 
@@ -55,7 +58,7 @@ export function verdictPower(options: PowerOptions): Power {
     }
     return out;
   };
-  const truth: TimeOutcome = options.ratio < 1 ? "faster" : options.ratio > 1 ? "slower" : "same";
+  const truth = trueOutcome(options.ratio, options.verdict);
   const counts: Record<TimeOutcome, number> = { faster: 0, slower: 0, same: 0, "cannot decide": 0 };
   for (let t = 0; t < trials; t++) {
     const aa = bench(1, "aa");
@@ -64,4 +67,11 @@ export function verdictPower(options: PowerOptions): Power {
   }
   const outcomes = Object.fromEntries(Object.entries(counts).map(([k, n]) => [k, n / trials])) as Record<TimeOutcome, number>;
   return { trials, outcomes, power: outcomes[truth] };
+}
+
+/** This function gives the true outcome of a ratio. The margin of the rule `difference` comes first, as in `timeVerdict`. */
+function trueOutcome(ratio: number, verdict: VerdictOptions = {}): TimeOutcome {
+  const margin = verdict.margin ?? 0.05;
+  if ((verdict.rule ?? "difference") === "difference" && Math.abs(Math.log(ratio)) <= margin) return "same";
+  return ratio < 1 ? "faster" : ratio > 1 ? "slower" : "same";
 }

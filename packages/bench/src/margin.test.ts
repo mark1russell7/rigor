@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type PairedTime, timeVerdict } from "./index.ts";
+import { type PairedTime, timeVerdict, verdictPower } from "./index.ts";
 
 /** The records of one round for each ratio: case `k` has the ratio `ratios[k]`. */
 const ofRatios = (ratios: readonly number[], prefix: string): PairedTime[] => ratios.map((r, k) => ({ case: `${prefix}${k}`, round: 0, first: "a", a: 10, b: 10 * r }));
@@ -65,5 +65,38 @@ describe("the margin comes before faster and slower", () => {
     const band = timeVerdict(candidate, aa, { rule: "band", kind: "case", bootstrap: options.bootstrap });
     // The A/A cases have the ratio 1, so the band is [1, 1]. The interval is below the band.
     expect(band.outcome).toBe("faster");
+  });
+});
+
+describe("the true outcome of verdictPower", () => {
+  const verdict = { bootstrap: { runs: 300, seed: 1 } };
+  // A small noise gives narrow intervals, so the shares of `same` and `faster` differ at the ratio 0.97.
+  const base = { cases: 10, trials: 10, seed: 3, sigma: 0.02 };
+
+  it("takes same as the true outcome of a ratio in the margin", () => {
+    const p = verdictPower({ ...base, ratio: 0.97, verdict });
+    expect(p.outcomes.same).toBeGreaterThan(p.outcomes.faster);
+    expect(p.power).toBe(p.outcomes.same);
+    const above = verdictPower({ ...base, ratio: 1.03, verdict });
+    expect(above.outcomes.same).toBeGreaterThan(above.outcomes.slower);
+    expect(above.power).toBe(above.outcomes.same);
+  });
+
+  it("keeps faster and slower as the true outcome of a ratio out of the margin", () => {
+    const fast = verdictPower({ ...base, ratio: 0.93, verdict });
+    expect(fast.outcomes.faster).toBeGreaterThan(0);
+    expect(fast.power).toBe(fast.outcomes.faster);
+    const slow = verdictPower({ ...base, ratio: 1.08, verdict });
+    expect(slow.outcomes.slower).toBeGreaterThan(0);
+    expect(slow.power).toBe(slow.outcomes.slower);
+  });
+
+  it("keeps faster below 1 with the margin 0 and with the rule band", () => {
+    const zero = verdictPower({ ...base, ratio: 0.97, verdict: { ...verdict, margin: 0 } });
+    expect(zero.outcomes.faster).toBeGreaterThan(zero.outcomes.same);
+    expect(zero.power).toBe(zero.outcomes.faster);
+    const band = verdictPower({ ...base, ratio: 0.97, verdict: { ...verdict, rule: "band" } });
+    expect(band.outcomes.faster).toBeGreaterThan(band.outcomes.same);
+    expect(band.power).toBe(band.outcomes.faster);
   });
 });
