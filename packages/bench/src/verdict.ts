@@ -152,6 +152,12 @@ export interface VerdictOptions extends BandOptions {
    * The default is no cap.
    */
   readonly noiseCap?: number;
+  /**
+   * The limit of the bias of the A/A arm, as a share of the margin of the verdict. The default is 0.5.
+   * The bias is `abs(log(m))` for the A/A median ratio `m` of the run. A bias above `biasShare` times the margin gives `cannot decide`.
+   * The margin is the margin of the rule `difference`, `verdictMargin(options)`. `Infinity` turns the check off.
+   */
+  readonly biasShare?: number;
   /** The quantile of the A/A spread of the noise cap and of the pooled band. The default is 0.9. */
   readonly spreadLevel?: number;
   /**
@@ -174,6 +180,23 @@ export interface NoiseCheck {
    * This value is `true` when the A/A median ratio of the run is out of `[exp(-cap), exp(cap)]`.
    * With a spread level of 0.5 or more, a biased run is also noisy. The check decides alone only below that level.
    */
+  readonly biased: boolean;
+}
+
+/**
+ * The bias check of a verdict. A shift `b` of the A/A median ratio moves each case ratio by `b`, and so it moves the verdict by `b`.
+ * Thus the limit of the bias is a share of the margin of the claim.
+ */
+export interface BiasCheck {
+  /** The median ratio of the A/A cases of the run. */
+  readonly aaMedian: number;
+  /** The bias `abs(log(aaMedian))`, on a log scale. */
+  readonly shift: number;
+  /** The limit of the bias: `biasShare` times the margin of the verdict. */
+  readonly limit: number;
+  readonly share: number;
+  readonly margin: number;
+  /** This value is `true` when `shift` is above `limit`. */
   readonly biased: boolean;
 }
 
@@ -202,6 +225,8 @@ export interface TimeVerdict {
   readonly pool?: PoolFacts;
   /** The noise cap. The verdict has this field only with the option `noiseCap`. */
   readonly noise?: NoiseCheck;
+  /** The bias check. The verdict has this field only when the A/A arm has `minimum` cases or more. */
+  readonly bias?: BiasCheck;
 }
 
 /**
@@ -214,6 +239,7 @@ export interface TimeVerdict {
  * - Each other case is `cannot decide`, and so is an A/A arm with too few cases.
  * - With `noiseCap`, an A/A spread of the run above the cap gives `cannot decide`.
  * - With `noiseCap`, an A/A median ratio of the run out of `[exp(-noiseCap), exp(noiseCap)]` also gives `cannot decide`.
+ * - A bias of the A/A median ratio above `biasShare` (default 0.5) times the margin of the verdict gives `cannot decide`.
  * - With `pool`, the pooled band replaces the band of the A/A arm of the run. The run still needs `minimum` A/A cases.
  */
 export function timeVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[], options: VerdictOptions = {}): TimeVerdict {
@@ -221,9 +247,25 @@ export function timeVerdict(candidate: readonly PairedTime[], aa: readonly Paire
   if (options.noiseCap !== undefined && !(options.noiseCap >= 0 && Number.isFinite(options.noiseCap))) {
     throw new RangeError(`timeVerdict: the noise cap is a finite number of 0 or more, not ${options.noiseCap}.`);
   }
+  const share = options.biasShare ?? 0.5;
+  if (!(share > 0)) throw new RangeError(`timeVerdict: the bias share is a number above 0, not ${share}.`);
   const pool = poolFor(options);
   let verdict = ruleVerdict(candidate, aa, options, pool?.band);
+  const ruled = verdict.outcome;
   if (pool !== undefined) verdict = { ...verdict, pool: pool.facts };
+  // The early outcomes (no candidate cases, too few A/A cases) have no band, and they keep their reason.
+  if (verdict.band !== undefined) {
+    const aaMedian = Math.exp(quantile(caseRatios(aa).map((r) => Math.log(r.ratio)), 0.5));
+    const margin = marginOf(options, pool?.band);
+    const shift = Math.abs(Math.log(aaMedian));
+    const limit = share * margin;
+    const bias: BiasCheck = { aaMedian, shift, limit, share, margin, biased: shift > limit };
+    verdict = { ...verdict, bias };
+    if (bias.biased) {
+      const reason = `The A/A median ratio of the run is ${round(aaMedian)}, a bias of ${round(shift)} on a log scale, above the limit ${round(limit)} (${share} of the margin ${round(margin)}). Without the check, the outcome is "${ruled}".`;
+      verdict = { ...verdict, outcome: "cannot decide", reason };
+    }
+  }
   if (options.noiseCap !== undefined) {
     const cap = options.noiseCap;
     const aaRatios = caseRatios(aa);
@@ -235,10 +277,10 @@ export function timeVerdict(candidate: readonly PairedTime[], aa: readonly Paire
     // The early outcomes (no candidate cases, too few A/A cases) keep their reason. Each other outcome gives way to the cap.
     if (noise.noisy && verdict.band !== undefined) {
       const why = spread === undefined ? "The A/A arm of the run has no cases, so the noise cap has no spread." : `The A/A spread of the run is ${round(spread)}, above the noise cap ${cap}.`;
-      const reason = `${why} Without the cap, the outcome is "${verdict.outcome}".`;
+      const reason = `${why} Without the cap, the outcome is "${ruled}".`;
       verdict = { ...verdict, outcome: "cannot decide", reason };
     } else if (noise.biased && verdict.band !== undefined) {
-      const reason = `The A/A median ratio of the run is ${round(aaMedian!)}, out of [${round(Math.exp(-cap))}, ${round(Math.exp(cap))}] of the noise cap ${cap}. Without the cap, the outcome is "${verdict.outcome}".`;
+      const reason = `The A/A median ratio of the run is ${round(aaMedian!)}, out of [${round(Math.exp(-cap))}, ${round(Math.exp(cap))}] of the noise cap ${cap}. Without the cap, the outcome is "${ruled}".`;
       verdict = { ...verdict, outcome: "cannot decide", reason };
     }
   }
