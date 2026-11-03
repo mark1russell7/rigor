@@ -148,6 +148,7 @@ export interface VerdictOptions extends BandOptions {
   readonly margin?: number;
   /**
    * The noise cap on the A/A spread of the run, on a log scale. Above the cap, the outcome is `cannot decide`.
+   * The cap also limits the bias of the A/A arm: an A/A median ratio out of `[exp(-noiseCap), exp(noiseCap)]` gives `cannot decide`.
    * The default is no cap.
    */
   readonly noiseCap?: number;
@@ -160,13 +161,20 @@ export interface VerdictOptions extends BandOptions {
   readonly pool?: PoolOptions;
 }
 
-/** The noise cap of a verdict: the A/A spread of the run and the cap. */
+/** The noise cap of a verdict: the A/A spread of the run, the A/A median ratio of the run and the cap. */
 export interface NoiseCheck {
   /** The A/A spread of the run, or undefined when the A/A arm has no cases. */
   readonly spread: number | undefined;
   readonly cap: number;
   /** This value is `true` when the spread is above the cap, or when the A/A arm has no cases. */
   readonly noisy: boolean;
+  /** The median ratio of the A/A cases of the run, or undefined when the A/A arm has no cases. A value far from 1 shows a bias of the order or of the arm slots. */
+  readonly aaMedian: number | undefined;
+  /**
+   * This value is `true` when the A/A median ratio of the run is out of `[exp(-cap), exp(cap)]`.
+   * With a spread level of 0.5 or more, a biased run is also noisy. The check decides alone only below that level.
+   */
+  readonly biased: boolean;
 }
 
 /** A time verdict, with the facts that it uses. */
@@ -205,6 +213,7 @@ export interface TimeVerdict {
  * - The rule `band` gives `faster` below the band, `slower` above the band, and `same` in the band.
  * - Each other case is `cannot decide`, and so is an A/A arm with too few cases.
  * - With `noiseCap`, an A/A spread of the run above the cap gives `cannot decide`.
+ * - With `noiseCap`, an A/A median ratio of the run out of `[exp(-noiseCap), exp(noiseCap)]` also gives `cannot decide`.
  * - With `pool`, the pooled band replaces the band of the A/A arm of the run. The run still needs `minimum` A/A cases.
  */
 export function timeVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[], options: VerdictOptions = {}): TimeVerdict {
@@ -219,12 +228,17 @@ export function timeVerdict(candidate: readonly PairedTime[], aa: readonly Paire
     const cap = options.noiseCap;
     const aaRatios = caseRatios(aa);
     const spread = aaRatios.length === 0 ? undefined : spreadOf(aaRatios, level);
-    const noise: NoiseCheck = { spread, cap, noisy: spread === undefined || spread > cap };
+    const aaMedian = aaRatios.length === 0 ? undefined : Math.exp(quantile(aaRatios.map((r) => Math.log(r.ratio)), 0.5));
+    const biased = aaMedian !== undefined && Math.abs(Math.log(aaMedian)) > cap;
+    const noise: NoiseCheck = { spread, cap, noisy: spread === undefined || spread > cap, aaMedian, biased };
     verdict = { ...verdict, noise };
     // The early outcomes (no candidate cases, too few A/A cases) keep their reason. Each other outcome gives way to the cap.
     if (noise.noisy && verdict.band !== undefined) {
       const why = spread === undefined ? "The A/A arm of the run has no cases, so the noise cap has no spread." : `The A/A spread of the run is ${round(spread)}, above the noise cap ${cap}.`;
       const reason = `${why} Without the cap, the outcome is "${verdict.outcome}".`;
+      verdict = { ...verdict, outcome: "cannot decide", reason };
+    } else if (noise.biased && verdict.band !== undefined) {
+      const reason = `The A/A median ratio of the run is ${round(aaMedian!)}, out of [${round(Math.exp(-cap))}, ${round(Math.exp(cap))}] of the noise cap ${cap}. Without the cap, the outcome is "${verdict.outcome}".`;
       verdict = { ...verdict, outcome: "cannot decide", reason };
     }
   }

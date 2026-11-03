@@ -110,3 +110,34 @@ describe("the true outcome of verdictPower", () => {
     expect(band.power).toBe(band.outcomes.faster);
   });
 });
+
+describe("the bias check of the noise cap", () => {
+  // 12 A/A cases have the ratio 1.2 and 8 have the ratio 1, so the A/A median ratio is 1.2, out of [exp(-0.1), exp(0.1)].
+  const biasedAa = [...ofRatios(steps(1.2, 1.2, 12), "ab"), ...ofRatios(steps(1, 1, 8), "ae")];
+  const candidate = ofRatios(steps(0.55, 0.65, 21), "c");
+  const bootstrap = { runs: 2000, seed: 7 };
+
+  it("gives cannot decide for an A/A median ratio out of the cap, and the reason names the bias", () => {
+    const free = timeVerdict(candidate, biasedAa, { bootstrap });
+    expect(free.outcome).toBe("faster");
+    // A spread level of 0.3 gives the spread 0, so only the bias check decides.
+    const v = timeVerdict(candidate, biasedAa, { bootstrap, noiseCap: 0.1, spreadLevel: 0.3 });
+    expect(v.noise).toMatchObject({ noisy: false, biased: true });
+    expect(v.noise!.aaMedian).toBeCloseTo(1.2, 10);
+    expect(v.outcome).toBe("cannot decide");
+    expect(v.reason).toMatch(/A\/A median ratio of the run is 1\.2/);
+    expect(v.reason).toMatch(/Without the cap, the outcome is "faster"/);
+  });
+
+  it("finds a biased run also noisy at the default spread level", () => {
+    const v = timeVerdict(candidate, biasedAa, { bootstrap, noiseCap: 0.1 });
+    expect(v.noise).toMatchObject({ noisy: true, biased: true });
+    expect(v.outcome).toBe("cannot decide");
+  });
+
+  it("keeps the outcome for an A/A median ratio in the cap", () => {
+    const v = timeVerdict(candidate, aa, { bootstrap, noiseCap: 0.1 });
+    expect(v.noise).toMatchObject({ noisy: false, biased: false, aaMedian: 1 });
+    expect(v.outcome).toBe("faster");
+  });
+});
