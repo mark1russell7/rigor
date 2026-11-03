@@ -9,7 +9,7 @@ npm install @mark1russell7/rigor-statistics
 ## Compare a candidate with a baseline
 
 ```ts
-import { compareRatios, noiseFloor } from "@mark1russell7/rigor-statistics";
+import { compareRatios, noiseFloor, noiseVerdict } from "@mark1russell7/rigor-statistics";
 
 // The ratio candidate / baseline of each input, and the measure of 5 seeds or folds of the same run.
 const noise = noiseFloor(foldMedians);           // 2 standard deviations; it needs 5 values or more
@@ -18,6 +18,10 @@ const c = compareRatios(ratios, { noise });
 c.wins, c.losses, c.signP;                       // how often, by any amount
 c.effect;                                        // by how much: the median, p10 and p90 of the inputs that are not ties
 c.gains, c.drops;                                // how often beyond the noise, with Wilson intervals
+
+// A difference (candidate - baseline) of each seed: beyond max(2 SD, margin)? Equal values give "no-spread".
+const v = noiseVerdict(foldDiffs, { margin: 0.02 }); // give the reason of the margin from the problem of the user
+v.state;                                         // "gain", "loss", "noise" or "no-spread"
 ```
 
 A promotion reads `gains` against `drops` and `effect`. A sign test alone is not enough, because it counts a win of any size. Judge a change of a default against the current default, not against "no change".
@@ -42,7 +46,7 @@ A promotion reads `gains` against `drops` and `effect`. A sign test alone is not
 | `binomialInterval(n, p, level)`, `negativeBinomialInterval(successes, p, level)` | The central interval of a binomial count, and of a count of failures before `successes` successes. Each tail outside holds `(1 - level) / 2` or less. |
 | `holm(pValues, level)` | The Holm correction of a family of tests. |
 | `spearman`, `kendallTau`, `ranks` | The rank correlations, with mean ranks for ties. |
-| `compareRatios`, `noiseFloor` | The comparison with a baseline, and the noise floor of the 5-seed rule. |
+| `compareRatios`, `noiseFloor`, `noiseVerdict` | The comparison with a baseline, the noise floor of the 5-seed rule with a margin of practical effect, and the state of a difference over the seeds. |
 | `brier`, `calibration` | The Brier score of predictions, and the hit rate of each stated level. |
 
 Each function throws a RangeError for an empty list, for a NaN and for a parameter out of its range. Thus a missing value cannot make a quiet NaN in a record.

@@ -12,16 +12,68 @@ export interface NoiseOptions {
   readonly k?: number;
   /** The fewest values (seeds or folds) that give a floor. The default is 5, the 5-seed rule. */
   readonly minimum?: number;
+  /**
+   * The margin of practical effect, in the units of the values. A difference that is real but smaller than the margin
+   * is too small to matter, so it is not a result. Give the reason of the margin from the problem of the user. The
+   * default is 0: no margin.
+   */
+  readonly margin?: number;
+}
+
+/** The checks of the options of the noise rule. It gives k, the minimum and the margin. */
+function noiseOptions(name: string, values: readonly number[], options: NoiseOptions): { k: number; margin: number } {
+  const minimum = options.minimum ?? 5;
+  if (values.length < minimum) throw new RangeError(`${name}: ${values.length} values; the rule needs ${minimum} or more seeds or folds.`);
+  const margin = options.margin ?? 0;
+  if (!Number.isFinite(margin) || margin < 0) throw new RangeError(`${name}: the margin is a finite number of 0 or more, not ${margin}.`);
+  return { k: options.k ?? 2, margin };
 }
 
 /**
- * The noise floor of a measure: k sample standard deviations of its value over independent seeds or folds. A
- * difference smaller than the floor is not a result.
+ * The noise floor of a measure: k sample standard deviations of its value over independent seeds or folds. When the
+ * margin of practical effect is larger, the floor is the margin. A difference smaller than the floor is not a result.
  */
 export function noiseFloor(values: readonly number[], options: NoiseOptions = {}): number {
-  const minimum = options.minimum ?? 5;
-  if (values.length < minimum) throw new RangeError(`noiseFloor: ${values.length} values; the rule needs ${minimum} or more seeds or folds.`);
-  return (options.k ?? 2) * sd(values);
+  const { k, margin } = noiseOptions("noiseFloor", values, options);
+  return Math.max(k * sd(values), margin);
+}
+
+/**
+ * The state of a difference over the seeds. "gain" and "loss": the mean is beyond the threshold. "noise": it is not.
+ * "no-spread": each seed gives the same value, so the seeds do not sample the noise and the rule tests nothing.
+ */
+export type NoiseState = "gain" | "loss" | "noise" | "no-spread";
+
+/** The noise rule of a difference over independent seeds or folds. */
+export interface NoiseVerdict {
+  /** The number of values. */
+  readonly n: number;
+  readonly mean: number;
+  /** The sample standard deviation of the values. */
+  readonly sd: number;
+  /** k times the standard deviation. */
+  readonly spread: number;
+  readonly margin: number;
+  /** The larger of `spread` and `margin`. The absolute mean must be above it. */
+  readonly threshold: number;
+  readonly state: NoiseState;
+}
+
+/**
+ * The noise rule of a difference (candidate minus baseline) over independent seeds or folds: the mean against
+ * max(k standard deviations, margin). With `better: "lower"`, a negative mean is the gain. When each value is equal,
+ * the state is "no-spread" and not a result, also when the mean is beyond the margin. Find out why the seeds do not
+ * change the value before you read the difference.
+ */
+export function noiseVerdict(values: readonly number[], options: NoiseOptions & { readonly better?: "higher" | "lower" } = {}): NoiseVerdict {
+  const { k, margin } = noiseOptions("noiseVerdict", values, options);
+  const s = sd(values);
+  const m = values.reduce((sum, v) => sum + v, 0) / values.length;
+  const spread = k * s;
+  const threshold = Math.max(spread, margin);
+  const up = (options.better ?? "higher") === "higher" ? m : -m;
+  const state: NoiseState = s === 0 ? "no-spread" : Math.abs(m) <= threshold ? "noise" : up > 0 ? "gain" : "loss";
+  return { n: values.length, mean: m, sd: s, spread, margin, threshold, state };
 }
 
 export interface CompareOptions {
