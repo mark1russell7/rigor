@@ -17,7 +17,7 @@ Many engines make their own copies of these tools. The duplication atlas ([codea
 | testgen | planned | Property tests on fast-check, pairwise and covering arrays, metamorphic relations. |
 | chaos | planned | Fault injection, schedules of latency and failure, load profiles. |
 
-The roadmap is in [docs/ROADMAP.md](docs/ROADMAP.md).
+The roadmap is in [docs/ROADMAP.md](docs/ROADMAP.md). The win test that layout-contract, packing and highways share is in [docs/WIN-TEST.md](docs/WIN-TEST.md).
 
 ## Use
 
