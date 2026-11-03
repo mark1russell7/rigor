@@ -1,0 +1,175 @@
+import { describe, expect, it } from "vitest";
+import { random } from "@mark1russell7/rigor-generators";
+import { binomialInterval, medianInterval, negativeBinomialInterval } from "./index.ts";
+
+/* ---------- The copies in the engines, word for word, as the references of the moves ---------- */
+
+// systems packages/kind/src/stats.ts and packages/harness/src/verdict.ts
+const systemsBelow = (n: number, j: number): number => {
+  let term = 1;
+  let sum = 0;
+  for (let i = 0; i <= j; i += 1) {
+    sum += term;
+    term = (term * (n - i)) / (i + 1);
+  }
+  return sum / 2 ** n;
+};
+const systemsMedianInterval = (sorted: readonly number[]): [number, number] => {
+  const n = sorted.length;
+  let k = 0;
+  while (k + 1 <= n / 2 && systemsBelow(n, k) <= 0.025) k += 1;
+  return k === 0 ? [sorted[0]!, sorted[n - 1]!] : [sorted[k - 1]!, sorted[n - k]!];
+};
+
+// systems packages/cells/src/callers.ts (targetConnections, at random)
+const systemsBinomial = (total: number, p: number, cover: number): { lo: number; hi: number } => {
+  const choose = (k: number): number => (k === 0 ? 1 : (choose(k - 1) * (total - k + 1)) / k);
+  const chance = Array.from({ length: total + 1 }, (_, k) => choose(k) * p ** k * (1 - p) ** (total - k));
+  const below = (k: number): number => chance.slice(0, k).reduce((sum, each) => sum + each, 0);
+  const above = (k: number): number => chance.slice(k + 1).reduce((sum, each) => sum + each, 0);
+  const tail = (1 - cover) / 2;
+  let lo = 0;
+  while (below(lo + 1) <= tail) lo += 1;
+  let hi = total;
+  while (above(hi - 1) <= tail) hi -= 1;
+  return { lo, hi };
+};
+
+// systems packages/cells/src/callers.ts (negativeBinomial)
+const systemsNegativeBinomial = (successes: number, p: number, cover: number): { lo: number; hi: number } => {
+  const tail = (1 - cover) / 2;
+  let chance = p ** successes;
+  let below = 0;
+  let lo = 0;
+  for (let k = 0; ; k += 1) {
+    if (below <= tail) lo = k;
+    if (below + chance >= 1 - tail) return { lo, hi: k };
+    below += chance;
+    chance *= ((k + successes) / (k + 1)) * (1 - p);
+  }
+};
+
+/** The exact rank of the median interval: the largest k where 40 times the sum of C(n, j < k) is not more than 2^n. */
+const exactRank = (n: number): number => {
+  const two = 2n ** BigInt(n);
+  let choose = 1n;
+  let sum = 0n;
+  let k = 0;
+  while (k + 1 <= n / 2) {
+    sum += choose;
+    if (40n * sum > two) break;
+    k += 1;
+    choose = (choose * BigInt(n - k + 1)) / BigInt(k);
+  }
+  return Math.max(1, k);
+};
+
+describe("medianInterval", () => {
+  it("gives x_(2) to x_(10) of 11 values, at 98.8 %", () => {
+    const eleven = [5, 1, 9, 3, 11, 7, 2, 10, 4, 8, 6];
+    const interval = medianInterval(eleven);
+    expect([interval.low, interval.high, interval.rank]).toEqual([2, 10, 2]);
+    expect(interval.coverage).toBeCloseTo(1 - 24 / 2048, 12);
+  });
+
+  it("gives the full range of 5 values or fewer, with a coverage less than the level", () => {
+    expect(medianInterval([3, 4, 5])).toMatchObject({ low: 3, high: 5, rank: 1 });
+    expect(medianInterval([7])).toMatchObject({ low: 7, high: 7, rank: 1 });
+    expect(medianInterval([1, 2, 3, 4, 5]).coverage).toBeCloseTo(1 - 2 / 32, 12);
+    expect(medianInterval([1, 2, 3, 4, 5, 6]).coverage).toBeGreaterThanOrEqual(0.95);
+    expect(medianInterval([1, 2, 3, 4, 5, 6, 7, 8, 9]).rank).toBe(2);
+  });
+
+  it("gives the exact rank for each n from 1 to 400", () => {
+    for (let n = 1; n <= 400; n++) {
+      const values = Array.from({ length: n }, (_, i) => i + 1);
+      expect(medianInterval(values).rank, `n = ${n}`).toBe(exactRank(n));
+    }
+  });
+
+  it("gives the same interval as the copy in systems, to the bit", () => {
+    const r = random("medianInterval");
+    for (let n = 1; n <= 300; n++) {
+      const values = Array.from({ length: n }, () => r.normal(10, 3)).sort((a, b) => a - b);
+      const interval = medianInterval(values);
+      expect([interval.low, interval.high], `n = ${n}`).toEqual(systemsMedianInterval(values));
+    }
+  });
+
+  it("sorts the values, and a smaller level gives a narrower interval", () => {
+    const values = Array.from({ length: 41 }, (_, i) => (i * 17) % 41);
+    expect(medianInterval(values)).toEqual(medianInterval([...values].sort((a, b) => a - b)));
+    expect(medianInterval(values, 0.5).rank).toBeGreaterThan(medianInterval(values, 0.99).rank);
+  });
+
+  it("throws for an empty list, a NaN and a level out of its range", () => {
+    expect(() => medianInterval([])).toThrow(RangeError);
+    expect(() => medianInterval([1, Number.NaN])).toThrow(RangeError);
+    expect(() => medianInterval([1, 2], 1)).toThrow(RangeError);
+    expect(() => medianInterval([1, 2], 0)).toThrow(RangeError);
+  });
+});
+
+describe("binomialInterval", () => {
+  it("gives the same interval as the copy in systems", () => {
+    for (const cover of [0.9, 0.95, 0.99])
+      for (const p of [0.05, 0.25, 1 / 3, 0.5, 0.7])
+        for (let n = 0; n <= 120; n++) {
+          const interval = binomialInterval(n, p, cover);
+          expect({ lo: interval.low, hi: interval.high }, `n = ${n}, p = ${p}, level = ${cover}`).toEqual(systemsBinomial(n, p, cover));
+        }
+  });
+
+  it("gives each tail outside the interval at most (1 - level) / 2, and the coverage", () => {
+    const interval = binomialInterval(24, 0.5);
+    expect([interval.low, interval.high]).toEqual([7, 17]);
+    expect(interval.coverage).toBeGreaterThanOrEqual(0.95);
+    expect(binomialInterval(1000, 0.5).coverage).toBeGreaterThanOrEqual(0.95);
+  });
+
+  it("gives one count for p = 0 and p = 1", () => {
+    expect(binomialInterval(10, 0)).toEqual({ low: 0, high: 0, coverage: 1 });
+    expect(binomialInterval(10, 1)).toEqual({ low: 10, high: 10, coverage: 1 });
+  });
+
+  it("throws for a parameter out of its range", () => {
+    expect(() => binomialInterval(-1, 0.5)).toThrow(RangeError);
+    expect(() => binomialInterval(2.5, 0.5)).toThrow(RangeError);
+    expect(() => binomialInterval(10, 1.5)).toThrow(RangeError);
+    expect(() => binomialInterval(10, 0.5, 1)).toThrow(RangeError);
+  });
+});
+
+describe("negativeBinomialInterval", () => {
+  it("gives the same interval as the copy in systems", () => {
+    for (const cover of [0.9, 0.95, 0.99])
+      for (const p of [0.1, 0.25, 0.5, 0.75, 0.9])
+        for (let r = 1; r <= 60; r++) {
+          const interval = negativeBinomialInterval(r, p, cover);
+          expect({ lo: interval.low, hi: interval.high }, `r = ${r}, p = ${p}, level = ${cover}`).toEqual(systemsNegativeBinomial(r, p, cover));
+        }
+  });
+
+  it("gives the figures of the systems cells, and the coverage", () => {
+    expect(negativeBinomialInterval(24, 0.5)).toMatchObject({ low: 12, high: 39 });
+    expect(negativeBinomialInterval(3, 0.5)).toMatchObject({ low: 0, high: 9 });
+    expect(negativeBinomialInterval(24, 0.5).coverage).toBeGreaterThanOrEqual(0.95);
+  });
+
+  it("does not stop on a first chance that is too small for a number", () => {
+    const interval = negativeBinomialInterval(2000, 0.5);
+    expect(interval.low).toBeLessThan(2000);
+    expect(interval.high).toBeGreaterThan(2000);
+  });
+
+  it("gives 0 for no success, and for p = 1", () => {
+    expect(negativeBinomialInterval(0, 0.5)).toEqual({ low: 0, high: 0, coverage: 1 });
+    expect(negativeBinomialInterval(5, 1)).toEqual({ low: 0, high: 0, coverage: 1 });
+  });
+
+  it("throws for a parameter out of its range", () => {
+    expect(() => negativeBinomialInterval(-1, 0.5)).toThrow(RangeError);
+    expect(() => negativeBinomialInterval(3, 0)).toThrow(RangeError);
+    expect(() => negativeBinomialInterval(3, 0.5, 0)).toThrow(RangeError);
+  });
+});
