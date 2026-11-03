@@ -37,7 +37,35 @@ v.comparison;                                     // the cases that gain and dro
 | `caseRatios(records)` | The ratio of each case. It refuses 2 records of one round, and an order that did not turn. |
 | `aaBand(aa, options)` | The band of the A/A arm, symmetric on a log scale. The kind `median` (the default) holds the A/A median, and the kind `case` holds one A/A case. It needs 5 cases or more. |
 | `timeVerdict(candidate, aa, options)` | The outcome of the rule `difference` (the default) or `band`. |
+| `caseIntervals(records, level)` | The ratio of each case with a distribution-free interval of its median over the rounds. The level 0.95 needs 6 rounds or more. |
+| `limitVerdict(candidate, aa, options)` | The verdict of the claim "the ratio of each case is at most `limit`": `within`, `beyond` or `cannot decide`. |
+| `timeRounds(arms, options)` | The timed rounds of one case in one process: a warm-up, a batch of at least the target time, and the order of `firstArm`. |
 | `verdictPower(options)` | The share of each outcome over seeded benches with a known ratio: the power test of a rule. |
+
+## A claim with a limit
+
+`timeVerdict` compares the ratio with 1. A claim with a limit needs `limitVerdict`. An example is "the new code takes at most 2 times the time of the old code":
+
+```ts
+const v = limitVerdict(records, aaRecords, { limit: 2 });
+
+v.outcome;                                        // "within", "beyond" or "cannot decide"
+v.cases;                                          // the interval, the bound and the outcome of each case
+```
+
+- The A/A band widens the interval of each case. The bound is the high end of the interval times the high end of the band.
+- A case is `within` when its bound is at most the limit. It is `beyond` when its low end times the low end of the band is above the limit.
+- The verdict is `beyond` when a case is `beyond`, and `within` when each case is `within`.
+
+## Time the rounds
+
+`timeRounds` times one case in one process. Start a fresh process for each case and each pair, and give the index of the case as `offset`:
+
+```ts
+const { records } = timeRounds({ a: () => oldCode(input), b: () => newCode(input) }, { case: "board-1", rounds: 31, offset: 0 });
+```
+
+Each arm gives a number. The sum of these numbers keeps the engine from removing the work of a call.
 
 ## The outcomes
 
