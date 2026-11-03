@@ -27,7 +27,7 @@ export interface Rounds {
   readonly records: PairedTime[];
   /** The count of calls of each arm in one batch. */
   readonly count: number;
-  /** The sum of the numbers that the arms gave. It keeps the engine from removing the work of a call. */
+  /** The sum of the numbers that the arms gave. The engine cannot remove the work of a call, because this sum uses it. */
   readonly sink: number;
 }
 
@@ -43,6 +43,7 @@ export function timeRounds(arms: Readonly<Record<Arm, () => number>>, options: R
   const warmMs = options.warmMs ?? 1000;
   const now = options.now ?? (() => performance.now());
   if (!Number.isSafeInteger(rounds) || rounds < 1) throw new RangeError(`timeRounds: the rounds are a whole number of 1 or more, not ${rounds}.`);
+  if (!Number.isSafeInteger(offset)) throw new RangeError(`timeRounds: the offset is a whole number, not ${offset}.`);
   if (!(targetMs > 0) || !(warmMs >= 0)) throw new RangeError("timeRounds: the target time is above 0, and the warm-up time is 0 or more.");
   let sink = 0;
   const batch = (arm: Arm, count: number): number => {

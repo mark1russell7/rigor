@@ -1,6 +1,6 @@
 import { random } from "@mark1russell7/rigor-generators";
 import { describe, expect, it } from "vitest";
-import { type PairedTime, caseIntervals, caseRatios, firstArm, limitVerdict, timeRounds } from "./index.ts";
+import { type PairedTime, caseIntervals, caseRatios, firstArm, limitVerdict } from "./index.ts";
 
 /** The records of `cases` cases of 11 rounds. Arm b takes `factor` times arm a, with a seeded noise of about 2 %. */
 function records(cases: number, factor: number, seed: number): PairedTime[] {
@@ -47,21 +47,5 @@ describe("limitVerdict", () => {
     expect(limitVerdict(records(6, 1.5, 7), records(4, 1, 8), { limit: 2 }).outcome).toBe("cannot decide");
     expect(limitVerdict([], aa, { limit: 2 }).outcome).toBe("cannot decide");
     expect(() => limitVerdict(records(6, 1.5, 7), aa, { limit: 0 })).toThrow(RangeError);
-  });
-});
-
-describe("timeRounds", () => {
-  it("grows the batch to the target time and turns the order each round", () => {
-    let t = 0;
-    const result = timeRounds({ a: () => ((t += 0.01), 1), b: () => ((t += 0.02), 2) }, { case: "x", rounds: 4, offset: 1, targetMs: 10, warmMs: 5, now: () => t });
-    expect(result.count).toBe(1024);
-    expect(result.records.map((r) => r.first)).toEqual(["b", "a", "b", "a"]);
-    for (const r of result.records) expect(r.b / r.a).toBeCloseTo(2, 9);
-    expect(caseRatios(result.records)[0]!.ratio).toBeCloseTo(2, 9);
-    expect(result.sink).toBeGreaterThan(0);
-  });
-
-  it("refuses a count of rounds that is not a whole number of 1 or more", () => {
-    expect(() => timeRounds({ a: () => 0, b: () => 0 }, { case: "x", rounds: 0 })).toThrow(RangeError);
   });
 });
