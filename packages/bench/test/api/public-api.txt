@@ -4,46 +4,184 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 33 names
+## . (build/index.d.ts): 41 names
 
-type Arm: build/index.d.ts#Arm
+type Arm: build/paired.d.ts#Arm
+type Balanced: build/index.d.ts#Balanced
 type Band: build/index.d.ts#Band
 type BandKind: build/index.d.ts#BandKind
 type BandOptions: build/index.d.ts#BandOptions
 type CaseInterval: build/index.d.ts#CaseInterval
 type CaseLimit: build/index.d.ts#CaseLimit
-type CaseRatio: build/index.d.ts#CaseRatio
+type CaseRatio: build/paired.d.ts#CaseRatio
+type JobRecords: build/index.d.ts#JobRecords
+type JobVerdict: build/index.d.ts#JobVerdict
 type LimitOptions: build/index.d.ts#LimitOptions
 type LimitOutcome: build/index.d.ts#LimitOutcome
 type LimitVerdict: build/index.d.ts#LimitVerdict
 type NoiseCheck: build/index.d.ts#NoiseCheck
-type PairedTime: build/index.d.ts#PairedTime
+type PairedTime: build/paired.d.ts#PairedTime
 type PoolFacts: build/index.d.ts#PoolFacts
 type PoolOptions: build/index.d.ts#PoolOptions
+type PooledVerdict: build/index.d.ts#PooledVerdict
 type Power: build/index.d.ts#Power
 type PowerOptions: build/index.d.ts#PowerOptions
 type Rounds: build/index.d.ts#Rounds
 type RoundsOptions: build/index.d.ts#RoundsOptions
+type RunPairs: build/index.d.ts#RunPairs
 type TimeOutcome: build/index.d.ts#TimeOutcome
 type TimeVerdict: build/index.d.ts#TimeVerdict
 type VerdictOptions: build/index.d.ts#VerdictOptions
 type VerdictRule: build/index.d.ts#VerdictRule
 aaBand: build/index.d.ts#aaBand
 aaSpread: build/index.d.ts#aaSpread
+armVerdicts: build/index.d.ts#armVerdicts
+balanceOrders: build/index.d.ts#balanceOrders
 caseIntervals: build/index.d.ts#caseIntervals
-caseRatios: build/index.d.ts#caseRatios
-checkPairedTime: build/index.d.ts#checkPairedTime
-firstArm: build/index.d.ts#firstArm
+caseRatios: build/paired.d.ts#caseRatios
+checkPairedTime: build/paired.d.ts#checkPairedTime
+firstArm: build/paired.d.ts#firstArm
 limitVerdict: build/index.d.ts#limitVerdict
 pooledBand: build/index.d.ts#pooledBand
+pooledVerdict: build/index.d.ts#pooledVerdict
 timeRounds: build/index.d.ts#timeRounds
 timeVerdict: build/index.d.ts#timeVerdict
 verdictPower: build/index.d.ts#verdictPower
 
+## ./fresh (build/fresh.d.ts): 17 names
+
+BenchEnv: build/fresh.d.ts#BenchEnv
+ChildExit: build/fresh.d.ts#ChildExit
+ChildLine: build/fresh.d.ts#ChildLine
+ChildSkip: build/fresh.d.ts#ChildSkip
+ChildTime: build/fresh.d.ts#ChildTime
+FreshArm: build/fresh.d.ts#FreshArm
+FreshOptions: build/fresh.d.ts#FreshOptions
+FreshRecord: build/fresh.d.ts#FreshRecord
+FreshRun: build/fresh.d.ts#FreshRun
+FreshSkip: build/fresh.d.ts#FreshSkip
+PairSlot: build/fresh.d.ts#PairSlot
+StartChild: build/fresh.d.ts#StartChild
+StartOptions: build/fresh.d.ts#StartOptions
+benchEnv: build/fresh.d.ts#benchEnv
+childLine: build/fresh.d.ts#childLine
+freshRun: build/fresh.d.ts#freshRun
+pairOrder: build/fresh.d.ts#pairOrder
+
 ## Declarations
 
-### build/index.d.ts#Arm
-type Arm = "a" | "b";
+### build/fresh.d.ts#BenchEnv
+export interface BenchEnv {
+  readonly cpu: string;
+  readonly cores: number;
+  readonly os: string;
+  readonly arch: string;
+  readonly node: string;
+  readonly runner?: string;
+}
+
+### build/fresh.d.ts#ChildExit
+export interface ChildExit {
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly code: number | null;
+  readonly timedOut?: boolean;
+  readonly error?: string;
+}
+
+### build/fresh.d.ts#ChildLine
+export type ChildLine = ChildTime | ChildSkip;
+
+### build/fresh.d.ts#ChildSkip
+export interface ChildSkip {
+  readonly skipped: string;
+  readonly ms?: number;
+  readonly hash?: string;
+}
+
+### build/fresh.d.ts#ChildTime
+export interface ChildTime {
+  readonly ms: number;
+  readonly hash?: string;
+  readonly skipped?: undefined;
+}
+
+### build/fresh.d.ts#FreshArm
+export interface FreshArm {
+  readonly id: string;
+  readonly command: readonly string[];
+}
+
+### build/fresh.d.ts#FreshOptions
+export interface FreshOptions {
+  readonly base: FreshArm;
+  readonly candidates: readonly FreshArm[];
+  readonly cases: readonly string[];
+  readonly rounds: number;
+  readonly roundOffset?: number;
+  readonly aa?: boolean;
+  readonly args?: (caseId: string) => readonly string[];
+  readonly timeoutMs?: number;
+  readonly maxBuffer?: number;
+  readonly job?: string;
+  readonly env?: BenchEnv;
+  readonly start?: StartChild;
+}
+
+### build/fresh.d.ts#FreshRecord
+export interface FreshRecord extends PairedTime {
+  readonly job: string;
+  readonly env: BenchEnv;
+}
+
+### build/fresh.d.ts#FreshRun
+export interface FreshRun {
+  readonly env: BenchEnv;
+  readonly job: string;
+  readonly pairs: Record<string, FreshRecord[]>;
+  readonly skipped: FreshSkip[];
+}
+
+### build/fresh.d.ts#FreshSkip
+export interface FreshSkip {
+  readonly arm: string;
+  readonly case: string;
+  readonly round: number;
+  readonly reason: string;
+}
+
+### build/fresh.d.ts#PairSlot
+export interface PairSlot {
+  readonly pair: number;
+  readonly first: Arm;
+}
+
+### build/fresh.d.ts#StartChild
+export type StartChild = (argv: readonly string[], options: StartOptions) => Promise<ChildExit>;
+
+### build/fresh.d.ts#StartOptions
+export interface StartOptions {
+  readonly timeoutMs: number;
+  readonly maxBuffer: number;
+}
+
+### build/fresh.d.ts#benchEnv
+export declare function benchEnv(): BenchEnv;
+
+### build/fresh.d.ts#childLine
+export declare function childLine(stdout: string): ChildLine;
+
+### build/fresh.d.ts#freshRun
+export declare function freshRun(options: FreshOptions): Promise<FreshRun>;
+
+### build/fresh.d.ts#pairOrder
+export declare function pairOrder(pairs: number, round: number, caseIndex: number): PairSlot[];
+
+### build/index.d.ts#Balanced
+interface Balanced<T extends PairedTime> {
+  readonly records: T[];
+  readonly trimmed: number;
+}
 
 ### build/index.d.ts#Band
 interface Band {
@@ -80,11 +218,17 @@ interface CaseLimit extends CaseInterval {
   readonly outcome: LimitOutcome;
 }
 
-### build/index.d.ts#CaseRatio
-interface CaseRatio {
-  readonly case: string;
-  readonly ratio: number;
-  readonly rounds: number;
+### build/index.d.ts#JobRecords
+interface JobRecords {
+  readonly job: string;
+  readonly candidate: readonly PairedTime[];
+  readonly aa: readonly PairedTime[];
+}
+
+### build/index.d.ts#JobVerdict
+interface JobVerdict {
+  readonly job: string;
+  readonly verdict: TimeVerdict;
 }
 
 ### build/index.d.ts#LimitOptions
@@ -114,15 +258,6 @@ interface NoiseCheck {
   readonly biased: boolean;
 }
 
-### build/index.d.ts#PairedTime
-interface PairedTime {
-  readonly case: string;
-  readonly round: number;
-  readonly first: Arm;
-  readonly a: number;
-  readonly b: number;
-}
-
 ### build/index.d.ts#PoolFacts
 interface PoolFacts {
   readonly cases: number;
@@ -138,6 +273,16 @@ interface PoolOptions {
   readonly floor?: number;
   readonly minimum?: number;
   readonly run?: (record: PairedTime) => string;
+}
+
+### build/index.d.ts#PooledVerdict
+interface PooledVerdict {
+  readonly outcome: TimeOutcome;
+  readonly pooled: TimeVerdict;
+  readonly jobs: readonly JobVerdict[];
+  readonly opposed: string[];
+  readonly trimmed: number;
+  readonly reason: string;
 }
 
 ### build/index.d.ts#Power
@@ -175,6 +320,11 @@ interface RoundsOptions {
   readonly now?: () => number;
 }
 
+### build/index.d.ts#RunPairs
+interface RunPairs {
+  readonly pairs: Readonly<Record<string, readonly PairedTime[]>>;
+}
+
 ### build/index.d.ts#TimeOutcome
 type TimeOutcome = "faster" | "slower" | "same" | "cannot decide";
 
@@ -209,23 +359,23 @@ export declare function aaBand(aa: readonly PairedTime[], options?: BandOptions)
 ### build/index.d.ts#aaSpread
 export declare function aaSpread(aa: readonly PairedTime[], level?: number): number;
 
+### build/index.d.ts#armVerdicts
+export declare function armVerdicts(run: RunPairs, aaPair: string, options?: VerdictOptions): Record<string, TimeVerdict>;
+
+### build/index.d.ts#balanceOrders
+export declare function balanceOrders<T extends PairedTime>(records: readonly T[]): Balanced<T>;
+
 ### build/index.d.ts#caseIntervals
 export declare function caseIntervals(records: readonly PairedTime[], level?: number): CaseInterval[];
-
-### build/index.d.ts#caseRatios
-export declare function caseRatios(records: readonly PairedTime[]): CaseRatio[];
-
-### build/index.d.ts#checkPairedTime
-export declare function checkPairedTime(record: PairedTime): PairedTime;
-
-### build/index.d.ts#firstArm
-export declare function firstArm(round: number, offset?: number): Arm;
 
 ### build/index.d.ts#limitVerdict
 export declare function limitVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[], options: LimitOptions): LimitVerdict;
 
 ### build/index.d.ts#pooledBand
 export declare function pooledBand(pool: PoolOptions, level?: number): Band;
+
+### build/index.d.ts#pooledVerdict
+export declare function pooledVerdict(jobs: readonly JobRecords[], options?: VerdictOptions): PooledVerdict;
 
 ### build/index.d.ts#timeRounds
 export declare function timeRounds(arms: Readonly<Record<Arm, () => number>>, options: RoundsOptions): Rounds;
@@ -235,3 +385,31 @@ export declare function timeVerdict(candidate: readonly PairedTime[], aa: readon
 
 ### build/index.d.ts#verdictPower
 export declare function verdictPower(options: PowerOptions): Power;
+
+### build/paired.d.ts#Arm
+type Arm = "a" | "b";
+
+### build/paired.d.ts#CaseRatio
+interface CaseRatio {
+  readonly case: string;
+  readonly ratio: number;
+  readonly rounds: number;
+}
+
+### build/paired.d.ts#PairedTime
+interface PairedTime {
+  readonly case: string;
+  readonly round: number;
+  readonly first: Arm;
+  readonly a: number;
+  readonly b: number;
+}
+
+### build/paired.d.ts#caseRatios
+declare function caseRatios(records: readonly PairedTime[]): CaseRatio[];
+
+### build/paired.d.ts#checkPairedTime
+declare function checkPairedTime(record: PairedTime): PairedTime;
+
+### build/paired.d.ts#firstArm
+declare function firstArm(round: number, offset?: number): Arm;
