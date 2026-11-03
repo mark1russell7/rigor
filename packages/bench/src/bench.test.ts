@@ -1,6 +1,6 @@
 import { random } from "@mark1russell7/rigor-generators";
 import { describe, expect, it } from "vitest";
-import { type PairedTime, aaBand, caseRatios, checkPairedTime, firstArm, timeVerdict } from "./index.ts";
+import { type PairedTime, aaBand, caseRatios, checkPairedTime, firstArm, timeVerdict, verdictPower } from "./index.ts";
 
 /** The records of `cases` cases and `rounds` rounds. Arm b takes `factor` times arm a, with a seeded noise of about `spread`. */
 function records(cases: number, rounds: number, factor: number, spread: number, seed: number, prefix = "c"): PairedTime[] {
@@ -92,7 +92,7 @@ describe("timeVerdict", () => {
   it("gives same for an equal candidate with a narrow interval", () => {
     const v = timeVerdict(records(40, 5, 1, 0.02, 14), aa, options);
     expect(v.outcome).toBe("same");
-    expect(v.reason).toMatch(/in the band/);
+    expect(v.reason).toMatch(/in the margin/);
   });
 
   it("gives cannot decide when the interval crosses an end of the band", () => {
@@ -113,5 +113,54 @@ describe("timeVerdict", () => {
   it("gives the same verdict for the same seed", () => {
     const c = records(20, 5, 0.97, 0.1, 17);
     expect(timeVerdict(c, aa, options)).toEqual(timeVerdict(c, aa, options));
+  });
+});
+
+describe("the rules and the bands", () => {
+  const aa = records(20, 5, 1, 0.1, 21, "aa");
+  const bootstrap = { runs: 1000, seed: 5 };
+
+  it("keeps the rule band of 0.1.0 as an option, with the band case", () => {
+    const v = timeVerdict(records(20, 5, 0.8, 0.1, 22), aa, { rule: "band", kind: "case", bootstrap });
+    expect(v.rule).toBe("band");
+    expect(v.band!.kind).toBe("case");
+    expect(v.outcome).toBe("faster");
+  });
+
+  it("gives a band median that is narrower than the band case", () => {
+    const wide = aaBand(aa, { kind: "case" });
+    const narrow = aaBand(aa, { kind: "median", bootstrap });
+    expect(narrow.kind).toBe("median");
+    expect(narrow.noise).toBeLessThan(wide.noise);
+    expect(narrow.low).toBeCloseTo(1 / narrow.high, 12);
+  });
+
+  it("counts the gains and the drops at the two ends of the band", () => {
+    const list: PairedTime[] = [0.5, 0.9, 1, 1.1, 2].map((ratio, c) => ({ case: `k${c}`, round: 0, first: "a", a: 10, b: 10 * ratio }));
+    const band = aaBand(aa, { kind: "case" });
+    const v = timeVerdict(list, aa, { bootstrap });
+    const below = list.filter((r) => r.b / r.a < band.low).length;
+    const above = list.filter((r) => r.b / r.a > band.high).length;
+    expect(v.comparison!.gains).toBe(below);
+    expect(v.comparison!.drops).toBe(above);
+  });
+
+  it("refuses a margin below 0", () => {
+    expect(() => timeVerdict(records(5, 3, 1, 0.1, 23), aa, { margin: -1 })).toThrow(RangeError);
+  });
+});
+
+describe("verdictPower", () => {
+  it("finds a large speedup, and rarely a change on equal arms", () => {
+    const verdict = { bootstrap: { runs: 500, seed: 1 } };
+    expect(verdictPower({ cases: 10, ratio: 0.7, trials: 20, seed: 1, verdict }).power).toBeGreaterThan(0.9);
+    const equal = verdictPower({ cases: 10, ratio: 1, trials: 40, seed: 2, verdict });
+    expect(equal.outcomes.faster + equal.outcomes.slower).toBeLessThan(0.15);
+    expect(Object.values(equal.outcomes).reduce((s, x) => s + x, 0)).toBeCloseTo(1, 12);
+  });
+
+  it("refuses a bad count of cases or a bad ratio", () => {
+    expect(() => verdictPower({ cases: 0, ratio: 1 })).toThrow(RangeError);
+    expect(() => verdictPower({ cases: 5, ratio: 0 })).toThrow(RangeError);
   });
 });
