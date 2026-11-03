@@ -141,7 +141,10 @@ export type VerdictRule = "band" | "difference";
 export interface VerdictOptions extends BandOptions {
   /** The rule of the verdict. The default is `difference`, from the power test of `verdictPower`. */
   readonly rule?: VerdictRule;
-  /** The half width on a log scale of the ratios that the rule `difference` calls `same`. The default is 0.05. */
+  /**
+   * The half width on a log scale of the ratios that the rule `difference` calls `same`. The default is 0.05.
+   * An interval in the margin is `same`, also when it is wholly below 1.
+   */
   readonly margin?: number;
   /**
    * The noise cap on the A/A spread of the run, on a log scale. Above the cap, the outcome is `cannot decide`.
@@ -195,8 +198,10 @@ export interface TimeVerdict {
 
 /**
  * This function gives the time verdict of the candidate arm `b` against the baseline arm `a`.
- * - The rule `difference` gives `faster` when the whole interval is below 1, and `slower` when it is above 1.
- *   It gives `same` when the interval is in `[exp(-margin), exp(margin)]`.
+ * - The rule `difference` gives `same` when the interval is in `[exp(-margin), exp(margin)]`. This test comes first, so
+ *   an interval in the margin and below 1 is `same`, not `faster`.
+ * - Out of the margin, the rule `difference` gives `faster` when the whole interval is below 1, and `slower` when it is above 1.
+ *   With the margin 0, each outcome stays the same as in 0.1.2.
  * - The rule `band` gives `faster` below the band, `slower` above the band, and `same` in the band.
  * - Each other case is `cannot decide`, and so is an A/A arm with too few cases.
  * - With `noiseCap`, an A/A spread of the run above the cap gives `cannot decide`.
@@ -251,9 +256,10 @@ function ruleVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[]
     const d = bootstrapTwo(logs, aaLogs, (x, y) => median(x) - median(y), options.bootstrap);
     const interval: Interval = { ...d, estimate: Math.exp(d.estimate), low: Math.exp(d.low), high: Math.exp(d.high) };
     const span = `The interval of the candidate median over the A/A median is [${round(interval.low)}, ${round(interval.high)}].`;
+    // The margin comes first: an interval in the margin is `same`, also when it is wholly below or above 1.
+    if (d.low >= -margin && d.high <= margin) return { ...facts, interval, outcome: "same", reason: `${span} The interval is in the margin of ${shown}.` };
     if (interval.high < 1) return { ...facts, interval, outcome: "faster", reason: `${span} The interval is below 1.` };
     if (interval.low > 1) return { ...facts, interval, outcome: "slower", reason: `${span} The interval is above 1.` };
-    if (d.low >= -margin && d.high <= margin) return { ...facts, interval, outcome: "same", reason: `${span} The interval is in the margin of ${shown}.` };
     return { ...facts, interval, outcome: "cannot decide", reason: `${span} The interval holds 1 and crosses the margin of ${shown}.` };
   }
   const interval = bootstrapMedian(cases.map((c) => c.ratio), options.bootstrap);
