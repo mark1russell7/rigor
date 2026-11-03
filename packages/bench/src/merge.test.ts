@@ -1,6 +1,6 @@
 import { random } from "@mark1russell7/rigor-generators";
 import { describe, expect, it } from "vitest";
-import { type PairedTime, armVerdicts, balanceOrders, caseRatios, firstArm, pooledVerdict, timeVerdict } from "./index.ts";
+import { type JobRecords, type PairedTime, armVerdicts, balanceOrders, caseRatios, firstArm, limitVerdict, pooledLimitVerdict, pooledVerdict, poolRecords, timeVerdict } from "./index.ts";
 
 /** A record with a job label, as `freshRun` gives it. */
 type JobTime = PairedTime & { readonly job: string };
@@ -151,5 +151,130 @@ describe("armVerdicts", () => {
     const aa = jobRecords("0", 6, 0, 5, 1, 0.02, "b2");
     expect(armVerdicts({ pairs: { fast, aa } }, "aa")["fast"]!.cases.map((c) => c.rounds)).toEqual([5, 5, 5, 5, 5, 5]);
     expect(() => armVerdicts({ pairs: { fast } }, "aa")).toThrow(/no pair "aa"/);
+  });
+});
+
+/** The jobs `0` to `n - 1`, each a copy of `base` with its own rounds: the job `k` has the rounds of `base` plus `k * rounds`. */
+function copies(base: JobRecords, n: number, rounds: number): JobRecords[] {
+  const shift = (records: readonly PairedTime[], k: number): JobTime[] => records.map((r) => ({ ...r, round: r.round + k * rounds, job: String(k) }));
+  return Array.from({ length: n }, (_, k) => ({ job: String(k), candidate: shift(base.candidate, k), aa: shift(base.aa, k) }));
+}
+
+describe("poolRecords", () => {
+  it("gives the merged and balanced records, the balanced records of each job, and the cases that a job skipped", () => {
+    const one = { job: "0", candidate: jobRecords("0", 5, 0, 3, 1.3, 0.05, "p0"), aa: jobRecords("0", 5, 0, 3, 1, 0.05, "p1") };
+    const two = { job: "1", candidate: jobRecords("1", 5, 4, 3, 1.3, 0.05, "p2"), aa: jobRecords("1", 5, 4, 3, 1, 0.05, "p3"), skipped: [{ case: "c3" }] };
+    const pool = poolRecords([one, two]);
+    const left = (records: readonly PairedTime[]) => records.filter((r) => r.case !== "c3");
+    expect(pool.dropped).toEqual(["c3"]);
+    expect(pool.candidate).toEqual(balanceOrders(left([...one.candidate, ...two.candidate])).records);
+    expect(pool.aa).toEqual(balanceOrders(left([...one.aa, ...two.aa])).records);
+    expect(pool.trimmed).toBe(8);
+    expect(pool.jobs).toEqual([
+      { job: "0", candidate: balanceOrders(left(one.candidate)).records, aa: balanceOrders(left(one.aa)).records },
+      { job: "1", candidate: balanceOrders(left(two.candidate)).records, aa: balanceOrders(left(two.aa)).records },
+    ]);
+  });
+
+  it("is the pool of pooledVerdict", () => {
+    const jobs = fiveJobs("shared", [0.8, 0.8, 0.8, 0.8, 1.5]);
+    const pool = poolRecords(jobs);
+    const v = pooledVerdict(jobs, { margin: 0.05 });
+    expect(v.pooled).toEqual(timeVerdict(pool.candidate, pool.aa, { margin: 0.05 }));
+    expect(v.jobs).toEqual(pool.jobs.map((j) => ({ job: j.job, verdict: timeVerdict(j.candidate, j.aa, { margin: 0.05 }) })));
+    expect(v.trimmed).toBe(pool.trimmed);
+    expect(v.dropped).toEqual(pool.dropped);
+  });
+
+  it("refuses two jobs with one label or with one case and round, with the name of the function that the caller used", () => {
+    const one = { job: "0", candidate: jobRecords("0", 5, 0, 5, 1, 0.1, "r0"), aa: jobRecords("0", 5, 0, 5, 1, 0.1, "r1") };
+    const two = { job: "1", candidate: jobRecords("1", 5, 0, 5, 1, 0.1, "r2"), aa: jobRecords("1", 5, 5, 5, 1, 0.1, "r3") };
+    expect(() => poolRecords([one, { ...one }])).toThrow(/^poolRecords: two jobs have the label "0"\.$/);
+    expect(() => poolRecords([one, two])).toThrow(/^poolRecords: the jobs "0" and "1" both have the round 0/);
+    expect(() => pooledVerdict([one, { ...one }])).toThrow(/^pooledVerdict: two jobs have the label "0"\.$/);
+    expect(() => pooledVerdict([one, two])).toThrow(/^pooledVerdict: the jobs "0" and "1"/);
+    expect(() => pooledLimitVerdict([one, { ...one }], { limit: 2 })).toThrow(/^pooledLimitVerdict: two jobs have the label "0"\.$/);
+    expect(() => pooledLimitVerdict([one, two], { limit: 2 })).toThrow(/^pooledLimitVerdict: the jobs "0" and "1"/);
+  });
+});
+
+describe("pooledLimitVerdict", () => {
+  const base = (factor: number, seed: string): JobRecords => ({
+    job: "0",
+    candidate: jobRecords("0", 6, 0, 10, factor, 0.02, `${seed}-c`),
+    aa: jobRecords("0", 6, 0, 10, 1, 0.02, `${seed}-aa`),
+  });
+
+  it("gives the limitVerdict of the one job of a pool of one job", () => {
+    for (const factor of [1.5, 3]) {
+      const job = base(factor, `one-${factor}`);
+      const single = limitVerdict(job.candidate, job.aa, { limit: 2 });
+      const v = pooledLimitVerdict([job], { limit: 2 });
+      expect(v.pooled).toEqual(single);
+      expect(v.jobs).toEqual([{ job: "0", verdict: single }]);
+      expect(v.outcome).toBe(single.outcome);
+      expect(v.reason).toBe(single.reason);
+    }
+  });
+
+  it("gives the limitVerdict of one job to N copies of that job", () => {
+    for (const [factor, outcome] of [[1.5, "within"], [3, "beyond"]] as const) {
+      const job = base(factor, `copy-${factor}`);
+      const single = limitVerdict(job.candidate, job.aa, { limit: 2 });
+      expect(single.outcome).toBe(outcome);
+      for (const n of [2, 3, 5]) {
+        const jobs = copies(job, n, 10);
+        const v = pooledLimitVerdict(jobs, { limit: 2 });
+        expect(v.outcome).toBe(single.outcome);
+        expect(v.opposed).toEqual([]);
+        expect(v.trimmed).toBe(0);
+        expect(v.pooled.band).toEqual(single.band);
+        expect(v.jobs.map((j) => j.verdict)).toEqual(Array.from({ length: n }, () => single));
+        const pool = poolRecords(jobs);
+        expect(v.pooled).toEqual(limitVerdict(pool.candidate, pool.aa, { limit: 2 }));
+        expect(v.pooled.cases.map((c) => [c.case, c.ratio, c.rounds / n, c.outcome])).toEqual(single.cases.map((c) => [c.case, c.ratio, c.rounds, c.outcome]));
+        // More rounds give each case an interval inside the interval of the one job.
+        v.pooled.cases.forEach((c, i) => {
+          expect(c.low).toBeGreaterThanOrEqual(single.cases[i]!.low);
+          expect(c.high).toBeLessThanOrEqual(single.cases[i]!.high);
+        });
+      }
+    }
+  });
+
+  it("fails the pool when one job is past the limit: the outcome is cannot decide, and the job is in opposed", () => {
+    const jobs = [1.5, 1.5, 1.5, 1.5, 3].map((factor, j) => ({
+      job: `sort-1k-${j}`,
+      candidate: jobRecords(`sort-1k-${j}`, 6, 10 * j, 10, factor, 0.02, `past-c${j}`),
+      aa: jobRecords(`sort-1k-${j}`, 6, 10 * j, 10, 1, 0.02, `past-aa${j}`),
+    }));
+    const v = pooledLimitVerdict(jobs, { limit: 2 });
+    expect(v.pooled.outcome).toBe("within");
+    expect(v.jobs[4]!.verdict.outcome).toBe("beyond");
+    expect(v.jobs.slice(0, 4).map((j) => j.verdict.outcome)).toEqual(["within", "within", "within", "within"]);
+    expect(v.opposed).toEqual(["sort-1k-4"]);
+    expect(v.outcome).toBe("cannot decide");
+    expect(v.reason.startsWith(v.pooled.reason)).toBe(true);
+    expect(v.reason).toContain(`the jobs "sort-1k-4" give "beyond"`);
+  });
+
+  it("keeps the pooled outcome when a job cannot decide, and removes each skipped case from all jobs", () => {
+    const jobs = [1.5, 1.5, 1.5, 2].map((factor, j) => ({
+      job: String(j),
+      candidate: jobRecords(String(j), 7, 10 * j, 10, factor, 0.02, `keep-c${j}`),
+      aa: jobRecords(String(j), 7, 10 * j, 10, 1, 0.02, `keep-aa${j}`),
+      skipped: j === 1 ? [{ case: "c6" }] : [],
+    }));
+    const v = pooledLimitVerdict(jobs, { limit: 2 });
+    expect(v.dropped).toEqual(["c6"]);
+    expect(v.pooled.cases.map((c) => c.case)).toEqual(["c0", "c1", "c2", "c3", "c4", "c5"]);
+    expect(v.jobs[3]!.verdict.outcome).toBe("cannot decide");
+    expect(v.pooled.outcome).toBe("within");
+    expect(v.outcome).toBe("within");
+    expect(v.opposed).toEqual([]);
+  });
+
+  it("refuses a limit that is not above 0", () => {
+    expect(() => pooledLimitVerdict([base(1.5, "bad")], { limit: -1 })).toThrow(RangeError);
   });
 });

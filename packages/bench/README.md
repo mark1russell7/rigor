@@ -45,7 +45,9 @@ v.comparison;                                     // the cases that gain and dro
 | `timeRounds(arms, options)` | The timed rounds of one case in one process: a warm-up, a batch of at least the target time, and the order of `firstArm`. |
 | `verdictPower(options)` | The share of each outcome over seeded benches with a known ratio: the power test of a rule. |
 | `balanceOrders(records)` | The records of each case with a turned order. It removes the extra records of the larger order, with the highest rounds first. |
+| `poolRecords(jobs)` | The pool of the jobs: the merged and balanced records, the records of each job, and the skipped cases. |
 | `pooledVerdict(jobs, options)` | The verdict of the merged records of all jobs, with the verdict of each job alone as a guard. |
+| `pooledLimitVerdict(jobs, options)` | The limit verdict of the merged records of all jobs, with the limit verdict of each job alone as a guard. |
 | `armVerdicts(run, aaPair, options)` | The verdict of each candidate pair of a run against its A/A pair. |
 | `benchEnv()` | From `/fresh`: the computer of this process, with the CPU model and the runner. |
 | `childLine(stdout)` | From `/fresh`: the last JSON line of a child, with its time `ms`, its `hash` and the reason of a skip. |
@@ -142,6 +144,25 @@ v.trimmed;                                        // the records that balanceOrd
 - A job can give its `skipped` list from `freshRun`. `pooledVerdict` then removes each skipped case from all jobs, and `dropped` lists these cases.
 - Two jobs with a record of one case and one round are an error. Set `roundOffset` of each job.
 - `armVerdicts` gives the verdict of each candidate pair of one run against its A/A pair.
+
+`poolRecords` makes the pool. It does the checks, the removal of the skipped cases and the balance of the list above. `pooledVerdict` and `pooledLimitVerdict` use it, so the two verdicts have one pool.
+
+### The pooled limit verdict
+
+A speed gate on limits over a CI matrix needs `pooledLimitVerdict`:
+
+```ts
+const v = pooledLimitVerdict(jobs, { limit: 2 });
+
+v.outcome;                                        // the pooled outcome, or "cannot decide" when a job gives the opposite outcome
+v.pooled;                                         // the limitVerdict of the merged records
+v.jobs;                                           // the limitVerdict of each job alone
+v.opposed;                                        // the jobs against the pooled outcome
+```
+
+- The pool of one job gives the `limitVerdict` of that job.
+- A job with `beyond` against a pooled `within`, or the reverse, makes the outcome `cannot decide`. Thus a job past the limit stops a gate that needs `within`.
+- A job with `cannot decide` does not change the outcome.
 
 ## The noise cap and the pooled band
 
