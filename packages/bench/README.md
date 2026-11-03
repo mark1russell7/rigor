@@ -57,6 +57,8 @@ v.cases;                                          // the interval, the bound and
 - A case is `within` when its bound is at most the limit. It is `beyond` when its low end times the low end of the band is above the limit.
 - The verdict is `beyond` when a case is `beyond`, and `within` when each case is `within`.
 
+The verdict has no correction for many cases. Each case has its own interval at the level `caseLevel`. Thus with many cases, a verdict `beyond` can come from noise only. Set `caseLevel` higher when a bench has many cases. A correction of Holm is an option for a later version.
+
 ## Time the rounds
 
 `timeRounds` times one case in one process. Start a fresh process for each case and each pair, and give the index of the case as `offset`:
@@ -65,7 +67,7 @@ v.cases;                                          // the interval, the bound and
 const { records } = timeRounds({ a: () => oldCode(input), b: () => newCode(input) }, { case: "board-1", rounds: 31, offset: 0 });
 ```
 
-Each arm gives a number. The sum of these numbers keeps the engine from removing the work of a call.
+Each arm gives a number. The engine cannot remove the work of a call, because the sum of these numbers uses it.
 
 ## The outcomes
 
