@@ -2,7 +2,7 @@
  * The pure part of the time-verdict explorer. The page simulates the paired-time records of a bench with seeded draws.
  * Each decision comes from `@mark1russell7/rigor-bench`: this module only draws the records and gives them to the package.
  */
-import { type CaseRatio, type PairedTime, type Power, type TimeVerdict, type VerdictOptions, caseRatios, firstArm, timeVerdict, verdictPower } from "@mark1russell7/rigor-bench";
+import { type CaseRatio, type PairedTime, type Power, type TimeVerdict, type VerdictOptions, caseRatios, firstArm, timeVerdict, verdictMargin, verdictPower } from "@mark1russell7/rigor-bench";
 import { random, type Random } from "@mark1russell7/rigor-generators";
 import { seedFrom } from "./seed.ts";
 
@@ -93,18 +93,21 @@ export function verdictOptions(records: Simulated): VerdictOptions {
   return { margin: MARGIN, noiseCap: NOISE_CAP, pool: { records: records.pool, run: runOf } };
 }
 
-/** The result of one bench: the records, the verdict of the package and the ratios of the A/A cases. */
+/** The result of one bench: the records, the verdict of the package, the ratios of the A/A cases and the same zone. */
 export interface Explored {
   readonly records: Simulated;
   readonly verdict: TimeVerdict;
   readonly aaCases: readonly CaseRatio[];
+  /** The margin of the rule on a log scale, from `verdictMargin`. The zone `[exp(-margin), exp(margin)]` gives `same`. */
+  readonly margin: number;
 }
 
-/** This function draws a bench and gives the verdict of `timeVerdict`. The page adds no rule of its own. */
+/** This function draws a bench and gives the verdict of `timeVerdict` and the margin of `verdictMargin`. The page adds no rule of its own. */
 export function explore(bench: Bench): Explored {
   const records = simulate(bench);
-  const verdict = timeVerdict(records.candidate, records.aa, verdictOptions(records));
-  return { records, verdict, aaCases: caseRatios(records.aa) };
+  const options = verdictOptions(records);
+  const verdict = timeVerdict(records.candidate, records.aa, options);
+  return { records, verdict, aaCases: caseRatios(records.aa), margin: verdictMargin(options) };
 }
 
 /**

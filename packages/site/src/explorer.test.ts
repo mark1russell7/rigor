@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { caseRatios, timeVerdict } from "@mark1russell7/rigor-bench";
+import { caseRatios, timeVerdict, verdictMargin } from "@mark1russell7/rigor-bench";
 import { pageHtml, packageRows, scrollCueCss, verdictSection } from "./build.ts";
 import { BADGE, callCode, factsText } from "./explorer-view.ts";
 import {
   CASES,
+  MARGIN,
   NOISE_CAP,
   POOL_RUNS,
   PRESETS,
@@ -49,6 +50,18 @@ describe("the verdict of the explorer", () => {
   it("is the verdict of timeVerdict for the same records and options", () => {
     const e = explore(START);
     expect(e.verdict).toEqual(timeVerdict(e.records.candidate, e.records.aa, verdictOptions(e.records)));
+  });
+
+  it("gives the same zone of verdictMargin: the wider of the margin and the pooled band", () => {
+    for (const id of ["faster", "same", "slower", "noisy"]) {
+      const e = explore(bench(id));
+      expect(e.margin).toBe(verdictMargin(verdictOptions(e.records)));
+      expect(e.margin).toBe(Math.max(MARGIN, e.verdict.band!.noise));
+    }
+    const same = explore(bench("same"));
+    expect(same.verdict.interval!.low).toBeGreaterThanOrEqual(Math.exp(-same.margin));
+    expect(same.verdict.interval!.high).toBeLessThanOrEqual(Math.exp(same.margin));
+    expect(explore(bench("noisy")).margin).toBeGreaterThan(MARGIN);
   });
 
   it("uses the pooled band of the earlier runs and the noise cap", () => {
@@ -132,8 +145,10 @@ describe("the text and the axis of the explorer", () => {
   });
 
   it("writes the facts of the verdict from its fields", () => {
-    const v = explore(START).verdict;
-    const text = factsText(v);
+    const e = explore(START);
+    const v = e.verdict;
+    const text = factsText(v, e.margin);
+    expect(text).toContain(ratioText(Math.exp(e.margin)));
     expect(text).toContain(ratioText(v.band!.low));
     expect(text).toContain(ratioText(v.band!.high));
     expect(text).toContain(`${POOL_RUNS} earlier runs`);

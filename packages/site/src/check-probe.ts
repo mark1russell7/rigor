@@ -26,7 +26,8 @@ const preset = async (id: string, expected: string): Promise<void> => {
 };
 
 check("the explorer shows a verdict when the page opens", await until(() => outcome() !== ""), badge());
-check("the pooled A/A band draws", await until(() => width("#vx-chart .band") > 0), width("#vx-chart .band"));
+check("the same zone draws", await until(() => width("#vx-chart .zone") > 0), width("#vx-chart .zone"));
+check("the pooled A/A band draws", width("#vx-chart .band") > 0, width("#vx-chart .band"));
 check("the interval of the candidate draws", width("#vx-chart .interval") > 0, width("#vx-chart .interval"));
 check("the line at 1 draws", $("#vx-chart .one") !== null);
 check("the diagram shows each record of the two pairs (2 x 8 cases x 9 rounds)", records() === 144, records());

@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 41 names
+## . (build/index.d.ts): 42 names
 
 type Arm: build/paired.d.ts#Arm
 type Balanced: build/index.d.ts#Balanced
@@ -46,6 +46,7 @@ pooledBand: build/index.d.ts#pooledBand
 pooledVerdict: build/index.d.ts#pooledVerdict
 timeRounds: build/index.d.ts#timeRounds
 timeVerdict: build/index.d.ts#timeVerdict
+verdictMargin: build/index.d.ts#verdictMargin
 verdictPower: build/index.d.ts#verdictPower
 
 ## ./fresh (build/fresh.d.ts): 17 names
@@ -386,6 +387,9 @@ export declare function timeRounds(arms: Readonly<Record<Arm, () => number>>, op
 
 ### build/index.d.ts#timeVerdict
 export declare function timeVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[], options?: VerdictOptions): TimeVerdict;
+
+### build/index.d.ts#verdictMargin
+export declare function verdictMargin(options?: VerdictOptions): number;
 
 ### build/index.d.ts#verdictPower
 export declare function verdictPower(options: PowerOptions): Power;

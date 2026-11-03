@@ -102,18 +102,21 @@ function drawChart(host: HTMLElement, tip: HTMLElement, result: Explored, bench:
     }
   }
 
-  // The verdict row: the pooled A/A band, the margin, the true ratio and the interval of the candidate.
+  // The verdict row: the same zone of `verdictMargin`, the pooled A/A band, the true ratio and the interval of the candidate.
   const yv = top.verdict;
   const mid = yv + verdictH / 2 + 6;
   root.append(svg("text", { x: pad.l, y: yv - 5, class: "row-label" }, "The verdict: the interval of the candidate over A/A"));
+  const zoneLow = Math.exp(-result.margin);
+  const zoneHigh = Math.exp(result.margin);
+  const zone = svg("rect", { x: x(zoneLow), y: yv + 6, width: Math.max(1, x(zoneHigh) - x(zoneLow)), height: verdictH - 6, rx: 4, class: "zone" });
+  tipOn(tip, zone, () => `The same zone: ${ratioText(zoneLow)} to ${ratioText(zoneHigh)}. An interval in it is same.`);
+  root.append(zone);
   if (v.band !== undefined) {
     const band = v.band;
     const rect = svg("rect", { x: x(band.low), y: yv + 6, width: Math.max(1, x(band.high) - x(band.low)), height: verdictH - 6, rx: 4, class: "band" });
     tipOn(tip, rect, () => `The pooled A/A band: ${ratioText(band.low)} to ${ratioText(band.high)}, from ${band.cases} A/A cases`);
     root.append(rect);
   }
-  const margin = svg("rect", { x: x(Math.exp(-MARGIN)), y: yv + 6, width: x(Math.exp(MARGIN)) - x(Math.exp(-MARGIN)), height: verdictH - 6, rx: 4, class: "margin" });
-  root.append(margin);
   // The line at 1 has a part in each row, so it does not cross the labels of the rows.
   for (const [y1, y2] of [[top.candidate, top.candidate + rowH], [top.aa, top.aa + rowH], [yv + 6, axisY]] as const) root.append(svg("line", { x1: x(1), x2: x(1), y1, y2, class: "one" }));
   const truth = x(bench.ratio);
@@ -131,12 +134,12 @@ function drawChart(host: HTMLElement, tip: HTMLElement, result: Explored, bench:
   host.replaceChildren(root);
 }
 
-/** This function gives the facts line of the verdict: the margin, the pooled band and the noise cap, from the fields of the verdict. */
-export function factsText(v: TimeVerdict): string {
-  const parts: string[] = [];
+/** This function gives the facts line: the same zone, the pooled band and the noise cap of the verdict. */
+export function factsText(v: TimeVerdict, margin: number): string {
+  const parts: string[] = [`The same zone of verdictMargin is ${ratioText(Math.exp(-margin))} to ${ratioText(Math.exp(margin))}: the wider of the margin of ${pct(MARGIN)} and the pooled A/A band.`];
   if (v.band !== undefined) {
     const runs = v.pool?.runs === undefined ? "" : ` of ${v.pool.runs} earlier runs`;
-    parts.push(`The same zone is the wider of the margin ${ratioText(Math.exp(-MARGIN))} to ${ratioText(Math.exp(MARGIN))} and the pooled A/A band ${ratioText(v.band.low)} to ${ratioText(v.band.high)} (${v.band.cases} cases${runs}).`);
+    parts.push(`The pooled A/A band is ${ratioText(v.band.low)} to ${ratioText(v.band.high)} (${v.band.cases} cases${runs}).`);
   }
   if (v.noise !== undefined && v.noise.spread !== undefined) {
     parts.push(`The A/A spread of this run is ${pct(Math.exp(v.noise.spread) - 1)}, and the noise cap is ${pct(Math.exp(v.noise.cap) - 1)}.`);
@@ -242,7 +245,7 @@ export function startExplorer(): void {
     badge.textContent = BADGE[v.outcome];
     why.textContent = plainWhy(v);
     reason.textContent = `The package says: ${v.reason}`;
-    facts.textContent = factsText(v);
+    facts.textContent = factsText(v, result.margin);
     drawChart(chart, tip, result, b);
     count.textContent = String(result.records.candidate.length + result.records.aa.length);
     if (records.open) fillRecords(recordBody, result);

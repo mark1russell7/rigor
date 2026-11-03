@@ -59,7 +59,7 @@ export function verdictSection(): string {
 </div>
 <div class="verdict" aria-live="polite"><span id="vx-badge" class="badge"></span><p id="vx-why"></p></div>
 <div id="vx-chart"></div>
-<div class="legend"><span><span class="key dot"></span>candidate case</span><span><span class="key dot aa"></span>A/A case</span><span><span class="key dot faint"></span>one round</span><span><span class="key band"></span>pooled A/A band</span><span><span class="key margin"></span>margin of 5%</span><span><span class="key interval"></span>interval of the candidate</span><span><span class="key truth"></span>true ratio</span></div>
+<div class="legend"><span><span class="key dot"></span>candidate case</span><span><span class="key dot aa"></span>A/A case</span><span><span class="key dot faint"></span>one round</span><span><span class="key zone"></span>same zone</span><span><span class="key band"></span>pooled A/A band</span><span><span class="key interval"></span>interval of the candidate</span><span><span class="key truth"></span>true ratio</span></div>
 <p id="vx-facts" class="fine"></p>
 <p id="vx-reason" class="fine"></p>
 <div class="power"><button type="button" id="vx-power-run">Test the rule on 50 new benches</button><div id="vx-power"></div></div>
@@ -125,8 +125,8 @@ input[type="range"] { padding: 0; margin-top: 10px; border: 0; background: none;
 .case { stroke: var(--card); stroke-width: 2; }
 .case.on { stroke: var(--ink); }
 .grid { stroke: var(--line); }
-.band { fill: var(--muted); opacity: 0.25; }
-.margin { fill: none; stroke: var(--ink); stroke-width: 1; stroke-dasharray: 4 3; opacity: 0.6; }
+.zone { fill: var(--muted); opacity: 0.25; }
+.band { fill: none; stroke: var(--ink); stroke-width: 1; stroke-dasharray: 4 3; opacity: 0.6; }
 .one { stroke: var(--ink); stroke-width: 1.5; }
 .truth, .interval { fill: var(--ink); }
 .interval.on { fill: var(--accent); }
@@ -135,8 +135,8 @@ input[type="range"] { padding: 0; margin-top: 10px; border: 0; background: none;
 .key.dot { width: 10px; height: 10px; border-radius: 50%; }
 .key.dot.aa { background: var(--muted); }
 .key.dot.faint { opacity: 0.35; }
-.key.band { background: var(--muted); opacity: 0.4; }
-.key.margin { background: none; border: 1px dashed var(--ink); }
+.key.zone { background: var(--muted); opacity: 0.4; }
+.key.band { background: none; border: 1px dashed var(--ink); }
 .key.interval { background: var(--ink); height: 6px; border-radius: 3px; }
 .key.truth { width: 0; height: 0; border-radius: 0; background: none; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid var(--ink); }
 .fine { font-size: 0.88rem; color: var(--muted); margin: 8px 0 0; }

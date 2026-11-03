@@ -18,4 +18,5 @@ export {
   aaSpread,
   pooledBand,
   timeVerdict,
+  verdictMargin,
 } from "./verdict.ts";

@@ -258,8 +258,10 @@ function marginOf(options: VerdictOptions, pooled: Band | undefined): number {
 }
 
 /**
- * This function gives the margin that the rule `difference` of `timeVerdict` uses with these options. It uses the same code as the verdict.
+ * This function gives the margin that the rule `difference` of `timeVerdict` uses with these options, on a log scale.
+ * The margin is the larger of the option `margin` (default 0.05) and the noise of the pooled band. It uses the same code as the verdict.
  * The pooled band comes from the records of the option `pool`, not from the records of the run.
+ * An interval in `[exp(-margin), exp(margin)]` has the outcome `same`. A page can draw that zone with this function.
  */
 export function verdictMargin(options: VerdictOptions = {}): number {
   return marginOf(options, poolFor(options)?.band);
