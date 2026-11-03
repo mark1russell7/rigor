@@ -91,6 +91,16 @@ describe("the true outcome of verdictPower", () => {
     expect(slow.power).toBe(slow.outcomes.slower);
   });
 
+  it("takes the margin of the verdict with a pool: the larger of margin and the pooled noise", () => {
+    // The floor 0.1 gives the pooled noise 0.1, above the margin 0.05. The ratio 0.93 is between exp(-0.1) and exp(-0.05).
+    const pool = { records: [], floor: 0.1 };
+    const pooled = verdictPower({ ...base, ratio: 0.93, verdict: { ...verdict, pool } });
+    expect(pooled.outcomes.same).toBeGreaterThan(pooled.outcomes.faster);
+    expect(pooled.power).toBe(pooled.outcomes.same);
+    const plain = verdictPower({ ...base, ratio: 0.93, verdict });
+    expect(plain.power).toBe(plain.outcomes.faster);
+  });
+
   it("keeps faster below 1 with the margin 0 and with the rule band", () => {
     const zero = verdictPower({ ...base, ratio: 0.97, verdict: { ...verdict, margin: 0 } });
     expect(zero.outcomes.faster).toBeGreaterThan(zero.outcomes.same);

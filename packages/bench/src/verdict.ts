@@ -212,7 +212,7 @@ export function timeVerdict(candidate: readonly PairedTime[], aa: readonly Paire
   if (options.noiseCap !== undefined && !(options.noiseCap >= 0 && Number.isFinite(options.noiseCap))) {
     throw new RangeError(`timeVerdict: the noise cap is a finite number of 0 or more, not ${options.noiseCap}.`);
   }
-  const pool = options.pool === undefined ? undefined : poolOf(options.pool, level);
+  const pool = poolFor(options);
   let verdict = ruleVerdict(candidate, aa, options, pool?.band);
   if (pool !== undefined) verdict = { ...verdict, pool: pool.facts };
   if (options.noiseCap !== undefined) {
@@ -231,6 +231,26 @@ export function timeVerdict(candidate: readonly PairedTime[], aa: readonly Paire
   return verdict;
 }
 
+/** This function gives the pooled band and its facts of the options, or undefined without the option `pool`. */
+function poolFor(options: VerdictOptions): { band: Band; facts: PoolFacts } | undefined {
+  return options.pool === undefined ? undefined : poolOf(options.pool, options.spreadLevel ?? 0.9);
+}
+
+/** This function gives the margin of the rule `difference`: the larger of `margin` and the noise of the pooled band. It refuses a margin below 0. */
+function marginOf(options: VerdictOptions, pooled: Band | undefined): number {
+  const given = options.margin ?? 0.05;
+  if (!(given >= 0)) throw new RangeError(`timeVerdict: the margin is 0 or more, not ${given}.`);
+  return pooled === undefined ? given : Math.max(given, pooled.noise);
+}
+
+/**
+ * This function gives the margin that the rule `difference` of `timeVerdict` uses with these options. It uses the same code as the verdict.
+ * The pooled band comes from the records of the option `pool`, not from the records of the run.
+ */
+export function verdictMargin(options: VerdictOptions = {}): number {
+  return marginOf(options, poolFor(options)?.band);
+}
+
 /** This function gives the outcome of the rule. A pooled band replaces the band of the A/A arm, and it widens the margin of the rule `difference`. */
 function ruleVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[], options: VerdictOptions, pooled: Band | undefined): TimeVerdict {
   const rule = options.rule ?? "difference";
@@ -247,9 +267,7 @@ function ruleVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[]
   const comparison = compareRatios(cases.map((c) => 1 + Math.log(c.ratio)), { better: "lower", noise: band.noise });
   const facts = { cases, rule, band, comparison };
   if (rule === "difference") {
-    const given = options.margin ?? 0.05;
-    if (!(given >= 0)) throw new RangeError(`timeVerdict: the margin is 0 or more, not ${given}.`);
-    const margin = pooled === undefined ? given : Math.max(given, pooled.noise);
+    const margin = marginOf(options, pooled);
     const shown = pooled === undefined ? margin : round(margin);
     const logs = cases.map((c) => Math.log(c.ratio));
     const aaLogs = aaRatios.map((c) => Math.log(c.ratio));
