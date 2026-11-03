@@ -14,6 +14,7 @@ export type QuantileMethod =
    * The higher of the two nearest ranks of type 7: `sorted[Math.ceil(p * (n - 1))]`. This is the method `"higher"` of
    * NumPy. The 0.5 quantile is the upper median `sorted[Math.floor(n / 2)]`. The rank `p * (n - 1)` is rounded to
    * `1e-9` before the ceiling. Thus a float error, for example `0.55 * 100 = 55.00000000000001`, does not move the rank up.
+   * The rounding keeps the exact rank while `p * (n - 1) * 1e9` is below `2 ** 53`, so for `n` up to approximately 9 million.
    */
   | "higher";
 
