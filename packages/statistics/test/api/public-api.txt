@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 49 names
+## . (build/index.d.ts): 51 names
 
 type BootstrapOptions: build/index.d.ts#BootstrapOptions
 type CalibrationLevel: build/index.d.ts#CalibrationLevel
@@ -24,6 +24,7 @@ type PermutationOptions: build/index.d.ts#PermutationOptions
 type PermutationResult: build/index.d.ts#PermutationResult
 type Proportion: build/index.d.ts#Proportion
 type QuantileMethod: build/index.d.ts#QuantileMethod
+type RidgeOptions: build/index.d.ts#RidgeOptions
 type Summary: build/index.d.ts#Summary
 Z95: build/index.d.ts#Z95
 binomialInterval: build/index.d.ts#binomialInterval
@@ -48,6 +49,7 @@ pairedPermutation: build/index.d.ts#pairedPermutation
 quantile: build/index.d.ts#quantile
 quantileSorted: build/index.d.ts#quantileSorted
 ranks: build/index.d.ts#ranks
+ridgeSolve: build/index.d.ts#ridgeSolve
 sd: build/index.d.ts#sd
 signTest: build/index.d.ts#signTest
 signTestPower: build/index.d.ts#signTestPower
@@ -192,6 +194,11 @@ interface Proportion {
 ### build/index.d.ts#QuantileMethod
 type QuantileMethod = "linear" | "nearest-rank";
 
+### build/index.d.ts#RidgeOptions
+interface RidgeOptions {
+  readonly free?: readonly number[];
+}
+
 ### build/index.d.ts#Summary
 interface Summary {
   readonly n: number;
@@ -273,6 +280,9 @@ export declare function quantileSorted(sortedValues: readonly number[], p: numbe
 
 ### build/index.d.ts#ranks
 export declare function ranks(values: readonly number[]): number[];
+
+### build/index.d.ts#ridgeSolve
+export declare function ridgeSolve(gram: ArrayLike<number>, moment: ArrayLike<number>, lambda: number, options?: RidgeOptions): number[];
 
 ### build/index.d.ts#sd
 export declare function sd(values: readonly number[]): number;

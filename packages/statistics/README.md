@@ -34,6 +34,7 @@ A promotion reads `gains` against `drops` and `effect`. A sign test alone is not
 | `bootstrapMedianRatio(numerator, denominator, options)` | The interval of `median(numerator) / median(denominator)`. It is the uncertainty of the ratio, not the spread of the samples. |
 | `leastSquares(x, y, { intercept })` | The ordinary least-squares fit of `y` on the rows of `x`, with a QR decomposition. It gives the coefficients, `residualSd`, `r2`, `n` and `k`. A singular design gives NaN coefficients. |
 | `bootstrapLeastSquares(x, y, options)` | One bootstrap interval for each coefficient of `leastSquares`, from the same draws of whole rows. A singular draw does not count. |
+| `ridgeSolve(gram, moment, lambda, { free })` | The ridge coefficients from the normal equations `X'X` and `X'y`, with a Cholesky factorization. The `free` coefficients have no penalty. A matrix that is not positive definite gives NaN coefficients. |
 | `signTest(better, worse, sides)`, `signTestPower(n, level)` | The sign test, and the fewest wins out of `n` that the test calls significant. |
 | `pairedPermutation(candidate, baseline, options)` | The paired permutation test (random sign flips). It uses the size of each difference. |
 | `wilson(k, n, z)` | The Wilson interval of a proportion. |
