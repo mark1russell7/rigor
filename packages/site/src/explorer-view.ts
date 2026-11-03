@@ -58,18 +58,63 @@ function tipOn(tip: HTMLElement, target: SVGElement, text: () => string, mark?: 
   });
 }
 
+/** The height of one line of a row label. */
+const LABEL_LINE = 15;
+
+/**
+ * This function breaks a row label into lines that fit the width. It measures each line in the diagram,
+ * so a narrow screen does not cut the label.
+ */
+function labelLines(root: SVGElement, text: string, width: number): string[] {
+  const probe = svg("text", { class: "row-label" }) as SVGTextElement;
+  root.append(probe);
+  const fits = (line: string): boolean => {
+    probe.textContent = line;
+    return probe.getComputedTextLength() <= width;
+  };
+  const lines: string[] = [];
+  let line = "";
+  for (const word of text.split(" ")) {
+    const next = line === "" ? word : `${line} ${word}`;
+    if (line !== "" && !fits(next)) {
+      lines.push(line);
+      line = word;
+    } else line = next;
+  }
+  lines.push(line);
+  probe.remove();
+  return lines;
+}
+
 /** This function draws the diagram: two rows of records, the verdict row and the axis. */
 function drawChart(host: HTMLElement, tip: HTMLElement, result: Explored, bench: Bench): void {
   const W = Math.max(280, Math.round(host.clientWidth));
   const pad = { l: 10, r: 10 };
   const rowH = 46;
-  const top = { candidate: 18, aa: 18 + rowH + 18, verdict: 18 + 2 * (rowH + 18) };
   const verdictH = 58;
+  const v = result.verdict;
+  const root = svg("svg", { width: W, role: "img", "aria-label": `The records of the bench, the pooled A/A band and the interval of the candidate. The verdict is ${v.outcome}.` });
+  // The diagram is in the page before the labels are measured.
+  host.replaceChildren(root);
+  const inner = W - pad.l - pad.r;
+  const labels = {
+    candidate: labelLines(root, `Candidate / baseline: ${bench.rounds} rounds of ${v.cases.length} cases`, inner),
+    aa: labelLines(root, "A/A: the baseline against itself, in the same run", inner),
+    verdict: labelLines(root, "The verdict: the interval of the candidate over A/A", inner),
+  };
+  // Each row starts below its label. A label of more lines moves its row and the rows below it down.
+  const below = (lines: readonly string[]): number => 18 + (lines.length - 1) * LABEL_LINE;
+  const candidateTop = below(labels.candidate);
+  const aaTop = candidateTop + rowH + below(labels.aa);
+  const top = { candidate: candidateTop, aa: aaTop, verdict: aaTop + rowH + below(labels.verdict) };
   const axisY = top.verdict + verdictH + 6;
   const H = axisY + 24;
-  const x = (ratio: number): number => pad.l + axisPlace(ratio) * (W - pad.l - pad.r);
-  const v = result.verdict;
-  const root = svg("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: "img", "aria-label": `The records of the bench, the pooled A/A band and the interval of the candidate. The verdict is ${v.outcome}.` });
+  root.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  root.setAttribute("height", String(H));
+  const x = (ratio: number): number => pad.l + axisPlace(ratio) * inner;
+  const label = (lines: readonly string[], y0: number): void => {
+    lines.forEach((line, i) => root.append(svg("text", { x: pad.l, y: y0 - 5 - (lines.length - 1 - i) * LABEL_LINE, class: "row-label" }, line)));
+  };
 
   // The axis and its ticks. The line at 1 goes over each row.
   root.append(svg("line", { x1: pad.l, x2: W - pad.r, y1: axisY, y2: axisY, class: "axis" }));
@@ -79,14 +124,14 @@ function drawChart(host: HTMLElement, tip: HTMLElement, result: Explored, bench:
     root.append(svg("text", { x: x(t), y: axisY + 17, class: "tick", "text-anchor": "middle" }, `${t}×`));
   }
 
-  // The records: a light dot for each round (b / a), and a dark dot for each case ratio.
-  const rows: { key: "candidate" | "aa"; label: string; series: string }[] = [
-    { key: "candidate", label: `Candidate / baseline: ${bench.rounds} rounds of ${result.verdict.cases.length} cases`, series: "s-candidate" },
-    { key: "aa", label: "A/A: the baseline against itself, in the same run", series: "s-aa" },
+  // The records: a small ring for each round (b / a), and a large dot for each case ratio.
+  const rows: { key: "candidate" | "aa"; series: string }[] = [
+    { key: "candidate", series: "s-candidate" },
+    { key: "aa", series: "s-aa" },
   ];
   for (const row of rows) {
     const y0 = top[row.key];
-    root.append(svg("text", { x: pad.l, y: y0 - 5, class: "row-label" }, row.label));
+    label(labels[row.key], y0);
     root.append(svg("line", { x1: pad.l, x2: W - pad.r, y1: y0 + rowH / 2, y2: y0 + rowH / 2, class: "grid" }));
     const records = row.key === "candidate" ? result.records.candidate : result.records.aa;
     records.forEach((r, i) => {
@@ -105,7 +150,7 @@ function drawChart(host: HTMLElement, tip: HTMLElement, result: Explored, bench:
   // The verdict row: the same zone of `verdictMargin`, the pooled A/A band, the true ratio and the interval of the candidate.
   const yv = top.verdict;
   const mid = yv + verdictH / 2 + 6;
-  root.append(svg("text", { x: pad.l, y: yv - 5, class: "row-label" }, "The verdict: the interval of the candidate over A/A"));
+  label(labels.verdict, yv);
   const zoneLow = Math.exp(-result.margin);
   const zoneHigh = Math.exp(result.margin);
   const zone = svg("rect", { x: x(zoneLow), y: yv + 6, width: Math.max(1, x(zoneHigh) - x(zoneLow)), height: verdictH - 6, rx: 4, class: "zone" });
@@ -131,7 +176,6 @@ function drawChart(host: HTMLElement, tip: HTMLElement, result: Explored, bench:
     tipOn(tip, hit, () => `The interval of the candidate: ${ratioText(iv.low)} to ${ratioText(iv.high)}, estimate ${ratioText(iv.estimate)}`, bar);
     root.append(bar, dot, hit);
   }
-  host.replaceChildren(root);
 }
 
 /** This function gives the facts line: the same zone, the pooled band and the noise cap of the verdict. */

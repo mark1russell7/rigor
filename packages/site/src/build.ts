@@ -117,7 +117,9 @@ input[type="range"] { padding: 0; margin-top: 10px; border: 0; background: none;
 .badge[data-outcome="same"] { background: var(--accent-soft); color: var(--ink); }
 .badge[data-outcome="cannot decide"] { background: #fab219; color: #0b0b0b; }
 #vx-chart svg { display: block; }
-.rec { opacity: 0.3; }
+.rec { fill-opacity: 0.45; stroke-width: 1; }
+.rec.s-candidate { stroke: var(--accent); }
+.rec.s-aa { stroke: var(--muted); }
 .s-candidate { fill: var(--accent); }
 .s-aa { fill: var(--muted); }
 .case { stroke: var(--card); stroke-width: 2; }
@@ -132,7 +134,7 @@ input[type="range"] { padding: 0; margin-top: 10px; border: 0; background: none;
 .row-label { fill: var(--muted); font-size: 12px; }
 .key.dot { width: 10px; height: 10px; border-radius: 50%; }
 .key.dot.aa { background: var(--muted); }
-.key.dot.faint { opacity: 0.35; }
+.key.dot.faint { width: 8px; height: 8px; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 45%, transparent); }
 .key.zone { background: var(--muted); opacity: 0.4; }
 .key.band { background: none; border: 1px dashed var(--ink); }
 .key.interval { background: var(--ink); height: 6px; border-radius: 3px; }
