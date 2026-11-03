@@ -145,9 +145,11 @@ The option `noiseCap` caps the A/A spread of the run. The spread is the quantile
 ```ts
 const v = timeVerdict(records, aaRecords, { noiseCap: 0.06 });
 
-v.noise;                                          // { spread, cap, noisy }
+v.noise;                                          // { spread, cap, noisy, aaMedian, biased }
 v.reason;                                         // the spread, the cap and the outcome without the cap
 ```
+
+Since 0.2.0, the noise cap also examines the bias of the A/A arm. An A/A median ratio out of `[exp(-noiseCap), exp(noiseCap)]` gives `cannot decide`. A bias of this size comes from the order or from the arm slots, not from the candidate. With a `spreadLevel` of 0.5 or more, a biased run is also noisy. More than half of its A/A cases are out of the cap. Thus the bias check decides alone only below the level 0.5. The fields `aaMedian` and `biased` keep the facts of the check.
 
 The option `pool` gives a band from the A/A records of earlier quiet runs, with a floor. The caller keeps the pool, for example in a file of the repository:
 
@@ -172,12 +174,14 @@ For a fixed limit, for example 1.10 against a fixed base, use `limitVerdict`.
 
 | Outcome | The rule `difference` (the default) | The rule `band` |
 | --- | --- | --- |
-| `faster` | The whole interval is below 1. | The interval of the median ratio is below the band. |
-| `slower` | The whole interval is above 1. | The interval is above the band. |
-| `same` | The interval is in `[exp(-margin), exp(margin)]`. The default margin is 0.05. | The interval is in the band. |
+| `same` | The interval is in `[exp(-margin), exp(margin)]`. The default margin is 0.05. The rule examines this outcome first. | The interval is in the band. |
+| `faster` | The whole interval is below 1, and it is not in the margin. | The interval of the median ratio is below the band. |
+| `slower` | The whole interval is above 1, and it is not in the margin. | The interval is above the band. |
 | `cannot decide` | The interval holds 1 and crosses the margin. | The interval crosses an end of the band. |
 
-Both rules give `cannot decide` when the A/A arm has fewer than 5 cases, or when the candidate has no cases. With `noiseCap`, both rules also give `cannot decide` when the A/A spread of the run is above the cap.
+Both rules give `cannot decide` when the A/A arm has fewer than 5 cases, or when the candidate has no cases. With `noiseCap`, an A/A spread of the run above the cap also gives `cannot decide`. So does an A/A median ratio of the run out of the cap.
+
+Since 0.2.0, the rule `difference` examines the margin before 1. An interval in the margin is `same`, also when it is wholly below 1. An example is the interval `[0.96, 0.98]` with the margin 0.05: it is `same`, and 0.1.2 gave `faster`. An interval below 1 that crosses `exp(-margin)` is still `faster`. With the margin 0, each outcome stays the same.
 
 ## The power test
 
@@ -196,3 +200,5 @@ Both rules give `cannot decide` when the A/A arm has fewer than 5 cases, or when
 | `difference` | 20 | 0.71 | 0 | 0.04 |
 
 The rule `band` compares an interval with a band of the same noise, so it needs a change of approximately twice that noise. With the kind `case`, it also calls a real speedup `same`. Thus `difference` is the default. Its false rate is near the 5% of a two-sided interval of level 0.95. A change of 7% needs approximately 20 cases for a power of 0.7.
+
+Since 0.2.0, `verdictPower` takes `same` as the true outcome of a ratio in the margin of the rule `difference`. The cells of the table stay, because the ratio 0.93 is out of the margin 0.05.

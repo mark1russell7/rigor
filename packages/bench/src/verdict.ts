@@ -141,10 +141,14 @@ export type VerdictRule = "band" | "difference";
 export interface VerdictOptions extends BandOptions {
   /** The rule of the verdict. The default is `difference`, from the power test of `verdictPower`. */
   readonly rule?: VerdictRule;
-  /** The half width on a log scale of the ratios that the rule `difference` calls `same`. The default is 0.05. */
+  /**
+   * The half width on a log scale of the ratios that the rule `difference` calls `same`. The default is 0.05.
+   * An interval in the margin is `same`, also when it is wholly below 1.
+   */
   readonly margin?: number;
   /**
    * The noise cap on the A/A spread of the run, on a log scale. Above the cap, the outcome is `cannot decide`.
+   * The cap also limits the bias of the A/A arm: an A/A median ratio out of `[exp(-noiseCap), exp(noiseCap)]` gives `cannot decide`.
    * The default is no cap.
    */
   readonly noiseCap?: number;
@@ -157,13 +161,20 @@ export interface VerdictOptions extends BandOptions {
   readonly pool?: PoolOptions;
 }
 
-/** The noise cap of a verdict: the A/A spread of the run and the cap. */
+/** The noise cap of a verdict: the A/A spread of the run, the A/A median ratio of the run and the cap. */
 export interface NoiseCheck {
   /** The A/A spread of the run, or undefined when the A/A arm has no cases. */
   readonly spread: number | undefined;
   readonly cap: number;
   /** This value is `true` when the spread is above the cap, or when the A/A arm has no cases. */
   readonly noisy: boolean;
+  /** The median ratio of the A/A cases of the run, or undefined when the A/A arm has no cases. A value far from 1 shows a bias of the order or of the arm slots. */
+  readonly aaMedian: number | undefined;
+  /**
+   * This value is `true` when the A/A median ratio of the run is out of `[exp(-cap), exp(cap)]`.
+   * With a spread level of 0.5 or more, a biased run is also noisy. The check decides alone only below that level.
+   */
+  readonly biased: boolean;
 }
 
 /** A time verdict, with the facts that it uses. */
@@ -195,11 +206,14 @@ export interface TimeVerdict {
 
 /**
  * This function gives the time verdict of the candidate arm `b` against the baseline arm `a`.
- * - The rule `difference` gives `faster` when the whole interval is below 1, and `slower` when it is above 1.
- *   It gives `same` when the interval is in `[exp(-margin), exp(margin)]`.
+ * - The rule `difference` gives `same` when the interval is in `[exp(-margin), exp(margin)]`. This test comes first, so
+ *   an interval in the margin and below 1 is `same`, not `faster`.
+ * - Out of the margin, the rule `difference` gives `faster` when the whole interval is below 1, and `slower` when it is above 1.
+ *   With the margin 0, each outcome stays the same as in 0.1.2.
  * - The rule `band` gives `faster` below the band, `slower` above the band, and `same` in the band.
  * - Each other case is `cannot decide`, and so is an A/A arm with too few cases.
  * - With `noiseCap`, an A/A spread of the run above the cap gives `cannot decide`.
+ * - With `noiseCap`, an A/A median ratio of the run out of `[exp(-noiseCap), exp(noiseCap)]` also gives `cannot decide`.
  * - With `pool`, the pooled band replaces the band of the A/A arm of the run. The run still needs `minimum` A/A cases.
  */
 export function timeVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[], options: VerdictOptions = {}): TimeVerdict {
@@ -207,23 +221,48 @@ export function timeVerdict(candidate: readonly PairedTime[], aa: readonly Paire
   if (options.noiseCap !== undefined && !(options.noiseCap >= 0 && Number.isFinite(options.noiseCap))) {
     throw new RangeError(`timeVerdict: the noise cap is a finite number of 0 or more, not ${options.noiseCap}.`);
   }
-  const pool = options.pool === undefined ? undefined : poolOf(options.pool, level);
+  const pool = poolFor(options);
   let verdict = ruleVerdict(candidate, aa, options, pool?.band);
   if (pool !== undefined) verdict = { ...verdict, pool: pool.facts };
   if (options.noiseCap !== undefined) {
     const cap = options.noiseCap;
     const aaRatios = caseRatios(aa);
     const spread = aaRatios.length === 0 ? undefined : spreadOf(aaRatios, level);
-    const noise: NoiseCheck = { spread, cap, noisy: spread === undefined || spread > cap };
+    const aaMedian = aaRatios.length === 0 ? undefined : Math.exp(quantile(aaRatios.map((r) => Math.log(r.ratio)), 0.5));
+    const biased = aaMedian !== undefined && Math.abs(Math.log(aaMedian)) > cap;
+    const noise: NoiseCheck = { spread, cap, noisy: spread === undefined || spread > cap, aaMedian, biased };
     verdict = { ...verdict, noise };
     // The early outcomes (no candidate cases, too few A/A cases) keep their reason. Each other outcome gives way to the cap.
     if (noise.noisy && verdict.band !== undefined) {
       const why = spread === undefined ? "The A/A arm of the run has no cases, so the noise cap has no spread." : `The A/A spread of the run is ${round(spread)}, above the noise cap ${cap}.`;
       const reason = `${why} Without the cap, the outcome is "${verdict.outcome}".`;
       verdict = { ...verdict, outcome: "cannot decide", reason };
+    } else if (noise.biased && verdict.band !== undefined) {
+      const reason = `The A/A median ratio of the run is ${round(aaMedian!)}, out of [${round(Math.exp(-cap))}, ${round(Math.exp(cap))}] of the noise cap ${cap}. Without the cap, the outcome is "${verdict.outcome}".`;
+      verdict = { ...verdict, outcome: "cannot decide", reason };
     }
   }
   return verdict;
+}
+
+/** This function gives the pooled band and its facts of the options, or undefined without the option `pool`. */
+function poolFor(options: VerdictOptions): { band: Band; facts: PoolFacts } | undefined {
+  return options.pool === undefined ? undefined : poolOf(options.pool, options.spreadLevel ?? 0.9);
+}
+
+/** This function gives the margin of the rule `difference`: the larger of `margin` and the noise of the pooled band. It refuses a margin below 0. */
+function marginOf(options: VerdictOptions, pooled: Band | undefined): number {
+  const given = options.margin ?? 0.05;
+  if (!(given >= 0)) throw new RangeError(`timeVerdict: the margin is 0 or more, not ${given}.`);
+  return pooled === undefined ? given : Math.max(given, pooled.noise);
+}
+
+/**
+ * This function gives the margin that the rule `difference` of `timeVerdict` uses with these options. It uses the same code as the verdict.
+ * The pooled band comes from the records of the option `pool`, not from the records of the run.
+ */
+export function verdictMargin(options: VerdictOptions = {}): number {
+  return marginOf(options, poolFor(options)?.band);
 }
 
 /** This function gives the outcome of the rule. A pooled band replaces the band of the A/A arm, and it widens the margin of the rule `difference`. */
@@ -242,18 +281,17 @@ function ruleVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[]
   const comparison = compareRatios(cases.map((c) => 1 + Math.log(c.ratio)), { better: "lower", noise: band.noise });
   const facts = { cases, rule, band, comparison };
   if (rule === "difference") {
-    const given = options.margin ?? 0.05;
-    if (!(given >= 0)) throw new RangeError(`timeVerdict: the margin is 0 or more, not ${given}.`);
-    const margin = pooled === undefined ? given : Math.max(given, pooled.noise);
+    const margin = marginOf(options, pooled);
     const shown = pooled === undefined ? margin : round(margin);
     const logs = cases.map((c) => Math.log(c.ratio));
     const aaLogs = aaRatios.map((c) => Math.log(c.ratio));
     const d = bootstrapTwo(logs, aaLogs, (x, y) => median(x) - median(y), options.bootstrap);
     const interval: Interval = { ...d, estimate: Math.exp(d.estimate), low: Math.exp(d.low), high: Math.exp(d.high) };
     const span = `The interval of the candidate median over the A/A median is [${round(interval.low)}, ${round(interval.high)}].`;
+    // The margin comes first: an interval in the margin is `same`, also when it is wholly below or above 1.
+    if (d.low >= -margin && d.high <= margin) return { ...facts, interval, outcome: "same", reason: `${span} The interval is in the margin of ${shown}.` };
     if (interval.high < 1) return { ...facts, interval, outcome: "faster", reason: `${span} The interval is below 1.` };
     if (interval.low > 1) return { ...facts, interval, outcome: "slower", reason: `${span} The interval is above 1.` };
-    if (d.low >= -margin && d.high <= margin) return { ...facts, interval, outcome: "same", reason: `${span} The interval is in the margin of ${shown}.` };
     return { ...facts, interval, outcome: "cannot decide", reason: `${span} The interval holds 1 and crosses the margin of ${shown}.` };
   }
   const interval = bootstrapMedian(cases.map((c) => c.ratio), options.bootstrap);

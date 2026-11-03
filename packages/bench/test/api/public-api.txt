@@ -253,6 +253,8 @@ interface NoiseCheck {
   readonly spread: number | undefined;
   readonly cap: number;
   readonly noisy: boolean;
+  readonly aaMedian: number | undefined;
+  readonly biased: boolean;
 }
 
 ### build/index.d.ts#PoolFacts
