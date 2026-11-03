@@ -250,7 +250,7 @@ for (const seed of seedsFrom(process.env.SEED, [1, 2, 3, 4, 5])) {
 
 /**
  * This function gives the module names that a bundle still imports. The page bundle runs in a browser, so it imports none.
- * An example is `node:perf_hooks` of the timer of `rigor-bench`: a browser cannot load it, and then no script of the page starts.
+ * A browser cannot load a Node module such as `node:fs`, and then no script of the page starts.
  * The bundler puts each static import at the start of an ES module, so this function reads only the statements at the start.
  * Thus the text of a code example in a string is not an import.
  */
@@ -295,8 +295,6 @@ async function main(argv: readonly string[]): Promise<number> {
     platform: "browser",
     fixedExtension: false,
     noExternal: [/.*/],
-    // The root of rigor-bench also exports its timer, which imports node:perf_hooks. The page does not use it, so the bundle drops the import.
-    treeshake: { moduleSideEffects: "no-external" },
     dts: false,
     minify: true,
     clean: false,
