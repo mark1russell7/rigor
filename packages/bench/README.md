@@ -89,11 +89,12 @@ const pool = { records: quietAaRecords, floor: Math.log(1.05) };   // each run h
 const v = timeVerdict(records, aaRecords, { noiseCap: 0.06, pool });
 
 v.band;                                           // the pooled band: its noise is at least the floor
-v.pool;                                           // { cases, spread, floor, pooled }
+v.pool;                                           // { cases, runs, spread, floor, pooled }
 ```
 
 - The noise of the pooled band is the larger of the floor and the spread of the pooled cases. The floor and the noise are on a log scale.
 - With fewer pooled cases than `minimum` (default 5), the band uses the floor alone.
+- The option `run` gives the run of each record, so `v.pool.runs` counts the runs. The cases of one run share one runner, so they are not independent.
 - The pooled band replaces the band of the run in the rule `band` and in `comparison`.
 - The rule `difference` uses the larger of `margin` and the noise of the pooled band as its margin.
 - The run still needs its own A/A arm of 5 cases or more. The noise cap uses that arm.

@@ -124,6 +124,7 @@ interface PairedTime {
 ### build/index.d.ts#PoolFacts
 interface PoolFacts {
   readonly cases: number;
+  readonly runs: number | undefined;
   readonly spread: number | undefined;
   readonly floor: number;
   readonly pooled: boolean;
@@ -134,6 +135,7 @@ interface PoolOptions {
   readonly records: readonly PairedTime[];
   readonly floor?: number;
   readonly minimum?: number;
+  readonly run?: (record: PairedTime) => string;
 }
 
 ### build/index.d.ts#Power

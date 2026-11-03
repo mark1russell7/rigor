@@ -82,12 +82,19 @@ export interface PoolOptions {
   readonly floor?: number;
   /** The fewest pooled cases that give a spread. With fewer cases, the noise of the band is the floor. The default is 5. */
   readonly minimum?: number;
+  /**
+   * The run of a record, for example the id of its CI run. The verdict counts the runs of the pool with it.
+   * The cases of one run share one runner, so they are not independent. Many cases from few runs show the noise of few runners.
+   */
+  readonly run?: (record: PairedTime) => string;
 }
 
 /** The facts of the pooled band of a verdict. */
 export interface PoolFacts {
   /** The count of the pooled A/A cases. */
   readonly cases: number;
+  /** The count of the runs of the pool, from the option `run`. It is undefined without that option. */
+  readonly runs: number | undefined;
   /** The A/A spread of the pooled cases, or undefined when the pool has fewer cases than `minimum`. */
   readonly spread: number | undefined;
   readonly floor: number;
@@ -115,7 +122,8 @@ function poolOf(pool: PoolOptions, level: number): { band: Band; facts: PoolFact
   const noise = Math.max(floor, spread ?? 0);
   const median = ratios.length === 0 ? 1 : Math.exp(quantile(ratios.map((r) => Math.log(r.ratio)), 0.5));
   const band: Band = { cases: ratios.length, kind: "case", noise, low: Math.exp(-noise), high: Math.exp(noise), median };
-  return { band, facts: { cases: ratios.length, spread, floor, pooled: spread !== undefined && spread > floor } };
+  const runs = pool.run === undefined ? undefined : new Set(pool.records.map(pool.run)).size;
+  return { band, facts: { cases: ratios.length, runs, spread, floor, pooled: spread !== undefined && spread > floor } };
 }
 
 /** The four outcomes of a time verdict. The candidate is the arm `b`, so `faster` is a ratio below 1. */

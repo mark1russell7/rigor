@@ -84,6 +84,13 @@ describe("aaSpread and pooledBand", () => {
     expect(pooledBand({ records: ofRatios([1.5, 0.6, 1.4]), floor: 0.05, minimum: 3 }).noise).toBeGreaterThan(0.3);
   });
 
+  it("counts the runs of the pool with the option run", () => {
+    const records = [...ofRatios([1, 1.01, 0.99], "run1 #"), ...ofRatios([1.02, 0.98], "run2 #")];
+    const timed = timeVerdict(records, records, { pool: { records, run: (r) => r.case.split(" ")[0]! }, minimum: 5 });
+    expect(timed.pool).toMatchObject({ cases: 5, runs: 2 });
+    expect(timeVerdict(records, records, { pool: { records } }).pool!.runs).toBeUndefined();
+  });
+
   it("refuses a bad floor or minimum", () => {
     expect(() => pooledBand({ records: [], floor: -0.1 })).toThrow(RangeError);
     expect(() => pooledBand({ records: [], floor: Number.NaN })).toThrow(RangeError);
@@ -127,7 +134,7 @@ describe("the noise cap and the pooled band of timeVerdict", () => {
     const c = records(20, 5, 1.1, 0.02, 35);
     const v = timeVerdict(c, aa, { rule: "band", bootstrap, pool: { records: quiet, floor } });
     expect(v.band!.noise).toBe(floor);
-    expect(v.pool).toEqual({ cases: 40, spread: aaSpread(quiet), floor, pooled: false });
+    expect(v.pool).toEqual({ cases: 40, runs: undefined, spread: aaSpread(quiet), floor, pooled: false });
     expect(v.outcome).toBe("same");
     // The band of the run is narrower, so the same candidate is slower without the pool.
     expect(timeVerdict(c, aa, { rule: "band", bootstrap }).outcome).toBe("slower");
@@ -162,7 +169,7 @@ describe("two runs of a sections time gate of highways", () => {
     aa: [29404.118021, 31449.429642000003, 31185.828029, 31124.415114, 29771.395763, 37101.331734, 40893.085517, 40556.433776, 36292.29369, 33748.567856],
   };
   const pairs = (a: readonly number[], b: readonly number[], prefix = "r"): PairedTime[] => a.map((ms, k) => ({ case: `${prefix}${k}`, round: 0, first: firstArm(k), a: ms, b: b[k]! }));
-  const pool = { records: pairs(QUIET_RUN.parent, QUIET_RUN.aa, "pool"), floor: Math.log(1.05) };
+  const pool = { records: pairs(QUIET_RUN.parent, QUIET_RUN.aa, "41542329976 #"), floor: Math.log(1.05), run: (r: PairedTime) => r.case.split(" ")[0]! };
   const gate = (run: typeof QUIET_RUN) => timeVerdict(pairs(run.parent, run.commit), pairs(run.parent, run.aa), { noiseCap: 0.06, pool });
 
   it("the quiet run 41542329976 gives same", () => {
@@ -170,6 +177,9 @@ describe("two runs of a sections time gate of highways", () => {
     expect(v.noise!.spread).toBeCloseTo(0.0272, 4);
     expect(v.noise!.noisy).toBe(false);
     expect(v.pool!.floor).toBe(Math.log(1.05));
+    // The 10 pooled cases come from one run, so they show the noise of one runner.
+    expect(v.pool!.cases).toBe(10);
+    expect(v.pool!.runs).toBe(1);
     expect(v.outcome).toBe("same");
     expect(v.interval!.low).toBeCloseTo(0.9913, 4);
     expect(v.interval!.high).toBeCloseTo(1.0162, 4);
