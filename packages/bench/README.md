@@ -107,6 +107,7 @@ run.pairs["old~aa"];                              // the records of the A/A pair
 - Only a line with `skipped` skips a case. A skip line does not need a time.
 - A skip in the first round of the job removes the case from each pair, and the run starts no more children for it. A skip after the first round stops the run with an error, because the child is not deterministic.
 - A child that does not stop at the time limit gets SIGTERM, and SIGKILL after 1 second. The signals go to its process group. On Windows, `taskkill /T /F` stops its tree.
+- A child must stop each process that it starts before it exits. On Windows, the runner cannot find a process that a child leaves after a normal exit.
 - Two different hashes of one arm on one case stop the run with an error.
 - Each record keeps its job and the computer of its job (`benchEnv`).
 
@@ -137,6 +138,7 @@ v.trimmed;                                        // the records that balanceOrd
 - A job with `cannot decide` or `same` does not change the outcome. Only a job with `faster` against a pooled `slower`, or the reverse, makes the outcome `cannot decide`.
 - A pooled `same` stays `same`, also with a job that gives `slower` or `faster`. Only the opposite direction opposes.
 - Each record with a field `job` has the label of its job, or `pooledVerdict` stops with an error.
+- A job can give its `skipped` list from `freshRun`. `pooledVerdict` then removes each skipped case from all jobs, and `dropped` lists these cases.
 - Two jobs with a record of one case and one round are an error. Set `roundOffset` of each job.
 - `armVerdicts` gives the verdict of each candidate pair of one run against its A/A pair.
 

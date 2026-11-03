@@ -40,6 +40,8 @@ export interface JobRecords {
   readonly job: string;
   readonly candidate: readonly PairedTime[];
   readonly aa: readonly PairedTime[];
+  /** The cases that the job skipped, as `freshRun` gives them. `pooledVerdict` removes each of these cases from all jobs. */
+  readonly skipped?: readonly { readonly case: string }[];
 }
 
 /** The verdict of one job alone. */
@@ -60,6 +62,8 @@ export interface PooledVerdict {
   readonly opposed: string[];
   /** The count of the records that `balanceOrders` removed from the merged candidate and A/A records. */
   readonly trimmed: number;
+  /** The cases that a job skipped, in sorted order. The verdicts use no record of these cases. */
+  readonly dropped: string[];
   /** The reason of the pooled verdict, and the opposed jobs. */
   readonly reason: string;
 }
@@ -72,6 +76,7 @@ const opposite: Partial<Record<TimeOutcome, TimeOutcome>> = { faster: "slower", 
  * - The verdict of each job alone uses the same options. A job with `cannot decide` or `same` does not change the outcome.
  * - A job that decides the opposite direction of the pooled outcome makes the outcome `cannot decide`.
  * - It refuses two jobs with one label, and two jobs with a record of one case and one round.
+ * - It removes each case that a job skipped from all jobs, so all jobs have the same cases.
  */
 export function pooledVerdict(jobs: readonly JobRecords[], options: VerdictOptions = {}): PooledVerdict {
   const labels = new Set<string>();
@@ -84,6 +89,10 @@ export function pooledVerdict(jobs: readonly JobRecords[], options: VerdictOptio
       if (r.job !== undefined && r.job !== job) throw new RangeError(`pooledVerdict: a record of the job ${JSON.stringify(job)} has the job ${JSON.stringify(r.job)}.`);
     }
   }
+  const dropped = [...new Set(jobs.flatMap((j) => (j.skipped ?? []).map((s) => s.case)))].sort();
+  const gone = new Set(dropped);
+  const keep = (records: readonly PairedTime[]): PairedTime[] => records.filter((r) => !gone.has(r.case));
+  jobs = jobs.map((j) => ({ ...j, candidate: keep(j.candidate), aa: keep(j.aa) }));
   uniqueRounds(jobs, "candidate");
   uniqueRounds(jobs, "aa");
   const candidate = balanceOrders(jobs.flatMap((j) => j.candidate));
@@ -93,10 +102,10 @@ export function pooledVerdict(jobs: readonly JobRecords[], options: VerdictOptio
   const against = opposite[pooled.outcome];
   const opposed = against === undefined ? [] : each.filter((j) => j.verdict.outcome === against).map((j) => j.job);
   const trimmed = candidate.trimmed + aa.trimmed;
-  if (opposed.length === 0) return { outcome: pooled.outcome, pooled, jobs: each, opposed, trimmed, reason: pooled.reason };
+  if (opposed.length === 0) return { outcome: pooled.outcome, pooled, jobs: each, opposed, trimmed, dropped, reason: pooled.reason };
   const names = opposed.map((j) => JSON.stringify(j)).join(", ");
   const reason = `${pooled.reason} The pooled outcome is "${pooled.outcome}", but the jobs ${names} give "${against}". Thus the outcome is "cannot decide".`;
-  return { outcome: "cannot decide", pooled, jobs: each, opposed, trimmed, reason };
+  return { outcome: "cannot decide", pooled, jobs: each, opposed, trimmed, dropped, reason };
 }
 
 /** This function refuses two jobs with a record of one case and one round in one pair. */
