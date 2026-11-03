@@ -1,11 +1,14 @@
 /**
  * node src/build.ts [--out dist]
  *
- * The build of the site: it bundles src/page.ts (with the generators) for the browser, and writes index.html.
+ * The build of the site: it bundles src/page.ts (with the generators and the bench) for the browser, and writes index.html.
+ * It also writes the probe of the site check to check-probe.js.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { NOISE_RANGE, RATIO_RANGE, START } from "./explorer.ts";
+import { readProbe } from "./probe-script.ts";
 
 /** The packages of rigor: the name, the state and what each one gives. */
 export interface PackageRow {
@@ -32,9 +35,43 @@ export function packageRows(versions: Versions): PackageRow[] {
   ];
 }
 
+/** This function reads the shared cue of a box that scrolls sideways, `scroll-cue.css` of `@mark1russell7/site-pages`. */
+export function scrollCueCss(): string {
+  return readFileSync(fileURLToPath(import.meta.resolve("@mark1russell7/site-pages/scroll-cue.css")), "utf8");
+}
+
 const escape = (s: string): string => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-export function pageHtml(rows: readonly PackageRow[], built: string): string {
+/** The section of the time-verdict explorer. The script of the page fills the presets, the rounds, the verdict and the diagram. */
+export function verdictSection(): string {
+  const range = (id: string, r: { min: number; max: number; step: number }, value: number): string =>
+    `<input type="range" id="${id}" min="${r.min}" max="${r.max}" step="${r.step}" value="${value}">`;
+  return `<section id="verdict">
+<h2>Try the time verdict</h2>
+<p>A bench times a baseline and a candidate in pairs. An A/A pair times the baseline against itself, so it shows the noise of the machine. Set the true ratio and the noise. The page draws seeded records, and <code>timeVerdict</code> of <code>rigor-bench</code> gives the verdict.</p>
+<div class="card">
+<div class="field"><span class="field-label">Presets</span><div id="vx-presets" class="chips" role="group" aria-label="Presets"></div></div>
+<div class="controls">
+<label>True ratio: candidate time over baseline time <output id="vx-ratio-out"></output>${range("vx-ratio", RATIO_RANGE, START.ratio)}</label>
+<label>Noise of one arm in one round <output id="vx-noise-out"></output>${range("vx-noise", NOISE_RANGE, START.noise)}</label>
+<div class="field"><span class="field-label">Rounds of each case</span><div id="vx-rounds" class="chips" role="group" aria-label="Rounds of each case"></div></div>
+<label>Seed<input id="vx-seed" value="${escape(START.seed)}" autocomplete="off" spellcheck="false"></label>
+</div>
+<div class="verdict" aria-live="polite"><span id="vx-badge" class="badge"></span><p id="vx-why"></p></div>
+<div id="vx-chart"></div>
+<div class="legend"><span><span class="key dot"></span>candidate case</span><span><span class="key dot aa"></span>A/A case</span><span><span class="key dot faint"></span>one round</span><span><span class="key band"></span>pooled A/A band</span><span><span class="key margin"></span>margin of 5%</span><span><span class="key interval"></span>interval of the candidate</span><span><span class="key truth"></span>true ratio</span></div>
+<p id="vx-facts" class="fine"></p>
+<p id="vx-reason" class="fine"></p>
+<div class="power"><button type="button" id="vx-power-run">Test the rule on 50 new benches</button><div id="vx-power"></div></div>
+<details id="vx-records"><summary>The paired-time records (<span id="vx-record-count"></span>)</summary>
+<div class="records scroll-cue"><table><thead><tr><th>Case</th><th>Round</th><th>First</th><th>a (ms)</th><th>b (ms)</th><th>b / a</th></tr></thead><tbody id="vx-record-rows"></tbody></table></div>
+</details>
+<pre class="scroll-cue"><code id="vx-code"></code></pre>
+</div>
+</section>`;
+}
+
+export function pageHtml(rows: readonly PackageRow[], built: string, scrollCue = ""): string {
   const table = rows
     .map((r) => `<tr><td><code>${escape(r.name)}</code></td><td><span class="state${r.state === "planned" ? " later" : ""}">${escape(r.state)}</span></td><td>${escape(r.gives)}</td></tr>`)
     .join("\n");
@@ -46,6 +83,7 @@ export function pageHtml(rows: readonly PackageRow[], built: string): string {
 <title>rigor</title>
 <meta name="description" content="Shared libraries for measured work: seeded generators, statistics, gates, test generation, chaos and load.">
 <style>
+${scrollCue}
 :root { color-scheme: light dark; --bg: #fcfcfb; --card: #ffffff; --ink: #1d1d1b; --muted: #5f5e5a; --line: #e4e2dc; --accent: #2a78d6; --accent-soft: #e6f0fc; --expected: #1d1d1b; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #1a1a19; --card: #232321; --ink: #ecebe6; --muted: #a5a39b; --line: #3a3936; --accent: #3987e5; --accent-soft: #1f3550; --expected: #ecebe6; } }
 :root[data-theme="dark"] { --bg: #1a1a19; --card: #232321; --ink: #ecebe6; --muted: #a5a39b; --line: #3a3936; --accent: #3987e5; --accent-soft: #1f3550; --expected: #ecebe6; }
@@ -65,9 +103,59 @@ p { max-width: 46em; }
 .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 12px; margin-bottom: 12px; }
 label { display: block; font-size: 0.85rem; color: var(--muted); font-weight: 600; }
 input { width: 100%; font: inherit; padding: 8px 10px; margin-top: 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
-#methods { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; }
-#methods button { font: inherit; font-size: 0.9rem; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; }
-#methods button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+#methods, .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; }
+#methods button, .chips button, .power button { font: inherit; font-size: 0.9rem; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; }
+#methods button[aria-pressed="true"], .chips button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.chips { margin: 4px 0 0; }
+.field { margin-bottom: 12px; }
+.field-label { display: block; font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+output { color: var(--ink); font-variant-numeric: tabular-nums; }
+input[type="range"] { padding: 0; margin-top: 10px; border: 0; background: none; accent-color: var(--accent); }
+.verdict { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 4px 0 12px; }
+.verdict p { margin: 0; flex: 1 1 16em; font-weight: 600; }
+.badge { font-size: 1.5rem; font-weight: 700; padding: 6px 18px; border-radius: 999px; white-space: nowrap; background: var(--line); color: var(--ink); }
+.badge[data-outcome="faster"] { background: #0ca30c; color: #fff; }
+.badge[data-outcome="slower"] { background: #d03b3b; color: #fff; }
+.badge[data-outcome="same"] { background: var(--accent-soft); color: var(--ink); }
+.badge[data-outcome="cannot decide"] { background: #fab219; color: #0b0b0b; }
+#vx-chart svg { display: block; }
+.rec { opacity: 0.3; }
+.s-candidate { fill: var(--accent); }
+.s-aa { fill: var(--muted); }
+.case { stroke: var(--card); stroke-width: 2; }
+.case.on { stroke: var(--ink); }
+.grid { stroke: var(--line); }
+.band { fill: var(--muted); opacity: 0.25; }
+.margin { fill: none; stroke: var(--ink); stroke-width: 1; stroke-dasharray: 4 3; opacity: 0.6; }
+.one { stroke: var(--ink); stroke-width: 1.5; }
+.truth, .interval { fill: var(--ink); }
+.interval.on { fill: var(--accent); }
+.estimate { fill: var(--ink); stroke: var(--card); stroke-width: 2; }
+.row-label { fill: var(--muted); font-size: 12px; }
+.key.dot { width: 10px; height: 10px; border-radius: 50%; }
+.key.dot.aa { background: var(--muted); }
+.key.dot.faint { opacity: 0.35; }
+.key.band { background: var(--muted); opacity: 0.4; }
+.key.margin { background: none; border: 1px dashed var(--ink); }
+.key.interval { background: var(--ink); height: 6px; border-radius: 3px; }
+.key.truth { width: 0; height: 0; border-radius: 0; background: none; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid var(--ink); }
+.fine { font-size: 0.88rem; color: var(--muted); margin: 8px 0 0; }
+.power { margin: 14px 0 10px; }
+.power button:disabled { opacity: 0.6; cursor: progress; }
+#vx-power p { margin: 8px 0 4px; }
+.shares { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; padding: 0; list-style: none; font-size: 0.9rem; }
+.shares .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; background: var(--line); }
+.shares [data-outcome="faster"] .swatch { background: #0ca30c; }
+.shares [data-outcome="slower"] .swatch { background: #d03b3b; }
+.shares [data-outcome="same"] .swatch { background: var(--accent); }
+.shares [data-outcome="cannot decide"] .swatch { background: #fab219; }
+details { margin: 10px 0 12px; }
+summary { cursor: pointer; font-weight: 600; }
+.records { max-height: 320px; overflow-y: auto; margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; }
+.records table { font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.records th, .records td { padding: 4px 8px; white-space: nowrap; }
+.scroll-cue { --scroll-cue-bg: var(--bg); }
+.records.scroll-cue { --scroll-cue-bg: var(--card); }
 pre { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; overflow-x: auto; font-size: 0.9rem; margin: 0 0 12px; }
 code { font-family: ui-monospace, "Cascadia Code", Menlo, monospace; font-size: 0.92em; }
 .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2.4fr); gap: 16px; }
@@ -107,7 +195,7 @@ footer a, p a { color: var(--accent); }
 <header>
 <h1>rigor</h1>
 <p class="lead">Shared libraries for measured work: seeded generators, statistics, gates, test generation, chaos and load. Each engine moves to them one function at a time, and its records stay byte-equal.</p>
-<nav><a href="#try">Try it</a><a href="#packages">Packages</a><a href="#why">Why</a><a href="status/">Status</a><a href="releases/">Releases</a><a href="https://github.com/mark1russell7/rigor">Source</a></nav>
+<nav><a href="#try">Try the generator</a><a href="#verdict">Try the time verdict</a><a href="#packages">Packages</a><a href="#why">Why</a><a href="status/">Status</a><a href="releases/">Releases</a><a href="https://github.com/mark1russell7/rigor">Source</a></nav>
 </header>
 <main>
 <section id="try">
@@ -119,7 +207,7 @@ footer a, p a { color: var(--accent); }
 <label>Stream label (optional, for <code>fork</code>)<input id="label" value="" placeholder="for example lanes" autocomplete="off" spellcheck="false"></label>
 </div>
 <div id="methods" role="group" aria-label="The method"></div>
-<pre><code id="code"></code></pre>
+<pre class="scroll-cue"><code id="code"></code></pre>
 <div class="split">
 <div><label>The first 12 values</label><ol id="values"></ol></div>
 <div><label>20,000 draws</label><div id="chart"></div>
@@ -128,9 +216,10 @@ footer a, p a { color: var(--accent); }
 </div>
 </div>
 </section>
+${verdictSection()}
 <section id="packages">
 <h2>Packages</h2>
-<div class="table"><table>
+<div class="table scroll-cue"><table>
 <thead><tr><th>Package</th><th>State</th><th>What it gives</th></tr></thead>
 <tbody>
 ${table}
@@ -139,7 +228,7 @@ ${table}
 <section id="why">
 <h2>Why</h2>
 <p>The duplication atlas (<a href="https://mark1russell7.github.io/codeatlas/">codeatlas</a>) found the same seeded generator written by hand approximately 40 times, in more than 10 repositories. No repository imported it from a package. The copies use different forms of mulberry32, but each one gives the same numbers as <code>random(seed).next</code>. Thus a repository moves to the package with no change to its records, and its tests prove it.</p>
-<pre><code>npm install @mark1russell7/rigor-generators
+<pre class="scroll-cue"><code>npm install @mark1russell7/rigor-generators
 
 import { random, seedsFrom } from "@mark1russell7/rigor-generators";
 
@@ -194,8 +283,10 @@ async function main(argv: readonly string[]): Promise<number> {
     clean: false,
   });
   const version = (name: string): string => (JSON.parse(readFileSync(join(here, `../${name}/package.json`), "utf8")) as { version: string }).version;
-  writeFileSync(join(out, "index.html"), pageHtml(packageRows({ generators: version("generators"), statistics: version("statistics"), bench: version("bench") }), new Date().toISOString().slice(0, 10)));
-  console.error(`wrote ${join(out, "index.html")} and page.js`);
+  const rows = packageRows({ generators: version("generators"), statistics: version("statistics"), bench: version("bench") });
+  writeFileSync(join(out, "index.html"), pageHtml(rows, new Date().toISOString().slice(0, 10), scrollCueCss()));
+  writeFileSync(join(out, "check-probe.js"), readProbe());
+  console.error(`wrote ${join(out, "index.html")}, page.js and check-probe.js`);
   return 0;
 }
 

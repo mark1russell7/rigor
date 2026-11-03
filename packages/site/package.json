@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/rigor-site",
-  "description": "The site of rigor: what each package does, and the generators to try in the browser.",
+  "description": "The site of rigor: what each package does, and the generators and the time verdict to try in the browser.",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,11 +12,13 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
   },
   "dependencies": {
+    "@mark1russell7/rigor-bench": "workspace:*",
     "@mark1russell7/rigor-generators": "workspace:*",
     "@mark1russell7/rigor-statistics": "workspace:*"
   },
   "devDependencies": {
     "@mark1russell7/cue": "^1.0.2",
+    "@mark1russell7/site-pages": "^0.1.8",
     "@types/node": "^26.6.5",
     "tsdown": "^0.23.1",
     "typescript": "^7.0.2",
