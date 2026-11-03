@@ -154,7 +154,8 @@ export interface VerdictOptions extends BandOptions {
   readonly noiseCap?: number;
   /**
    * The limit of the bias of the A/A arm, as a share of the margin of the verdict. The default is 0.5.
-   * The bias is `abs(log(m))` for the A/A median ratio `m` of the run. A bias above `biasShare` times the margin gives `cannot decide`.
+   * The check takes the bootstrap interval of the log A/A median ratio of the run. When the whole interval is out of `[-limit, limit]`, the outcome is `cannot decide`.
+   * The limit is `biasShare` times the margin. Thus the check finds a real bias, not the sampling noise of the A/A median.
    * The margin is the margin of the rule `difference`, `verdictMargin(options)`. `Infinity` turns the check off.
    */
   readonly biasShare?: number;
@@ -192,11 +193,13 @@ export interface BiasCheck {
   readonly aaMedian: number;
   /** The bias `abs(log(aaMedian))`, on a log scale. */
   readonly shift: number;
+  /** The bootstrap interval of the log A/A median ratio of the run. */
+  readonly interval: Interval;
   /** The limit of the bias: `biasShare` times the margin of the verdict. */
   readonly limit: number;
   readonly share: number;
   readonly margin: number;
-  /** This value is `true` when `shift` is above `limit`. */
+  /** This value is `true` when the whole `interval` is above `limit` or below `-limit`. */
   readonly biased: boolean;
 }
 
@@ -239,7 +242,7 @@ export interface TimeVerdict {
  * - Each other case is `cannot decide`, and so is an A/A arm with too few cases.
  * - With `noiseCap`, an A/A spread of the run above the cap gives `cannot decide`.
  * - With `noiseCap`, an A/A median ratio of the run out of `[exp(-noiseCap), exp(noiseCap)]` also gives `cannot decide`.
- * - A bias of the A/A median ratio above `biasShare` (default 0.5) times the margin of the verdict gives `cannot decide`.
+ * - A bootstrap interval of the log A/A median ratio wholly out of `biasShare` (default 0.5) times the margin gives `cannot decide`.
  * - With `pool`, the pooled band replaces the band of the A/A arm of the run. The run still needs `minimum` A/A cases.
  */
 export function timeVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[], options: VerdictOptions = {}): TimeVerdict {
@@ -255,14 +258,16 @@ export function timeVerdict(candidate: readonly PairedTime[], aa: readonly Paire
   if (pool !== undefined) verdict = { ...verdict, pool: pool.facts };
   // The early outcomes (no candidate cases, too few A/A cases) have no band, and they keep their reason.
   if (verdict.band !== undefined) {
-    const aaMedian = Math.exp(quantile(caseRatios(aa).map((r) => Math.log(r.ratio)), 0.5));
+    const logs = caseRatios(aa).map((r) => Math.log(r.ratio));
+    const aaMedian = Math.exp(quantile(logs, 0.5));
+    const interval = bootstrapMedian(logs, options.bootstrap);
     const margin = marginOf(options, pool?.band);
     const shift = Math.abs(Math.log(aaMedian));
     const limit = share * margin;
-    const bias: BiasCheck = { aaMedian, shift, limit, share, margin, biased: shift > limit };
+    const bias: BiasCheck = { aaMedian, shift, interval, limit, share, margin, biased: interval.low > limit || interval.high < -limit };
     verdict = { ...verdict, bias };
     if (bias.biased) {
-      const reason = `The A/A median ratio of the run is ${round(aaMedian)}, a bias of ${round(shift)} on a log scale, above the limit ${round(limit)} (${share} of the margin ${round(margin)}). Without the check, the outcome is "${ruled}".`;
+      const reason = `The A/A median ratio of the run is ${round(aaMedian)}, and the interval of its log [${round(interval.low)}, ${round(interval.high)}] is wholly out of the limit ${round(limit)} (${share} of the margin ${round(margin)}). Without the check, the outcome is "${ruled}".`;
       verdict = { ...verdict, outcome: "cannot decide", reason };
     }
   }
