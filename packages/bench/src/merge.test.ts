@@ -111,6 +111,18 @@ describe("pooledVerdict", () => {
     expect(v.reason).toContain(`the jobs "4" give "slower"`);
   });
 
+  it("removes each case that a job skipped from all jobs", () => {
+    const one = { job: "0", candidate: jobRecords("0", 5, 0, 5, 1.3, 0.05, "s0"), aa: jobRecords("0", 5, 0, 5, 1, 0.05, "s1") };
+    const two = { job: "1", candidate: jobRecords("1", 5, 5, 5, 1.3, 0.05, "s2"), aa: jobRecords("1", 5, 5, 5, 1, 0.05, "s3") };
+    const skipped = { ...two, skipped: [{ case: "c4" }, { case: "c1" }] };
+    const result = pooledVerdict([one, skipped]);
+    expect(result.dropped).toEqual(["c1", "c4"]);
+    const left = (records: readonly PairedTime[]) => records.filter((r) => r.case !== "c1" && r.case !== "c4");
+    expect(result.pooled).toEqual(timeVerdict(left([...one.candidate, ...two.candidate]), left([...one.aa, ...two.aa])));
+    expect(result.jobs[0]!.verdict).toEqual(timeVerdict(left(one.candidate), left(one.aa)));
+    expect(pooledVerdict([one, two]).dropped).toEqual([]);
+  });
+
   it("refuses two jobs with one case and round, and two jobs with one label", () => {
     const one = { job: "0", candidate: jobRecords("0", 5, 0, 5, 1, 0.1, "d0"), aa: jobRecords("0", 5, 0, 5, 1, 0.1, "d1") };
     const two = { job: "1", candidate: jobRecords("1", 5, 0, 5, 1, 0.1, "d2"), aa: jobRecords("1", 5, 5, 5, 1, 0.1, "d3") };

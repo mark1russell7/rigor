@@ -223,6 +223,9 @@ interface JobRecords {
   readonly job: string;
   readonly candidate: readonly PairedTime[];
   readonly aa: readonly PairedTime[];
+  readonly skipped?: readonly {
+    readonly case: string;
+  }[];
 }
 
 ### build/index.d.ts#JobVerdict
@@ -282,6 +285,7 @@ interface PooledVerdict {
   readonly jobs: readonly JobVerdict[];
   readonly opposed: string[];
   readonly trimmed: number;
+  readonly dropped: string[];
   readonly reason: string;
 }
 
