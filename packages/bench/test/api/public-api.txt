@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 42 names
+## . (build/index.d.ts): 48 names
 
 type Arm: build/paired.d.ts#Arm
 type Balanced: build/index.d.ts#Balanced
@@ -14,6 +14,7 @@ type BandOptions: build/index.d.ts#BandOptions
 type CaseInterval: build/index.d.ts#CaseInterval
 type CaseLimit: build/index.d.ts#CaseLimit
 type CaseRatio: build/paired.d.ts#CaseRatio
+type JobLimitVerdict: build/index.d.ts#JobLimitVerdict
 type JobRecords: build/index.d.ts#JobRecords
 type JobVerdict: build/index.d.ts#JobVerdict
 type LimitOptions: build/index.d.ts#LimitOptions
@@ -23,6 +24,9 @@ type NoiseCheck: build/index.d.ts#NoiseCheck
 type PairedTime: build/paired.d.ts#PairedTime
 type PoolFacts: build/index.d.ts#PoolFacts
 type PoolOptions: build/index.d.ts#PoolOptions
+type PooledJob: build/index.d.ts#PooledJob
+type PooledLimitVerdict: build/index.d.ts#PooledLimitVerdict
+type PooledRecords: build/index.d.ts#PooledRecords
 type PooledVerdict: build/index.d.ts#PooledVerdict
 type Power: build/index.d.ts#Power
 type PowerOptions: build/index.d.ts#PowerOptions
@@ -42,7 +46,9 @@ caseRatios: build/paired.d.ts#caseRatios
 checkPairedTime: build/paired.d.ts#checkPairedTime
 firstArm: build/paired.d.ts#firstArm
 limitVerdict: build/index.d.ts#limitVerdict
+poolRecords: build/index.d.ts#poolRecords
 pooledBand: build/index.d.ts#pooledBand
+pooledLimitVerdict: build/index.d.ts#pooledLimitVerdict
 pooledVerdict: build/index.d.ts#pooledVerdict
 timeRounds: build/index.d.ts#timeRounds
 timeVerdict: build/index.d.ts#timeVerdict
@@ -219,6 +225,12 @@ interface CaseLimit extends CaseInterval {
   readonly outcome: LimitOutcome;
 }
 
+### build/index.d.ts#JobLimitVerdict
+interface JobLimitVerdict {
+  readonly job: string;
+  readonly verdict: LimitVerdict;
+}
+
 ### build/index.d.ts#JobRecords
 interface JobRecords {
   readonly job: string;
@@ -277,6 +289,33 @@ interface PoolOptions {
   readonly floor?: number;
   readonly minimum?: number;
   readonly run?: (record: PairedTime) => string;
+}
+
+### build/index.d.ts#PooledJob
+interface PooledJob {
+  readonly job: string;
+  readonly candidate: PairedTime[];
+  readonly aa: PairedTime[];
+}
+
+### build/index.d.ts#PooledLimitVerdict
+interface PooledLimitVerdict {
+  readonly outcome: LimitOutcome;
+  readonly pooled: LimitVerdict;
+  readonly jobs: readonly JobLimitVerdict[];
+  readonly opposed: string[];
+  readonly trimmed: number;
+  readonly dropped: string[];
+  readonly reason: string;
+}
+
+### build/index.d.ts#PooledRecords
+interface PooledRecords {
+  readonly candidate: PairedTime[];
+  readonly aa: PairedTime[];
+  readonly jobs: readonly PooledJob[];
+  readonly trimmed: number;
+  readonly dropped: string[];
 }
 
 ### build/index.d.ts#PooledVerdict
@@ -376,8 +415,14 @@ export declare function caseIntervals(records: readonly PairedTime[], level?: nu
 ### build/index.d.ts#limitVerdict
 export declare function limitVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[], options: LimitOptions): LimitVerdict;
 
+### build/index.d.ts#poolRecords
+export declare function poolRecords(jobs: readonly JobRecords[]): PooledRecords;
+
 ### build/index.d.ts#pooledBand
 export declare function pooledBand(pool: PoolOptions, level?: number): Band;
+
+### build/index.d.ts#pooledLimitVerdict
+export declare function pooledLimitVerdict(jobs: readonly JobRecords[], options: LimitOptions): PooledLimitVerdict;
 
 ### build/index.d.ts#pooledVerdict
 export declare function pooledVerdict(jobs: readonly JobRecords[], options?: VerdictOptions): PooledVerdict;
