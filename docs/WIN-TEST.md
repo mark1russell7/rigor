@@ -43,14 +43,17 @@ The verdict:
 - Each other interval gives `cannot decide`. An A/A pair with fewer than 5 cases also gives `cannot decide`.
 - The outcome of the merged records is the pooled outcome.
 
-The noise cap:
+The noise cap and the A/A bias:
 
 - The A/A spread is the 0.9 quantile of `abs(log(ratio))` over the A/A cases of the merged records.
 - When the A/A spread is above `noiseCap`, the outcome is `cannot decide`. This rule is the option `noiseCap` of `timeVerdict`, with its default `spreadLevel` 0.9.
+- The pooled verdict has its own cap: the spread of the merged A/A cases.
+- An A/A median ratio outside `[exp(-noiseCap), exp(noiseCap)]` gives `cannot decide`. Such a median shows an order effect or a warm-up effect of the bench.
 
 The guard of the jobs:
 
 - Each job also gets its own verdict from its own records, with the same `timeMargin` and `noiseCap`.
+- A noisy job abstains: its `cannot decide` does not oppose the pooled outcome.
 - When one job alone gives the opposite direction of the pooled outcome, the outcome is `cannot decide`. An example is a job with `slower` against a pooled `faster`.
 - The guard does not need the agreement of each job. With 5 jobs, that rule loses most of the power of the pooled verdict.
 
@@ -58,16 +61,18 @@ The time tail:
 
 - The tail set holds the cases with a median time of the default or of the candidate of `timeFloorMs` or more, over the merged rounds.
 - An input under `timeFloorMs` in the two arms is too small to be a cost to the user.
-- `limitVerdict` of rigor-bench, with the option `limit` set to `timeTail`, gives each case of the tail set the outcome `within`, `beyond` or `cannot decide`.
+- `limitVerdict` of rigor-bench gives each case of the tail set the outcome `within`, `beyond` or `cannot decide`.
+- Its option `limit` is `timeTail`, and its option `caseLevel` is `timeTailLevel`.
 - The verdict of each case uses the merged rounds of the case and the A/A pair of the merged records.
 - The time tail passes when at most a share `1 - timeTailQ` of the tail set is not `within`.
 - The time tail fails when more than a share `1 - timeTailQ` of the tail set is `beyond`.
-- Each other time tail gives `cannot decide`.
+- Each other time tail gives `cannot decide`. With many tail cases, the share keeps one wrong `beyond` from a failure of the row.
 - An empty tail set gives the line `tail: not measured, no input above timeFloorMs` in the record. It does not stop a promotion.
 
 The result:
 
 - The outcome `slower` or a failed time tail fails the Time test.
+- The Time test has no allowance for a slowdown out of the margin. A known slowdown is a separate claim with `limitVerdict`, and the record states its limit.
 - A candidate with `cannot decide` in the pooled outcome or in the time tail does not promote.
 - The record keeps the pooled interval, the A/A median ratio, the A/A spread and the noise cap.
 - The record keeps the verdict and the CPU model of each job, and the count of the records that the balance removed.
@@ -78,13 +83,14 @@ Each repository states these settings. A change of a value is a measured decisio
 | Setting | What it is |
 |---|---|
 | `timeMargin` | The half width of the margin on a log scale. An interval in `[exp(-timeMargin), exp(timeMargin)]` is `same`. |
-| `noiseCap` | The largest A/A spread on a log scale. A larger spread gives `cannot decide`. |
+| `noiseCap` | The largest A/A spread on a log scale. A larger spread gives `cannot decide`. It also limits the A/A median ratio. |
 | `jobs` | The count of the CI jobs. Each job has its own runner. |
 | `cases` | The count of the cases of each job. |
 | `rounds` | The count of the rounds of each case in each job. |
 | `timeFloorMs` | The smallest median time in milliseconds of a case of the tail set. |
 | `timeTail` | The largest ratio of a case of the tail set. |
 | `timeTailQ` | The share of the tail set that is `within` the limit `timeTail`. |
+| `timeTailLevel` | The level of the interval of each case of the tail set. The default is 0.95. |
 
 The joint bench of layout-contract states `timeMargin` 0.05, 5 jobs, 20 cases and 5 rounds.
 <!-- /shared:win-test -->
