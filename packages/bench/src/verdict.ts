@@ -96,8 +96,9 @@ export interface PoolFacts {
 }
 
 /**
- * This function gives the pooled band. Its noise is the larger of the floor and the A/A spread of the pooled records.
- * The spread is the `level` quantile of `abs(log(ratio))`. The default level is 0.9. The band has the kind `case`.
+ * This function gives the pooled band of the kind `case`. Its noise is the larger of the floor and the A/A spread of the pooled records.
+ * The spread is the `level` quantile of `abs(log(ratio))`, with the default level 0.9.
+ *
  * A band with fewer pooled cases than `minimum` uses the floor alone. A band with no pooled cases has the median 1.
  */
 export function pooledBand(pool: PoolOptions, level = 0.9): Band {
