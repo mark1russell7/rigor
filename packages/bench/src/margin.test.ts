@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type PairedTime, timeVerdict, verdictPower } from "./index.ts";
+import { type PairedTime, timeVerdict, verdictMargin, verdictPower } from "./index.ts";
 
 /** The records of one round for each ratio: case `k` has the ratio `ratios[k]`. */
 const ofRatios = (ratios: readonly number[], prefix: string): PairedTime[] => ratios.map((r, k) => ({ case: `${prefix}${k}`, round: 0, first: "a", a: 10, b: 10 * r }));
@@ -139,5 +139,29 @@ describe("the bias check of the noise cap", () => {
     const v = timeVerdict(candidate, aa, { bootstrap, noiseCap: 0.1 });
     expect(v.noise).toMatchObject({ noisy: false, biased: false, aaMedian: 1 });
     expect(v.outcome).toBe("faster");
+  });
+});
+
+describe("verdictMargin", () => {
+  it("gives the margin of the options, and 0.05 by default", () => {
+    expect(verdictMargin()).toBe(0.05);
+    expect(verdictMargin({ margin: 0.02 })).toBe(0.02);
+    expect(() => verdictMargin({ margin: -1 })).toThrow(RangeError);
+  });
+
+  it("gives the larger of the margin and the noise of the pooled band", () => {
+    const quiet = ofRatios(steps(1, 1, 10), "q");
+    const loud = ofRatios(steps(0.8, 1.25, 10), "l");
+    expect(verdictMargin({ margin: 0.05, pool: { records: quiet } })).toBe(0.05);
+    expect(verdictMargin({ margin: 0.05, pool: { records: loud } })).toBeGreaterThan(0.05);
+    expect(verdictMargin({ margin: 0.05, pool: { records: quiet, floor: 0.1 } })).toBe(0.1);
+  });
+
+  it("is the margin that the verdict uses: an interval in the zone is same", () => {
+    const loud = ofRatios(steps(0.8, 1.25, 10), "l");
+    const m = verdictMargin({ margin: 0.05, pool: { records: loud } });
+    const v = timeVerdict(ofRatios(steps(Math.exp(-m / 2), Math.exp(-m / 4), 21), "c"), aa, { ...options, pool: { records: loud } });
+    expect(v.interval!.low).toBeGreaterThanOrEqual(Math.exp(-m));
+    expect(v.outcome).toBe("same");
   });
 });

@@ -7,7 +7,7 @@ This file lists the items of the roadmap of this repository. The status page of 
 | ID | Status | Priority | Title |
 | --- | --- | --- | --- |
 | R1 | in progress | P1 | generators 0.1.0: the seeded generator and its draws, byte-equal to each copy of mulberry32 |
-| R2 | in progress | P1 | The site: the packages, and the generator to try in the browser |
+| R2 | in progress | P1 | The site: the packages, and the generator and the time verdict to try in the browser |
 | R4 | in progress | P1 | statistics 0.1.0: quantiles, bootstrap intervals, sign and permutation tests, Wilson, Holm, rank correlation, the comparison beyond the noise and Brier, equal to the bit to each copy |
 
 ## Next

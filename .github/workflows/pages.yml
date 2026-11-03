@@ -40,6 +40,8 @@ jobs:
       roadmap: docs/ROADMAP.md
       site-check: true
       site-check-pages: /,/releases/,/status/
+      # The probe drives the time-verdict explorer. The build writes it from packages/site/src/check-probe.ts.
+      site-check-probe: packages/site/dist/check-probe.js
       deploy: ${{ github.event_name != 'pull_request' }}
 
   # This job examines the deployed site: the page, its script and the pages of site-pages.

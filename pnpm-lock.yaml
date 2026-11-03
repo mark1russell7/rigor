@@ -248,6 +248,9 @@ importers:
 
   packages/site:
     dependencies:
+      '@mark1russell7/rigor-bench':
+        specifier: workspace:*
+        version: link:../bench
       '@mark1russell7/rigor-generators':
         specifier: workspace:*
         version: link:../generators
@@ -258,6 +261,9 @@ importers:
       '@mark1russell7/cue':
         specifier: ^1.0.2
         version: 1.1.0
+      '@mark1russell7/site-pages':
+        specifier: ^0.1.8
+        version: 0.1.8
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.6
@@ -493,6 +499,11 @@ packages:
 
   '@mark1russell7/cue@1.1.0':
     resolution: {integrity: sha512-R9pjuWNFqd/LSfOI8uY7w8E2Dri8UQFGLodBuV4d2E0pwzWM5ISVXWVhC7+aYgrR1GXSMzbyo5ZLWvqyQCwdIg==}
+    engines: {node: '>=22'}
+    hasBin: true
+
+  '@mark1russell7/site-pages@0.1.8':
+    resolution: {integrity: sha512-L8X6LqQCIEPCscVqIqdNGm9U0d5BMuH357whGIMzf2iW/JiXfIMGXNsExO7MxR6/Z5dIkT0/bPvsii1vfkCEvQ==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -1614,6 +1625,8 @@ snapshots:
   '@mark1russell7/conventions@0.21.0': {}
 
   '@mark1russell7/cue@1.1.0': {}
+
+  '@mark1russell7/site-pages@0.1.8': {}
 
   '@mark1russell7/ste-lint@0.1.2':
     dependencies:

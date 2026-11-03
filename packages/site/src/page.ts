@@ -1,8 +1,13 @@
 /**
  * The page of the site. The pure part (the methods, the bins and the expected counts) has tests. The DOM part,
  * `start`, runs only in a browser: it reads the controls, draws, and shows the first values and a histogram.
+ * The time-verdict explorer has its own files: `explorer.ts` and `explorer-view.ts`.
  */
 import { random, type Random } from "@mark1russell7/rigor-generators";
+import { startExplorer } from "./explorer-view.ts";
+import { seedFrom } from "./seed.ts";
+
+export { seedFrom };
 
 /** One method of the generator that the page shows. A histogram has `bins` bins from `min` to `max`. */
 export interface Method {
@@ -64,12 +69,6 @@ export const METHODS: readonly Method[] = [
     expected: () => uniform(8),
   },
 ];
-
-/** The seed of the text in the seed field: an integer is a number, other text is a string (hashed). */
-export function seedFrom(text: string): number | string {
-  const t = text.trim();
-  return /^-?\d+$/.test(t) && Number.isSafeInteger(Number(t)) ? Number(t) : t;
-}
 
 /** The generator of the page: the seed, then the fork with the label, if there is a label. */
 export function generatorOf(seedText: string, label: string): Random {
@@ -231,4 +230,7 @@ export function start(): void {
   render();
 }
 
-if (typeof document !== "undefined") start();
+if (typeof document !== "undefined") {
+  start();
+  startExplorer();
+}

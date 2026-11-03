@@ -37,6 +37,7 @@ v.comparison;                                     // the cases that gain and dro
 | `caseRatios(records)` | The ratio of each case. It refuses 2 records of one round, and an order that did not turn. |
 | `aaBand(aa, options)` | The band of the A/A arm, symmetric on a log scale. The kind `median` (the default) holds the A/A median, and the kind `case` holds one A/A case. It needs 5 cases or more. |
 | `timeVerdict(candidate, aa, options)` | The outcome of the rule `difference` (the default) or `band`. |
+| `verdictMargin(options)` | The margin of the rule `difference` on a log scale: the larger of `margin` and the noise of the pooled band. An interval in `[exp(-margin), exp(margin)]` is `same`. |
 | `aaSpread(aa, level)` | The A/A spread: the `level` quantile of `abs(log(ratio))` over the A/A cases. The default level is 0.9. |
 | `pooledBand(pool, level)` | The pooled band: the larger of the floor and the A/A spread of the records of earlier runs. |
 | `caseIntervals(records, level)` | The ratio of each case with a distribution-free interval of its median over the rounds. The level 0.95 needs 6 rounds or more. |

@@ -3,7 +3,6 @@
  * one batch grows until a batch of arm `a` takes the target time. Each round times one batch of each arm, in the order
  * of `firstArm`. Start this function in a fresh process for each case.
  */
-import { performance } from "node:perf_hooks";
 import { type Arm, type PairedTime, firstArm } from "./paired.ts";
 
 /** The options of the timed rounds of one case. */
@@ -18,7 +17,7 @@ export interface RoundsOptions {
   readonly targetMs?: number;
   /** The time in milliseconds of the warm-up of the two arms. The default is 1000. */
   readonly warmMs?: number;
-  /** The clock in milliseconds. The default is `performance.now`. */
+  /** The clock in milliseconds. The default is `performance.now` of the global `performance` of Node and of each browser. */
   readonly now?: () => number;
 }
 
