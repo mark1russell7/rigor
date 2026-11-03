@@ -251,6 +251,7 @@ interface JobVerdict {
 interface LimitOptions extends BandOptions {
   readonly limit: number;
   readonly caseLevel?: number;
+  readonly share?: number;
 }
 
 ### build/index.d.ts#LimitOutcome
@@ -263,6 +264,8 @@ interface LimitVerdict {
   readonly limit: number;
   readonly cases: readonly CaseLimit[];
   readonly band: Band | undefined;
+  readonly share: number;
+  readonly allowed: number;
 }
 
 ### build/index.d.ts#NoiseCheck

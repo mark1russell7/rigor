@@ -48,4 +48,27 @@ describe("limitVerdict", () => {
     expect(limitVerdict([], aa, { limit: 2 }).outcome).toBe("cannot decide");
     expect(() => limitVerdict(records(6, 1.5, 7), aa, { limit: 0 })).toThrow(RangeError);
   });
+
+  /** The records of 20 cases: `slow` cases take 3 times arm a, and the other cases take 1.5 times. */
+  const tail = (slow: number, seed: number): PairedTime[] =>
+    records(20, 1.5, seed).map((r) => (Number(r.case.slice(1)) < slow ? { ...r, b: r.b * 2 } : r));
+
+  it("permits a share of the cases out of the limit with the option share", () => {
+    const one = tail(1, 9);
+    expect(limitVerdict(one, aa, { limit: 2 })).toMatchObject({ outcome: "beyond", share: 1, allowed: 0 });
+    const shared = limitVerdict(one, aa, { limit: 2, share: 0.95 });
+    expect(shared).toMatchObject({ outcome: "within", share: 0.95, allowed: 1 });
+    expect(shared.reason).toMatch(/1 of 20 cases are not within, and the share 0.95 permits 1.$/);
+    const two = limitVerdict(tail(2, 10), aa, { limit: 2, share: 0.95 });
+    expect(two.outcome).toBe("beyond");
+    expect(two.reason).toMatch(/^2 of 20 cases are above the limit 2, and the share 0.95 permits 1./);
+  });
+
+  it("cannot decide when too many cases hold the limit, and counts the allowed cases with no float error", () => {
+    const near = records(20, 2, 11);
+    expect(limitVerdict(near, aa, { limit: 2, share: 0.95 }).outcome).toBe("cannot decide");
+    expect(limitVerdict(records(10, 1.5, 12), aa, { limit: 2, share: 0.9 }).allowed).toBe(1);
+    expect(limitVerdict(records(19, 1.5, 13), aa, { limit: 2, share: 0.95 }).allowed).toBe(0);
+    for (const share of [0, -0.1, 1.5, Number.NaN]) expect(() => limitVerdict(near, aa, { limit: 2, share }), String(share)).toThrow(/the share is above 0 and at most 1/);
+  });
 });

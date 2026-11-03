@@ -41,6 +41,11 @@ export interface LimitOptions extends BandOptions {
   readonly limit: number;
   /** The level of the interval of each case. The default is 0.95. */
   readonly caseLevel?: number;
+  /**
+   * The share of the cases that the claim needs `within`, above 0 and at most 1. The default 1 needs each case. With 0.95
+   * and 20 cases, 1 case can be `beyond` or `cannot decide`. The option `timeTailQ` of a promotion record is this share.
+   */
+  readonly share?: number;
 }
 
 /** The verdict of one case against the limit. */
@@ -61,25 +66,34 @@ export interface LimitVerdict {
   readonly cases: readonly CaseLimit[];
   /** The band of the A/A arm, or undefined when the A/A arm has too few cases. */
   readonly band: Band | undefined;
+  /** The share of the option `share`. */
+  readonly share: number;
+  /** The number of cases that can be other than `within`: the floor of the number of cases times `1 - share`. */
+  readonly allowed: number;
 }
 
 /**
  * This function gives the verdict of the claim "the ratio `b / a` of each case is at most `limit`". The A/A band widens
  * the interval of each case: the bound is the high end times the high end of the band.
  * - A case is `within` when its bound is at most the limit, and `beyond` when its floor is above the limit.
- * - The verdict is `beyond` when a case is `beyond`, and `within` when each case is `within`.
+ * - The verdict is `within` when `allowed` cases or fewer are other than `within`. With the default share 1, `allowed` is 0.
+ * - The verdict is `beyond` when more than `allowed` cases are `beyond`.
  * - Each other verdict is `cannot decide`, and so is an A/A arm with too few cases or a candidate with no cases.
  */
 export function limitVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[], options: LimitOptions): LimitVerdict {
   const { limit } = options;
   if (!(limit > 0 && Number.isFinite(limit))) throw new RangeError(`limitVerdict: the limit is a finite number above 0, not ${limit}.`);
+  const share = options.share ?? 1;
+  if (!(share > 0 && share <= 1)) throw new RangeError(`limitVerdict: the share is above 0 and at most 1, not ${share}.`);
   const intervals = caseIntervals(candidate, options.caseLevel);
   const minimum = options.minimum ?? 5;
-  if (intervals.length === 0) return { outcome: "cannot decide", reason: "The candidate has no cases.", limit, cases: [], band: undefined };
+  // The small term keeps a product such as 10 * (1 - 0.9) = 0.9999999999999998 from a floor of 0.
+  const allowed = Math.floor(intervals.length * (1 - share) + 1e-9);
+  if (intervals.length === 0) return { outcome: "cannot decide", reason: "The candidate has no cases.", limit, cases: [], band: undefined, share, allowed };
   const aaCount = caseRatios(aa).length;
   if (aaCount < minimum) {
     const cases = intervals.map((c) => ({ ...c, bound: c.high, floor: c.low, outcome: "cannot decide" as const }));
-    return { outcome: "cannot decide", reason: `The A/A arm has ${aaCount} cases, and a band needs ${minimum} or more.`, limit, cases, band: undefined };
+    return { outcome: "cannot decide", reason: `The A/A arm has ${aaCount} cases, and a band needs ${minimum} or more.`, limit, cases, band: undefined, share, allowed };
   }
   const band = aaBand(aa, options);
   const cases = intervals.map((c): CaseLimit => {
@@ -88,15 +102,21 @@ export function limitVerdict(candidate: readonly PairedTime[], aa: readonly Pair
     const outcome: LimitOutcome = bound <= limit ? "within" : floor > limit ? "beyond" : "cannot decide";
     return { ...c, bound, floor, outcome };
   });
-  const top = cases.reduce((a, b) => (b.bound > a.bound ? b : a));
+  const facts = { limit, cases, band, share, allowed };
   const beyond = cases.filter((c) => c.outcome === "beyond");
-  if (beyond.length > 0) {
-    return { outcome: "beyond", reason: `${beyond.length} of ${cases.length} cases are above the limit ${limit}, the first is ${JSON.stringify(beyond[0]!.case)}.`, limit, cases, band };
+  const others = cases.filter((c) => c.outcome !== "within");
+  const permit = allowed === 0 ? "" : `, and the share ${share} permits ${allowed}`;
+  if (beyond.length > allowed) {
+    return { outcome: "beyond", reason: `${beyond.length} of ${cases.length} cases are above the limit ${limit}${permit}. The first is ${JSON.stringify(beyond[0]!.case)}.`, ...facts };
   }
-  if (cases.every((c) => c.outcome === "within")) {
-    return { outcome: "within", reason: `The largest bound is ${round(top.bound)} in the case ${JSON.stringify(top.case)}, and it is at most the limit ${limit}.`, limit, cases, band };
+  if (others.length <= allowed) {
+    const inside = cases.filter((c) => c.outcome === "within");
+    const top = (inside.length > 0 ? inside : cases).reduce((a, b) => (b.bound > a.bound ? b : a));
+    const rest = others.length === 0 ? "" : ` ${others.length} of ${cases.length} cases are not within${permit}.`;
+    return { outcome: "within", reason: `The largest bound of a case within is ${round(top.bound)} in the case ${JSON.stringify(top.case)}, and it is at most the limit ${limit}.${rest}`, ...facts };
   }
-  return { outcome: "cannot decide", reason: `The bound of the case ${JSON.stringify(top.case)} is ${round(top.bound)}, above the limit ${limit}, and its floor is not above it.`, limit, cases, band };
+  const top = cases.reduce((a, b) => (b.bound > a.bound ? b : a));
+  return { outcome: "cannot decide", reason: `${others.length} of ${cases.length} cases are not within${permit}. The bound of the case ${JSON.stringify(top.case)} is ${round(top.bound)}, above the limit ${limit}, and too few floors are above it.`, ...facts };
 }
 
 function round(x: number): number {
