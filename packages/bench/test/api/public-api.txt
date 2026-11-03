@@ -48,11 +48,13 @@ timeRounds: build/index.d.ts#timeRounds
 timeVerdict: build/index.d.ts#timeVerdict
 verdictPower: build/index.d.ts#verdictPower
 
-## ./fresh (build/fresh.d.ts): 15 names
+## ./fresh (build/fresh.d.ts): 17 names
 
 BenchEnv: build/fresh.d.ts#BenchEnv
 ChildExit: build/fresh.d.ts#ChildExit
 ChildLine: build/fresh.d.ts#ChildLine
+ChildSkip: build/fresh.d.ts#ChildSkip
+ChildTime: build/fresh.d.ts#ChildTime
 FreshArm: build/fresh.d.ts#FreshArm
 FreshOptions: build/fresh.d.ts#FreshOptions
 FreshRecord: build/fresh.d.ts#FreshRecord
@@ -88,10 +90,20 @@ export interface ChildExit {
 }
 
 ### build/fresh.d.ts#ChildLine
-export interface ChildLine {
+export type ChildLine = ChildTime | ChildSkip;
+
+### build/fresh.d.ts#ChildSkip
+export interface ChildSkip {
+  readonly skipped: string;
+  readonly ms?: number;
+  readonly hash?: string;
+}
+
+### build/fresh.d.ts#ChildTime
+export interface ChildTime {
   readonly ms: number;
   readonly hash?: string;
-  readonly skipped?: string;
+  readonly skipped?: undefined;
 }
 
 ### build/fresh.d.ts#FreshArm
