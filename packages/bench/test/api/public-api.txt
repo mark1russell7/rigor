@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 28 names
+## . (build/index.d.ts): 33 names
 
 type Arm: build/index.d.ts#Arm
 type Band: build/index.d.ts#Band
@@ -16,7 +16,10 @@ type CaseRatio: build/index.d.ts#CaseRatio
 type LimitOptions: build/index.d.ts#LimitOptions
 type LimitOutcome: build/index.d.ts#LimitOutcome
 type LimitVerdict: build/index.d.ts#LimitVerdict
+type NoiseCheck: build/index.d.ts#NoiseCheck
 type PairedTime: build/index.d.ts#PairedTime
+type PoolFacts: build/index.d.ts#PoolFacts
+type PoolOptions: build/index.d.ts#PoolOptions
 type Power: build/index.d.ts#Power
 type PowerOptions: build/index.d.ts#PowerOptions
 type Rounds: build/index.d.ts#Rounds
@@ -26,11 +29,13 @@ type TimeVerdict: build/index.d.ts#TimeVerdict
 type VerdictOptions: build/index.d.ts#VerdictOptions
 type VerdictRule: build/index.d.ts#VerdictRule
 aaBand: build/index.d.ts#aaBand
+aaSpread: build/index.d.ts#aaSpread
 caseIntervals: build/index.d.ts#caseIntervals
 caseRatios: build/index.d.ts#caseRatios
 checkPairedTime: build/index.d.ts#checkPairedTime
 firstArm: build/index.d.ts#firstArm
 limitVerdict: build/index.d.ts#limitVerdict
+pooledBand: build/index.d.ts#pooledBand
 timeRounds: build/index.d.ts#timeRounds
 timeVerdict: build/index.d.ts#timeVerdict
 verdictPower: build/index.d.ts#verdictPower
@@ -100,6 +105,13 @@ interface LimitVerdict {
   readonly band: Band | undefined;
 }
 
+### build/index.d.ts#NoiseCheck
+interface NoiseCheck {
+  readonly spread: number | undefined;
+  readonly cap: number;
+  readonly noisy: boolean;
+}
+
 ### build/index.d.ts#PairedTime
 interface PairedTime {
   readonly case: string;
@@ -107,6 +119,23 @@ interface PairedTime {
   readonly first: Arm;
   readonly a: number;
   readonly b: number;
+}
+
+### build/index.d.ts#PoolFacts
+interface PoolFacts {
+  readonly cases: number;
+  readonly runs: number | undefined;
+  readonly spread: number | undefined;
+  readonly floor: number;
+  readonly pooled: boolean;
+}
+
+### build/index.d.ts#PoolOptions
+interface PoolOptions {
+  readonly records: readonly PairedTime[];
+  readonly floor?: number;
+  readonly minimum?: number;
+  readonly run?: (record: PairedTime) => string;
 }
 
 ### build/index.d.ts#Power
@@ -156,12 +185,17 @@ interface TimeVerdict {
   readonly interval: Interval | undefined;
   readonly band: Band | undefined;
   readonly comparison: Comparison | undefined;
+  readonly pool?: PoolFacts;
+  readonly noise?: NoiseCheck;
 }
 
 ### build/index.d.ts#VerdictOptions
 interface VerdictOptions extends BandOptions {
   readonly rule?: VerdictRule;
   readonly margin?: number;
+  readonly noiseCap?: number;
+  readonly spreadLevel?: number;
+  readonly pool?: PoolOptions;
 }
 
 ### build/index.d.ts#VerdictRule
@@ -169,6 +203,9 @@ type VerdictRule = "band" | "difference";
 
 ### build/index.d.ts#aaBand
 export declare function aaBand(aa: readonly PairedTime[], options?: BandOptions): Band;
+
+### build/index.d.ts#aaSpread
+export declare function aaSpread(aa: readonly PairedTime[], level?: number): number;
 
 ### build/index.d.ts#caseIntervals
 export declare function caseIntervals(records: readonly PairedTime[], level?: number): CaseInterval[];
@@ -184,6 +221,9 @@ export declare function firstArm(round: number, offset?: number): Arm;
 
 ### build/index.d.ts#limitVerdict
 export declare function limitVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[], options: LimitOptions): LimitVerdict;
+
+### build/index.d.ts#pooledBand
+export declare function pooledBand(pool: PoolOptions, level?: number): Band;
 
 ### build/index.d.ts#timeRounds
 export declare function timeRounds(arms: Readonly<Record<Arm, () => number>>, options: RoundsOptions): Rounds;

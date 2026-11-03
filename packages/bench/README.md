@@ -37,6 +37,8 @@ v.comparison;                                     // the cases that gain and dro
 | `caseRatios(records)` | The ratio of each case. It refuses 2 records of one round, and an order that did not turn. |
 | `aaBand(aa, options)` | The band of the A/A arm, symmetric on a log scale. The kind `median` (the default) holds the A/A median, and the kind `case` holds one A/A case. It needs 5 cases or more. |
 | `timeVerdict(candidate, aa, options)` | The outcome of the rule `difference` (the default) or `band`. |
+| `aaSpread(aa, level)` | The A/A spread: the `level` quantile of `abs(log(ratio))` over the A/A cases. The default level is 0.9. |
+| `pooledBand(pool, level)` | The pooled band: the larger of the floor and the A/A spread of the records of earlier runs. |
 | `caseIntervals(records, level)` | The ratio of each case with a distribution-free interval of its median over the rounds. The level 0.95 needs 6 rounds or more. |
 | `limitVerdict(candidate, aa, options)` | The verdict of the claim "the ratio of each case is at most `limit`": `within`, `beyond` or `cannot decide`. |
 | `timeRounds(arms, options)` | The timed rounds of one case in one process: a warm-up, a batch of at least the target time, and the order of `firstArm`. |
@@ -69,6 +71,38 @@ const { records } = timeRounds({ a: () => oldCode(input), b: () => newCode(input
 
 Each arm gives a number. The engine cannot remove the work of a call, because the sum of these numbers uses it.
 
+## The noise cap and the pooled band
+
+Two options of `timeVerdict` keep a noisy run from a decision. Both are off by default, so the output stays the same as in 0.1.0.
+
+The option `noiseCap` caps the A/A spread of the run. The spread is the quantile `spreadLevel` (default 0.9) of `abs(log(ratio))` over the A/A cases. Above the cap, the outcome is `cannot decide`:
+
+```ts
+const v = timeVerdict(records, aaRecords, { noiseCap: 0.06 });
+
+v.noise;                                          // { spread, cap, noisy }
+v.reason;                                         // the spread, the cap and the outcome without the cap
+```
+
+The option `pool` gives a band from the A/A records of earlier quiet runs, with a floor. The caller keeps the pool, for example in a file of the repository:
+
+```ts
+const pool = { records: quietAaRecords, floor: Math.log(1.05) };   // each run has its own case names
+const v = timeVerdict(records, aaRecords, { noiseCap: 0.06, pool });
+
+v.band;                                           // the pooled band: its noise is at least the floor
+v.pool;                                           // { cases, runs, spread, floor, pooled }
+```
+
+- The noise of the pooled band is the larger of the floor and the spread of the pooled cases. The floor and the noise are on a log scale.
+- With fewer pooled cases than `minimum` (default 5), the band uses the floor alone.
+- The option `run` gives the run of each record, so `v.pool.runs` counts the runs. The cases of one run share one runner, so they are not independent.
+- The pooled band replaces the band of the run in the rule `band` and in `comparison`.
+- The rule `difference` uses the larger of `margin` and the noise of the pooled band as its margin.
+- The run still needs its own A/A arm of 5 cases or more. The noise cap uses that arm.
+
+For a fixed limit, for example 1.10 against a fixed base, use `limitVerdict`.
+
 ## The outcomes
 
 | Outcome | The rule `difference` (the default) | The rule `band` |
@@ -78,7 +112,7 @@ Each arm gives a number. The engine cannot remove the work of a call, because th
 | `same` | The interval is in `[exp(-margin), exp(margin)]`. The default margin is 0.05. | The interval is in the band. |
 | `cannot decide` | The interval holds 1 and crosses the margin. | The interval crosses an end of the band. |
 
-Both rules give `cannot decide` when the A/A arm has fewer than 5 cases, or when the candidate has no cases.
+Both rules give `cannot decide` when the A/A arm has fewer than 5 cases, or when the candidate has no cases. With `noiseCap`, both rules also give `cannot decide` when the A/A spread of the run is above the cap.
 
 ## The power test
 
