@@ -4,7 +4,7 @@
  * gain and the inputs that lose beyond the noise, with the effect size. A sign test alone is not enough. Second, each
  * prediction states a probability, and the Brier score measures how good the stated probabilities were.
  */
-import { median, quantileSorted, sd, sorted } from "./describe.ts";
+import { allEqual, median, quantileSorted, sd, sorted } from "./describe.ts";
 import { type Proportion, signTest, wilson } from "./tests.ts";
 
 export interface NoiseOptions {
@@ -72,7 +72,7 @@ export function noiseVerdict(values: readonly number[], options: NoiseOptions & 
   const spread = k * s;
   const threshold = Math.max(spread, margin);
   const up = (options.better ?? "higher") === "higher" ? m : -m;
-  const state: NoiseState = s === 0 ? "no-spread" : Math.abs(m) <= threshold ? "noise" : up > 0 ? "gain" : "loss";
+  const state: NoiseState = allEqual(values) ? "no-spread" : Math.abs(m) <= threshold ? "noise" : up > 0 ? "gain" : "loss";
   return { n: values.length, mean: m, sd: s, spread, margin, threshold, state };
 }
 
