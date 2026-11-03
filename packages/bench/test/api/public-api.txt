@@ -4,24 +4,34 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 18 names
+## . (build/index.d.ts): 28 names
 
 type Arm: build/index.d.ts#Arm
 type Band: build/index.d.ts#Band
 type BandKind: build/index.d.ts#BandKind
 type BandOptions: build/index.d.ts#BandOptions
+type CaseInterval: build/index.d.ts#CaseInterval
+type CaseLimit: build/index.d.ts#CaseLimit
 type CaseRatio: build/index.d.ts#CaseRatio
+type LimitOptions: build/index.d.ts#LimitOptions
+type LimitOutcome: build/index.d.ts#LimitOutcome
+type LimitVerdict: build/index.d.ts#LimitVerdict
 type PairedTime: build/index.d.ts#PairedTime
 type Power: build/index.d.ts#Power
 type PowerOptions: build/index.d.ts#PowerOptions
+type Rounds: build/index.d.ts#Rounds
+type RoundsOptions: build/index.d.ts#RoundsOptions
 type TimeOutcome: build/index.d.ts#TimeOutcome
 type TimeVerdict: build/index.d.ts#TimeVerdict
 type VerdictOptions: build/index.d.ts#VerdictOptions
 type VerdictRule: build/index.d.ts#VerdictRule
 aaBand: build/index.d.ts#aaBand
+caseIntervals: build/index.d.ts#caseIntervals
 caseRatios: build/index.d.ts#caseRatios
 checkPairedTime: build/index.d.ts#checkPairedTime
 firstArm: build/index.d.ts#firstArm
+limitVerdict: build/index.d.ts#limitVerdict
+timeRounds: build/index.d.ts#timeRounds
 timeVerdict: build/index.d.ts#timeVerdict
 verdictPower: build/index.d.ts#verdictPower
 
@@ -51,11 +61,43 @@ interface BandOptions {
   readonly bootstrap?: BootstrapOptions;
 }
 
+### build/index.d.ts#CaseInterval
+interface CaseInterval extends CaseRatio {
+  readonly low: number;
+  readonly high: number;
+  readonly coverage: number;
+}
+
+### build/index.d.ts#CaseLimit
+interface CaseLimit extends CaseInterval {
+  readonly bound: number;
+  readonly floor: number;
+  readonly outcome: LimitOutcome;
+}
+
 ### build/index.d.ts#CaseRatio
 interface CaseRatio {
   readonly case: string;
   readonly ratio: number;
   readonly rounds: number;
+}
+
+### build/index.d.ts#LimitOptions
+interface LimitOptions extends BandOptions {
+  readonly limit: number;
+  readonly caseLevel?: number;
+}
+
+### build/index.d.ts#LimitOutcome
+type LimitOutcome = "within" | "beyond" | "cannot decide";
+
+### build/index.d.ts#LimitVerdict
+interface LimitVerdict {
+  readonly outcome: LimitOutcome;
+  readonly reason: string;
+  readonly limit: number;
+  readonly cases: readonly CaseLimit[];
+  readonly band: Band | undefined;
 }
 
 ### build/index.d.ts#PairedTime
@@ -85,6 +127,23 @@ interface PowerOptions {
   readonly verdict?: VerdictOptions;
 }
 
+### build/index.d.ts#Rounds
+interface Rounds {
+  readonly records: PairedTime[];
+  readonly count: number;
+  readonly sink: number;
+}
+
+### build/index.d.ts#RoundsOptions
+interface RoundsOptions {
+  readonly case: string;
+  readonly rounds: number;
+  readonly offset?: number;
+  readonly targetMs?: number;
+  readonly warmMs?: number;
+  readonly now?: () => number;
+}
+
 ### build/index.d.ts#TimeOutcome
 type TimeOutcome = "faster" | "slower" | "same" | "cannot decide";
 
@@ -111,6 +170,9 @@ type VerdictRule = "band" | "difference";
 ### build/index.d.ts#aaBand
 export declare function aaBand(aa: readonly PairedTime[], options?: BandOptions): Band;
 
+### build/index.d.ts#caseIntervals
+export declare function caseIntervals(records: readonly PairedTime[], level?: number): CaseInterval[];
+
 ### build/index.d.ts#caseRatios
 export declare function caseRatios(records: readonly PairedTime[]): CaseRatio[];
 
@@ -119,6 +181,12 @@ export declare function checkPairedTime(record: PairedTime): PairedTime;
 
 ### build/index.d.ts#firstArm
 export declare function firstArm(round: number, offset?: number): Arm;
+
+### build/index.d.ts#limitVerdict
+export declare function limitVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[], options: LimitOptions): LimitVerdict;
+
+### build/index.d.ts#timeRounds
+export declare function timeRounds(arms: Readonly<Record<Arm, () => number>>, options: RoundsOptions): Rounds;
 
 ### build/index.d.ts#timeVerdict
 export declare function timeVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[], options?: VerdictOptions): TimeVerdict;
