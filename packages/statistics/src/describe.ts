@@ -12,7 +12,8 @@ export type QuantileMethod =
   | "nearest-rank"
   /**
    * The higher of the two nearest ranks of type 7: `sorted[Math.ceil(p * (n - 1))]`. This is the method `"higher"` of
-   * NumPy. The 0.5 quantile is the upper median `sorted[Math.floor(n / 2)]`.
+   * NumPy. The 0.5 quantile is the upper median `sorted[Math.floor(n / 2)]`. The rank `p * (n - 1)` is rounded to
+   * `1e-9` before the ceiling. Thus a float error, for example `0.55 * 100 = 55.00000000000001`, does not move the rank up.
    */
   | "higher";
 
@@ -54,7 +55,8 @@ export function quantileSorted(sortedValues: readonly number[], p: number, metho
   if (!(p >= 0 && p <= 1)) throw new RangeError(`quantile: p is from 0 to 1, not ${p}.`);
   const n = sortedValues.length;
   if (method === "nearest-rank") return sortedValues[Math.min(n - 1, Math.max(0, Math.ceil(p * n) - 1))] as number;
-  if (method === "higher") return sortedValues[Math.ceil(p * (n - 1))] as number;
+  // The rank on a grid of 1e-9, so that a float error above a whole rank does not give the next rank.
+  if (method === "higher") return sortedValues[Math.ceil(Math.round(p * (n - 1) * 1e9) / 1e9)] as number;
   const at = (n - 1) * p;
   const low = Math.floor(at);
   const part = at - low;
