@@ -25,6 +25,11 @@
   "author": "Mark Russell (https://github.com/mark1russell7)",
   "type": "module",
   "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./fresh": "./src/fresh.ts",
+    "./package.json": "./package.json"
+  },
   "files": [
     "build"
   ],
@@ -36,6 +41,10 @@
       ".": {
         "types": "./build/index.d.ts",
         "import": "./build/index.js"
+      },
+      "./fresh": {
+        "types": "./build/fresh.d.ts",
+        "import": "./build/fresh.js"
       },
       "./package.json": "./package.json"
     }

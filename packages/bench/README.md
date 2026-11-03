@@ -43,6 +43,13 @@ v.comparison;                                     // the cases that gain and dro
 | `limitVerdict(candidate, aa, options)` | The verdict of the claim "the ratio of each case is at most `limit`": `within`, `beyond` or `cannot decide`. |
 | `timeRounds(arms, options)` | The timed rounds of one case in one process: a warm-up, a batch of at least the target time, and the order of `firstArm`. |
 | `verdictPower(options)` | The share of each outcome over seeded benches with a known ratio: the power test of a rule. |
+| `balanceOrders(records)` | The records of each case with a turned order. It removes the extra records of the larger order, with the highest rounds first. |
+| `pooledVerdict(jobs, options)` | The verdict of the merged records of all jobs, with the verdict of each job alone as a guard. |
+| `armVerdicts(run, aaPair, options)` | The verdict of each candidate pair of a run against its A/A pair. |
+| `benchEnv()` | From `/fresh`: the computer of this process, with the CPU model and the runner. |
+| `childLine(stdout)` | From `/fresh`: the last JSON line of a child, with its time `ms`, its `hash` and the reason of a skip. |
+| `pairOrder(pairs, round, caseIndex)` | From `/fresh`: the order of the pairs of one case in one round, and the first arm of each pair. |
+| `freshRun(options)` | From `/fresh`: the records of each pair, with each arm in its own fresh child process. |
 
 ## A claim with a limit
 
@@ -70,6 +77,64 @@ const { records } = timeRounds({ a: () => oldCode(input), b: () => newCode(input
 ```
 
 Each arm gives a number. The engine cannot remove the work of a call, because the sum of these numbers uses it.
+
+## The fresh runner
+
+The entry `@mark1russell7/rigor-bench/fresh` starts child processes, so it is for Node only. The root entry stays free of `node:child_process`.
+
+`freshRun` starts each arm of each pair, case and round in a fresh child. The child prints one JSON line, for example `{"ms": 12.5, "hash": "9f3a"}`:
+
+```ts
+import { freshRun } from "@mark1russell7/rigor-bench/fresh";
+
+const run = await freshRun({
+  base: { id: "old", command: ["node", "bench/arm.js", "--entry", "old"] },
+  candidates: [{ id: "new", command: ["node", "bench/arm.js", "--entry", "new"] }],
+  cases: ["board-1", "board-2"],
+  rounds: 5,
+  roundOffset: job * 5,                           // global rounds over the jobs
+  job: String(job),
+});
+
+run.pairs["new"];                                 // the records of the pair (old, new)
+run.pairs["old~aa"];                              // the records of the A/A pair (old, old)
+```
+
+- Each candidate is a pair (base, candidate) with its own base child. The A/A pair is (base, base).
+- `pairOrder` gives the order. Pair `p` starts with `firstArm(round, caseIndex + p)`, and the pair that starts first turns each second round.
+- The arguments of a case come after the command. The default is `--case <id>`.
+- A child that exits with an error, takes too long or prints no JSON line stops the run with an error. The error names the arm, the case, the round and the tail of `stderr`.
+- Only a line with `skipped` skips a case. The case then leaves each pair, and the run starts no more children for it.
+- Two different hashes of one arm on one case stop the run with an error.
+- Each record keeps its job and the computer of its job (`benchEnv`).
+
+A run of many jobs sets `roundOffset` to `job * rounds`. Then the merged records have one record of each case and round. Without it, each job repeats the first orders, and the merge removes more records.
+
+### Why pairs, and not a rotation of all arms
+
+A rotation of N arms turns the order of two arms only when they are N/2 apart in the rotation. For 4 arms, two arms 1 apart come in the order 3:1 over 4 rounds. Thus each pair of `freshRun` has its own two children, and the order of each pair turns each round.
+
+## The pooled verdict
+
+`pooledVerdict` gives the verdict of the records of all jobs together:
+
+```ts
+const v = pooledVerdict(
+  jobs.map((j) => ({ job: j.job, candidate: j.pairs["new"], aa: j.pairs["old~aa"] })),
+  { margin: 0.05 },
+);
+
+v.outcome;                                        // the pooled outcome, or "cannot decide" when a job decides the opposite direction
+v.jobs;                                           // the verdict of each job alone
+v.opposed;                                        // the jobs against the pooled direction
+v.trimmed;                                        // the records that balanceOrders removed
+```
+
+- The function merges the records, and balances the merged records with `balanceOrders`. A caller cannot pool records without a turned order.
+- The verdict of each job uses the same options as the pooled verdict.
+- A job with `cannot decide` or `same` does not change the outcome. Only a job with `faster` against a pooled `slower`, or the reverse, makes the outcome `cannot decide`.
+- Two jobs with a record of one case and one round are an error. Set `roundOffset` of each job.
+- `armVerdicts` gives the verdict of each candidate pair of one run against its A/A pair.
 
 ## The noise cap and the pooled band
 
