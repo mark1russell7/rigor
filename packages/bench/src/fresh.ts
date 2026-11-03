@@ -26,17 +26,27 @@ export function benchEnv(): BenchEnv {
 }
 
 /** The JSON line of a child: its time in milliseconds, the hash of its output, and the reason of a skip. */
-export interface ChildLine {
+export type ChildLine = ChildTime | ChildSkip;
+
+/** The result line of a child that timed the arm. */
+export interface ChildTime {
   readonly ms: number;
   /** The hash of the output of the arm. Two different hashes of one arm on one case are an error. */
   readonly hash?: string;
-  /** The reason of a skip. The runner removes the case from each pair. */
-  readonly skipped?: string;
+  readonly skipped?: undefined;
+}
+
+/** The result line of a child that skipped the case. A skip line does not need a time. */
+export interface ChildSkip {
+  /** The reason of the skip. The runner removes the case from each pair. */
+  readonly skipped: string;
+  readonly ms?: number;
+  readonly hash?: string;
 }
 
 /**
  * This function reads the last line of `stdout` that starts with `{`. The time `ms` is a finite number above 0.
- * A child that skips also prints a time. No such line, bad JSON or a bad field is an error.
+ * A skip line has the reason `skipped` and does not need a time. No such line, bad JSON or a bad field is an error.
  */
 export function childLine(stdout: string): ChildLine {
   const line = stdout
@@ -52,10 +62,13 @@ export function childLine(stdout: string): ChildLine {
   }
   if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error(`childLine: the last JSON line is not an object: ${line.slice(0, 200)}`);
   const { ms, hash, skipped } = value as Record<string, unknown>;
-  if (!(typeof ms === "number" && Number.isFinite(ms) && ms > 0)) throw new Error(`childLine: the time ms is a finite number above 0, not ${JSON.stringify(ms)}.`);
   if (hash !== undefined && typeof hash !== "string") throw new Error(`childLine: the hash is a string, not ${JSON.stringify(hash)}.`);
-  if (skipped !== undefined && !(typeof skipped === "string" && skipped !== "")) throw new Error(`childLine: the reason of a skip is a string that is not empty, not ${JSON.stringify(skipped)}.`);
-  return { ms, ...(hash === undefined ? {} : { hash }), ...(skipped === undefined ? {} : { skipped }) };
+  if (skipped !== undefined) {
+    if (!(typeof skipped === "string" && skipped !== "")) throw new Error(`childLine: the reason of a skip is a string that is not empty, not ${JSON.stringify(skipped)}.`);
+    return { skipped, ...(typeof ms === "number" ? { ms } : {}), ...(hash === undefined ? {} : { hash }) };
+  }
+  if (!(typeof ms === "number" && Number.isFinite(ms) && ms > 0)) throw new Error(`childLine: the time ms is a finite number above 0, not ${JSON.stringify(ms)}.`);
+  return { ms, ...(hash === undefined ? {} : { hash }) };
 }
 
 /** One slot of the order of a round: the index of the pair, and the arm of that pair that starts first. */

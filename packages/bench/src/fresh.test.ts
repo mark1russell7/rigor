@@ -46,6 +46,7 @@ describe("childLine", () => {
   it("reads the last line that starts with {", () => {
     expect(childLine('log\n{"ms":5}\nmore log\n{"ms":2.5,"hash":"h"}\r\ndone\n')).toEqual({ ms: 2.5, hash: "h" });
     expect(childLine('  {"ms":1,"skipped":"too large"}')).toEqual({ ms: 1, skipped: "too large" });
+    expect(childLine('{"skipped":"too large"}')).toEqual({ skipped: "too large" });
   });
 
   it("refuses no line, bad JSON and a bad time", () => {
