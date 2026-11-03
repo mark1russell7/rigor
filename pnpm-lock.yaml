@@ -173,11 +173,11 @@ importers:
         specifier: ^0.2.0
         version: 0.2.0(@swc/core@1.16.20)(dependency-cruiser@18.7.0)
       '@mark1russell7/conventions':
-        specifier: ^0.22.0
-        version: 0.22.0
+        specifier: ^0.23.0
+        version: 0.23.0
       '@mark1russell7/cue':
-        specifier: ^1.0.2
-        version: 1.1.0
+        specifier: ^2.0.0
+        version: 2.0.0
       '@mark1russell7/ste-lint':
         specifier: ^0.1.1
         version: 0.1.2
@@ -213,8 +213,8 @@ importers:
         version: link:../statistics
     devDependencies:
       '@mark1russell7/cue':
-        specifier: ^1.0.2
-        version: 1.1.0
+        specifier: ^2.0.0
+        version: 2.0.0
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.6
@@ -231,8 +231,8 @@ importers:
   packages/generators:
     devDependencies:
       '@mark1russell7/cue':
-        specifier: ^1.0.2
-        version: 1.1.0
+        specifier: ^2.0.0
+        version: 2.0.0
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.6
@@ -259,11 +259,11 @@ importers:
         version: link:../statistics
     devDependencies:
       '@mark1russell7/cue':
-        specifier: ^1.0.2
-        version: 1.1.0
+        specifier: ^2.0.0
+        version: 2.0.0
       '@mark1russell7/site-pages':
         specifier: ^0.1.8
-        version: 0.1.9
+        version: 0.1.10
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.6
@@ -284,8 +284,8 @@ importers:
         version: link:../generators
     devDependencies:
       '@mark1russell7/cue':
-        specifier: ^1.0.2
-        version: 1.1.0
+        specifier: ^2.0.0
+        version: 2.0.0
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.6
@@ -492,18 +492,18 @@ packages:
       dependency-cruiser:
         optional: true
 
-  '@mark1russell7/conventions@0.22.0':
-    resolution: {integrity: sha512-MtNaOnUyG9trSTY0S9In5+JtGwNpYHRGYxvDgncGtn50VBE75fJ7aSFNOxZDcDY4F0+AoG2pOJbnQd+bSSX13Q==}
+  '@mark1russell7/conventions@0.23.0':
+    resolution: {integrity: sha512-VFrPq12jxlLGaX5yLzULf0rRa/7TXp5mmb8H2x2zfQS19tcyY1IYcanDKkQIikf8SjUDNzisDLmspUgPucy16A==}
     engines: {node: '>=22'}
     hasBin: true
 
-  '@mark1russell7/cue@1.1.0':
-    resolution: {integrity: sha512-R9pjuWNFqd/LSfOI8uY7w8E2Dri8UQFGLodBuV4d2E0pwzWM5ISVXWVhC7+aYgrR1GXSMzbyo5ZLWvqyQCwdIg==}
+  '@mark1russell7/cue@2.0.0':
+    resolution: {integrity: sha512-ILRKnaE/Ooe+saWXiQ8BaRTncHIDq7/1xyGEAZs4JzF0gkZ7FNv9e6OKIBERAmprKbb598SEV5gCDgdibYWOqw==}
     engines: {node: '>=22'}
     hasBin: true
 
-  '@mark1russell7/site-pages@0.1.9':
-    resolution: {integrity: sha512-i553Ngctr0MTx+NU5SRjGasotEjYjgnwJTXW3Hn5Cd809QRP2KEgd8GUl4SoVEMK/73O4k4nsHCD24sraje74w==}
+  '@mark1russell7/site-pages@0.1.10':
+    resolution: {integrity: sha512-dcMPqlWsxJ+fRvl5cZH01a+/94ujk5ogRfg5puO2JC7pvE5jq1IV48UrcbtP+zcS5r9zMUbvUVz74E9xQYY8FQ==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -1622,11 +1622,11 @@ snapshots:
       '@swc/core': 1.16.20
       dependency-cruiser: 18.7.0
 
-  '@mark1russell7/conventions@0.22.0': {}
+  '@mark1russell7/conventions@0.23.0': {}
 
-  '@mark1russell7/cue@1.1.0': {}
+  '@mark1russell7/cue@2.0.0': {}
 
-  '@mark1russell7/site-pages@0.1.9': {}
+  '@mark1russell7/site-pages@0.1.10': {}
 
   '@mark1russell7/ste-lint@0.1.2':
     dependencies:
