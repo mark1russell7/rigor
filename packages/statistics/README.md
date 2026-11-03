@@ -27,7 +27,7 @@ A promotion reads `gains` against `drops` and `effect`. A sign test alone is not
 | Function | What it gives |
 | --- | --- |
 | `mean`, `sd`, `median`, `summarize` | The descriptive statistics. `sd` is the sample standard deviation. |
-| `quantile(values, p, method)`, `quantileSorted` | The `p` quantile, with the `"linear"` method (type 7, the default) or the `"nearest-rank"` method (type 1). |
+| `quantile(values, p, method)`, `quantileSorted` | The `p` quantile, with the `"linear"` method (type 7, the default), the `"nearest-rank"` method (type 1) or the `"higher"` method (`sorted[Math.ceil(p * (n - 1))]`, as NumPy). |
 | `bootstrap(data, statistic, options)` | A percentile bootstrap interval of any statistic. The options are `runs`, `level` or `ends`, `seed` and `method`. |
 | `bootstrapMedian`, `bootstrapClusters` | The interval of the median, and a bootstrap that draws whole clusters (boards, seeds, sites). |
 | `bootstrapTwo(a, b, statistic, options)` | A bootstrap interval of a statistic of two independent samples, for example two arms of a benchmark. Each run draws all of `a`, then all of `b`. |
@@ -53,6 +53,7 @@ The tests prove that these functions give the same numbers as the copies in the 
 | `quantile` of highways, packing and layout-contract (`quantileOf`) | `quantile(values, p)` |
 | `quantile` of lag and lag-hud, `percentile` of lag (with `p / 100`) | `quantile(values, p, "nearest-rank")` |
 | `median` of coeval, lag, crawler and packing | `median(values)` |
+| The upper median `sorted[Math.floor(n / 2)]` of highways | `quantile(values, 0.5, "higher")` |
 | `bootstrapMedian` of packing | `bootstrapMedian(sortedValues, { runs, level, seed })`. Give the values sorted, because packing draws from the sorted list. |
 | `bootstrapMedian` of highways | `bootstrap(values, (s) => quantile(s, 0.5), { runs, level, seed })` |
 | `bootstrap` of layout-contract | `bootstrapClusters(rows, (r) => r.cluster, statistic, { runs, seed, ends: [0.025, 0.975] })` |

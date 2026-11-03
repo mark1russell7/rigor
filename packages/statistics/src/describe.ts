@@ -4,12 +4,17 @@
  * quiet NaN in a record.
  */
 
-/** The two definitions of a quantile that the engines use (Hyndman and Fan, 1996). */
+/** The definitions of a quantile that the engines use (Hyndman and Fan, 1996, and the names of NumPy). */
 export type QuantileMethod =
   /** Type 7: a linear step between the two nearest ranks. The default of R and NumPy. */
   | "linear"
   /** Type 1: the smallest value with at least the share `p` of the values at or below it. */
-  | "nearest-rank";
+  | "nearest-rank"
+  /**
+   * The higher of the two nearest ranks of type 7: `sorted[Math.ceil(p * (n - 1))]`. This is the method `"higher"` of
+   * NumPy. The 0.5 quantile is the upper median `sorted[Math.floor(n / 2)]`.
+   */
+  | "higher";
 
 function checked(name: string, values: readonly number[]): void {
   if (values.length === 0) throw new RangeError(`${name}: the list is empty.`);
@@ -41,13 +46,15 @@ export function sd(values: readonly number[]): number {
 /**
  * The `p` quantile of a list that is already sorted. Use it when you take several quantiles of one list.
  * The linear method gives the same numbers as the copies in highways, packing and layout-contract. The
- * nearest-rank method gives the same numbers as the copies in lag, lag-hud and the backtest of highways.
+ * nearest-rank method gives the same numbers as the copies in lag, lag-hud and the backtest of highways. The
+ * higher method gives the upper median of the copies in highways with `p = 0.5`.
  */
 export function quantileSorted(sortedValues: readonly number[], p: number, method: QuantileMethod = "linear"): number {
   checked("quantile", sortedValues);
   if (!(p >= 0 && p <= 1)) throw new RangeError(`quantile: p is from 0 to 1, not ${p}.`);
   const n = sortedValues.length;
   if (method === "nearest-rank") return sortedValues[Math.min(n - 1, Math.max(0, Math.ceil(p * n) - 1))] as number;
+  if (method === "higher") return sortedValues[Math.ceil(p * (n - 1))] as number;
   const at = (n - 1) * p;
   const low = Math.floor(at);
   const part = at - low;
