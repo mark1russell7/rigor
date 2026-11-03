@@ -248,6 +248,23 @@ for (const seed of seedsFrom(process.env.SEED, [1, 2, 3, 4, 5])) {
 `;
 }
 
+/**
+ * This function gives the module names that a bundle still imports. The page bundle runs in a browser, so it imports none.
+ * An example is `node:perf_hooks` of the timer of `rigor-bench`: a browser cannot load it, and then no script of the page starts.
+ * The bundler puts each static import at the start of an ES module, so this function reads only the statements at the start.
+ * Thus the text of a code example in a string is not an import.
+ */
+export function bundleImports(code: string): string[] {
+  const statement = /^\s*(?:import|export)\s*(?:[\w$*{},\s]*?\bfrom\s*)?["']([^"']+)["']\s*;?/;
+  const names: string[] = [];
+  let rest = code;
+  for (let m = statement.exec(rest); m !== null; m = statement.exec(rest)) {
+    names.push(m[1]!);
+    rest = rest.slice(m[0].length);
+  }
+  return names;
+}
+
 export function parseSiteArgs(argv: readonly string[]): { readonly out: string } | { readonly error: string } {
   let out = "dist";
   for (let i = 0; i < argv.length; i++) {
@@ -278,10 +295,17 @@ async function main(argv: readonly string[]): Promise<number> {
     platform: "browser",
     fixedExtension: false,
     noExternal: [/.*/],
+    // The root of rigor-bench also exports its timer, which imports node:perf_hooks. The page does not use it, so the bundle drops the import.
+    treeshake: { moduleSideEffects: "no-external" },
     dts: false,
     minify: true,
     clean: false,
   });
+  const left = bundleImports(readFileSync(join(out, "page.js"), "utf8"));
+  if (left.length > 0) {
+    console.error(`page.js imports ${left.join(", ")}, and a browser cannot load it. The bundle holds each module of the page.`);
+    return 1;
+  }
   const version = (name: string): string => (JSON.parse(readFileSync(join(here, `../${name}/package.json`), "utf8")) as { version: string }).version;
   const rows = packageRows({ generators: version("generators"), statistics: version("statistics"), bench: version("bench") });
   writeFileSync(join(out, "index.html"), pageHtml(rows, new Date().toISOString().slice(0, 10), scrollCueCss()));

@@ -25,7 +25,8 @@ const preset = async (id: string, expected: string): Promise<void> => {
   check(`the badge of the preset ${id} says ${expected}`, LABEL[expected]?.test(badge()), badge());
 };
 
-check("the explorer shows a verdict when the page opens", await until(() => outcome() !== ""), badge());
+// The page script draws the explorer when it starts. Wait for the whole first draw before the first check.
+check("the explorer shows a verdict when the page opens", await until(() => outcome() !== "" && records() > 0 && $("#vx-presets button") !== null, 10000), badge());
 check("the same zone draws", await until(() => width("#vx-chart .zone") > 0), width("#vx-chart .zone"));
 check("the pooled A/A band draws", width("#vx-chart .band") > 0, width("#vx-chart .band"));
 check("the interval of the candidate draws", width("#vx-chart .interval") > 0, width("#vx-chart .interval"));

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { caseRatios, timeVerdict, verdictMargin } from "@mark1russell7/rigor-bench";
-import { pageHtml, packageRows, scrollCueCss, verdictSection } from "./build.ts";
+import { bundleImports, pageHtml, packageRows, scrollCueCss, verdictSection } from "./build.ts";
 import { BADGE, callCode, factsText } from "./explorer-view.ts";
 import {
   CASES,
@@ -22,6 +22,18 @@ import {
 import { readProbe } from "./probe-script.ts";
 
 const bench = (id: string) => ({ ...PRESETS.find((p) => p.id === id)!.bench, seed: "42" });
+
+describe("bundleImports", () => {
+  it("finds each module that a minified bundle imports at its start", () => {
+    expect(bundleImports('import"node:perf_hooks";function e(){}')).toEqual(["node:perf_hooks"]);
+    expect(bundleImports('import{a as b}from"x";import*as c from "y";\nexport*from"z";const d=1')).toEqual(["x", "y", "z"]);
+  });
+
+  it("does not take the text of a code example for an import", () => {
+    expect(bundleImports('function e(){return`import { timeVerdict } from "@mark1russell7/rigor-bench";`}')).toEqual([]);
+    expect(bundleImports("const important=1;e.import=2;")).toEqual([]);
+  });
+});
 
 describe("the simulated bench", () => {
   it("draws the records of the two pairs and of the pool", () => {
