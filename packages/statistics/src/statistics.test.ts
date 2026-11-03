@@ -1,3 +1,4 @@
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { mulberry32, random } from "@mark1russell7/rigor-generators";
 import {
@@ -12,6 +13,7 @@ import {
   mean,
   median,
   noiseFloor,
+  noiseVerdict,
   pairedPermutation,
   quantile,
   quantileSorted,
@@ -394,6 +396,47 @@ describe("the comparison with a baseline", () => {
     expect(noiseFloor([1, 2, 3, 4, 5])).toBeCloseTo(2 * Math.sqrt(2.5), 12);
     expect(() => noiseFloor([1, 2, 3])).toThrow(RangeError);
     expect(noiseFloor([1, 2, 3], { minimum: 3, k: 1 })).toBe(1);
+  });
+
+  it("takes a margin of practical effect, and keeps the old floor without one", () => {
+    const values = [0.1, 0.12, 0.11, 0.09, 0.1];
+    expect(noiseFloor(values, { margin: 0 })).toBe(noiseFloor(values));
+    expect(noiseFloor(values, { margin: 0.5 })).toBe(0.5);
+    expect(noiseFloor(values, { margin: 0.001 })).toBe(2 * sd(values));
+    expect(() => noiseFloor(values, { margin: -1 })).toThrow(/margin/);
+    expect(() => noiseFloor(values, { margin: Number.NaN })).toThrow(/margin/);
+  });
+
+  it("gives the state of a difference over the seeds: gain, loss, noise, or no spread", () => {
+    const gain = noiseVerdict([0.1, 0.12, 0.11, 0.09, 0.1]);
+    expect(gain.state).toBe("gain");
+    expect(gain.mean).toBeCloseTo(0.104, 12);
+    expect(gain.threshold).toBe(gain.spread);
+    expect(noiseVerdict([-0.1, -0.12, -0.11, -0.09, -0.1]).state).toBe("loss");
+    expect(noiseVerdict([-0.1, -0.12, -0.11, -0.09, -0.1], { better: "lower" }).state).toBe("gain");
+    expect(noiseVerdict([0.1, -0.1, 0.05, -0.05, 0]).state).toBe("noise");
+    // A real difference under the margin is not a result.
+    const small = noiseVerdict([0.1, 0.12, 0.11, 0.09, 0.1], { margin: 0.2 });
+    expect([small.state, small.threshold]).toEqual(["noise", 0.2]);
+    // Equal values do not sample the noise: the state is no-spread, also beyond the margin.
+    const flat = noiseVerdict([0.3, 0.3, 0.3, 0.3, 0.3], { margin: 0.1 });
+    expect([flat.state, flat.sd, flat.spread]).toEqual(["no-spread", 0, 0]);
+    expect(() => noiseVerdict([1, 2])).toThrow(/5 or more/);
+  });
+
+  it("gives an sd of exactly 0 and the state no-spread for n copies of any finite value", () => {
+    // The mean of 5 copies of this value is not the value, so the old sd was 1.24e-16.
+    const x = 0.868730285466694;
+    expect(sd([x, x, x, x, x])).toBe(0);
+    expect(noiseVerdict([x, x, x, x, x]).state).toBe("no-spread");
+    fc.assert(
+      fc.property(fc.double({ noNaN: true, noDefaultInfinity: true }), fc.integer({ min: 5, max: 40 }), (v, n) => {
+        const values = Array.from({ length: n }, () => v);
+        expect(sd(values)).toBe(0);
+        expect(noiseVerdict(values).state).toBe("no-spread");
+      }),
+      { seed: 57, numRuns: 2000 },
+    );
   });
 });
 

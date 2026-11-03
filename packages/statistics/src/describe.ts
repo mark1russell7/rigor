@@ -35,10 +35,19 @@ export function mean(values: readonly number[]): number {
   return sum / values.length;
 }
 
-/** The sample standard deviation (the divisor is n - 1). It needs 2 values or more. */
+/** This function tells if each value is equal to the first value. An empty list gives true. */
+export function allEqual(values: readonly number[]): boolean {
+  return values.every((v) => v === values[0]);
+}
+
+/**
+ * The sample standard deviation (the divisor is n - 1). It needs 2 values or more. Equal values give exactly 0. The
+ * rounding of the mean gives a small number that is not 0 for some equal values, so the function examines them first.
+ */
 export function sd(values: readonly number[]): number {
   checked("sd", values);
   if (values.length < 2) throw new RangeError("sd: the list needs 2 values or more.");
+  if (allEqual(values)) return 0;
   const m = mean(values);
   let sum = 0;
   for (const v of values) sum += (v - m) ** 2;

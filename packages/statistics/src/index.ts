@@ -32,8 +32,11 @@ export {
   type Effect,
   type Forecast,
   type NoiseOptions,
+  type NoiseState,
+  type NoiseVerdict,
   brier,
   calibration,
   compareRatios,
   noiseFloor,
+  noiseVerdict,
 } from "./compare.ts";

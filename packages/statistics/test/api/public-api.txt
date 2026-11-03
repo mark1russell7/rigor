@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 51 names
+## . (build/index.d.ts): 54 names
 
 type BootstrapOptions: build/index.d.ts#BootstrapOptions
 type CalibrationLevel: build/index.d.ts#CalibrationLevel
@@ -20,6 +20,8 @@ type LeastSquaresFit: build/index.d.ts#LeastSquaresFit
 type LeastSquaresOptions: build/index.d.ts#LeastSquaresOptions
 type MedianInterval: build/index.d.ts#MedianInterval
 type NoiseOptions: build/index.d.ts#NoiseOptions
+type NoiseState: build/index.d.ts#NoiseState
+type NoiseVerdict: build/index.d.ts#NoiseVerdict
 type PermutationOptions: build/index.d.ts#PermutationOptions
 type PermutationResult: build/index.d.ts#PermutationResult
 type Proportion: build/index.d.ts#Proportion
@@ -45,6 +47,7 @@ median: build/index.d.ts#median
 medianInterval: build/index.d.ts#medianInterval
 negativeBinomialInterval: build/index.d.ts#negativeBinomialInterval
 noiseFloor: build/index.d.ts#noiseFloor
+noiseVerdict: build/index.d.ts#noiseVerdict
 pairedPermutation: build/index.d.ts#pairedPermutation
 quantile: build/index.d.ts#quantile
 quantileSorted: build/index.d.ts#quantileSorted
@@ -169,6 +172,21 @@ interface MedianInterval {
 interface NoiseOptions {
   readonly k?: number;
   readonly minimum?: number;
+  readonly margin?: number;
+}
+
+### build/index.d.ts#NoiseState
+type NoiseState = "gain" | "loss" | "noise" | "no-spread";
+
+### build/index.d.ts#NoiseVerdict
+interface NoiseVerdict {
+  readonly n: number;
+  readonly mean: number;
+  readonly sd: number;
+  readonly spread: number;
+  readonly margin: number;
+  readonly threshold: number;
+  readonly state: NoiseState;
 }
 
 ### build/index.d.ts#PermutationOptions
@@ -268,6 +286,11 @@ export declare function negativeBinomialInterval(successes: number, p: number, l
 
 ### build/index.d.ts#noiseFloor
 export declare function noiseFloor(values: readonly number[], options?: NoiseOptions): number;
+
+### build/index.d.ts#noiseVerdict
+export declare function noiseVerdict(values: readonly number[], options?: NoiseOptions & {
+  readonly better?: "higher" | "lower";
+}): NoiseVerdict;
 
 ### build/index.d.ts#pairedPermutation
 export declare function pairedPermutation(candidate: readonly number[], baseline: readonly number[], options?: PermutationOptions): PermutationResult;

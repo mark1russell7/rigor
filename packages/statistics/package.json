@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/rigor-statistics",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "The statistics of measured work: quantiles, bootstrap intervals, the sign test, the paired permutation test, Wilson intervals, the Holm correction, rank correlation, the comparison with a baseline beyond the noise, and the Brier score.",
   "keywords": [
     "statistics",
@@ -62,6 +62,7 @@
   "devDependencies": {
     "@mark1russell7/cue": "^2.0.0",
     "@types/node": "^26.6.5",
+    "fast-check": "^4.10.2",
     "tsdown": "^0.23.1",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3"
