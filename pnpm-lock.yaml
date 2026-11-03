@@ -173,8 +173,8 @@ importers:
         specifier: ^0.2.0
         version: 0.2.0(@swc/core@1.16.20)(dependency-cruiser@18.7.0)
       '@mark1russell7/conventions':
-        specifier: ^0.21.0
-        version: 0.21.0
+        specifier: ^0.22.0
+        version: 0.22.0
       '@mark1russell7/cue':
         specifier: ^1.0.2
         version: 1.1.0
@@ -492,8 +492,8 @@ packages:
       dependency-cruiser:
         optional: true
 
-  '@mark1russell7/conventions@0.21.0':
-    resolution: {integrity: sha512-mYD55jKunbfbAQXhs5bKD5vXOvWEzL1+jvyMpZCmcidT28m+ddM4iJG42StanDIeQD7ifuRrsN7q3ejnIJe7tg==}
+  '@mark1russell7/conventions@0.22.0':
+    resolution: {integrity: sha512-MtNaOnUyG9trSTY0S9In5+JtGwNpYHRGYxvDgncGtn50VBE75fJ7aSFNOxZDcDY4F0+AoG2pOJbnQd+bSSX13Q==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -1622,7 +1622,7 @@ snapshots:
       '@swc/core': 1.16.20
       dependency-cruiser: 18.7.0
 
-  '@mark1russell7/conventions@0.21.0': {}
+  '@mark1russell7/conventions@0.22.0': {}
 
   '@mark1russell7/cue@1.1.0': {}
 
