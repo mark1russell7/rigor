@@ -33,7 +33,19 @@ for (const seed of seedsFrom(process.env.SEED, [1, 2, 3, 4, 5])) {
 }
 ```
 
-The package also exports the parts: `mulberry32(seed)` (the raw source), `fnv1a32(text)` (the FNV-1a hash of the UTF-8 bytes), `seedOf(seed)`, `deriveSeed(seed, label)` and `randomOf(source, seed)` (the draws over a source that you give).
+The package also exports the parts: `mulberry32(seed)` (the raw source), `fnv1a32(text, options)` (the FNV-1a hash), `seedOf(seed)`, `deriveSeed(seed, label)` and `randomOf(source, seed)` (the draws over a source that you give).
+
+## The input of `fnv1a32`
+
+The option `input` of `fnv1a32` selects the units that the hash reads. Use it to replace a local copy of FNV-1a with the same hashes.
+
+| `input` | The hash reads | A copy with this form |
+| --- | --- | --- |
+| `"utf8"` (the default) | The bytes of `TextEncoder`. A lone surrogate becomes the bytes of U+FFFD. | `new TextEncoder().encode(text)` |
+| `"utf16"` | Each UTF-16 code unit, one unit for each step. | `h ^= text.charCodeAt(i)` |
+| `"wtf8"` | The UTF-8 bytes of each code point. A lone surrogate becomes its own 3 bytes. | A UTF-8 encoder over `for (const ch of text)` |
+
+For a string without a lone surrogate, `"utf8"` and `"wtf8"` give the same hash.
 
 ## Move from a copy of mulberry32
 

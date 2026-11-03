@@ -41,7 +41,9 @@ type Source = () => number;
 export declare function deriveSeed(seed: number, label: string): number;
 
 ### build/index.d.ts#fnv1a32
-export declare function fnv1a32(text: string): number;
+export declare function fnv1a32(text: string, options?: {
+  readonly input?: "utf8" | "utf16" | "wtf8";
+}): number;
 
 ### build/index.d.ts#mulberry32
 export declare function mulberry32(seed: number): Source;

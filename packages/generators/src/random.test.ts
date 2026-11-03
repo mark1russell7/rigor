@@ -48,6 +48,87 @@ describe("fnv1a32", () => {
     expect(fnv1a32("foobar")).toBe(0xbf9cf968);
     expect(fnv1a32("é")).not.toBe(fnv1a32("é".normalize("NFD")));
   });
+
+  /** The UTF-16 form of highways (`fnv1a` of `src/highways/corridors`): one code unit for each step. */
+  function units(text: string): number {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < text.length; i++) {
+      h ^= text.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
+    return h >>> 0;
+  }
+
+  /** The WTF-8 form of highways (`fnv1a32` of `src/bench/screen/hash.ts`): the UTF-8 bytes of each code point. */
+  function codePointBytes(text: string): number {
+    const out: number[] = [];
+    for (const ch of text) {
+      const c = ch.codePointAt(0) as number;
+      if (c < 0x80) out.push(c);
+      else if (c < 0x800) out.push(0xc0 | (c >> 6), 0x80 | (c & 63));
+      else if (c < 0x10000) out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+      else out.push(0xf0 | (c >> 18), 0x80 | ((c >> 12) & 63), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+    }
+    let h = 0x811c9dc5;
+    for (const byte of out) {
+      h ^= byte;
+      h = Math.imul(h, 0x01000193);
+    }
+    return h >>> 0;
+  }
+
+  /** 1000 strings from a seeded source: ASCII, two-byte, three-byte and astral characters, and lone surrogates. */
+  function strings(): string[] {
+    const r = random("fnv1a32-input");
+    const pool = [0x41, 0x7a, 0x30, 0x20, 0xe9, 0x3b1, 0x4e2d, 0xffff, 0xd800, 0xdbff, 0xdc00, 0xdfff];
+    const out = ["", "\uD800", "a\uDC00b", "\uDC00\uD800", "😀"];
+    while (out.length < 1000) {
+      let s = "";
+      const length = r.int(0, 12);
+      for (let i = 0; i < length; i++) {
+        const kind = r.below(4);
+        if (kind === 0) s += String.fromCharCode(r.int(0x20, 0x7e));
+        else if (kind === 1) s += String.fromCharCode(r.pick(pool));
+        else if (kind === 2) s += String.fromCodePoint(r.int(0x10000, 0x10ffff));
+        else s += String.fromCharCode(r.int(0, 0xffff));
+      }
+      out.push(s);
+    }
+    return out;
+  }
+
+  /** `true` when the string has no lone surrogate. */
+  const wellFormed = (s: string): boolean => !/\p{Cs}/u.test(s);
+
+  it("keeps the old hashes when the input is utf8 or not given", () => {
+    for (const s of strings()) expect(fnv1a32(s, { input: "utf8" })).toBe(fnv1a32(s));
+    expect(fnv1a32("foobar", { input: "utf8" })).toBe(0xbf9cf968);
+    expect(fnv1a32("\uD800")).toBe(55024714);
+  });
+
+  it("gives the hash of the UTF-16 code units, equal to the copy of highways", () => {
+    for (const s of strings()) expect(fnv1a32(s, { input: "utf16" })).toBe(units(s));
+    expect(fnv1a32("", { input: "utf16" })).toBe(0x811c9dc5);
+    expect(fnv1a32("\uD800", { input: "utf16" })).toBe(75617567);
+    expect(fnv1a32("a\uDC00b", { input: "utf16" })).toBe(176117714);
+  });
+
+  it("gives the hash of the WTF-8 bytes, equal to the copy of highways", () => {
+    for (const s of strings()) expect(fnv1a32(s, { input: "wtf8" })).toBe(codePointBytes(s));
+    expect(fnv1a32("", { input: "wtf8" })).toBe(0x811c9dc5);
+    expect(fnv1a32("\uD800", { input: "wtf8" })).toBe(1973925784);
+    expect(fnv1a32("a\uDC00b", { input: "wtf8" })).toBe(2014720891);
+  });
+
+  it("gives the utf8 hash for wtf8 when the string has no lone surrogate", () => {
+    const whole = strings().filter(wellFormed);
+    expect(whole.length).toBeGreaterThan(100);
+    for (const s of whole) expect(fnv1a32(s, { input: "wtf8" })).toBe(fnv1a32(s));
+  });
+
+  it("refuses an unknown input", () => {
+    expect(() => fnv1a32("a", { input: "latin1" as "utf8" })).toThrow(RangeError);
+  });
 });
 
 describe("seeds", () => {
