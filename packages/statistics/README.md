@@ -1,6 +1,6 @@
 # @mark1russell7/rigor-statistics
 
-The statistics of measured work. It gives quantiles, bootstrap intervals, the sign test, the paired permutation test, Wilson intervals and the Holm correction. It also gives least squares, rank correlation, the comparison with a baseline beyond the noise, and the Brier score of predictions.
+The statistics of measured work. It gives quantiles, bootstrap intervals, the sign test, the paired permutation test, Wilson intervals and the Holm correction. It gives the interval of a median from order statistics, and the central interval of a binomial count. It also gives least squares, rank correlation, the comparison with a baseline beyond the noise, and the Brier score of predictions.
 
 ```sh
 npm install @mark1russell7/rigor-statistics
@@ -37,6 +37,8 @@ A promotion reads `gains` against `drops` and `effect`. A sign test alone is not
 | `signTest(better, worse, sides)`, `signTestPower(n, level)` | The sign test, and the fewest wins out of `n` that the test calls significant. |
 | `pairedPermutation(candidate, baseline, options)` | The paired permutation test (random sign flips). It uses the size of each difference. |
 | `wilson(k, n, z)` | The Wilson interval of a proportion. |
+| `medianInterval(values, level)` | The distribution-free interval of a median, from two order statistics. It gives `low`, `high`, the `rank` of `low` and the `coverage`. |
+| `binomialInterval(n, p, level)`, `negativeBinomialInterval(successes, p, level)` | The central interval of a binomial count, and of a count of failures before `successes` successes. Each tail outside holds `(1 - level) / 2` or less. |
 | `holm(pValues, level)` | The Holm correction of a family of tests. |
 | `spearman`, `kendallTau`, `ranks` | The rank correlations, with mean ranks for ties. |
 | `compareRatios`, `noiseFloor` | The comparison with a baseline, and the noise floor of the 5-seed rule. |
@@ -60,6 +62,8 @@ The tests prove that these functions give the same numbers as the copies in the 
 | `signTestPower` of highways | `signTestPower(n, level)` |
 | `wilson` of packing | `wilson(k, n, z)`. packing rounds the ends to 4 places at the call. |
 | `spearman` of the highways backtest, `kendallTau` of highways | `spearman`, `kendallTau` |
+| `medianInterval` of the harness and kind of systems | `medianInterval(sortedValues)`, with `low` and `high` |
+| The binomial band of `targetConnections` and `negativeBinomial` of the cells of systems | `binomialInterval(n, p, cover)` and `negativeBinomialInterval(successes, p, cover)` |
 
 A copy that gives NaN, 0 or `undefined` for an empty list must test the list at the call, because these functions throw.
 

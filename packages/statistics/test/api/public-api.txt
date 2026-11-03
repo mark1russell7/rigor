@@ -4,19 +4,21 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 44 names
+## . (build/index.d.ts): 49 names
 
 type BootstrapOptions: build/index.d.ts#BootstrapOptions
 type CalibrationLevel: build/index.d.ts#CalibrationLevel
 type CompareOptions: build/index.d.ts#CompareOptions
 type Comparison: build/index.d.ts#Comparison
 type Corrected: build/index.d.ts#Corrected
+type CountInterval: build/index.d.ts#CountInterval
 type Effect: build/index.d.ts#Effect
 type Forecast: build/index.d.ts#Forecast
 type Interval: build/index.d.ts#Interval
 KENDALL_EXACT: build/index.d.ts#KENDALL_EXACT
 type LeastSquaresFit: build/index.d.ts#LeastSquaresFit
 type LeastSquaresOptions: build/index.d.ts#LeastSquaresOptions
+type MedianInterval: build/index.d.ts#MedianInterval
 type NoiseOptions: build/index.d.ts#NoiseOptions
 type PermutationOptions: build/index.d.ts#PermutationOptions
 type PermutationResult: build/index.d.ts#PermutationResult
@@ -24,6 +26,7 @@ type Proportion: build/index.d.ts#Proportion
 type QuantileMethod: build/index.d.ts#QuantileMethod
 type Summary: build/index.d.ts#Summary
 Z95: build/index.d.ts#Z95
+binomialInterval: build/index.d.ts#binomialInterval
 bootstrap: build/index.d.ts#bootstrap
 bootstrapClusters: build/index.d.ts#bootstrapClusters
 bootstrapLeastSquares: build/index.d.ts#bootstrapLeastSquares
@@ -38,6 +41,8 @@ kendallTau: build/index.d.ts#kendallTau
 leastSquares: build/index.d.ts#leastSquares
 mean: build/index.d.ts#mean
 median: build/index.d.ts#median
+medianInterval: build/index.d.ts#medianInterval
+negativeBinomialInterval: build/index.d.ts#negativeBinomialInterval
 noiseFloor: build/index.d.ts#noiseFloor
 pairedPermutation: build/index.d.ts#pairedPermutation
 quantile: build/index.d.ts#quantile
@@ -101,6 +106,13 @@ interface Corrected {
   readonly reject: boolean;
 }
 
+### build/index.d.ts#CountInterval
+interface CountInterval {
+  readonly low: number;
+  readonly high: number;
+  readonly coverage: number;
+}
+
 ### build/index.d.ts#Effect
 interface Effect {
   readonly n: number;
@@ -141,6 +153,14 @@ interface LeastSquaresFit {
 ### build/index.d.ts#LeastSquaresOptions
 interface LeastSquaresOptions {
   readonly intercept?: boolean;
+}
+
+### build/index.d.ts#MedianInterval
+interface MedianInterval {
+  readonly low: number;
+  readonly high: number;
+  readonly rank: number;
+  readonly coverage: number;
 }
 
 ### build/index.d.ts#NoiseOptions
@@ -188,6 +208,9 @@ interface Summary {
 ### build/index.d.ts#Z95
 export declare const Z95 = 1.959963984540054;
 
+### build/index.d.ts#binomialInterval
+export declare function binomialInterval(n: number, p: number, level?: number): CountInterval;
+
 ### build/index.d.ts#bootstrap
 export declare function bootstrap<T>(data: readonly T[], statistic: (sample: readonly T[]) => number, options?: BootstrapOptions): Interval;
 
@@ -229,6 +252,12 @@ export declare function mean(values: readonly number[]): number;
 
 ### build/index.d.ts#median
 export declare function median(values: readonly number[]): number;
+
+### build/index.d.ts#medianInterval
+export declare function medianInterval(values: readonly number[], level?: number): MedianInterval;
+
+### build/index.d.ts#negativeBinomialInterval
+export declare function negativeBinomialInterval(successes: number, p: number, level?: number): CountInterval;
 
 ### build/index.d.ts#noiseFloor
 export declare function noiseFloor(values: readonly number[], options?: NoiseOptions): number;
