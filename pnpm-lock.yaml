@@ -205,6 +205,9 @@ importers:
 
   packages/bench:
     dependencies:
+      '@mark1russell7/rigor-generators':
+        specifier: workspace:^
+        version: link:../generators
       '@mark1russell7/rigor-statistics':
         specifier: workspace:^
         version: link:../statistics
@@ -212,9 +215,6 @@ importers:
       '@mark1russell7/cue':
         specifier: ^1.0.2
         version: 1.1.0
-      '@mark1russell7/rigor-generators':
-        specifier: workspace:^
-        version: link:../generators
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.6

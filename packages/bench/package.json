@@ -50,10 +50,10 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
   },
   "dependencies": {
+    "@mark1russell7/rigor-generators": "workspace:^",
     "@mark1russell7/rigor-statistics": "workspace:^"
   },
   "devDependencies": {
-    "@mark1russell7/rigor-generators": "workspace:^",
     "@mark1russell7/cue": "^1.0.2",
     "@types/node": "^26.6.5",
     "tsdown": "^0.23.1",
