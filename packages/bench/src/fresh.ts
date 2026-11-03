@@ -165,6 +165,8 @@ export interface FreshRecord extends PairedTime {
 export interface FreshSkip {
   readonly arm: string;
   readonly case: string;
+  /** The global round of the skip. A skip is in the first round of its job. */
+  readonly round: number;
   readonly reason: string;
 }
 
@@ -188,7 +190,8 @@ const TAIL = 2000;
  * - Each candidate is a pair (base, candidate) with its own base child. The A/A pair is (base, base).
  * - In each round and case, the pairs come in the order of `pairOrder`. The first arm of a pair starts first.
  * - A child that exits with an error, takes too long or prints no JSON line is an error. Only a skip line skips a case.
- * - A case that an arm skips leaves each pair, and the runner starts no more children for it.
+ * - A case that an arm skips in the first round of the job leaves each pair, and the runner starts no more children for it.
+ * - A skip after the first round is an error. It shows a child that is not deterministic, and it drops paid data.
  * - Two different hashes of one arm on one case are an error.
  */
 export async function freshRun(options: FreshOptions): Promise<FreshRun> {
@@ -239,7 +242,8 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
           const where = `the arm ${JSON.stringify(who.id)} (pair ${JSON.stringify(pair.id)}, arm ${arm}) on the case ${JSON.stringify(id)}, round ${round}`;
           const line = await child(start, [...who.command, ...args(id)], { timeoutMs, maxBuffer }, where);
           if (line.skipped !== undefined) {
-            skip = { arm: who.id, case: id, reason: line.skipped };
+            if (r > 0) throw new Error(`freshRun: ${where} skipped the case after the first round of the job (${JSON.stringify(line.skipped)}). A child that skips only in a later round is not deterministic.`);
+            skip = { arm: who.id, case: id, round, reason: line.skipped };
             break;
           }
           if (line.hash !== undefined) {
@@ -256,7 +260,6 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
       if (skip !== undefined) {
         skipped.push(skip);
         gone.add(id);
-        for (const list of Object.values(out)) for (let k = list.length - 1; k >= 0; k--) if (list[k]!.case === id) list.splice(k, 1);
         continue;
       }
       for (const { pair, record } of records) out[pair]!.push(record);
@@ -287,26 +290,65 @@ async function child(start: StartChild, argv: readonly string[], limits: StartOp
   }
 }
 
-/** This function starts a process with `spawn` and no shell. It stops the process at the time limit or at the output limit. */
+/** The wait, in milliseconds, for the pipes of a child after its exit, and for the exit of a child after a stop. */
+const GRACE_MS = 1000;
+
+/**
+ * This function starts a process with `spawn` and no shell. It stops the process and its tree at the time limit or at the output limit.
+ *
+ * - The promise settles at the close of the pipes, or a grace time after the exit of the child. A grandchild can keep a pipe open.
+ * - A stop sends SIGTERM to the process group, and SIGKILL after the grace time. On Windows, `taskkill /T /F` stops the tree.
+ */
 function startProcess(argv: readonly string[], options: StartOptions): Promise<ChildExit> {
   return new Promise((resolve) => {
     const [program, ...rest] = argv;
-    const proc = spawn(program!, rest, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    const windows = process.platform === "win32";
+    // On POSIX, the child leads its own process group, so a signal to the group reaches the grandchildren.
+    const proc = spawn(program!, rest, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true, detached: !windows });
     const out: Buffer[] = [];
     const err: Buffer[] = [];
     let timedOut = false;
     let settled = false;
+    let stopping = false;
     let error: string | undefined;
+    let grace: ReturnType<typeof setTimeout> | undefined;
+    const signal = (name: NodeJS.Signals): void => {
+      const pid = proc.pid;
+      if (pid === undefined) return;
+      if (windows) {
+        // TerminateProcess stops only the direct child. The flag /T of taskkill also stops its tree.
+        spawn("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "ignore", windowsHide: true }).on("error", () => proc.kill());
+        return;
+      }
+      try {
+        process.kill(-pid, name);
+      } catch {
+        proc.kill(name);
+      }
+    };
     const finish = (code: number | null): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      clearTimeout(grace);
+      proc.stdout.destroy();
+      proc.stderr.destroy();
       const exit: ChildExit = { stdout: Buffer.concat(out).toString("utf8"), stderr: Buffer.concat(err).toString("utf8"), code, timedOut };
       resolve(error === undefined ? exit : { ...exit, error });
     };
+    const stop = (): void => {
+      if (stopping) return;
+      stopping = true;
+      signal("SIGTERM");
+      clearTimeout(grace);
+      grace = setTimeout(() => {
+        if (!windows) signal("SIGKILL");
+        finish(null);
+      }, GRACE_MS);
+    };
     const timer = setTimeout(() => {
       timedOut = true;
-      proc.kill();
+      stop();
     }, options.timeoutMs);
     const take = (list: Buffer[]) => {
       let bytes = 0;
@@ -314,7 +356,7 @@ function startProcess(argv: readonly string[], options: StartOptions): Promise<C
         bytes += chunk.length;
         if (bytes > options.maxBuffer) {
           error ??= `an output is more than ${options.maxBuffer} bytes`;
-          proc.kill();
+          stop();
           return;
         }
         list.push(chunk);
@@ -326,6 +368,15 @@ function startProcess(argv: readonly string[], options: StartOptions): Promise<C
       error ??= e.message;
       // A program that does not start gives no event close.
       if (proc.pid === undefined) finish(null);
+    });
+    proc.on("exit", (code) => {
+      clearTimeout(timer);
+      if (stopping) return;
+      // A grandchild that holds a pipe keeps the event close away. After the grace time, the runner stops the group.
+      grace = setTimeout(() => {
+        if (!windows) signal("SIGKILL");
+        finish(code);
+      }, GRACE_MS);
     });
     proc.on("close", (code) => finish(code));
   });

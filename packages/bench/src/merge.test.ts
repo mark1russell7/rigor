@@ -117,6 +117,8 @@ describe("pooledVerdict", () => {
     expect(() => pooledVerdict([one, two])).toThrow(/roundOffset/);
     expect(() => pooledVerdict([one, two])).toThrow(RangeError);
     expect(() => pooledVerdict([one, { ...one }])).toThrow(/two jobs have the label/);
+    const other = { ...two, aa: jobRecords("1", 5, 10, 5, 1, 0.1, "d3"), candidate: jobRecords("9", 5, 5, 5, 1, 0.1, "d2") };
+    expect(() => pooledVerdict([one, other])).toThrow(/a record of the job "1" has the job "9"/);
   });
 });
 

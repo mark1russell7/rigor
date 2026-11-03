@@ -146,6 +146,7 @@ export interface FreshRun {
 export interface FreshSkip {
   readonly arm: string;
   readonly case: string;
+  readonly round: number;
   readonly reason: string;
 }
 

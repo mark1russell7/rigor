@@ -36,7 +36,7 @@ export function balanceOrders<T extends PairedTime>(records: readonly T[]): Bala
 
 /** The records of one job: the candidate pair and the A/A pair. */
 export interface JobRecords {
-  /** The label of the job, for example the index of its CI job. */
+  /** The label of the job, for example the index of its CI job. A record with a field `job` has this label, or `pooledVerdict` refuses it. */
   readonly job: string;
   readonly candidate: readonly PairedTime[];
   readonly aa: readonly PairedTime[];
@@ -78,6 +78,11 @@ export function pooledVerdict(jobs: readonly JobRecords[], options: VerdictOptio
   for (const { job } of jobs) {
     if (labels.has(job)) throw new RangeError(`pooledVerdict: two jobs have the label ${JSON.stringify(job)}.`);
     labels.add(job);
+  }
+  for (const { job, candidate: c, aa: a } of jobs) {
+    for (const r of [...c, ...a] as readonly (PairedTime & { readonly job?: unknown })[]) {
+      if (r.job !== undefined && r.job !== job) throw new RangeError(`pooledVerdict: a record of the job ${JSON.stringify(job)} has the job ${JSON.stringify(r.job)}.`);
+    }
   }
   uniqueRounds(jobs, "candidate");
   uniqueRounds(jobs, "aa");

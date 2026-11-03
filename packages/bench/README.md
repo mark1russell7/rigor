@@ -104,7 +104,9 @@ run.pairs["old~aa"];                              // the records of the A/A pair
 - `pairOrder` gives the order. Pair `p` starts with `firstArm(round, caseIndex + p)`, and the pair that starts first turns each second round.
 - The arguments of a case come after the command. The default is `--case <id>`.
 - A child that exits with an error, takes too long or prints no JSON line stops the run with an error. The error names the arm, the case, the round and the tail of `stderr`.
-- Only a line with `skipped` skips a case. The case then leaves each pair, and the run starts no more children for it.
+- Only a line with `skipped` skips a case. A skip line does not need a time.
+- A skip in the first round of the job removes the case from each pair, and the run starts no more children for it. A skip after the first round stops the run with an error, because the child is not deterministic.
+- A child that does not stop at the time limit gets SIGTERM, and SIGKILL after 1 second. The signals go to its process group. On Windows, `taskkill /T /F` stops its tree.
 - Two different hashes of one arm on one case stop the run with an error.
 - Each record keeps its job and the computer of its job (`benchEnv`).
 
@@ -133,6 +135,8 @@ v.trimmed;                                        // the records that balanceOrd
 - The function merges the records, and balances the merged records with `balanceOrders`. A caller cannot pool records without a turned order.
 - The verdict of each job uses the same options as the pooled verdict.
 - A job with `cannot decide` or `same` does not change the outcome. Only a job with `faster` against a pooled `slower`, or the reverse, makes the outcome `cannot decide`.
+- A pooled `same` stays `same`, also with a job that gives `slower` or `faster`. Only the opposite direction opposes.
+- Each record with a field `job` has the label of its job, or `pooledVerdict` stops with an error.
 - Two jobs with a record of one case and one round are an error. Set `roundOffset` of each job.
 - `armVerdicts` gives the verdict of each candidate pair of one run against its A/A pair.
 

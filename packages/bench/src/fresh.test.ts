@@ -154,18 +154,23 @@ describe("freshRun", () => {
     expect(calls.length).toBe(4);
   });
 
-  it("removes a skipped case from each pair, and starts no more children for it", async () => {
-    const { start, calls } = fake((program, caseId, k) => (program === "next" && caseId === "y" && k > 16 ? { stdout: '{"ms":1,"skipped":"too large"}' } : undefined));
-    const result = await run({ start });
-    expect(result.skipped).toEqual([{ arm: "next", case: "y", reason: "too large" }]);
+  it("removes a case that an arm skips in the first round from each pair, and starts no more children for it", async () => {
+    const { start, calls } = fake((program, caseId, k) => (program === "next" && caseId === "y" && k <= 8 ? { stdout: '{"skipped":"too large"}' } : undefined));
+    const result = await run({ start, roundOffset: 4 });
+    expect(result.skipped).toEqual([{ arm: "next", case: "y", round: 4, reason: "too large" }]);
     for (const records of Object.values(result.pairs)) {
       expect(records.some((r) => r.case === "y")).toBe(false);
       expect(records.filter((r) => r.case === "x").length).toBe(4);
     }
     const lastY = calls.findLastIndex((c) => c.case === "y");
     expect(calls[lastY]!.program).toBe("next");
-    expect(calls[lastY]!.ms).toBeGreaterThan(17);
+    expect(calls[lastY]!.ms).toBeLessThanOrEqual(8);
     expect(calls.slice(lastY + 1).every((c) => c.case === "x")).toBe(true);
+  });
+
+  it("refuses a skip after the first round of the job, with the round", async () => {
+    const { start } = fake((program, caseId, k) => (program === "next" && caseId === "y" && k > 16 ? { stdout: '{"ms":1,"skipped":"too large"}' } : undefined));
+    await expect(run({ start })).rejects.toThrow(/arm "next".*case "y", round 2 skipped the case after the first round/);
   });
 
   it("refuses a crash, a timeout and a child with no JSON line, with the arm, the case, the round and the tail of stderr", async () => {
@@ -223,4 +228,22 @@ describe("freshRun", () => {
     const missing = { id: "missing", command: ["D:/no/such/program-of-rigor"] };
     await expect(freshRun({ base: missing, candidates: [], cases: ["x"], rounds: 1, env: ENV })).rejects.toThrow(/arm "missing".*failed/);
   });
+
+  // The grandchild inherits stdout and keeps the pipe open.
+  const grandchild = 'require("node:child_process").spawn(process.execPath, ["-e", "setTimeout(() => {}, 20000)"], { stdio: "inherit" }).unref();';
+
+  it("settles a grace time after the exit of a child whose grandchild holds stdout", async () => {
+    const node = { id: "node", command: [process.execPath, "-e", `${grandchild} console.log(JSON.stringify({ ms: 1 })); process.exit(0);`, "--"] };
+    const t0 = performance.now();
+    const result = await freshRun({ base: node, candidates: [], cases: ["x"], rounds: 1, env: ENV });
+    expect(result.pairs["node~aa"]!.map((r) => [r.a, r.b])).toEqual([[1, 1]]);
+    expect(performance.now() - t0).toBeLessThan(8000);
+  }, 15000);
+
+  it("stops a child that ignores SIGTERM and holds a grandchild, at the time limit", async () => {
+    const node = { id: "node", command: [process.execPath, "-e", `process.on("SIGTERM", () => {}); ${grandchild} setInterval(() => {}, 1000);`, "--"] };
+    const t0 = performance.now();
+    await expect(freshRun({ base: node, candidates: [], cases: ["x"], rounds: 1, timeoutMs: 300, env: ENV })).rejects.toThrow(/took more than 300 ms/);
+    expect(performance.now() - t0).toBeLessThan(6000);
+  }, 15000);
 });
