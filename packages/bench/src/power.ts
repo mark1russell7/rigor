@@ -4,7 +4,7 @@
  */
 import { random } from "@mark1russell7/rigor-generators";
 import { firstArm, type PairedTime } from "./paired.ts";
-import { type TimeOutcome, type VerdictOptions, timeVerdict } from "./verdict.ts";
+import { type TimeOutcome, type VerdictOptions, timeVerdict, verdictMargin } from "./verdict.ts";
 
 /** The options of a power test. */
 export interface PowerOptions {
@@ -28,7 +28,11 @@ export interface PowerOptions {
 export interface Power {
   readonly trials: number;
   readonly outcomes: Readonly<Record<TimeOutcome, number>>;
-  /** The share of the trials whose outcome is the true one: `faster` for a ratio below 1, `slower` above 1, `same` at 1. */
+  /**
+   * The share of the trials whose outcome is the true one. For the rule `difference`, a ratio in the margin of the verdict has the true outcome `same`.
+   * That margin is the larger of `margin` and the noise of the pooled band. The pool is the same in each trial, so each trial has the same margin.
+   * Out of that margin, and for the rule `band`, the true outcome is `faster` below 1, `slower` above 1 and `same` at 1.
+   */
   readonly power: number;
 }
 
@@ -55,7 +59,7 @@ export function verdictPower(options: PowerOptions): Power {
     }
     return out;
   };
-  const truth: TimeOutcome = options.ratio < 1 ? "faster" : options.ratio > 1 ? "slower" : "same";
+  const truth = trueOutcome(options.ratio, options.verdict);
   const counts: Record<TimeOutcome, number> = { faster: 0, slower: 0, same: 0, "cannot decide": 0 };
   for (let t = 0; t < trials; t++) {
     const aa = bench(1, "aa");
@@ -64,4 +68,10 @@ export function verdictPower(options: PowerOptions): Power {
   }
   const outcomes = Object.fromEntries(Object.entries(counts).map(([k, n]) => [k, n / trials])) as Record<TimeOutcome, number>;
   return { trials, outcomes, power: outcomes[truth] };
+}
+
+/** This function gives the true outcome of a ratio. The margin of the rule `difference` comes first, as in `timeVerdict`. */
+function trueOutcome(ratio: number, verdict: VerdictOptions = {}): TimeOutcome {
+  if ((verdict.rule ?? "difference") === "difference" && Math.abs(Math.log(ratio)) <= verdictMargin(verdict)) return "same";
+  return ratio < 1 ? "faster" : ratio > 1 ? "slower" : "same";
 }

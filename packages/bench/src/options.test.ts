@@ -111,7 +111,7 @@ describe("the noise cap and the pooled band of timeVerdict", () => {
     expect(capped.outcome).toBe("cannot decide");
     expect(capped.reason).toMatch(/above the noise cap/);
     expect(capped.reason).toMatch(/Without the cap, the outcome is "faster"/);
-    expect(capped.noise).toEqual({ spread, cap: spread / 2, noisy: true });
+    expect(capped.noise).toMatchObject({ spread, cap: spread / 2, noisy: true, biased: false });
     expect(capped.interval).toEqual(free.interval);
     const loose = timeVerdict(c, aa, { bootstrap, noiseCap: spread });
     expect(loose.outcome).toBe("faster");
@@ -123,7 +123,7 @@ describe("the noise cap and the pooled band of timeVerdict", () => {
   it("keeps the reasons of the early outcomes under the cap", () => {
     const none = timeVerdict(records(20, 5, 0.5, 0.1, 33), [], { bootstrap, noiseCap: 0.01 });
     expect(none.reason).toMatch(/A\/A arm has 0 cases/);
-    expect(none.noise).toEqual({ spread: undefined, cap: 0.01, noisy: true });
+    expect(none.noise).toEqual({ spread: undefined, cap: 0.01, noisy: true, aaMedian: undefined, biased: false });
     expect(() => timeVerdict([], aa, { noiseCap: -1 })).toThrow(RangeError);
     expect(() => timeVerdict([], aa, { noiseCap: Number.NaN })).toThrow(RangeError);
   });
