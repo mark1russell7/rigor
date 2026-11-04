@@ -120,6 +120,7 @@ function progressReader(file: string): () => ProgressEvent[] {
  * - A case in `done` or `earlier` does not run. A case that ended, or that has an end from `onEnd`, does not run again.
  * - An `over-budget` end of `earlier` counts as an overrun of this run. `onEnd` does not get the end again.
  * - A child that ends without a stop ends the run. Its exit code is the code of the result.
+ * - A line of the progress file that is not JSON stops the child, and this function then throws the error.
  */
 export async function superviseCases(options: SuperviseOptions): Promise<SuperviseResult> {
   const { cases, progressFile, start, onEnd, now = Date.now } = options;
@@ -184,7 +185,14 @@ export async function superviseCases(options: SuperviseOptions): Promise<Supervi
       let timer: ReturnType<typeof setTimeout> | undefined;
       await Promise.race([exited, new Promise((resolve) => (timer = setTimeout(resolve, pollMs)))]);
       clearTimeout(timer);
-      update();
+      try {
+        update();
+      } catch (error) {
+        // A progress file that cannot be read cannot hold the child to its budget, so the child must not outlive the supervisor.
+        child.stop();
+        await exited;
+        throw error;
+      }
       const current = state.running;
       const budgetMs = current === undefined ? undefined : byId.get(current.id)?.budgetMs;
       if (state.exit === undefined && current !== undefined && budgetMs !== undefined && now() - current.at > budgetMs) over = { id: current.id, stage: current.stage, budgetMs };

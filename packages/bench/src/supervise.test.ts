@@ -14,7 +14,7 @@ const SHORT = 300;
  */
 const CHILD = `
 const { appendFileSync } = require("node:fs");
-const [, progress, log, ...ids] = process.argv;
+const [, , progress, log, ...ids] = process.argv;
 const write = (event) => appendFileSync(progress, JSON.stringify(event) + "\\n");
 for (const id of ids) {
   const stage = id.includes(":") ? id.split(":")[1] : "";
@@ -52,6 +52,26 @@ describe("superviseCases", () => {
     expect(ran()).toEqual(["a", "slow", "b"]);
     expect(result).toEqual({ code: 0, starts: 2, ends, left: [] });
   }, 20_000);
+
+  it("stops the child when the progress file has a bad line, and gives the error", async () => {
+    const { progressFile } = setup();
+    let stops = 0;
+    let exit: (code: number | null) => void = () => undefined;
+    const start = (): SupervisedChild => {
+      appendFileSync(progressFile, "not json\n");
+      return {
+        stop: () => {
+          stops += 1;
+          exit(null);
+        },
+        exited: new Promise((resolve) => {
+          exit = resolve;
+        }),
+      };
+    };
+    await expect(superviseCases({ cases: [fast("a")], progressFile, start, onEnd: () => undefined, pollMs: 20 })).rejects.toThrow(SyntaxError);
+    expect(stops).toBe(1);
+  });
 
   it("skips the other cases of a group after 2 overruns, and names the 2 overruns", async () => {
     const { progressFile, start, ran } = setup();
