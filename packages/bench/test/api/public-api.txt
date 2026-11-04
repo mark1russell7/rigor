@@ -524,6 +524,10 @@ type RungEvidence = {
   readonly rounds: readonly BudgetRound[];
   readonly aa: readonly BudgetRound[];
 } | {
+  readonly kind: "quantile";
+  readonly measure: string;
+  readonly values: readonly number[];
+} | {
   readonly kind: "rate";
   readonly measure: string;
   readonly failures: number;
