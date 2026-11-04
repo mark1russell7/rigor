@@ -73,6 +73,31 @@ The band of a curve is `value ± width × RMSE`, from the held-out error of the 
 
 The field `nearest` of each place tells how far the place is from a measurement. It goes from 0 to 1, and 0 means that a point was measured there. A viewer can fade the band away from the data. A table cell with the `fallback` value has `nearest` above 0.
 
+### The error of one cell
+
+Each fold keeps one error for each measure. To get the error of a chosen set of points, fit with the option `outOfFold`. Each fold then stores the prediction of each held-out point with a value, on the scale of the model. The default is off, and a record with no option has the same bytes as a record of an earlier version.
+
+`heldOutErrorAt(record, "ms", ids)` gives the fields of `heldOutError` for these points. The baseline of a point is the mean of the training points of its fold. The set of all the points gives the pooled error of the folds, to the rounding of the sums. A test examines this at 24 seeds, with a relative tolerance of 1e-12.
+
+### The reason that a measure is absent
+
+A measure with `null` has no value. To tell why, declare the reasons in the field `reasons` of the data. Then map the measure to a reason in the field `absent` of the point:
+
+```json
+{
+  "reasons": [{ "id": "budget", "label": "Out of budget" }],
+  "points": [{ "id": "p7", "values": { "boxes": 10000 }, "measures": { "ms": null }, "absent": { "ms": "budget" } }]
+}
+```
+
+`parseResponseRecord` refuses a reason on a measure with a number, and a reason with no declaration. A measure with `null` and no reason is good. `fitResponse` treats each of them as `null`, and it keeps the reasons in the record.
+
+`sliceResponse` and `surfaceResponse` give these points in a list `absent`, beside the list `points`. Each item has `id`, `at`, `reason` and `group`. The value of `reason` is `null` when the point states no reason. Thus a chart can draw each reason apart.
+
+### Many levels with few pairs
+
+The default expansion has one product for each pair of levels of two dimensions. Two dimensions with 76 and 33 levels thus give 2508 products, and the limit `RESPONSE_MAX_TERMS` refuses them. With the option `interactions: "seen"`, a ridge fit keeps only the terms that are not 0 at one point or more. This choice looks only at the inputs of the points. A term with no point has the weight 0, so the choice does not change a prediction. The limit applies after the choice.
+
 ## The functions
 
 | Function | What it gives |
@@ -98,7 +123,8 @@ The field `nearest` of each place tells how far the place is from a measurement.
 | `fitResponse(data, options)` | A record of the format `response-records/1`, with one model for each measure and held-out folds. |
 | `parseResponseRecord(value)` | The examination of unknown data. It gives the record, or one fault with a path for each error. |
 | `predictResponse(model, inputs)`, `heldOutError(record, measure)` | The value of a model at one set of inputs, and the error of the folds of a measure. |
-| `sliceResponse(record, measure, options)`, `surfaceResponse(record, measure, options)` | A fitted curve over one dimension, or a fitted surface over two, with the matching measured points, a band and the distance to the nearest measurement. |
+| `heldOutErrorAt(record, measure, ids)` | The held-out error of a chosen set of points, from the predictions of the option `outOfFold`. |
+| `sliceResponse(record, measure, options)`, `surfaceResponse(record, measure, options)` | A fitted curve over one dimension, or a fitted surface over two, with the matching measured points, the matching points with no value, a band and the distance to the nearest measurement. |
 
 Each function throws a RangeError for an empty list, for a NaN and for a parameter out of its range. Thus a missing value cannot make a quiet NaN in a record.
 
