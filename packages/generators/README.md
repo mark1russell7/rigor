@@ -59,6 +59,17 @@ A parameter is a number or a range `[min, max]`. `sampler` draws from a range on
 
 `Math.exp`, `Math.log` and `Math.pow` can give other results on another JavaScript engine. `dependsOnLibm` tells if a spec uses them. Only `recorded` does not, so write the numbers of the other families into a corpus when a corpus must match on each platform.
 
+### Recorded tables
+
+A corpus can draw real sizes. Each table has 100 midpoint quantiles of the recorded values, with its source, its license and its date. `recordedSpec` gives the spec of the family `recorded` for a table.
+
+| Table | Values | Source | License |
+| --- | --- | --- | --- |
+| `DIAGRAM_BOX_AREA` | the areas of 9859 boxes of 293 real diagrams | the Ptolemy II models of the ELK model set | the Ptolemy II license. The field `notice` keeps its text |
+| `GIT_BLOB_BYTES` | the sizes of 20751 files of one git tree | `microsoft/vscode` | MIT |
+
+The tables keep the values of one measure, so a table gives no link between the width and the height of a box.
+
 ## The input of `fnv1a32`
 
 The option `input` of `fnv1a32` selects the units that the hash reads. Use it to replace a local copy of FNV-1a with the same hashes.
