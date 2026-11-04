@@ -111,6 +111,8 @@ v.fails;                                          // true only when an interval 
 
 - `BUDGET_LOOKS` has looks at 6, 12 and 24 rounds. The interval of 6 rounds is the same as in `budgetVerdict`.
 - Each extra look at the data adds a chance of error. The levels of the looks are high, so the sum of the chances is 0.0442, under the overall 0.05.
+- The sum comes from the real coverage of each interval, not from the nominal level. A list that spends more than the overall level gives a `RangeError`.
+- Each coverage needs independent rounds. This limit stays: a slow computer for one whole run moves all its rounds.
 - The first look with an outcome decides a case. Later rounds of the case do not change it.
 - A final `cannot decide` does not fail. Show it to the reader of the run. A median near the limit can have this outcome.
 

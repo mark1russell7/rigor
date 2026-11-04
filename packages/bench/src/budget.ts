@@ -219,6 +219,20 @@ function caseAtLooks(name: string, values: readonly number[], aaValues: readonly
 /**
  * This function gives the budget verdict of a run that adds rounds. A caller gives all rounds so far, and it gets a
  * verdict and the field `more`. It adds the rounds of `more` to both arms, and it calls the function again.
+ *
+ * The chance of error of one look is 1 - coverage, and the coverage is 1 - 2 P(X <= k - 1), for X ~ Binomial(n, 1/2) and
+ * the rank k of the interval. The nominal level does not give this chance. The default looks have these figures:
+ *
+ * | Rounds n | Level | Rank k | Coverage | Chance of error |
+ * | ---: | ---: | ---: | ---: | ---: |
+ * | 6 | 0.95 | 1 | 0.96875 | 0.03125 |
+ * | 12 | 0.99 | 2 | 0.99365 | 0.00635 |
+ * | 24 | 0.99 | 6 | 0.99339 | 0.00661 |
+ * | Sum | | | | 0.04421 |
+ *
+ * The sum is the Bonferroni bound over the looks. Each coverage needs independent rounds. Rounds with a shared cause, for
+ * example a slow computer for one run, do not have that coverage.
+ *
  * - The first look of a case with an outcome decides the case. Later rounds do not change it.
  * - Each look reads the rounds of that look in the order of their numbers. Thus a verdict comes again from its records.
  * - A sum of `budgetLookSpend` above 1 - `level` gives a `RangeError`, because many looks at one level spend too much.
