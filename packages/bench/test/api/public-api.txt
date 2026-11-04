@@ -4,13 +4,18 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 80 names
+## . (build/index.d.ts): 87 names
 
 type Arm: build/paired.d.ts#Arm
+BUDGET_LOOKS: build/index.d.ts#BUDGET_LOOKS
 type Balanced: build/index.d.ts#Balanced
 type Band: build/index.d.ts#Band
 type BandKind: build/index.d.ts#BandKind
 type BandOptions: build/index.d.ts#BandOptions
+type BudgetLook: build/index.d.ts#BudgetLook
+type BudgetLooksOptions: build/index.d.ts#BudgetLooksOptions
+type BudgetLooksVerdict: build/index.d.ts#BudgetLooksVerdict
+type BudgetMore: build/index.d.ts#BudgetMore
 type BudgetOptions: build/index.d.ts#BudgetOptions
 type BudgetOutcome: build/index.d.ts#BudgetOutcome
 type BudgetResult: build/index.d.ts#BudgetResult
@@ -68,6 +73,8 @@ aaBand: build/index.d.ts#aaBand
 aaSpread: build/index.d.ts#aaSpread
 armVerdicts: build/index.d.ts#armVerdicts
 balanceOrders: build/index.d.ts#balanceOrders
+budgetLookSpend: build/index.d.ts#budgetLookSpend
+budgetLooksVerdict: build/index.d.ts#budgetLooksVerdict
 budgetVerdict: build/index.d.ts#budgetVerdict
 caseIntervals: build/index.d.ts#caseIntervals
 caseRatios: build/paired.d.ts#caseRatios

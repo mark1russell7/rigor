@@ -1,4 +1,18 @@
-export { type BudgetOptions, type BudgetOutcome, type BudgetRound, type BudgetVerdict, type CaseBudget, budgetVerdict } from "./budget.ts";
+export {
+  BUDGET_LOOKS,
+  type BudgetLook,
+  type BudgetLooksOptions,
+  type BudgetLooksVerdict,
+  type BudgetMore,
+  type BudgetOptions,
+  type BudgetOutcome,
+  type BudgetRound,
+  type BudgetVerdict,
+  type CaseBudget,
+  budgetLookSpend,
+  budgetLooksVerdict,
+  budgetVerdict,
+} from "./budget.ts";
 export { type ControlFactors, type ControlOptions, type ControlRow, type GroupCounts, type GroupFactor, type MeasuredFactor, type NoFactor, controlFactor } from "./control.ts";
 export {
   type BudgetResult,

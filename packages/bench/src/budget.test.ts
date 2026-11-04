@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type BudgetRound, budgetVerdict } from "./index.ts";
+import { BUDGET_LOOKS, type BudgetRound, budgetLookSpend, budgetLooksVerdict, budgetVerdict } from "./index.ts";
 
 /** The rounds of one case, one for each value. */
 function rounds(name: string, values: readonly number[]): BudgetRound[] {
@@ -91,5 +91,79 @@ describe("budgetVerdict", () => {
     expect(() => budgetVerdict([...six, { case: "pond", round: 0, value: 1 }], six, options)).toThrow(/comes twice/);
     expect(() => budgetVerdict(six, six, { limit: -1, maxDifference: 200 })).toThrow(RangeError);
     expect(() => budgetVerdict(six, six, { limit: 450, maxDifference: Number.NaN })).toThrow(RangeError);
+  });
+});
+
+describe("budgetLooksVerdict", () => {
+  /** Six values with one above the limit: the interval of 6 rounds holds the limit. */
+  const noisy = [300, 320, 340, 360, 380, 533];
+  const quiet = [300, 320, 340, 360, 380, 400];
+  /** The same run with 12 rounds: one value above the limit stays out of the interval of 12 rounds. */
+  const twelve = [...noisy, ...quiet];
+
+  it("spends less than 0.05 with the default looks", () => {
+    expect(budgetLookSpend(BUDGET_LOOKS)).toBeCloseTo(0.0442, 4);
+  });
+
+  it("gives the verdict of budgetVerdict at the first look", () => {
+    const v = budgetLooksVerdict(rounds("pond", quiet), rounds("pond", quiet), options);
+    expect(v).toMatchObject({ outcome: "within", more: [], fails: false });
+    expect(v.cases[0]).toEqual(budgetVerdict(rounds("pond", quiet), rounds("pond", quiet), options).cases[0]);
+  });
+
+  it("asks for the next look of an undecided case only", () => {
+    const v = budgetLooksVerdict([...rounds("pond", noisy), ...rounds("river", quiet)], [...rounds("pond", quiet), ...rounds("river", quiet)], options);
+    expect(v.outcome).toBe("cannot decide");
+    expect(v.more).toEqual([{ case: "pond", rounds: 12 }]);
+    expect(v.fails).toBe(false);
+  });
+
+  it("decides at the second look when the outlier leaves the interval", () => {
+    const v = budgetLooksVerdict(rounds("pond", twelve), rounds("pond", twelve), options);
+    expect(v.cases[0]).toMatchObject({ outcome: "within", rounds: 12, high: 400 });
+    expect(v.more).toEqual([]);
+  });
+
+  it("keeps the first outcome of a case when later rounds come", () => {
+    const later = [...quiet, 900, 900, 900, 900, 900, 900];
+    const v = budgetLooksVerdict(rounds("pond", later), rounds("pond", later), options);
+    expect(v.cases[0]).toMatchObject({ outcome: "within", rounds: 6 });
+  });
+
+  it("fails only when the interval is above the limit", () => {
+    const high = [460, 500, 510, 520, 530, 540];
+    const v = budgetLooksVerdict(rounds("pond", high), rounds("pond", high), options);
+    expect(v).toMatchObject({ outcome: "beyond", more: [], fails: true });
+  });
+
+  it("gives a final cannot decide at the last look, and that does not fail", () => {
+    const spread = Array.from({ length: 24 }, (_, i) => (i % 2 === 0 ? 300 : 600));
+    const v = budgetLooksVerdict(rounds("pond", spread), rounds("pond", spread), options);
+    expect(v).toMatchObject({ outcome: "cannot decide", more: [], fails: false });
+    expect(v.cases[0]?.rounds).toBe(24);
+  });
+
+  it("does not depend on the order of the rounds", () => {
+    const pond = rounds("pond", twelve);
+    expect(budgetLooksVerdict([...pond].reverse(), pond, options)).toEqual(budgetLooksVerdict(pond, pond, options));
+  });
+
+  it("asks for the first look of a case with too few rounds", () => {
+    const v = budgetLooksVerdict(rounds("pond", [1, 2, 3]), rounds("pond", [1, 2, 3]), options);
+    expect(v.more).toEqual([{ case: "pond", rounds: 6 }]);
+  });
+
+  it("refuses looks that spend too much, are out of order, or are too small", () => {
+    const six = rounds("pond", quiet);
+    const many = [6, 12, 24, 48].map((n) => ({ rounds: n, level: 0.95 }));
+    expect(() => budgetLooksVerdict(six, six, { ...options, looks: many })).toThrow(/spend/);
+    expect(() => budgetLookSpend([])).toThrow(RangeError);
+    expect(() =>
+      budgetLookSpend([
+        { rounds: 12, level: 0.95 },
+        { rounds: 6, level: 0.95 },
+      ]),
+    ).toThrow(/rising order/);
+    expect(() => budgetLookSpend([{ rounds: 5, level: 0.95 }])).toThrow(/too few/);
   });
 });

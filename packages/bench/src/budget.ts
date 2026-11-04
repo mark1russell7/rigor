@@ -122,7 +122,12 @@ export function budgetVerdict(rounds: readonly BudgetRound[], aa: readonly Budge
   const values = valuesOfCases("the rounds", rounds);
   const aaValues = valuesOfCases("the A/A arm", aa);
   const cases = [...values.keys()].sort().map((name) => caseBudget(name, values.get(name) ?? [], aaValues.get(name) ?? [], options, level));
-  const facts = { limit, maxDifference, level, cases };
+  return verdictOf(cases, { limit, maxDifference, level });
+}
+
+/** This function gives the verdict of a list of case verdicts. */
+function verdictOf(cases: readonly CaseBudget[], claim: Pick<BudgetVerdict, "limit" | "maxDifference" | "level">): BudgetVerdict {
+  const facts = { ...claim, cases };
   if (cases.length === 0) return { outcome: "cannot decide", reason: "The verdict has no cases.", ...facts };
   const first = cases.find((c) => c.outcome === "beyond") ?? cases.find((c) => c.outcome === "cannot decide");
   if (first === undefined) {
@@ -131,6 +136,112 @@ export function budgetVerdict(rounds: readonly BudgetRound[], aa: readonly Budge
   }
   const count = cases.filter((c) => c.outcome === first.outcome).length;
   return { outcome: first.outcome, reason: `${count} of ${cases.length} cases have this outcome. The first is this one: ${first.reason}`, ...facts };
+}
+
+/** One look of a budget with looks: the rounds of each arm, and the level of the interval at those rounds. */
+export interface BudgetLook {
+  readonly rounds: number;
+  readonly level: number;
+}
+
+/**
+ * These looks start with 6 rounds, as `budgetVerdict` does, and they stop at 24. The three looks spend 0.0442 of the
+ * overall 0.05. On the blocking times of a noisy web page, 97% of the runs with a median 16% under the limit stop by 24.
+ */
+export const BUDGET_LOOKS: readonly BudgetLook[] = [
+  { rounds: 6, level: 0.95 },
+  { rounds: 12, level: 0.99 },
+  { rounds: 24, level: 0.99 },
+];
+
+/** The options of a budget verdict with looks. */
+export interface BudgetLooksOptions {
+  /** The largest median that the claim permits, in the unit of the values. */
+  readonly limit: number;
+  /** The largest difference between the medians of the two arms of the same build. */
+  readonly maxDifference: number;
+  /** The looks, with the rounds in rising order. The default is `BUDGET_LOOKS`. */
+  readonly looks?: readonly BudgetLook[];
+  /** The level over all looks of one case. The default is 0.95. */
+  readonly level?: number;
+}
+
+/** The next look of one case: the rounds that each arm of the case needs. */
+export interface BudgetMore {
+  readonly case: string;
+  readonly rounds: number;
+}
+
+/** A budget verdict with looks. The field `level` is the level over all looks. */
+export interface BudgetLooksVerdict extends BudgetVerdict {
+  /** The chance of error that the looks spend: the sum of 1 - coverage over the looks. */
+  readonly spent: number;
+  /** The cases with no outcome that can have another look. The list is empty when the verdict is final. */
+  readonly more: readonly BudgetMore[];
+  /** True only when the interval of a case is above the limit. A case with no outcome at the last look does not fail. */
+  readonly fails: boolean;
+}
+
+/**
+ * This function gives the chance of error that a list of looks spends: the sum of 1 - coverage of each look. This sum is
+ * the Bonferroni bound over the looks. A look that has too few rounds for its level gives a `RangeError`.
+ */
+export function budgetLookSpend(looks: readonly BudgetLook[]): number {
+  if (looks.length === 0) throw new RangeError("budgetLookSpend: the list of looks is empty.");
+  let spent = 0;
+  let last = 0;
+  for (const { rounds, level } of looks) {
+    if (!(Number.isInteger(rounds) && rounds > last)) throw new RangeError(`budgetLookSpend: the rounds of the looks are whole numbers in rising order, not ${rounds} after ${last}.`);
+    const { coverage } = medianInterval(
+      Array.from({ length: rounds }, (_, i) => i),
+      level,
+    );
+    if (coverage < level) throw new RangeError(`budgetLookSpend: ${rounds} rounds are too few for the level ${level}.`);
+    spent += 1 - coverage;
+    last = rounds;
+  }
+  return spent;
+}
+
+/** This function gives the outcome of one case: the first look with an outcome, or the last look that the rounds reach. */
+function caseAtLooks(name: string, values: readonly number[], aaValues: readonly number[], options: BudgetOptions, looks: readonly BudgetLook[]): { verdict: CaseBudget; next: number | undefined } {
+  let verdict: CaseBudget | undefined;
+  for (const { rounds, level } of looks) {
+    if (values.length < rounds || aaValues.length < rounds) {
+      return { verdict: verdict ?? caseBudget(name, values, aaValues, options, level), next: rounds };
+    }
+    verdict = caseBudget(name, values.slice(0, rounds), aaValues.slice(0, rounds), options, level);
+    if (verdict.outcome !== "cannot decide") return { verdict, next: undefined };
+  }
+  return { verdict: verdict as CaseBudget, next: undefined };
+}
+
+/**
+ * This function gives the budget verdict of a run that adds rounds. A caller gives all rounds so far, and it gets a
+ * verdict and the field `more`. It adds the rounds of `more` to both arms, and it calls the function again.
+ * - The first look of a case with an outcome decides the case. Later rounds do not change it.
+ * - Each look reads the rounds of that look in the order of their numbers. Thus a verdict comes again from its records.
+ * - A sum of `budgetLookSpend` above 1 - `level` gives a `RangeError`, because many looks at one level spend too much.
+ * - The field `fails` is true only for the outcome `beyond`. Tell a final `cannot decide` to the reader of the run.
+ */
+export function budgetLooksVerdict(rounds: readonly BudgetRound[], aa: readonly BudgetRound[], options: BudgetLooksOptions): BudgetLooksVerdict {
+  const { limit, maxDifference } = options;
+  const looks = options.looks ?? BUDGET_LOOKS;
+  const level = options.level ?? 0.95;
+  const spent = budgetLookSpend(looks);
+  if (spent > 1 - level) throw new RangeError(`budgetLooksVerdict: the looks spend ${round(spent)}, over the ${round(1 - level)} of the level ${level}.`);
+  if (!(limit >= 0 && Number.isFinite(limit))) throw new RangeError(`budgetLooksVerdict: the limit is finite and 0 or more, not ${limit}.`);
+  if (!(maxDifference >= 0 && Number.isFinite(maxDifference))) throw new RangeError(`budgetLooksVerdict: the largest difference is finite and 0 or more, not ${maxDifference}.`);
+  const byRound = (list: readonly BudgetRound[]): BudgetRound[] => [...list].sort((a, b) => a.round - b.round);
+  const values = valuesOfCases("the rounds", byRound(rounds));
+  const aaValues = valuesOfCases("the A/A arm", byRound(aa));
+  const results = [...values.keys()].sort().map((name) => ({ name, ...caseAtLooks(name, values.get(name) ?? [], aaValues.get(name) ?? [], { limit, maxDifference }, looks) }));
+  const verdict = verdictOf(
+    results.map((r) => r.verdict),
+    { limit, maxDifference, level },
+  );
+  const more = results.flatMap((r) => (r.next === undefined ? [] : [{ case: r.name, rounds: r.next }]));
+  return { ...verdict, spent, more, fails: verdict.cases.some((c) => c.outcome === "beyond") };
 }
 
 function round(x: number): number {
