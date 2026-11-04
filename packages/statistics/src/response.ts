@@ -10,7 +10,7 @@
  * A model calculates integer powers with multiplication, so its terms are equal in each JavaScript engine. A log
  * scale uses `Math.log10` and `10 ** x`. An engine can give a different last bit for these two operations.
  */
-import { quantile } from "./describe.ts";
+import { mean, quantile } from "./describe.ts";
 
 /** The value of the field `schema` of a record. */
 export const RESPONSE_RECORDS_SCHEMA = "response-records/1";
@@ -77,6 +77,14 @@ export interface ResponseMeasure {
   readonly direction: "higher" | "lower" | "none";
 }
 
+/** A declared reason that a measure is absent, for example infeasible, unsupported or out of budget. */
+export interface ResponseReason {
+  /** The key of the reason in the field `absent` of a point. */
+  readonly id: string;
+  /** The name that a view shows. */
+  readonly label: string;
+}
+
 /** One measured point. */
 export interface ResponsePoint {
   readonly id: string;
@@ -86,6 +94,8 @@ export interface ResponsePoint {
   readonly measures: Readonly<Record<string, number | null>>;
   /** The points of one group stay on one side of each split, for example the repeats of one seed. */
   readonly group?: string;
+  /** The reason of a measure with `null`: a map from the id of the measure to the id of a declared reason. */
+  readonly absent?: Readonly<Record<string, string>>;
 }
 
 /** One factor of a term: a power of a number dimension, or 1 at a level and 0 at each other level. */
@@ -191,6 +201,11 @@ export interface ResponseFold {
   readonly heldOut: readonly string[];
   /** The error of each measure. A measure with no held-out point or no training point has no entry. */
   readonly errors: Readonly<Record<string, ResponseFoldError>>;
+  /**
+   * The prediction of each held-out point with a value, on the scale of the model. The keys are the id of the measure,
+   * then the id of the point. The model of this fold gave them. Only the option `outOfFold` of `fitResponse` writes this field.
+   */
+  readonly predictions?: Readonly<Record<string, Readonly<Record<string, number>>>>;
 }
 
 /** The data of a record, before a fit. */
@@ -199,6 +214,8 @@ export interface ResponseData {
   readonly name: string;
   readonly dimensions: readonly ResponseDimension[];
   readonly measures: readonly ResponseMeasure[];
+  /** The reasons that a measure of a point can be absent. Each id in the field `absent` of a point is in this list. */
+  readonly reasons?: readonly ResponseReason[];
   readonly points: readonly ResponsePoint[];
 }
 
@@ -283,6 +300,16 @@ export interface ResponseSlicePoint {
   readonly group?: string;
 }
 
+/** A point of a slice that matches the held values and has no value of the measure. */
+export interface ResponseAbsentPoint {
+  readonly id: string;
+  /** The value of the varied dimension. */
+  readonly at: ResponseValue;
+  /** The id of the declared reason. The value `null` means that the point states no reason. */
+  readonly reason: string | null;
+  readonly group?: string;
+}
+
 /** The fitted curve over one dimension, and the measured points that match the held values. */
 export interface ResponseSlice {
   readonly measure: string;
@@ -291,6 +318,8 @@ export interface ResponseSlice {
   readonly held: Readonly<Record<string, ResponseInputValue>>;
   readonly curve: readonly ResponseCurvePoint[];
   readonly points: readonly ResponseSlicePoint[];
+  /** The points that match the held values and have no value of the measure, each with its reason. */
+  readonly absent: readonly ResponseAbsentPoint[];
   readonly error: ResponseHeldOutError;
 }
 
@@ -300,6 +329,16 @@ export interface ResponseSurfacePoint {
   /** The values of the two varied dimensions. */
   readonly at: readonly [ResponseValue, ResponseValue];
   readonly value: number;
+  readonly group?: string;
+}
+
+/** A point of a surface that matches the held values and has no value of the measure. */
+export interface ResponseSurfaceAbsentPoint {
+  readonly id: string;
+  /** The values of the two varied dimensions. */
+  readonly at: readonly [ResponseValue, ResponseValue];
+  /** The id of the declared reason. The value `null` means that the point states no reason. */
+  readonly reason: string | null;
   readonly group?: string;
 }
 
@@ -314,6 +353,8 @@ export interface ResponseSurface {
   /** One row for each value of `y`. Each row has one cell for each value of `x`. */
   readonly cells: readonly (readonly ResponseBand[])[];
   readonly points: readonly ResponseSurfacePoint[];
+  /** The points that match the held values and have no value of the measure, each with its reason. */
+  readonly absent: readonly ResponseSurfaceAbsentPoint[];
   readonly error: ResponseHeldOutError;
 }
 
@@ -409,6 +450,11 @@ function predictScaled(model: ResponseModel, inputs: Readonly<Record<string, Res
   return sum + 0;
 }
 
+/** This function changes a measured value to the scale of a model. A log scale with a floor lifts each smaller value. */
+export function toModelScale(value: number, log: boolean, floor: number | undefined): number {
+  return log ? Math.log10(Math.max(value, floor ?? value)) : value;
+}
+
 /** This function changes a value from the scale of the model to the scale of the measure. */
 function unscale(model: ResponseModel, value: number): number {
   return model.scale === "log" ? 10 ** value : value;
@@ -453,11 +499,69 @@ export function heldOutError(record: Pick<ResponseRecord, "folds">, measure: str
   return { n, folds, mae, rmse: Math.sqrt(square / n), baselineMae, skill: baselineMae > 0 ? 1 - mae / baselineMae : null };
 }
 
+/** This function gives the stored predictions of a measure in a fold. A fold with no predictions gives `undefined`. */
+function predictionsOf(fold: ResponseFold, measure: string): Readonly<Record<string, number>> | undefined {
+  return fold.predictions !== undefined && Object.hasOwn(fold.predictions, measure) ? fold.predictions[measure] : undefined;
+}
+
+/**
+ * This function gives the held-out error of a chosen set of points, on the scale of the model. It uses the stored
+ * predictions of the option `outOfFold`. Thus a reader can get the error of one cell. The result has the fields of
+ * `heldOutError`, and the set of all the points gives the same values to the rounding of the sums.
+ *
+ * Each point counts at most once. A point with no value of the measure, or with no prediction, adds nothing to `n`.
+ * The baseline of a point is the mean of the training points of its fold.
+ *
+ * The function throws a RangeError for an unknown measure and for a record with no predictions of the measure. It
+ * also throws for an unknown id, for a repeated id, and for a set with no point to score.
+ */
+export function heldOutErrorAt(record: ResponseRecord, measure: string, ids: readonly string[]): ResponseHeldOutError {
+  const model = record.models.find((m) => m.measure === measure);
+  if (model === undefined) throw new RangeError(`heldOutErrorAt: the record has no model of the measure "${measure}".`);
+  if (!record.folds.some((fold) => predictionsOf(fold, measure) !== undefined)) throw new RangeError(`heldOutErrorAt: the record has no predictions of the measure "${measure}". Fit it with the option outOfFold.`);
+  const chosen = new Set(ids);
+  if (chosen.size !== ids.length) throw new RangeError("heldOutErrorAt: the list of ids has a repeated id.");
+  const points = new Map(record.points.map((p) => [p.id, p]));
+  for (const id of ids) if (!points.has(id)) throw new RangeError(`heldOutErrorAt: the record has no point "${id}".`);
+  const scaled = (point: ResponsePoint): number | undefined => {
+    const value = point.measures[measure];
+    return typeof value === "number" ? toModelScale(value, model.scale === "log", model.floor) : undefined;
+  };
+  let n = 0;
+  let folds = 0;
+  let absolute = 0;
+  let square = 0;
+  let baselineSum = 0;
+  for (const fold of record.folds) {
+    const predicted = predictionsOf(fold, measure);
+    if (predicted === undefined) continue;
+    const scored = fold.heldOut.filter((id) => chosen.has(id) && Object.hasOwn(predicted, id));
+    if (scored.length === 0) continue;
+    const held = new Set(fold.heldOut);
+    const baseline = mean(record.points.flatMap((p) => (held.has(p.id) || scaled(p) === undefined ? [] : [scaled(p) as number])));
+    folds += 1;
+    for (const id of scored) {
+      const y = scaled(points.get(id) as ResponsePoint) as number;
+      const error = y - (predicted[id] as number);
+      n += 1;
+      absolute += Math.abs(error);
+      square += error * error;
+      baselineSum += Math.abs(y - baseline);
+    }
+  }
+  if (n === 0) throw new RangeError(`heldOutErrorAt: no chosen point has a prediction of the measure "${measure}".`);
+  const mae = absolute / n;
+  const baselineMae = baselineSum / n;
+  return { n, folds, mae, rmse: Math.sqrt(square / n), baselineMae, skill: baselineMae > 0 ? 1 - mae / baselineMae : null };
+}
+
 /** The parts of a slice or a surface that do not depend on the number of varied dimensions. */
 interface Frame {
   readonly held: Readonly<Record<string, ResponseInputValue>>;
   readonly axes: readonly (readonly ResponseValue[])[];
   readonly matched: readonly ResponsePoint[];
+  /** The points that match the held values and have no value of the measure. */
+  readonly missing: readonly ResponsePoint[];
   readonly error: ResponseHeldOutError;
   readonly band: (inputs: Readonly<Record<string, ResponseInputValue>>) => ResponseBand;
 }
@@ -587,12 +691,11 @@ function frameOf(name: string, record: ResponseRecord, measure: string, vary: re
   }
   const others = record.dimensions.filter((d) => !vary.includes(d.id));
   const held = heldValues(name, record, vary, hold, neededLevels(name, varied, vary));
-  const matched = record.points.filter(
-    (p) =>
-      typeof p.measures[measure] === "number" &&
-      vary.every((id) => p.values[id] !== null) &&
-      others.every((d) => matches(d, p.values[d.id] as ResponseInputValue, whenHolds(d, p.values) ? (held[d.id] as ResponseInputValue) : null, tolerance)),
+  const placed = record.points.filter(
+    (p) => vary.every((id) => p.values[id] !== null) && others.every((d) => matches(d, p.values[d.id] as ResponseInputValue, whenHolds(d, p.values) ? (held[d.id] as ResponseInputValue) : null, tolerance)),
   );
+  const matched = placed.filter((p) => typeof p.measures[measure] === "number");
+  const missing = placed.filter((p) => typeof p.measures[measure] !== "number");
   const error = heldOutError(record, measure);
   const nearest = nearestOf(record.dimensions, record.points, measure);
   const band = (inputs: Readonly<Record<string, ResponseInputValue>>): ResponseBand => {
@@ -600,16 +703,21 @@ function frameOf(name: string, record: ResponseRecord, measure: string, vary: re
     const value = predictScaled(model, place);
     return { value: unscale(model, value), low: unscale(model, value - width * error.rmse), high: unscale(model, value + width * error.rmse), nearest: nearest(place) };
   };
-  return { held, axes: varied.map((d) => axisValues(d, steps)), matched, error, band };
+  return { held, axes: varied.map((d) => axisValues(d, steps)), matched, missing, error, band };
 }
 
 /** This function gives the group field of a measured point of a view. */
 const groupOf = (point: ResponsePoint): { readonly group?: string } => (point.group === undefined ? {} : { group: point.group });
 
+/** This function gives the declared reason of a point with no value of a measure, or `null` for no stated reason. */
+const reasonOf = (point: ResponsePoint, measure: string): string | null => (point.absent !== undefined && Object.hasOwn(point.absent, measure) ? (point.absent[measure] as string) : null);
+
 /**
  * This function gives a view of a measure over one dimension of a parsed record:
  * - `curve`: the fitted value at each level, or at `steps` values of a continuous dimension, with its band.
  * - `points`: the measured points that match the held values. This list is empty when no point matches them.
+ * - `absent`: the points that match the held values and have no value of the measure, each with its reason. A chart
+ *   can draw each reason apart.
  * - `held`: the value of each other dimension.
  * - `error`: the held-out error.
  *
@@ -633,13 +741,14 @@ const groupOf = (point: ResponsePoint): { readonly group?: string } => (point.gr
  */
 export function sliceResponse(record: ResponseRecord, measure: string, options: ResponseSliceOptions): ResponseSlice {
   const { vary } = options;
-  const { held, axes, matched, error, band } = frameOf("sliceResponse", record, measure, [vary], options);
+  const { held, axes, matched, missing, error, band } = frameOf("sliceResponse", record, measure, [vary], options);
   return {
     measure,
     vary,
     held,
     curve: (axes[0] as readonly ResponseValue[]).map((at) => ({ at, ...band({ ...held, [vary]: at }) })),
     points: matched.map((p) => ({ id: p.id, at: p.values[vary] as ResponseValue, value: p.measures[measure] as number, ...groupOf(p) })),
+    absent: missing.map((p) => ({ id: p.id, at: p.values[vary] as ResponseValue, reason: reasonOf(p, measure), ...groupOf(p) })),
     error,
   };
 }
@@ -653,7 +762,7 @@ export function sliceResponse(record: ResponseRecord, measure: string, options: 
 export function surfaceResponse(record: ResponseRecord, measure: string, options: ResponseSurfaceOptions): ResponseSurface {
   const { vary } = options;
   const [xId, yId] = vary;
-  const { held, axes, matched, error, band } = frameOf("surfaceResponse", record, measure, vary, options);
+  const { held, axes, matched, missing, error, band } = frameOf("surfaceResponse", record, measure, vary, options);
   const x = axes[0] as readonly ResponseValue[];
   const y = axes[1] as readonly ResponseValue[];
   return {
@@ -664,6 +773,7 @@ export function surfaceResponse(record: ResponseRecord, measure: string, options
     y,
     cells: y.map((b) => x.map((a) => band({ ...held, [xId]: a, [yId]: b }))),
     points: matched.map((p) => ({ id: p.id, at: [p.values[xId] as ResponseValue, p.values[yId] as ResponseValue], value: p.measures[measure] as number, ...groupOf(p) })),
+    absent: missing.map((p) => ({ id: p.id, at: [p.values[xId] as ResponseValue, p.values[yId] as ResponseValue], reason: reasonOf(p, measure), ...groupOf(p) })),
     error,
   };
 }

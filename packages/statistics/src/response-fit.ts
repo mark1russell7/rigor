@@ -28,6 +28,7 @@ import {
   groupKey,
   isNumberDimension,
   product,
+  toModelScale,
 } from "./response.ts";
 import { ridgeSolve } from "./ridge.ts";
 
@@ -45,8 +46,11 @@ export interface ResponseFitOptions {
    * When true, a ridge fit also has the products of two dimensions, up to `degree`. The default is true. The value
    * false also removes the products of a conditional dimension with the levels of its parent. Thus this option is the
    * way out of the limit `RESPONSE_MAX_TERMS`.
+   *
+   * The value `seen` is the expansion of true, with only the terms that are not 0 at one point or more. Thus a sparse
+   * product of two large sets of levels keeps only the pairs with points. The limit applies after this choice.
    */
-  readonly interactions?: boolean;
+  readonly interactions?: boolean | "seen";
   /** The stated terms of a ridge fit, in place of `degree` and `interactions`. */
   readonly terms?: readonly (readonly ResponseFactor[])[];
   /** The penalties that a ridge fit chooses from, each above 0. The default is `RESPONSE_LAMBDAS`. */
@@ -55,6 +59,11 @@ export interface ResponseFitOptions {
   readonly log?: readonly string[];
   /** On a log scale, each smaller value takes this value. With no floor, a value of 0 or less is an error. */
   readonly logFloor?: number;
+  /**
+   * When true, each fold stores the prediction of each held-out point with a value. Then `heldOutErrorAt` gives the error of
+   * a chosen set of points. The default is false, and the record then has no field `predictions`.
+   */
+  readonly outOfFold?: boolean;
 }
 
 /** The default penalties of a ridge fit. The coordinates are from -1 to 1, so one list suits each record. */
@@ -72,6 +81,13 @@ interface Row {
 
 /** A fit that leaves out one fold. Its result gives the prediction of a row, by the index of the row. */
 type Learner = (fold: number) => (row: number) => number;
+
+/** The score of a measure in one fold. */
+interface FoldScore {
+  readonly error: ResponseFoldError;
+  /** The prediction of each held-out point with a value, by the id of the point. */
+  readonly predictions: Readonly<Record<string, number>>;
+}
 
 /** The terms and the other choices that apply to each measure. */
 interface Plan {
@@ -146,6 +162,13 @@ function expansion(dimensions: readonly ResponseDimension[], degree: number, int
     }
   });
   return terms;
+}
+
+/** This function gives the terms that are not 0 at one point or more. A fold gives a term with no point the weight 0. */
+function seenTerms(terms: readonly (readonly ResponseFactor[])[], dimensions: readonly ResponseDimension[], points: readonly ResponsePoint[]): readonly (readonly ResponseFactor[])[] {
+  const inputs = checkedInputs(dimensions, terms);
+  const places = points.map((point) => ({ at: coordinates(inputs, point.values), values: point.values }));
+  return terms.filter((term) => places.some(({ at, values }) => product(term, at, values) !== 0));
 }
 
 /** This function gives the inputs of a ridge fit: one for each dimension of a term. It throws for a bad term. */
@@ -260,19 +283,23 @@ function tableLearner(rows: readonly Row[], dimensions: readonly string[]): Lear
   };
 }
 
-/** This function gives the error of a fold. A fold with no held-out row or no training row has no error. */
-function foldError(rows: readonly Row[], fold: number, learner: Learner): ResponseFoldError | undefined {
+/** This function gives the score of a fold. A fold with no held-out row or no training row has no score. */
+function foldScore(rows: readonly Row[], fold: number, learner: Learner): FoldScore | undefined {
   const train = rows.filter((row) => row.fold !== fold).map((row) => row.y);
   const held = rows.flatMap((row, r) => (row.fold === fold ? [r] : []));
   if (held.length === 0 || train.length === 0) return undefined;
   const predict = learner(fold);
   const baseline = mean(train);
-  const errors = held.map((r) => (rows[r] as Row).y - predict(r));
+  const predicted = held.map((r) => predict(r));
+  const errors = held.map((r, i) => (rows[r] as Row).y - (predicted[i] as number));
   return {
-    n: held.length,
-    mae: mean(errors.map(Math.abs)),
-    rmse: Math.sqrt(mean(errors.map((e) => e * e))),
-    baselineMae: mean(held.map((r) => Math.abs((rows[r] as Row).y - baseline))),
+    error: {
+      n: held.length,
+      mae: mean(errors.map(Math.abs)),
+      rmse: Math.sqrt(mean(errors.map((e) => e * e))),
+      baselineMae: mean(held.map((r) => Math.abs((rows[r] as Row).y - baseline))),
+    },
+    predictions: Object.fromEntries(held.map((r, i) => [(rows[r] as Row).point.id, predicted[i] as number])),
   };
 }
 
@@ -282,25 +309,24 @@ function rowsOf(points: readonly ResponsePoint[], measure: string, log: boolean,
     const value = point.measures[measure];
     if (typeof value !== "number") return [];
     if (log && floor === undefined && value <= 0) throw new RangeError(`fitResponse: the point "${point.id}" has the value ${value} of the log measure "${measure}". Give logFloor.`);
-    const y = log ? Math.log10(Math.max(value, floor ?? value)) : value;
-    return [{ point, y, fold: foldOf.get(groupKey(point)) as number }];
+    return [{ point, y: toModelScale(value, log, floor), fold: foldOf.get(groupKey(point)) as number }];
   });
 }
 
-/** This function gives the model of one measure on all its rows, and the error of each fold. */
-function fitMeasure(rows: readonly Row[], measure: ResponseMeasure, log: boolean, floor: number | undefined, plan: Plan): { readonly model: ResponseModel; readonly errors: readonly (ResponseFoldError | undefined)[] } {
+/** This function gives the model of one measure on all its rows, and the score of each fold. */
+function fitMeasure(rows: readonly Row[], measure: ResponseMeasure, log: boolean, floor: number | undefined, plan: Plan): { readonly model: ResponseModel; readonly scores: readonly (FoldScore | undefined)[] } {
   if (rows.length === 0) throw new RangeError(`fitResponse: no point has a value of the measure "${measure.id}".`);
   const base = { measure: measure.id, scale: log ? ("log" as const) : ("linear" as const), ...(log && floor !== undefined ? { floor } : {}) };
   const ridge = plan.kind === "ridge" ? ridgeLearner(rows, plan) : undefined;
   const learner = ridge?.learner ?? tableLearner(rows, plan.ids);
-  const errors = Array.from({ length: plan.folds }, (_, f) => foldError(rows, f, learner));
-  if (errors.every((e) => e === undefined)) throw new RangeError(`fitResponse: all the values of the measure "${measure.id}" are in one fold. Give more groups.`);
+  const scores = Array.from({ length: plan.folds }, (_, f) => foldScore(rows, f, learner));
+  if (scores.every((s) => s === undefined)) throw new RangeError(`fitResponse: all the values of the measure "${measure.id}" are in one fold. Give more groups.`);
   const conditional = plan.conditional.length === 0 ? {} : { conditional: plan.conditional };
-  if (ridge === undefined) return { model: { kind: "table", ...base, dimensions: plan.ids, ...conditional, cells: tableCells(rows, plan.ids), fallback: mean(rows.map((r) => r.y)) }, errors };
+  if (ridge === undefined) return { model: { kind: "table", ...base, dimensions: plan.ids, ...conditional, cells: tableCells(rows, plan.ids), fallback: mean(rows.map((r) => r.y)) }, scores };
   const { lambda, beta } = ridge.final();
   if (!beta.every(Number.isFinite)) throw new RangeError(`fitResponse: the fit of the measure "${measure.id}" with lambda ${lambda} is singular. Give a larger lambda.`);
   const terms = plan.terms.map((factors, j) => ({ factors, weight: beta[j + 1] as number }));
-  return { model: { kind: "ridge", ...base, lambda, inputs: plan.inputs, intercept: beta[0] as number, terms }, errors };
+  return { model: { kind: "ridge", ...base, lambda, inputs: plan.inputs, intercept: beta[0] as number, terms }, scores };
 }
 
 /** This function examines the options that do not depend on the data, and it gives the number of folds and the penalties. */
@@ -340,7 +366,10 @@ function kindOf(dimensions: readonly ResponseDimension[], model: "auto" | "ridge
  * The penalty: each fold of a ridge fit chooses from `lambdas` with the other folds. Thus the held-out error of a
  * fold is not optimistic. The model of the record chooses with all the folds.
  *
- * The errors: a fold scores the model of the other folds on its held-out points, on the scale of the model.
+ * The errors: a fold scores the model of the other folds on its held-out points, on the scale of the model. With the
+ * option `outOfFold`, the fold also stores the prediction of each of these points.
+ *
+ * The reasons: a measure with a stated reason is `null` for the fit. The field `reasons` of the data stays in the record.
  *
  * The result does not depend on the order of the points, except for the field `points`, which keeps the order of
  * the data. The same data and options give the same bytes in one JavaScript engine.
@@ -357,8 +386,10 @@ export function fitResponse(data: ResponseData, options: ResponseFitOptions = {}
   const log = new Set(options.log ?? []);
   for (const id of log) if (!measures.some((m) => m.id === id)) throw new RangeError(`fitResponse: the option log names the unknown measure "${id}".`);
   const kind = kindOf(dimensions, options.model ?? "auto");
-  const terms = kind === "table" ? [] : (options.terms ?? expansion(dimensions, degree, options.interactions ?? true));
-  if (terms.length + 1 > RESPONSE_MAX_TERMS) throw new RangeError(`fitResponse: the expansion has ${terms.length} terms, and the limit is ${RESPONSE_MAX_TERMS - 1}. Set interactions to false, or give terms.`);
+  const interactions = options.interactions ?? true;
+  const expanded = kind === "table" ? [] : (options.terms ?? expansion(dimensions, degree, interactions !== false));
+  const terms = interactions === "seen" && options.terms === undefined ? seenTerms(expanded, dimensions, data.points) : expanded;
+  if (terms.length + 1 > RESPONSE_MAX_TERMS) throw new RangeError(`fitResponse: the expansion has ${terms.length} terms, and the limit is ${RESPONSE_MAX_TERMS - 1}. Set interactions to false or "seen", or give terms.`);
   const inputs = checkedInputs(dimensions, terms);
   const points = [...data.points].sort((a, b) => byText(a.id, b.id));
   const groups = [...new Set(points.map(groupKey))].sort(byText);
@@ -368,14 +399,17 @@ export function fitResponse(data: ResponseData, options: ResponseFitOptions = {}
   const foldOf = new Map(shuffled.map((group, i) => [group, i % folds]));
   const plan: Plan = { ids: dimensions.map((d) => d.id), conditional: dimensions.flatMap((d) => (d.when === undefined ? [] : [d.id])), kind, folds, lambdas, terms, inputs };
   const fits = measures.map((m) => fitMeasure(rowsOf(points, m.id, log.has(m.id), options.logFloor, foldOf), m, log.has(m.id), options.logFloor, plan));
-  const foldRecords: readonly ResponseFold[] = Array.from({ length: folds }, (_, f) => ({
-    heldOut: points.filter((p) => foldOf.get(groupKey(p)) === f).map((p) => p.id),
-    errors: Object.fromEntries(
-      measures.flatMap((m, i) => {
-        const error = fits[i]?.errors[f];
-        return error === undefined ? [] : [[m.id, error]];
-      }),
-    ),
-  }));
-  return { schema: RESPONSE_RECORDS_SCHEMA, name: data.name, dimensions, measures, points: data.points, models: fits.map((fit) => fit.model), folds: foldRecords };
+  const foldRecords: readonly ResponseFold[] = Array.from({ length: folds }, (_, f) => {
+    const scored = measures.flatMap((m, i) => {
+      const score = fits[i]?.scores[f];
+      return score === undefined ? [] : [[m.id, score] as const];
+    });
+    return {
+      heldOut: points.filter((p) => foldOf.get(groupKey(p)) === f).map((p) => p.id),
+      errors: Object.fromEntries(scored.map(([id, score]) => [id, score.error])),
+      ...(options.outOfFold === true ? { predictions: Object.fromEntries(scored.map(([id, score]) => [id, score.predictions])) } : {}),
+    };
+  });
+  const reasons = data.reasons === undefined ? {} : { reasons: data.reasons };
+  return { schema: RESPONSE_RECORDS_SCHEMA, name: data.name, dimensions, measures, ...reasons, points: data.points, models: fits.map((fit) => fit.model), folds: foldRecords };
 }
