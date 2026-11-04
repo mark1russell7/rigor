@@ -759,8 +759,8 @@ const reasonOf = (point: ResponsePoint, measure: string): string | null => (poin
  * distance is on the log scale of the model, so the band is a ratio. The band has one width along all the curve. The
  * band is the mean error of the model, and `nearest` tells how far the place is from a measurement.
  *
- * A measure with a `range` keeps each place inside it. The fields `value`, `low` and `high` move to the nearest end,
- * the place has the field `clipped`, and the field `clipped` of the view counts these places. The function
+ * A measure with a `range` keeps each place inside it. The fields `value`, `low` and `high` move to the nearest end.
+ * The place then has the field `clipped`, and the field `clipped` of the view counts these places. The function
  * `predictResponse` gives the value that the model fitted.
  *
  * The function throws a RangeError for an unknown measure or dimension, and for a held value that is not good for its
@@ -818,7 +818,7 @@ export function surfaceResponse(record: ResponseRecord, measure: string, options
  */
 export function responseCells(record: Pick<ResponseRecord, "dimensions">, vary: string | readonly [string, string], steps = 33): number {
   checkSteps("responseCells", steps);
-  const ids = typeof vary === "string" ? [vary] : vary;
+  const ids: readonly string[] = typeof vary === "string" ? [vary] : vary;
   if (new Set(ids).size !== ids.length) throw new RangeError(`responseCells: the two varied dimensions are one dimension, "${ids[0]}".`);
   return ids.reduce((count, id) => {
     const dimension = record.dimensions.find((d) => d.id === id);
