@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 72 names
+## . (build/index.d.ts): 77 names
 
 type Arm: build/paired.d.ts#Arm
 type Balanced: build/index.d.ts#Balanced
@@ -20,6 +20,10 @@ type CaseBudget: build/index.d.ts#CaseBudget
 type CaseInterval: build/index.d.ts#CaseInterval
 type CaseLimit: build/index.d.ts#CaseLimit
 type CaseRatio: build/paired.d.ts#CaseRatio
+type ControlFactors: build/index.d.ts#ControlFactors
+type ControlOptions: build/index.d.ts#ControlOptions
+type ControlRow: build/index.d.ts#ControlRow
+type GroupFactor: build/index.d.ts#GroupFactor
 type JobLimitVerdict: build/index.d.ts#JobLimitVerdict
 type JobRecords: build/index.d.ts#JobRecords
 type JobVerdict: build/index.d.ts#JobVerdict
@@ -66,6 +70,7 @@ caseIntervals: build/index.d.ts#caseIntervals
 caseRatios: build/paired.d.ts#caseRatios
 checkLadder: build/index.d.ts#checkLadder
 checkPairedTime: build/paired.d.ts#checkPairedTime
+controlFactor: build/index.d.ts#controlFactor
 firstArm: build/paired.d.ts#firstArm
 ladderVerdict: build/index.d.ts#ladderVerdict
 limitVerdict: build/index.d.ts#limitVerdict
@@ -310,6 +315,36 @@ interface CaseLimit extends CaseInterval {
   readonly bound: number;
   readonly floor: number;
   readonly outcome: LimitOutcome;
+}
+
+### build/index.d.ts#ControlFactors
+interface ControlFactors {
+  readonly base: string | undefined;
+  readonly factors: readonly GroupFactor[];
+}
+
+### build/index.d.ts#ControlOptions
+interface ControlOptions {
+  readonly base?: string;
+  readonly minPairs?: number;
+}
+
+### build/index.d.ts#ControlRow
+interface ControlRow {
+  readonly group: string;
+  readonly key: string;
+  readonly value: number;
+  readonly censored?: boolean;
+}
+
+### build/index.d.ts#GroupFactor
+interface GroupFactor {
+  readonly group: string;
+  readonly factor: number;
+  readonly pairs: number;
+  readonly low: number;
+  readonly high: number;
+  readonly censored: number;
 }
 
 ### build/index.d.ts#JobLimitVerdict
@@ -633,6 +668,9 @@ export declare function caseIntervals(records: readonly PairedTime[], level?: nu
 
 ### build/index.d.ts#checkLadder
 export declare function checkLadder(ladder: Ladder): readonly string[];
+
+### build/index.d.ts#controlFactor
+export declare function controlFactor(rows: readonly ControlRow[], options?: ControlOptions): ControlFactors;
 
 ### build/index.d.ts#ladderVerdict
 export declare function ladderVerdict(ladder: Ladder, records: readonly RungRecord[], options: LadderOptions): LadderVerdict;
