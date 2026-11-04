@@ -138,7 +138,7 @@ Each function throws a RangeError for an empty list, for a NaN and for a paramet
 
 ### The limits of the shape of a sample
 
-`modeCount` joins more than about 24 evenly spaced clusters, because its grid has 96 points. A tight cluster also needs more than about `n ** 0.8 / 8` values in a sample of `n` values. Under these limits a test holds the count at 20 clusters.
+`modeCount` joins more than approximately 24 evenly spaced clusters, because its grid has 96 points. A tight cluster also needs more than approximately `n ** 0.8 / 8` values in a sample of `n` values. Under these limits a test holds the count at 20 clusters.
 
 `bestSmoothLaw` is not reliable under 300 values. The laws with a fitted end have a benefit at small sizes. This table gives the share of correct results for 500 seeded samples of each law. A test holds it.
 

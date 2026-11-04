@@ -102,8 +102,8 @@ function peaksOf(density: Float64Array): Peak[] {
  * This function counts the modes of a sample with a kernel estimate on a grid. Two peaks stay apart when the valley
  * between them is under `valleyRatio` of the lower peak. A mode counts when it holds `minShare` of the mass. The peaks
  * join from left to right, so a reversed axis can change the count of a close mixture. The result is at least 1.
- * The grid has 96 points, so the function joins more than about 24 evenly spaced clusters. A tight cluster also needs
- * more than about `n ** 0.8 / 8` values for a sample of `n` values.
+ * The grid has 96 points, so the function joins more than approximately 24 evenly spaced clusters. A tight cluster
+ * also needs more than approximately `n ** 0.8 / 8` values for a sample of `n` values.
  * The function throws a RangeError for an empty list or for a value that is not finite.
  */
 export function modeCount(values: readonly number[], options: ModeOptions = {}): number {
