@@ -689,7 +689,7 @@ export interface CaseProgress {
 export declare const DEFAULT_OVERRUNS = 2;
 
 ### build/supervise.d.ts#DEFAULT_POLL_MS
-export declare const DEFAULT_POLL_MS = 1000;
+export declare const DEFAULT_POLL_MS = 1e3;
 
 ### build/supervise.d.ts#SuperviseOptions
 export interface SuperviseOptions {
