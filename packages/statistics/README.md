@@ -123,6 +123,8 @@ The default expansion has one product for each pair of levels of two dimensions.
 | `holm(pValues, level)` | The Holm correction of a family of tests. |
 | `spearman`, `kendallTau`, `ranks` | The rank correlations, with mean ranks for ties. |
 | `compareRatios`, `noiseFloor`, `noiseVerdict` | The comparison with a baseline, the noise floor of the 5-seed rule with a margin of practical effect, and the state of a difference over the seeds. |
+| `modeCount(values, { minShare, valleyRatio })` | The count of the modes of a sample, from a kernel density estimate. |
+| `smoothLawScores(values)`, `bestSmoothLaw(values)` | The mean log density of the uniform, normal, exponential, log-normal and Pareto laws at their fits, and the best of them. |
 | `brier`, `calibration` | The Brier score of predictions, and the hit rate of each stated level. |
 | `fitResponse(data, options)` | A record of the format `response-records/1`, with one model for each measure and held-out folds. |
 | `parseResponseRecord(value)` | The examination of unknown data. It gives the record, or one fault with a path for each error. |
