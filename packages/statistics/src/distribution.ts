@@ -54,7 +54,8 @@ interface Peak {
  * This function gives the width of the kernel. The width from the quartiles follows the distance between clusters, so
  * it hides many tight clusters. A low quantile of the spans of neighbouring values follows the width of a cluster.
  * The function uses the tight width only when it is far under the other width, so a smooth sample keeps its width.
- * The grid sets the smallest tight width, so equal values in groups stay visible on the grid.
+ * The tight width stays over the grid step and over the median gap of the distinct values. A step of rounding is no gap
+ * between clusters, so a rounded smooth sample keeps one mode.
  */
 function kernelWidth(values: readonly number[], low: number, high: number): number {
   const count = values.length;
@@ -63,7 +64,10 @@ function kernelWidth(values: readonly number[], low: number, high: number): numb
   const wide = KERNEL_FACTOR * Math.max(scale, (high - low) / GRID) * count ** -0.2;
   const neighbours = Math.min(count - 1, Math.ceil(SPAN_FACTOR * count ** 0.8));
   const tight = quantile(order.slice(neighbours).map((x, i) => x - order[i]!), SPAN_QUANTILE);
-  return tight < TIGHT_RATIO * wide ? Math.max(tight, (high - low) / GRID) : wide;
+  if (tight >= TIGHT_RATIO * wide) return wide;
+  const distinct = order.filter((x, i) => i === 0 || x !== order[i - 1]);
+  const resolution = quantile(distinct.slice(1).map((x, i) => x - distinct[i]!), 0.5);
+  return Math.min(wide, Math.max(tight, resolution, (high - low) / GRID));
 }
 
 /** This function gives the Gaussian kernel density of the values on a grid. */
@@ -103,7 +107,9 @@ function peaksOf(density: Float64Array): Peak[] {
  * between them is under `valleyRatio` of the lower peak. A mode counts when it holds `minShare` of the mass. The peaks
  * join from left to right, so a reversed axis can change the count of a close mixture. The result is at least 1.
  * The grid has 96 points, so the function joins more than approximately 24 evenly spaced clusters. A tight cluster
- * also needs more than approximately `n ** 0.8 / 8` values for a sample of `n` values.
+ * also needs more than approximately `n ** 0.8 / 8` values for a sample of `n` values. A cluster with an SD over 5
+ * percent of the gap to the next cluster can join it. Even groups of equal values are also a rounded uniform law, so
+ * many such groups give 1. A rounding step of 0.5 SD or more gives more than one mode for a smooth law.
  * The function throws a RangeError for an empty list or for a value that is not finite.
  */
 export function modeCount(values: readonly number[], options: ModeOptions = {}): number {

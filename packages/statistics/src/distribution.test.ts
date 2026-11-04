@@ -76,8 +76,37 @@ describe("the count of the modes", () => {
     expect(modeCount(spaced(count, 1000, 0.5))).toBe(count);
   });
 
-  it.each([6, 9, 12, 20])("gives %i groups of equal values", (count) => {
-    expect(modeCount(spaced(count, 50, 0))).toBe(count);
+  it.each([
+    [6, 200, 6],
+    [9, 1000, 9],
+    [12, 1000, 12],
+    [20, 1000, 1],
+  ])("reads %i even groups of %i equal values as %i modes", (count, size, modes) => {
+    expect(modeCount(spaced(count, size, 0))).toBe(modes);
+  });
+
+  it.each([
+    [200, 99],
+    [1000, 100],
+  ])("keeps one mode for a rounded normal law at %i values", (n, ones) => {
+    const r = random(`rounded ${n}`);
+    let one = 0;
+    for (let i = 0; i < 100; i++) if (modeCount(Array.from({ length: n }, () => 2 * Math.round(r.normal(100, 10) / 2))) === 1) one++;
+    expect(one).toBe(ones);
+  });
+
+  it("keeps one mode for the log areas of whole-number sides", () => {
+    const r = random("sides");
+    for (let i = 0; i < 100; i++) expect(modeCount(Array.from({ length: 1000 }, () => Math.log(r.int(1, 20) * r.int(1, 20))))).toBe(1);
+  });
+
+  it("gives each tight cluster of rounded values", () => {
+    expect(modeCount(spaced(12, 200, 2).map(Math.round))).toBe(12);
+  });
+
+  it("joins clusters wider than the limit at small sizes", () => {
+    expect(modeCount(spaced(12, 50, 5))).toBe(12);
+    expect(modeCount(spaced(12, 50, 8))).toBe(1);
   });
 
   it("gives the same count for random clusters", () => {
