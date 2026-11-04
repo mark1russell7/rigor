@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 54 names
+## . (build/index.d.ts): 71 names
 
 type Arm: build/paired.d.ts#Arm
 type Balanced: build/index.d.ts#Balanced
@@ -13,6 +13,7 @@ type BandKind: build/index.d.ts#BandKind
 type BandOptions: build/index.d.ts#BandOptions
 type BudgetOptions: build/index.d.ts#BudgetOptions
 type BudgetOutcome: build/index.d.ts#BudgetOutcome
+type BudgetResult: build/index.d.ts#BudgetResult
 type BudgetRound: build/index.d.ts#BudgetRound
 type BudgetVerdict: build/index.d.ts#BudgetVerdict
 type CaseBudget: build/index.d.ts#CaseBudget
@@ -22,9 +23,15 @@ type CaseRatio: build/paired.d.ts#CaseRatio
 type JobLimitVerdict: build/index.d.ts#JobLimitVerdict
 type JobRecords: build/index.d.ts#JobRecords
 type JobVerdict: build/index.d.ts#JobVerdict
+LADDER_FORMAT: build/index.d.ts#LADDER_FORMAT
+type Ladder: build/index.d.ts#Ladder
+type LadderDimension: build/index.d.ts#LadderDimension
+type LadderOptions: build/index.d.ts#LadderOptions
+type LadderVerdict: build/index.d.ts#LadderVerdict
 type LimitOptions: build/index.d.ts#LimitOptions
 type LimitOutcome: build/index.d.ts#LimitOutcome
 type LimitVerdict: build/index.d.ts#LimitVerdict
+type MedianBudget: build/index.d.ts#MedianBudget
 type NoiseCheck: build/index.d.ts#NoiseCheck
 type PairedTime: build/paired.d.ts#PairedTime
 type PoolFacts: build/index.d.ts#PoolFacts
@@ -35,13 +42,20 @@ type PooledRecords: build/index.d.ts#PooledRecords
 type PooledVerdict: build/index.d.ts#PooledVerdict
 type Power: build/index.d.ts#Power
 type PowerOptions: build/index.d.ts#PowerOptions
+type RateBudget: build/index.d.ts#RateBudget
 type Rounds: build/index.d.ts#Rounds
 type RoundsOptions: build/index.d.ts#RoundsOptions
 type RunPairs: build/index.d.ts#RunPairs
+type Rung: build/index.d.ts#Rung
+type RungBudget: build/index.d.ts#RungBudget
+type RungEvidence: build/index.d.ts#RungEvidence
+type RungRecord: build/index.d.ts#RungRecord
+type RungVerdict: build/index.d.ts#RungVerdict
 type TimeOutcome: build/index.d.ts#TimeOutcome
 type TimeVerdict: build/index.d.ts#TimeVerdict
 type VerdictOptions: build/index.d.ts#VerdictOptions
 type VerdictRule: build/index.d.ts#VerdictRule
+type WorstBudget: build/index.d.ts#WorstBudget
 aaBand: build/index.d.ts#aaBand
 aaSpread: build/index.d.ts#aaSpread
 armVerdicts: build/index.d.ts#armVerdicts
@@ -49,13 +63,16 @@ balanceOrders: build/index.d.ts#balanceOrders
 budgetVerdict: build/index.d.ts#budgetVerdict
 caseIntervals: build/index.d.ts#caseIntervals
 caseRatios: build/paired.d.ts#caseRatios
+checkLadder: build/index.d.ts#checkLadder
 checkPairedTime: build/paired.d.ts#checkPairedTime
 firstArm: build/paired.d.ts#firstArm
+ladderVerdict: build/index.d.ts#ladderVerdict
 limitVerdict: build/index.d.ts#limitVerdict
 poolRecords: build/index.d.ts#poolRecords
 pooledBand: build/index.d.ts#pooledBand
 pooledLimitVerdict: build/index.d.ts#pooledLimitVerdict
 pooledVerdict: build/index.d.ts#pooledVerdict
+rungVerdict: build/index.d.ts#rungVerdict
 timeRounds: build/index.d.ts#timeRounds
 timeVerdict: build/index.d.ts#timeVerdict
 verdictMargin: build/index.d.ts#verdictMargin
@@ -227,6 +244,13 @@ interface BudgetOptions {
 ### build/index.d.ts#BudgetOutcome
 type BudgetOutcome = "within" | "beyond" | "cannot decide";
 
+### build/index.d.ts#BudgetResult
+interface BudgetResult {
+  readonly measure: string;
+  readonly outcome: BudgetOutcome;
+  readonly reason: string;
+}
+
 ### build/index.d.ts#BudgetRound
 interface BudgetRound {
   readonly case: string;
@@ -295,6 +319,39 @@ interface JobVerdict {
   readonly verdict: TimeVerdict;
 }
 
+### build/index.d.ts#LADDER_FORMAT
+export declare const LADDER_FORMAT = "rigor-ladder/1";
+
+### build/index.d.ts#Ladder
+interface Ladder {
+  readonly format: typeof LADDER_FORMAT;
+  readonly subject: string;
+  readonly dimensions: readonly LadderDimension[];
+  readonly rungs: readonly Rung[];
+}
+
+### build/index.d.ts#LadderDimension
+interface LadderDimension {
+  readonly name: string;
+  readonly describe: string;
+}
+
+### build/index.d.ts#LadderOptions
+interface LadderOptions {
+  readonly now: string;
+  readonly maxAgeDays?: number;
+}
+
+### build/index.d.ts#LadderVerdict
+interface LadderVerdict {
+  readonly subject: string;
+  readonly held: string | undefined;
+  readonly next: string | undefined;
+  readonly failed: boolean;
+  readonly reason: string;
+  readonly rungs: readonly RungVerdict[];
+}
+
 ### build/index.d.ts#LimitOptions
 interface LimitOptions extends BandOptions {
   readonly limit: number;
@@ -314,6 +371,16 @@ interface LimitVerdict {
   readonly band: Band | undefined;
   readonly share: number;
   readonly allowed: number;
+}
+
+### build/index.d.ts#MedianBudget
+interface MedianBudget {
+  readonly kind: "median";
+  readonly measure: string;
+  readonly unit: string;
+  readonly limit: number;
+  readonly maxDifference: number;
+  readonly caseLevel?: number;
 }
 
 ### build/index.d.ts#NoiseCheck
@@ -398,6 +465,13 @@ interface PowerOptions {
   readonly verdict?: VerdictOptions;
 }
 
+### build/index.d.ts#RateBudget
+interface RateBudget {
+  readonly kind: "rate";
+  readonly measure: string;
+  readonly limit: number;
+}
+
 ### build/index.d.ts#Rounds
 interface Rounds {
   readonly records: PairedTime[];
@@ -418,6 +492,58 @@ interface RoundsOptions {
 ### build/index.d.ts#RunPairs
 interface RunPairs {
   readonly pairs: Readonly<Record<string, readonly PairedTime[]>>;
+}
+
+### build/index.d.ts#Rung
+interface Rung {
+  readonly name: string;
+  readonly at: Readonly<Record<string, number>>;
+  readonly budgets: readonly RungBudget[];
+  readonly test: string;
+  readonly locked?: boolean;
+}
+
+### build/index.d.ts#RungBudget
+type RungBudget = MedianBudget | RateBudget | WorstBudget;
+
+### build/index.d.ts#RungEvidence
+type RungEvidence = {
+  readonly kind: "median";
+  readonly measure: string;
+  readonly rounds: readonly BudgetRound[];
+  readonly aa: readonly BudgetRound[];
+} | {
+  readonly kind: "rate";
+  readonly measure: string;
+  readonly failures: number;
+  readonly trials: number;
+} | {
+  readonly kind: "worst";
+  readonly measure: string;
+  readonly values: readonly number[];
+};
+
+### build/index.d.ts#RungRecord
+interface RungRecord {
+  readonly rung: string;
+  readonly commit: string;
+  readonly at: string;
+  readonly real: readonly string[];
+  readonly synthetic: readonly string[];
+  readonly evidence: readonly RungEvidence[];
+}
+
+### build/index.d.ts#RungVerdict
+interface RungVerdict {
+  readonly rung: string;
+  readonly test: string;
+  readonly locked: boolean;
+  readonly outcome: BudgetOutcome;
+  readonly reason: string;
+  readonly budgets: readonly BudgetResult[];
+  readonly commit: string | undefined;
+  readonly real: readonly string[];
+  readonly synthetic: readonly string[];
 }
 
 ### build/index.d.ts#TimeOutcome
@@ -448,6 +574,15 @@ interface VerdictOptions extends BandOptions {
 ### build/index.d.ts#VerdictRule
 type VerdictRule = "band" | "difference";
 
+### build/index.d.ts#WorstBudget
+interface WorstBudget {
+  readonly kind: "worst";
+  readonly measure: string;
+  readonly unit: string;
+  readonly limit: number;
+  readonly minDrills: number;
+}
+
 ### build/index.d.ts#aaBand
 export declare function aaBand(aa: readonly PairedTime[], options?: BandOptions): Band;
 
@@ -466,6 +601,12 @@ export declare function budgetVerdict(rounds: readonly BudgetRound[], aa: readon
 ### build/index.d.ts#caseIntervals
 export declare function caseIntervals(records: readonly PairedTime[], level?: number): CaseInterval[];
 
+### build/index.d.ts#checkLadder
+export declare function checkLadder(ladder: Ladder): readonly string[];
+
+### build/index.d.ts#ladderVerdict
+export declare function ladderVerdict(ladder: Ladder, records: readonly RungRecord[], options: LadderOptions): LadderVerdict;
+
 ### build/index.d.ts#limitVerdict
 export declare function limitVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[], options: LimitOptions): LimitVerdict;
 
@@ -480,6 +621,9 @@ export declare function pooledLimitVerdict(jobs: readonly JobRecords[], options:
 
 ### build/index.d.ts#pooledVerdict
 export declare function pooledVerdict(jobs: readonly JobRecords[], options?: VerdictOptions): PooledVerdict;
+
+### build/index.d.ts#rungVerdict
+export declare function rungVerdict(rung: Rung, record: RungRecord | undefined, options: LadderOptions): RungVerdict;
 
 ### build/index.d.ts#timeRounds
 export declare function timeRounds(arms: Readonly<Record<Arm, () => number>>, options: RoundsOptions): Rounds;

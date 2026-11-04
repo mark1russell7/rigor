@@ -90,6 +90,50 @@ v.cases;                                          // the medians, the interval, 
 - The level 0.95 needs 6 rounds or more in each arm. With fewer rounds, the case is `cannot decide`.
 - A case is `within` when the high end of the interval of its median is at most the limit. A case is `beyond` when the low end is above the limit.
 
+## A claim at each size: the ladder
+
+A ladder is the scale plan of a product, as data. It has rungs at sizes that grow, for example 1, 10 and 100 tenants. Each rung has budgets, and it names the test that holds it. A number in a document is not a rung: a rung is held only when a record of its test shows each budget `within`.
+
+```ts
+const ladder: Ladder = {
+  format: LADDER_FORMAT,
+  subject: "reference service",
+  dimensions: [{ name: "tenants", describe: "one customer" }],
+  rungs: [{
+    name: "1,000 tenants",
+    at: { tenants: 1000 },
+    test: "load-1000",
+    locked: true,
+    budgets: [
+      { kind: "median", measure: "read", unit: "ms", limit: 50, maxDifference: 20 },
+      { kind: "rate", measure: "failed requests", limit: 0.0001 },
+      { kind: "worst", measure: "lost writes", unit: "writes", limit: 0, minDrills: 3 },
+    ],
+  }],
+};
+
+const v = ladderVerdict(ladder, records, { now: new Date().toISOString(), maxAgeDays: 8 });
+
+v.held;                                           // the highest rung with each rung up to it within
+v.next;                                           // the first rung that is not within
+v.failed;                                         // true when a locked rung is not within
+```
+
+There are three kinds of budget:
+
+| Kind | Evidence | The verdict |
+| --- | --- | --- |
+| `median` | Rounds and an A/A arm | `budgetVerdict`, so the rules of a budget apply. |
+| `rate` | Failures and trials | The Wilson interval at 95 % against the limit. |
+| `worst` | The value of each drill | The largest value against the limit. One bad drill is `beyond`. |
+
+- A failed rate of 0 of 38,500 holds a limit of 0.01 %. A failed rate of 0 of 30,000 is `cannot decide`, because the Wilson bound of that run is 0.0128 %.
+- A locked rung fails when it is `beyond` and when it is `cannot decide`. A skipped test is not a pass.
+- The verdict reads the newest record of each rung, so an old pass does not hide a new failure. With `maxAgeDays`, an older record gives `cannot decide`.
+- A high rung does not count over a gap: `held` stops at the first rung that is not `within`.
+- A record states what was real and what was synthetic. A record with no entry in `real` gives `cannot decide`.
+- `checkLadder` gives each problem of a ladder as data. `ladderVerdict` throws a `RangeError` for a ladder with problems.
+
 ## Time the rounds
 
 `timeRounds` times one case in one process. Start a fresh process for each case and each pair, and give the index of the case as `offset`:

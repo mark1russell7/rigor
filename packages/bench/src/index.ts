@@ -1,4 +1,23 @@
 export { type BudgetOptions, type BudgetOutcome, type BudgetRound, type BudgetVerdict, type CaseBudget, budgetVerdict } from "./budget.ts";
+export {
+  type BudgetResult,
+  type Ladder,
+  type LadderDimension,
+  type LadderOptions,
+  type LadderVerdict,
+  type MedianBudget,
+  type RateBudget,
+  type Rung,
+  type RungBudget,
+  type RungEvidence,
+  type RungRecord,
+  type RungVerdict,
+  type WorstBudget,
+  LADDER_FORMAT,
+  checkLadder,
+  ladderVerdict,
+  rungVerdict,
+} from "./ladder.ts";
 export { type CaseInterval, type CaseLimit, type LimitOptions, type LimitOutcome, type LimitVerdict, caseIntervals, limitVerdict } from "./limit.ts";
 export {
   type Balanced,
