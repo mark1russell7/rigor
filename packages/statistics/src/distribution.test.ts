@@ -2,6 +2,32 @@ import { describe, expect, it } from "vitest";
 import { random, type Random } from "@mark1russell7/rigor-generators";
 import { bestSmoothLaw, modeCount, smoothLawScores, type SmoothLaw } from "./distribution.ts";
 
+/** This function gives one draw of a Poisson law. */
+function poisson(r: Random, mean: number): number {
+  const limit = Math.exp(-mean);
+  let count = 0;
+  for (let p = r.next(); p > limit; p *= r.next()) count++;
+  return count;
+}
+
+/** This function gives one draw of a binomial law. */
+function binomial(r: Random, trials: number, p: number): number {
+  let count = 0;
+  for (let i = 0; i < trials; i++) if (r.next() < p) count++;
+  return count;
+}
+
+/** The discrete laws with one mode, with the share of false counts at 100, 300 and 1,000 values. */
+const ONE_MODE: readonly (readonly [string, (r: Random) => number, readonly number[]])[] = [
+  ["rounded normal, SD 4", (r) => Math.round(r.normal(0, 4)), [0.003, 0.001, 0.001]],
+  ["Poisson, mean 3", (r) => poisson(r, 3), [0.006, 0.001, 0]],
+  ["Poisson, mean 10", (r) => poisson(r, 10), [0.001, 0, 0]],
+  ["binomial, 10 trials, p 0.5", (r) => binomial(r, 10, 0.5), [0.008, 0.009, 0.001]],
+  ["binomial, 100 trials, p 0.5", (r) => binomial(r, 100, 0.5), [0.001, 0, 0]],
+  ["Poisson, mean 1", (r) => poisson(r, 1), [0, 0, 0]],
+  ["geometric, p 0.1", (r) => Math.floor(Math.log(1 - r.next()) / Math.log(0.9)), [0.213, 0.028, 0]],
+];
+
 /** This function gives `n` values of a quantile function at even steps, so a test needs no random numbers. */
 const evenly = (n: number, quantileOf: (p: number) => number): number[] => Array.from({ length: n }, (_, i) => quantileOf((i + 0.5) / n));
 
@@ -108,6 +134,35 @@ describe("the count of the modes", () => {
     expect(modeCount(groups)).toBe(3);
     expect(modeCount(groups, { minShare: 0.05 })).toBe(6);
   });
+
+  it("gives one count for x and -x on seeded random laws", () => {
+    const r = random("flip of the axis");
+    for (let t = 0; t < 400; t++) {
+      const weights = Array.from({ length: r.int(2, 24) }, () => r.next() ** 2);
+      const total = weights.reduce((sum, weight) => sum + weight, 0);
+      const pick = (u: number): number => {
+        let left = u * total;
+        return weights.findIndex((weight) => (left -= weight) <= 0);
+      };
+      const discrete = Array.from({ length: r.int(100, 3000) }, () => pick(r.next()));
+      expect(modeCount(discrete.map((x) => -x))).toBe(modeCount(discrete));
+      const far = r.range(2, 5);
+      const mixture = Array.from({ length: 300 }, () => (r.next() < 0.5 ? r.normal(0, 1) : r.normal(far, 0.8)));
+      expect(modeCount(mixture.map((x) => -x))).toBe(modeCount(mixture));
+    }
+  });
+
+  it("holds the table of the README for discrete laws with one mode", () => {
+    for (const [law, draw, table] of ONE_MODE) {
+      const shares = [100, 300, 1000].map((n) => {
+        const r = random(`false count ${law} ${n}`);
+        let wrong = 0;
+        for (let i = 0; i < 1000; i++) if (modeCount(Array.from({ length: n }, () => draw(r))) !== 1) wrong++;
+        return wrong / 1000;
+      });
+      expect(shares).toEqual(table);
+    }
+  }, 60_000);
 
   it("holds the table of the README for smooth samples", () => {
     const SIZES = [10, 30, 100, 300, 1000];
