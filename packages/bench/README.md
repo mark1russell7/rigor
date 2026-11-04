@@ -54,6 +54,9 @@ v.comparison;                                     // the cases that gain and dro
 | `childLine(stdout)` | From `/fresh`: the last JSON line of a child, with its time `ms`, its `hash` and the reason of a skip. |
 | `pairOrder(pairs, round, caseIndex)` | From `/fresh`: the order of the pairs of one case in one round, and the first arm of each pair. |
 | `freshRun(options)` | From `/fresh`: the records of each pair, with each arm in its own fresh child process. |
+| `superviseCases(options)` | From `/supervise`: each case in a child process, held to a time budget, with a hard stop and a resume. |
+| `caseProgress(file)` | From `/supervise`: the writer of the progress file of a child. |
+| `startSupervisedProcess(argv, options)` | From `/supervise`: a child process that `superviseCases` can stop with its tree. |
 
 ## A claim with a limit
 
@@ -182,6 +185,34 @@ A run of many jobs sets `roundOffset` to `job * rounds`. Then the merged records
 ### Why pairs, and not a rotation of all arms
 
 A rotation of N arms turns the order of two arms only when they are N/2 apart in the rotation. For 4 arms, two arms 1 apart come in the order 3:1 over 4 rounds. Thus each pair of `freshRun` has its own two children, and the order of each pair turns each round.
+
+## Run cases with a time budget
+
+The entry `@mark1russell7/rigor-bench/supervise` starts child processes, so it is for Node only.
+
+The function `superviseCases` holds each case to a time budget. Code that does not return cannot stop itself, so the cases run in a child process and a hard stop ends the child.
+
+```ts
+import { startSupervisedProcess, superviseCases } from "@mark1russell7/rigor-bench/supervise";
+
+const result = await superviseCases({
+  cases: [{ id: "a", budgetMs: 300_000, groups: { "": "router-1" } }],
+  progressFile: "out/progress.ndjson",
+  start: (left) => startSupervisedProcess([process.execPath, "run-cases.js", ...left]),
+  onEnd: (end) => writeRecord(end),
+});
+```
+
+The child calls `caseProgress(file).start(id, stage)` before each stage, and `end(id)` after the result is on the disk.
+
+- A stage over its budget gives `over-budget`. This time is a lower bound, so a statistic treats it as censored, not as a value. The next child runs the cases that are left.
+- After 2 overruns in one group (the option `overruns`), each other case of the group gives `not-run`, with the ids of the 2 overruns. An overrun is measured, and a skip is not. Keep these tags different.
+- An overrun counts for the group of its stage only. A slow router thus does not count against the packer of its cases.
+- A case in `done` does not run, so a resume runs no case two times.
+- Only an overrun starts a new child, so the other cases keep the process and the caches of a normal run.
+- A case can end between a read of the file and the stop. That case has its result, so it does not get a tag.
+
+The callback `onEnd` writes the record of each tag. The callback `start` can also repair a file that a stop cut.
 
 ## The pooled verdict
 

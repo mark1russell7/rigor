@@ -98,6 +98,20 @@ childLine: build/fresh.d.ts#childLine
 freshRun: build/fresh.d.ts#freshRun
 pairOrder: build/fresh.d.ts#pairOrder
 
+## ./supervise (build/supervise.d.ts): 11 names
+
+CaseProgress: build/supervise.d.ts#CaseProgress
+DEFAULT_OVERRUNS: build/supervise.d.ts#DEFAULT_OVERRUNS
+DEFAULT_POLL_MS: build/supervise.d.ts#DEFAULT_POLL_MS
+SuperviseOptions: build/supervise.d.ts#SuperviseOptions
+SuperviseResult: build/supervise.d.ts#SuperviseResult
+SupervisedCase: build/supervise.d.ts#SupervisedCase
+SupervisedChild: build/supervise.d.ts#SupervisedChild
+SupervisedEnd: build/supervise.d.ts#SupervisedEnd
+caseProgress: build/supervise.d.ts#caseProgress
+startSupervisedProcess: build/supervise.d.ts#startSupervisedProcess
+superviseCases: build/supervise.d.ts#superviseCases
+
 ## Declarations
 
 ### build/fresh.d.ts#BenchEnv
@@ -664,3 +678,74 @@ declare function checkPairedTime(record: PairedTime): PairedTime;
 
 ### build/paired.d.ts#firstArm
 declare function firstArm(round: number, offset?: number): Arm;
+
+### build/supervise.d.ts#CaseProgress
+export interface CaseProgress {
+  start(id: string, stage?: string): void;
+  end(id: string): void;
+}
+
+### build/supervise.d.ts#DEFAULT_OVERRUNS
+export declare const DEFAULT_OVERRUNS = 2;
+
+### build/supervise.d.ts#DEFAULT_POLL_MS
+export declare const DEFAULT_POLL_MS = 1000;
+
+### build/supervise.d.ts#SuperviseOptions
+export interface SuperviseOptions {
+  readonly cases: readonly SupervisedCase[];
+  readonly done?: ReadonlySet<string>;
+  readonly progressFile: string;
+  readonly start: (left: readonly string[]) => SupervisedChild;
+  readonly onEnd: (end: SupervisedEnd) => void;
+  readonly overruns?: number;
+  readonly pollMs?: number;
+  readonly now?: () => number;
+}
+
+### build/supervise.d.ts#SuperviseResult
+export interface SuperviseResult {
+  readonly code: number | null;
+  readonly starts: number;
+  readonly ends: readonly SupervisedEnd[];
+  readonly left: readonly string[];
+}
+
+### build/supervise.d.ts#SupervisedCase
+export interface SupervisedCase {
+  readonly id: string;
+  readonly budgetMs: number;
+  readonly groups?: Readonly<Record<string, string>>;
+}
+
+### build/supervise.d.ts#SupervisedChild
+export interface SupervisedChild {
+  stop(): void;
+  readonly exited: Promise<number | null>;
+}
+
+### build/supervise.d.ts#SupervisedEnd
+export type SupervisedEnd = {
+  readonly kind: "over-budget";
+  readonly id: string;
+  readonly budgetMs: number;
+  readonly stage: string;
+} | {
+  readonly kind: "not-run";
+  readonly id: string;
+  readonly budgetMs: number;
+  readonly group: string;
+  readonly because: readonly string[];
+};
+
+### build/supervise.d.ts#caseProgress
+export declare function caseProgress(file: string, now?: () => number): CaseProgress;
+
+### build/supervise.d.ts#startSupervisedProcess
+export declare function startSupervisedProcess(argv: readonly string[], options?: {
+  readonly cwd?: string;
+  readonly env?: NodeJS.ProcessEnv;
+}): SupervisedChild;
+
+### build/supervise.d.ts#superviseCases
+export declare function superviseCases(options: SuperviseOptions): Promise<SuperviseResult>;
