@@ -9,7 +9,7 @@ import { median, quantile } from "@mark1russell7/rigor-statistics";
 export interface ControlRow {
   /** The name of the group: a run, or a shard of one run. */
   readonly group: string;
-  /** The name of the case. The same key in two groups names the same work. */
+  /** The name of a class of work. The same key in two groups names equal work, so a ratio of the two measures the load. */
   readonly key: string;
   /** The time. It is finite and more than 0. */
   readonly value: number;
@@ -19,29 +19,45 @@ export interface ControlRow {
 
 /** The options of `controlFactor`. */
 export interface ControlOptions {
-  /** The group that the factors compare with. Without it, the base is the median control time of all groups. */
+  /** The group that the factors compare with. Without it, the base of each key is the median of that key over the groups. */
   readonly base?: string;
-  /** The least number of keys in a factor. A factor with fewer keys is refused. The default is 5. */
+  /** The least number of keys in a factor. A group with fewer keys has no factor. The default is 5. */
   readonly minPairs?: number;
 }
 
-/** The factor of one group. */
-export interface GroupFactor {
+/** The counts of one group, with or without a factor. */
+export interface GroupCounts {
   readonly group: string;
-  /** The median ratio of the times of this group over the base. A factor of 1.6 means that this group took 1.6 times as long. */
-  readonly factor: number;
   /** The number of keys that the factor reads. */
   readonly pairs: number;
+  /** The number of keys that this function left out because a time of the key was censored. The factor reads low when this count is not 0. */
+  readonly censored: number;
+  /** The number of keys of this group that have no time to compare with, so no ratio reads them. */
+  readonly unshared: number;
+}
+
+/** The factor of one group. */
+export interface MeasuredFactor extends GroupCounts {
+  /** The median ratio of the times of this group over the base. A factor of 1.6 means that this group took 1.6 times as long. */
+  readonly factor: number;
   /** The quartiles of the ratios. A wide spread means that one factor does not explain the load. */
   readonly low: number;
   readonly high: number;
-  /** The number of keys that this function left out because a time of the key was censored. */
-  readonly censored: number;
 }
+
+/** A group with too few usable keys. It has no factor, and the other groups keep theirs. */
+export interface NoFactor extends GroupCounts {
+  readonly factor: undefined;
+  /** The reason that this group has no factor. */
+  readonly reason: string;
+}
+
+/** The result of one group. Read `factor` first: a group with too few usable keys has no factor. */
+export type GroupFactor = MeasuredFactor | NoFactor;
 
 /** The factors of a run, with the base that they use. */
 export interface ControlFactors {
-  /** The base group, or undefined when the base is the median of all groups. */
+  /** The base group, or undefined when the base of each key is its median over the groups. */
   readonly base: string | undefined;
   readonly factors: readonly GroupFactor[];
 }
@@ -60,9 +76,17 @@ function checkedRows(rows: readonly ControlRow[]): Map<string, Map<string, Contr
   return groups;
 }
 
-function factorOf(group: string, ratios: readonly number[], censored: number, minPairs: number): GroupFactor {
-  if (ratios.length < minPairs) throw new RangeError(`controlFactor: the group ${JSON.stringify(group)} has ${ratios.length} usable keys, and the least is ${minPairs}.`);
-  return { group, factor: median(ratios), pairs: ratios.length, low: quantile(ratios, 0.25), high: quantile(ratios, 0.75), censored };
+function factorOf(group: string, ratios: readonly number[], censored: number, unshared: number, minPairs: number): GroupFactor {
+  const counts = { group, pairs: ratios.length, censored, unshared };
+  if (ratios.length < minPairs) return { ...counts, factor: undefined, reason: `the group ${JSON.stringify(group)} has ${ratios.length} usable keys, and the least is ${minPairs}.` };
+  return { ...counts, factor: median(ratios), low: quantile(ratios, 0.25), high: quantile(ratios, 0.75) };
+}
+
+/** This function refuses a result with no factor at all, because such a result measures nothing. */
+function withFactors(base: string | undefined, factors: readonly GroupFactor[]): ControlFactors {
+  const thin = factors.find((f): f is NoFactor => f.factor === undefined);
+  if (thin !== undefined && factors.every((f) => f.factor === undefined)) throw new RangeError(`controlFactor: no group has a factor: ${thin.reason}`);
+  return { base, factors };
 }
 
 /** This function gives the factors over one base group. Each factor reads the keys that the two groups share. */
@@ -74,38 +98,55 @@ function againstGroup(groups: Map<string, Map<string, ControlRow>>, base: string
     if (group === base) continue;
     const ratios: number[] = [];
     let censored = 0;
+    let unshared = 0;
     for (const [key, r] of rows) {
       const b = baseRows.get(key);
-      if (b === undefined) continue;
-      if (r.censored === true || b.censored === true) censored += 1;
+      if (b === undefined) unshared += 1;
+      else if (r.censored === true || b.censored === true) censored += 1;
       else ratios.push(r.value / b.value);
     }
-    factors.push(factorOf(group, ratios, censored, minPairs));
+    factors.push(factorOf(group, ratios, censored, unshared, minPairs));
   }
-  return { base, factors };
+  return withFactors(base, factors);
 }
 
-/** This function gives the factors over the median control time of all groups, as one run grouped by shard needs. */
-function againstMedian(groups: Map<string, Map<string, ControlRow>>, minPairs: number): ControlFactors {
-  const all = [...groups.values()].flatMap((rows) => [...rows.values()]);
-  const clean = all.filter((r) => r.censored !== true);
-  if (clean.length === 0) throw new RangeError("controlFactor: the rows have no time that is not censored.");
-  const middle = median(clean.map((r) => r.value));
+/**
+ * This function gives the factors over the median of each key, as one run grouped by shard needs.
+ * Each group holds a different mix of work, so a time compares only with the times of the same key. A key in one group has nothing to compare with.
+ */
+function againstKeys(groups: Map<string, Map<string, ControlRow>>, minPairs: number): ControlFactors {
+  const clean = new Map<string, number[]>();
+  for (const rows of groups.values()) {
+    for (const [key, r] of rows) if (r.censored !== true) clean.set(key, [...(clean.get(key) ?? []), r.value]);
+  }
   const factors = [...groups].map(([group, rows]) => {
-    const kept = [...rows.values()].filter((r) => r.censored !== true);
-    return factorOf(group, kept.map((r) => r.value / middle), rows.size - kept.length, minPairs);
+    const ratios: number[] = [];
+    let censored = 0;
+    let unshared = 0;
+    for (const [key, r] of rows) {
+      const times = clean.get(key) ?? [];
+      if (r.censored === true) censored += 1;
+      else if (times.length >= 2) ratios.push(r.value / median(times));
+      else unshared += 1;
+    }
+    return factorOf(group, ratios, censored, unshared, minPairs);
   });
-  return { base: undefined, factors };
+  return withFactors(undefined, factors);
 }
 
 /**
  * This function gives the load factor of each group from the times of a control.
- * With `base`, a factor compares the keys that a group shares with that group. Without it, a factor compares the times of a group with the median of all times.
- * A censored time is only a lower limit, so no ratio reads it. The result counts those keys.
+ *
+ * With `base`, a factor compares the keys that a group shares with that group. Without it, a factor compares each time with the median of its key over the groups.
+ * A key names a class of work, so equal keys in two groups mean equal work. Each group has at most one row for a key.
+ *
+ * A censored time is only a lower limit, so no ratio reads it, and the result counts those keys. A run stops its slowest cases, so a factor reads low when `censored` is not 0.
+ *
+ * A group with too few usable keys gets an entry with no factor and its reason, so the other groups keep their factors. This function refuses a result where no group has a factor.
  */
 export function controlFactor(rows: readonly ControlRow[], options: ControlOptions = {}): ControlFactors {
   const minPairs = options.minPairs ?? DEFAULT_MIN_PAIRS;
   if (!(Number.isInteger(minPairs) && minPairs >= 1)) throw new RangeError(`controlFactor: minPairs is a whole number of 1 or more, not ${minPairs}.`);
   const groups = checkedRows(rows);
-  return options.base === undefined ? againstMedian(groups, minPairs) : againstGroup(groups, options.base, minPairs);
+  return options.base === undefined ? againstKeys(groups, minPairs) : againstGroup(groups, options.base, minPairs);
 }

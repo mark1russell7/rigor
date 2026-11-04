@@ -161,11 +161,15 @@ import { controlFactor } from "@mark1russell7/rigor-bench";
 const two = controlFactor(rows, { base: "run-1" });
 two.factors[0]; // { group: "run-2", factor: 1.35, pairs: 200, low: 1.2, high: 1.5, censored: 3 }
 
-// One run, grouped by shard: each shard against the median control time of the run.
+// One run, grouped by shard: each time against the median of its key over the shards.
 const shards = controlFactor(shardRows);
 ```
 
-- A censored time is only a lower limit, so no ratio reads it. The field `censored` counts those keys.
+- A key names a class of work, so equal keys in two groups mean equal work. Thus a shard with a different mix of work does not read as load. Each group has at most one row for a key.
+- A key in one group has nothing to compare with, so no factor reads it. The field `unshared` counts those keys.
+- Without `base`, a factor reads against the other groups. Thus a load that all groups share does not show.
+- A group with too few usable keys gets an entry with `factor` undefined and a `reason`, so the other groups keep their factors. The function refuses a result where no group has a factor.
+- A censored time is only a lower limit, so no ratio reads it. The field `censored` counts those keys. A run stops its slowest cases, so a factor reads low when `censored` is not 0.
 - The fields `low` and `high` are the quartiles of the ratios. A wide spread means that one factor does not explain the load.
 - The function refuses a group with fewer usable keys than `minPairs`. The default is 5.
 

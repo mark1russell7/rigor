@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 77 names
+## . (build/index.d.ts): 80 names
 
 type Arm: build/paired.d.ts#Arm
 type Balanced: build/index.d.ts#Balanced
@@ -23,6 +23,7 @@ type CaseRatio: build/paired.d.ts#CaseRatio
 type ControlFactors: build/index.d.ts#ControlFactors
 type ControlOptions: build/index.d.ts#ControlOptions
 type ControlRow: build/index.d.ts#ControlRow
+type GroupCounts: build/index.d.ts#GroupCounts
 type GroupFactor: build/index.d.ts#GroupFactor
 type JobLimitVerdict: build/index.d.ts#JobLimitVerdict
 type JobRecords: build/index.d.ts#JobRecords
@@ -35,7 +36,9 @@ type LadderVerdict: build/index.d.ts#LadderVerdict
 type LimitOptions: build/index.d.ts#LimitOptions
 type LimitOutcome: build/index.d.ts#LimitOutcome
 type LimitVerdict: build/index.d.ts#LimitVerdict
+type MeasuredFactor: build/index.d.ts#MeasuredFactor
 type MedianBudget: build/index.d.ts#MedianBudget
+type NoFactor: build/index.d.ts#NoFactor
 type NoiseCheck: build/index.d.ts#NoiseCheck
 type PairedTime: build/paired.d.ts#PairedTime
 type PoolFacts: build/index.d.ts#PoolFacts
@@ -337,15 +340,16 @@ interface ControlRow {
   readonly censored?: boolean;
 }
 
-### build/index.d.ts#GroupFactor
-interface GroupFactor {
+### build/index.d.ts#GroupCounts
+interface GroupCounts {
   readonly group: string;
-  readonly factor: number;
   readonly pairs: number;
-  readonly low: number;
-  readonly high: number;
   readonly censored: number;
+  readonly unshared: number;
 }
+
+### build/index.d.ts#GroupFactor
+type GroupFactor = MeasuredFactor | NoFactor;
 
 ### build/index.d.ts#JobLimitVerdict
 interface JobLimitVerdict {
@@ -423,6 +427,13 @@ interface LimitVerdict {
   readonly allowed: number;
 }
 
+### build/index.d.ts#MeasuredFactor
+interface MeasuredFactor extends GroupCounts {
+  readonly factor: number;
+  readonly low: number;
+  readonly high: number;
+}
+
 ### build/index.d.ts#MedianBudget
 interface MedianBudget {
   readonly kind: "median";
@@ -431,6 +442,12 @@ interface MedianBudget {
   readonly limit: number;
   readonly maxDifference: number;
   readonly caseLevel?: number;
+}
+
+### build/index.d.ts#NoFactor
+interface NoFactor extends GroupCounts {
+  readonly factor: undefined;
+  readonly reason: string;
 }
 
 ### build/index.d.ts#NoiseCheck
