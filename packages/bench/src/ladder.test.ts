@@ -197,7 +197,7 @@ describe("ladderVerdict", () => {
 describe("a quantile budget", () => {
   const budget = { kind: "quantile", measure: "read p99", unit: "ms", quantile: 0.99, limit: 500 } as const;
   const on = rung(1, { budgets: [budget] });
-  const verdictOf = (values: readonly number[]) => rungVerdict(on, record(1, { evidence: [{ kind: "quantile", measure: "read p99", values }] })).budgets[0];
+  const verdictOf = (values: readonly number[]) => rungVerdict(on, record(1, { evidence: [{ kind: "quantile", measure: "read p99", values }] }), { now }).budgets[0];
   const flat = (n: number, value: number): number[] => Array.from({ length: n }, () => value);
 
   it("is within when the upper bound of the quantile is at the limit or under it", () => {
