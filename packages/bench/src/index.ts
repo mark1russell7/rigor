@@ -1,3 +1,4 @@
+export { type BudgetOptions, type BudgetOutcome, type BudgetRound, type BudgetVerdict, type CaseBudget, budgetVerdict } from "./budget.ts";
 export { type CaseInterval, type CaseLimit, type LimitOptions, type LimitOutcome, type LimitVerdict, caseIntervals, limitVerdict } from "./limit.ts";
 export {
   type Balanced,
