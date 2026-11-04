@@ -127,11 +127,12 @@ There are four kinds of budget:
 | Kind | Evidence | The verdict |
 | --- | --- | --- |
 | `median` | Rounds and an A/A arm | `budgetVerdict`, so the rules of a budget apply. |
-| `quantile` | The values | The distribution-free interval of the quantile at 95 % against the limit. |
+| `quantile` | The values, and optional `censored` bounds | The distribution-free interval of the quantile at 95 % against the limit. |
 | `rate` | Failures and trials | The Wilson interval at 95 % against the limit. |
 | `worst` | The value of each drill | The largest value against the limit. One bad drill is `beyond`. |
 
 - A p99 needs 368 independent values for an upper bound at 95 %. A p95 needs 72 and a p99.9 needs 3,688. `quantileSamples` gives the count. With fewer values, the verdict is `cannot decide` or `beyond`. It is not `within`. Latencies of one run can follow each other: space the samples apart, or give one value for each run.
+- An arrival with no reply goes in `censored`, and an arrival that was not sent goes there too. Each value is a lower bound: the time that the arrival waited. The low end of the interval reads the bounds, and the high end reads each censored value as `Infinity`. Thus a `beyond` can come from the bounds alone, and a `within` needs real replies up to the upper rank. Do not put a censored value in `values`: its bound is low, and the verdict can be a false `within`.
 - A failed rate of 0 of 38,500 holds a limit of 0.01 %. A failed rate of 0 of 30,000 is `cannot decide`, because the Wilson bound of that run is 0.0128 %.
 - A locked rung fails when it is `beyond` and when it is `cannot decide`. A skipped test is not a pass.
 - The verdict reads the newest record of each rung, so an old pass does not hide a new failure. With `maxAgeDays`, an older record gives `cannot decide`.

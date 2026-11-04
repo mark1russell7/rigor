@@ -53,6 +53,11 @@ export interface WorstBudget {
  * A budget on a high quantile, for example the p99 of a read. A record gives the values. The verdict is the distribution-free
  * interval of the quantile against the limit. A p99 needs 368 independent values at the level 0.95: refer to `quantileSamples`.
  * Successive times of one run can follow each other. Space them apart, or give one value for each run.
+ *
+ * The evidence can also hold `censored`: a lower bound for each arrival with no reply, and for each arrival that was not
+ * sent. The bound is the time that the arrival waited. The true value is that bound or more, with no upper limit. Thus the
+ * low end of the interval reads the bounds, and the high end reads each censored value as `Infinity`. A `beyond` stays
+ * provable from the bounds alone. A `within` needs real replies up to the upper rank of the interval.
  */
 export interface QuantileBudget {
   readonly kind: "quantile";
@@ -95,7 +100,7 @@ export interface Ladder {
 /** The measured evidence for one budget. Its `kind` is the kind of the budget. */
 export type RungEvidence =
   | { readonly kind: "median"; readonly measure: string; readonly rounds: readonly BudgetRound[]; readonly aa: readonly BudgetRound[] }
-  | { readonly kind: "quantile"; readonly measure: string; readonly values: readonly number[] }
+  | { readonly kind: "quantile"; readonly measure: string; readonly values: readonly number[]; readonly censored?: readonly number[] }
   | { readonly kind: "rate"; readonly measure: string; readonly failures: number; readonly trials: number }
   | { readonly kind: "worst"; readonly measure: string; readonly values: readonly number[] };
 
@@ -243,16 +248,24 @@ function worstResult(budget: WorstBudget, values: readonly number[]): BudgetResu
   return { measure: budget.measure, outcome, reason: `The measure ${JSON.stringify(budget.measure)} is "${outcome}" (${facts}, ${budget.minDrills} drills needed).` };
 }
 
-/** This function gives the verdict of a quantile: its distribution-free interval against the limit. */
-function quantileResult(budget: QuantileBudget, values: readonly number[]): BudgetResult {
+/**
+ * This function gives the verdict of a quantile: its distribution-free interval against the limit. With censored values, the
+ * low end reads their bounds and the high end reads them as `Infinity`. Each true sample has its interval inside that one.
+ */
+function quantileResult(budget: QuantileBudget, values: readonly number[], censored: readonly number[]): BudgetResult {
   const level = budget.level ?? 0.95;
   const needed = quantileSamples(budget.quantile, level);
   const say = (outcome: BudgetOutcome, facts: string): BudgetResult => ({ measure: budget.measure, outcome, reason: `The measure ${JSON.stringify(budget.measure)} is "${outcome}" (${facts}, ${needed} values needed).` });
-  if (values.length === 0) return say("cannot decide", `0 values, limit ${budget.limit} ${budget.unit}`);
+  const open = censored.length > 0;
+  const bounds = [...values, ...censored];
+  if (bounds.length === 0) return say("cannot decide", `0 values, limit ${budget.limit} ${budget.unit}`);
   if (values.some((value) => Number.isNaN(value))) return say("cannot decide", "the values have a NaN");
-  const interval = quantileInterval(values, budget.quantile, level);
-  const facts = `${values.length} values, quantile ${budget.quantile} at ${quantile(values, budget.quantile, "nearest-rank")} ${budget.unit}, interval ${interval.low} to ${interval.high}, limit ${budget.limit}`;
-  return say(interval.high <= budget.limit ? "within" : interval.low > budget.limit ? "beyond" : "cannot decide", facts);
+  if (!censored.every((value) => Number.isFinite(value))) return say("cannot decide", "a censored value is not a finite number");
+  const lowest = quantileInterval(bounds, budget.quantile, level);
+  const highest = open ? quantileInterval([...values, ...censored.map(() => Infinity)], budget.quantile, level) : lowest;
+  const [count, point] = open ? [`${values.length} values and ${censored.length} censored`, "at least"] : [`${values.length} values`, "at"];
+  const facts = `${count}, quantile ${budget.quantile} ${point} ${quantile(bounds, budget.quantile, "nearest-rank")} ${budget.unit}, interval ${lowest.low} to ${highest.high}, limit ${budget.limit}`;
+  return say(highest.high <= budget.limit ? "within" : lowest.low > budget.limit ? "beyond" : "cannot decide", facts);
 }
 
 /** This function gives the verdict of one budget from the evidence of a record. */
@@ -264,7 +277,7 @@ function budgetResult(budget: RungBudget, evidence: readonly RungEvidence[]): Bu
     const v = budgetVerdict(found.rounds, found.aa, { limit: budget.limit, maxDifference: budget.maxDifference, ...(budget.caseLevel === undefined ? {} : { caseLevel: budget.caseLevel }) });
     return { measure: budget.measure, outcome: v.outcome, reason: v.reason };
   }
-  if (budget.kind === "quantile" && found.kind === "quantile") return quantileResult(budget, found.values);
+  if (budget.kind === "quantile" && found.kind === "quantile") return quantileResult(budget, found.values, found.censored ?? []);
   if (budget.kind === "rate" && found.kind === "rate") return rateResult(budget, found.failures, found.trials);
   if (budget.kind === "worst" && found.kind === "worst") return worstResult(budget, found.values);
   return none(`the budget is ${budget.kind}, and the evidence is ${found.kind}`);

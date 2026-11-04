@@ -541,6 +541,7 @@ type RungEvidence = {
   readonly kind: "quantile";
   readonly measure: string;
   readonly values: readonly number[];
+  readonly censored?: readonly number[];
 } | {
   readonly kind: "rate";
   readonly measure: string;
