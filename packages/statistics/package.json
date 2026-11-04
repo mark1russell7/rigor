@@ -31,6 +31,7 @@
   "license": "MIT",
   "author": "Mark Russell (https://github.com/mark1russell7)",
   "type": "module",
+  "sideEffects": false,
   "main": "./src/index.ts",
   "files": [
     "build"
