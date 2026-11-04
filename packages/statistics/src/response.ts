@@ -75,6 +75,11 @@ export interface ResponseMeasure {
   readonly unit: string;
   /** The better direction of the value. The value `none` means that no direction is better. */
   readonly direction: "higher" | "lower" | "none";
+  /**
+   * The low and the high end of the possible values, for example `[0, 1]` for a share. Each measured value is in this
+   * range. A view clips its fitted values to it, and a fit does not use it.
+   */
+  readonly range?: readonly [number, number];
 }
 
 /** A declared reason that a measure is absent, for example infeasible, unsupported or out of budget. */
@@ -283,6 +288,8 @@ export interface ResponseBand {
    * count over the dimensions.
    */
   readonly nearest: number;
+  /** This field is true when the measure has a `range` and the view moved `value`, `low` or `high` into it. */
+  readonly clipped?: true;
 }
 
 /** One place of a curve. */
@@ -321,6 +328,8 @@ export interface ResponseSlice {
   /** The points that match the held values and have no value of the measure, each with its reason. */
   readonly absent: readonly ResponseAbsentPoint[];
   readonly error: ResponseHeldOutError;
+  /** The number of places of `curve` with the field `clipped`. */
+  readonly clipped: number;
 }
 
 /** A measured point of a surface. */
@@ -356,6 +365,8 @@ export interface ResponseSurface {
   /** The points that match the held values and have no value of the measure, each with its reason. */
   readonly absent: readonly ResponseSurfaceAbsentPoint[];
   readonly error: ResponseHeldOutError;
+  /** The number of places of `cells` with the field `clipped`. */
+  readonly clipped: number;
 }
 
 /** This function gives the key of the group of a point. A point without a group is a group of its own. */
@@ -646,6 +657,14 @@ function heldValues(name: string, record: ResponseRecord, vary: readonly string[
   return Object.fromEntries(others.map((d) => [d.id, valueOf(d)]));
 }
 
+/** This function refuses a bad option `steps`. */
+function checkSteps(name: string, steps: number): void {
+  if (!Number.isSafeInteger(steps) || steps < 2) throw new RangeError(`${name}: steps is a whole number of 2 or more, not ${steps}.`);
+}
+
+/** This function gives a value inside a range. */
+const clip = (value: number, [low, high]: readonly [number, number]): number => Math.min(high, Math.max(low, value));
+
 /** This function gives the values of an axis: each level, or `steps` equal distances on the scale of the dimension. */
 function axisValues(dimension: ResponseDimension, steps: number): readonly ResponseValue[] {
   if (dimension.kind !== "continuous") return dimension.levels;
@@ -670,7 +689,7 @@ function matches(dimension: ResponseDimension, value: ResponseInputValue, held: 
 /** This function examines the request of a view, and it gives the parts that the two views share. */
 function frameOf(name: string, record: ResponseRecord, measure: string, vary: readonly string[], options: ResponseViewOptions): Frame {
   const { hold = {}, steps = 33, tolerance = 0, width = 1 } = options;
-  if (!Number.isSafeInteger(steps) || steps < 2) throw new RangeError(`${name}: steps is a whole number of 2 or more, not ${steps}.`);
+  checkSteps(name, steps);
   if (!(Number.isFinite(tolerance) && tolerance >= 0)) throw new RangeError(`${name}: tolerance is a finite number of 0 or more, not ${tolerance}.`);
   if (!(Number.isFinite(width) && width >= 0)) throw new RangeError(`${name}: width is a finite number of 0 or more, not ${width}.`);
   const model = record.models.find((m) => m.measure === measure);
@@ -698,10 +717,14 @@ function frameOf(name: string, record: ResponseRecord, measure: string, vary: re
   const missing = placed.filter((p) => typeof p.measures[measure] !== "number");
   const error = heldOutError(record, measure);
   const nearest = nearestOf(record.dimensions, record.points, measure);
+  const range = record.measures.find((m) => m.id === measure)?.range;
   const band = (inputs: Readonly<Record<string, ResponseInputValue>>): ResponseBand => {
     const place = Object.fromEntries(record.dimensions.map((d) => [d.id, whenHolds(d, inputs) ? (inputs[d.id] as ResponseInputValue) : null]));
     const value = predictScaled(model, place);
-    return { value: unscale(model, value), low: unscale(model, value - width * error.rmse), high: unscale(model, value + width * error.rmse), nearest: nearest(place) };
+    const fitted = { value: unscale(model, value), low: unscale(model, value - width * error.rmse), high: unscale(model, value + width * error.rmse) };
+    const inside = range === undefined ? fitted : { value: clip(fitted.value, range), low: clip(fitted.low, range), high: clip(fitted.high, range) };
+    const moved = inside.value !== fitted.value || inside.low !== fitted.low || inside.high !== fitted.high;
+    return { ...inside, nearest: nearest(place), ...(moved ? { clipped: true as const } : {}) };
   };
   return { held, axes: varied.map((d) => axisValues(d, steps)), matched, missing, error, band };
 }
@@ -736,20 +759,26 @@ const reasonOf = (point: ResponsePoint, measure: string): string | null => (poin
  * distance is on the log scale of the model, so the band is a ratio. The band has one width along all the curve. The
  * band is the mean error of the model, and `nearest` tells how far the place is from a measurement.
  *
+ * A measure with a `range` keeps each place inside it. The fields `value`, `low` and `high` move to the nearest end.
+ * The place then has the field `clipped`, and the field `clipped` of the view counts these places. The function
+ * `predictResponse` gives the value that the model fitted.
+ *
  * The function throws a RangeError for an unknown measure or dimension, and for a held value that is not good for its
  * dimension. It also throws for a dimension that is both varied and held, and for a bad option.
  */
 export function sliceResponse(record: ResponseRecord, measure: string, options: ResponseSliceOptions): ResponseSlice {
   const { vary } = options;
   const { held, axes, matched, missing, error, band } = frameOf("sliceResponse", record, measure, [vary], options);
+  const curve = (axes[0] as readonly ResponseValue[]).map((at) => ({ at, ...band({ ...held, [vary]: at }) }));
   return {
     measure,
     vary,
     held,
-    curve: (axes[0] as readonly ResponseValue[]).map((at) => ({ at, ...band({ ...held, [vary]: at }) })),
+    curve,
     points: matched.map((p) => ({ id: p.id, at: p.values[vary] as ResponseValue, value: p.measures[measure] as number, ...groupOf(p) })),
     absent: missing.map((p) => ({ id: p.id, at: p.values[vary] as ResponseValue, reason: reasonOf(p, measure), ...groupOf(p) })),
     error,
+    clipped: curve.filter((place) => place.clipped === true).length,
   };
 }
 
@@ -765,15 +794,35 @@ export function surfaceResponse(record: ResponseRecord, measure: string, options
   const { held, axes, matched, missing, error, band } = frameOf("surfaceResponse", record, measure, vary, options);
   const x = axes[0] as readonly ResponseValue[];
   const y = axes[1] as readonly ResponseValue[];
+  const cells = y.map((b) => x.map((a) => band({ ...held, [xId]: a, [yId]: b })));
   return {
     measure,
     vary,
     held,
     x,
     y,
-    cells: y.map((b) => x.map((a) => band({ ...held, [xId]: a, [yId]: b }))),
+    cells,
     points: matched.map((p) => ({ id: p.id, at: [p.values[xId] as ResponseValue, p.values[yId] as ResponseValue], value: p.measures[measure] as number, ...groupOf(p) })),
     absent: missing.map((p) => ({ id: p.id, at: [p.values[xId] as ResponseValue, p.values[yId] as ResponseValue], reason: reasonOf(p, measure), ...groupOf(p) })),
     error,
+    clipped: cells.flat().filter((place) => place.clipped === true).length,
   };
+}
+
+/**
+ * This function gives the number of fitted places of a view before the view starts: the product of the lengths of its
+ * axes. A level axis counts its levels, and a continuous axis counts `steps`. The field `nearest` reads each point at
+ * each place, so the reads of a view are this count times the number of points. The default of `steps` is the default
+ * of a view. The function throws a RangeError for an unknown dimension, for one dimension named two times, and for a
+ * bad `steps`.
+ */
+export function responseCells(record: Pick<ResponseRecord, "dimensions">, vary: string | readonly [string, string], steps = 33): number {
+  checkSteps("responseCells", steps);
+  const ids: readonly string[] = typeof vary === "string" ? [vary] : vary;
+  if (new Set(ids).size !== ids.length) throw new RangeError(`responseCells: the two varied dimensions are one dimension, "${ids[0]}".`);
+  return ids.reduce((count, id) => {
+    const dimension = record.dimensions.find((d) => d.id === id);
+    if (dimension === undefined) throw new RangeError(`responseCells: the record has no dimension "${id}".`);
+    return count * (dimension.kind === "continuous" ? steps : dimension.levels.length);
+  }, 1);
 }

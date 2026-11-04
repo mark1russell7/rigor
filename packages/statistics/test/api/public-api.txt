@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 107 names
+## . (build/index.d.ts): 109 names
 
 type BootstrapOptions: build/index.d.ts#BootstrapOptions
 type CalibrationLevel: build/index.d.ts#CalibrationLevel
@@ -103,6 +103,7 @@ predictResponse: build/index.d.ts#predictResponse
 quantile: build/index.d.ts#quantile
 quantileSorted: build/index.d.ts#quantileSorted
 ranks: build/index.d.ts#ranks
+responseCells: build/index.d.ts#responseCells
 ridgeSolve: build/index.d.ts#ridgeSolve
 sd: build/index.d.ts#sd
 signTest: build/index.d.ts#signTest
@@ -112,6 +113,7 @@ sorted: build/index.d.ts#sorted
 spearman: build/index.d.ts#spearman
 summarize: build/index.d.ts#summarize
 surfaceResponse: build/index.d.ts#surfaceResponse
+whenHolds: build/index.d.ts#whenHolds
 wilson: build/index.d.ts#wilson
 
 ## Declarations
@@ -320,6 +322,7 @@ interface ResponseBand {
   readonly low: number;
   readonly high: number;
   readonly nearest: number;
+  readonly clipped?: true;
 }
 
 ### build/index.d.ts#ResponseCurvePoint
@@ -411,6 +414,7 @@ interface ResponseMeasure {
   readonly label: string;
   readonly unit: string;
   readonly direction: "higher" | "lower" | "none";
+  readonly range?: readonly [number, number];
 }
 
 ### build/index.d.ts#ResponseModel
@@ -453,6 +457,7 @@ interface ResponseSlice {
   readonly points: readonly ResponseSlicePoint[];
   readonly absent: readonly ResponseAbsentPoint[];
   readonly error: ResponseHeldOutError;
+  readonly clipped: number;
 }
 
 ### build/index.d.ts#ResponseSliceOptions
@@ -479,6 +484,7 @@ interface ResponseSurface {
   readonly points: readonly ResponseSurfacePoint[];
   readonly absent: readonly ResponseSurfaceAbsentPoint[];
   readonly error: ResponseHeldOutError;
+  readonly clipped: number;
 }
 
 ### build/index.d.ts#ResponseSurfaceAbsentPoint
@@ -688,6 +694,9 @@ export declare function quantileSorted(sortedValues: readonly number[], p: numbe
 ### build/index.d.ts#ranks
 export declare function ranks(values: readonly number[]): number[];
 
+### build/index.d.ts#responseCells
+export declare function responseCells(record: Pick<ResponseRecord, "dimensions">, vary: string | readonly [string, string], steps?: number): number;
+
 ### build/index.d.ts#ridgeSolve
 export declare function ridgeSolve(gram: ArrayLike<number>, moment: ArrayLike<number>, lambda: number, options?: RidgeOptions): number[];
 
@@ -714,6 +723,9 @@ export declare function summarize(values: readonly number[]): Summary;
 
 ### build/index.d.ts#surfaceResponse
 export declare function surfaceResponse(record: ResponseRecord, measure: string, options: ResponseSurfaceOptions): ResponseSurface;
+
+### build/index.d.ts#whenHolds
+export declare function whenHolds(dimension: ResponseDimension, values: Readonly<Record<string, unknown>>): boolean;
 
 ### build/index.d.ts#wilson
 export declare function wilson(k: number, n: number, z?: number): Proportion;

@@ -55,8 +55,10 @@ export {
   heldOutError,
   heldOutErrorAt,
   predictResponse,
+  responseCells,
   sliceResponse,
   surfaceResponse,
+  whenHolds,
 } from "./response.ts";
 export { type ParsedResponseRecord, type ResponseFault, RESPONSE_MAX_POWER, parseResponseRecord } from "./response-parse.ts";
 export { type ResponseFitOptions, RESPONSE_LAMBDAS, RESPONSE_MAX_TERMS, fitResponse } from "./response-fit.ts";

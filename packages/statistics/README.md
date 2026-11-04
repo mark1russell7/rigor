@@ -71,6 +71,8 @@ To vary a conditional dimension, `sliceResponse` needs its parent at a level ins
 
 The band of a curve is `value ± width × RMSE`, from the held-out error of the folds. On a log scale, the band is a ratio. The band has one width along the curve. It is the mean error of the model.
 
+A measure with the field `range` keeps each view inside it, for example `[0, 1]` for a share. `sliceResponse` and `surfaceResponse` move `value`, `low` and `high` to the nearest end. Such a place has the field `clipped`, and the field `clipped` of the view counts these places. `predictResponse` gives the value that the model fitted, and a fit does not use the range. `parseResponseRecord` refuses a measured value outside the range.
+
 The field `nearest` of each place tells how far the place is from a measurement. It goes from 0 to 1, and 0 means that a point was measured there. A viewer can fade the band away from the data. A table cell with the `fallback` value has `nearest` above 0.
 
 ### The error of one cell
@@ -124,6 +126,8 @@ The default expansion has one product for each pair of levels of two dimensions.
 | `parseResponseRecord(value)` | The examination of unknown data. It gives the record, or one fault with a path for each error. |
 | `predictResponse(model, inputs)`, `heldOutError(record, measure)` | The value of a model at one set of inputs, and the error of the folds of a measure. |
 | `heldOutErrorAt(record, measure, ids)` | The held-out error of a chosen set of points, from the predictions of the option `outOfFold`. |
+| `responseCells(record, vary, steps)` | The number of fitted places of a view, level axes included. It lets a caller bound the time of a view before the view starts. |
+| `whenHolds(dimension, values)` | True when a place has the condition of a dimension. A dimension with no `when` is always present. |
 | `sliceResponse(record, measure, options)`, `surfaceResponse(record, measure, options)` | A fitted curve over one dimension, or a fitted surface over two, with the matching measured points, the matching points with no value, a band and the distance to the nearest measurement. |
 
 Each function throws a RangeError for an empty list, for a NaN and for a parameter out of its range. Thus a missing value cannot make a quiet NaN in a record.
