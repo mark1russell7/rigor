@@ -103,6 +103,55 @@ describe("superviseCases", () => {
     expect(ended).toEqual(["slow"]);
   }, 20_000);
 
+  it("gives the same ends and runs the same cases when a run stops and resumes", async () => {
+    const group = { "": "router" };
+    const cases = [fast("a"), slow("slow-1", group), fast("b"), slow("slow-2", group), slow("slow-3", group), { id: "other", budgetMs: LONG, groups: group }, fast("c")];
+
+    const whole = setup();
+    const straight = await superviseCases({ cases, progressFile: whole.progressFile, start: whole.start, onEnd: () => undefined, pollMs: 20 });
+    expect(straight.ends.map((end) => [end.kind, end.id])).toEqual([
+      ["over-budget", "slow-1"],
+      ["over-budget", "slow-2"],
+      ["not-run", "slow-3"],
+      ["not-run", "other"],
+    ]);
+
+    // The first part stops after 1 overrun: the second child ends at once with an error.
+    const first = setup();
+    let starts = 0;
+    const startOnce = (left: readonly string[]): SupervisedChild => ((starts += 1) === 1 ? first.start(left) : { stop: () => undefined, exited: Promise.resolve(1) });
+    const stopped = await superviseCases({ cases, progressFile: first.progressFile, start: startOnce, onEnd: () => undefined, pollMs: 20 });
+    expect(stopped).toMatchObject({ code: 1, left: ["b", "slow-2", "slow-3", "other", "c"] });
+    expect(stopped.ends.map((end) => end.id)).toEqual(["slow-1"]);
+
+    const second = setup();
+    const resumed = await superviseCases({ cases, done: new Set(["a"]), earlier: stopped.ends, progressFile: second.progressFile, start: second.start, onEnd: () => undefined, pollMs: 20 });
+    expect([...stopped.ends, ...resumed.ends]).toEqual(straight.ends);
+    expect([...first.ran(), ...second.ran()]).toEqual(whole.ran());
+  }, 30_000);
+
+  it("reports the skips of a group that passed its limit before a stop", async () => {
+    const { progressFile, start, ran } = setup();
+    const group = { "": "router" };
+    const earlier: SupervisedEnd[] = [
+      { kind: "over-budget", id: "x", budgetMs: SHORT, stage: "" },
+      { kind: "over-budget", id: "y", budgetMs: SHORT, stage: "" },
+      { kind: "not-run", id: "z", budgetMs: SHORT, group: "router", because: ["x", "y"] },
+    ];
+    const cases = [slow("x", group), slow("y", group), slow("z", group), slow("w", group), fast("a")];
+    const seen: SupervisedEnd[] = [];
+    const result = await superviseCases({ cases, earlier, progressFile, start, onEnd: (end) => seen.push(end), pollMs: 20 });
+    expect(seen).toEqual([{ kind: "not-run", id: "w", budgetMs: SHORT, group: "router", because: ["x", "y"] }]);
+    expect(result).toEqual({ code: 0, starts: 1, ends: seen, left: [] });
+    expect(ran()).toEqual(["a"]);
+  }, 20_000);
+
+  it("refuses an overrun of `earlier` that has no case, because its group is not known", async () => {
+    const { progressFile } = setup();
+    const earlier: SupervisedEnd[] = [{ kind: "over-budget", id: "x", budgetMs: SHORT, stage: "" }];
+    await expect(superviseCases({ cases: [fast("a")], earlier, progressFile, start: () => expect.fail("A child started."), onEnd: () => undefined })).rejects.toThrow(RangeError);
+  });
+
   it("starts no child when each case is done", async () => {
     const { progressFile } = setup();
     const result = await superviseCases({ cases: [fast("a")], done: new Set(["a"]), progressFile, start: () => expect.fail("A child started."), onEnd: () => undefined });

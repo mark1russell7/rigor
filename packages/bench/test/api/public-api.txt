@@ -695,6 +695,7 @@ export declare const DEFAULT_POLL_MS = 1000;
 export interface SuperviseOptions {
   readonly cases: readonly SupervisedCase[];
   readonly done?: ReadonlySet<string>;
+  readonly earlier?: readonly SupervisedEnd[];
   readonly progressFile: string;
   readonly start: (left: readonly string[]) => SupervisedChild;
   readonly onEnd: (end: SupervisedEnd) => void;

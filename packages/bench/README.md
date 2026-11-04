@@ -209,6 +209,7 @@ The child calls `caseProgress(file).start(id, stage)` before each stage, and `en
 - After 2 overruns in one group (the option `overruns`), each other case of the group gives `not-run`, with the ids of the 2 overruns. An overrun is measured, and a skip is not. Keep these tags different.
 - An overrun counts for the group of its stage only. A slow router thus does not count against the packer of its cases.
 - A case in `done` does not run, so a resume runs no case two times.
+- The option `earlier` takes the ends of a stopped run. Its overruns count for their groups, so a stop and a resume give the same ends as a run with no stop. Keep each case in `cases`, and put the ids of the finished cases in `done`.
 - Only an overrun starts a new child, so the other cases keep the process and the caches of a normal run.
 - A case can end between a read of the file and the stop. That case has its result, so it does not get a tag.
 

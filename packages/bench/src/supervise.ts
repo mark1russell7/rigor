@@ -46,6 +46,11 @@ export interface SuperviseOptions {
   readonly cases: readonly SupervisedCase[];
   /** The ids of the cases of an earlier run. These cases do not run. */
   readonly done?: ReadonlySet<string>;
+  /**
+   * The ends of an earlier run of these cases, in their order. These cases do not run, and an `over-budget` end needs its case in `cases`.
+   * Each `over-budget` end counts for its group, so a stop and a resume give the same ends as a run with no stop.
+   */
+  readonly earlier?: readonly SupervisedEnd[];
   /** The file that the child writes with `caseProgress`. The supervisor makes it empty at the start. */
   readonly progressFile: string;
   /** This function starts a child on the ids that are left. */
@@ -112,7 +117,8 @@ function progressReader(file: string): () => ProgressEvent[] {
  *
  * - A stage over its budget stops the child, and `onEnd` gets `over-budget`. The next child runs the cases that are left.
  * - After `overruns` overruns in one group, each other case of the group ends as `not-run`, with the ids of those overruns.
- * - A case in `done` does not run. A case that ended, or that has an end from `onEnd`, does not run again.
+ * - A case in `done` or `earlier` does not run. A case that ended, or that has an end from `onEnd`, does not run again.
+ * - An `over-budget` end of `earlier` counts as an overrun of this run. `onEnd` does not get the end again.
  * - A child that ends without a stop ends the run. Its exit code is the code of the result.
  */
 export async function superviseCases(options: SuperviseOptions): Promise<SuperviseResult> {
@@ -129,6 +135,25 @@ export async function superviseCases(options: SuperviseOptions): Promise<Supervi
     ends.push(end);
     onEnd(end);
   };
+  const countOverrun = (id: string, stage: string): void => {
+    const group = byId.get(id)?.groups?.[stage];
+    if (group === undefined) return;
+    const ids = [...(groupOverruns.get(group) ?? []), id];
+    groupOverruns.set(group, ids);
+    if (ids.length < limit) return;
+    for (const c of cases) {
+      if (!finished.has(c.id) && Object.values(c.groups ?? {}).includes(group)) report({ kind: "not-run", id: c.id, budgetMs: c.budgetMs, group, because: ids.slice(0, limit) });
+    }
+  };
+
+  const earlier = options.earlier ?? [];
+  for (const end of earlier) {
+    if (end.kind === "over-budget" && !byId.has(end.id)) throw new RangeError(`The case "${end.id}" of the option earlier is not in the option cases.`);
+    finished.add(end.id);
+  }
+  for (const end of earlier) {
+    if (end.kind === "over-budget") countOverrun(end.id, end.stage);
+  }
 
   writeFileSync(progressFile, "");
   const readEvents = progressReader(progressFile);
@@ -175,14 +200,7 @@ export async function superviseCases(options: SuperviseOptions): Promise<Supervi
     // The case can end between the read and the stop. Then its result is on the disk, and it has no overrun.
     if (finished.has(over.id)) continue;
     report({ kind: "over-budget", ...over });
-    const group = byId.get(over.id)?.groups?.[over.stage];
-    if (group === undefined) continue;
-    const ids = [...(groupOverruns.get(group) ?? []), over.id];
-    groupOverruns.set(group, ids);
-    if (ids.length < limit) continue;
-    for (const c of cases) {
-      if (!finished.has(c.id) && Object.values(c.groups ?? {}).includes(group)) report({ kind: "not-run", id: c.id, budgetMs: c.budgetMs, group, because: ids.slice(0, limit) });
-    }
+    countOverrun(over.id, over.stage);
   }
   return { code, starts, ends, left: left() };
 }
