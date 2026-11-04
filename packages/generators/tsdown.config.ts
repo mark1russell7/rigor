@@ -10,5 +10,7 @@ export default defineConfig({
   fixedExtension: false,
   sourcemap: true,
   dts: true,
+  // One output file for each source file: with `sideEffects: false`, a bundler drops each file that a user does not import.
+  unbundle: true,
   publint: true,
 });
