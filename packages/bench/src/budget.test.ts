@@ -1,3 +1,4 @@
+import { random } from "@mark1russell7/rigor-generators";
 import { describe, expect, it } from "vitest";
 import { BUDGET_LOOKS, type BudgetRound, budgetLookSpend, budgetLooksVerdict, budgetVerdict } from "./index.ts";
 
@@ -151,6 +152,18 @@ describe("budgetLooksVerdict", () => {
   it("asks for the first look of a case with too few rounds", () => {
     const v = budgetLooksVerdict(rounds("pond", [1, 2, 3]), rounds("pond", [1, 2, 3]), options);
     expect(v.more).toEqual([{ case: "pond", rounds: 6 }]);
+  });
+
+  it.each([
+    ["a tight shape", 0.2, 1],
+    ["a wide shape", 1, 2],
+  ])("keeps the false-fail rate at or under 0.05 at the limit, for %s", (_name, sigma, seed) => {
+    const r = random(seed);
+    const arm = (): BudgetRound[] => rounds("pond", Array.from({ length: 24 }, () => 450 * Math.exp(r.normal(0, sigma))));
+    const runs = 2000;
+    let fails = 0;
+    for (let run = 0; run < runs; run++) if (budgetLooksVerdict(arm(), arm(), { limit: 450, maxDifference: 1e9 }).fails) fails += 1;
+    expect(fails / runs).toBeLessThanOrEqual(0.05);
   });
 
   it("refuses looks that spend too much, are out of order, or are too small", () => {
