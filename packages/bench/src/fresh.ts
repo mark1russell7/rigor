@@ -5,6 +5,7 @@
 import { spawn } from "node:child_process";
 import { arch, cpus, platform } from "node:os";
 import { type Arm, type PairedTime, firstArm } from "./paired.ts";
+import { stopTree } from "./tree.ts";
 
 /** The computer of a run. The `cpu` is the model of the first CPU. */
 export interface BenchEnv {
@@ -312,20 +313,7 @@ function startProcess(argv: readonly string[], options: StartOptions): Promise<C
     let stopping = false;
     let error: string | undefined;
     let grace: ReturnType<typeof setTimeout> | undefined;
-    const signal = (name: NodeJS.Signals): void => {
-      const pid = proc.pid;
-      if (pid === undefined) return;
-      if (windows) {
-        // TerminateProcess stops only the direct child. The flag /T of taskkill also stops its tree.
-        spawn("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "ignore", windowsHide: true }).on("error", () => proc.kill());
-        return;
-      }
-      try {
-        process.kill(-pid, name);
-      } catch {
-        proc.kill(name);
-      }
-    };
+    const signal = (name: NodeJS.Signals): void => stopTree(proc, name);
     const finish = (code: number | null): void => {
       if (settled) return;
       settled = true;
