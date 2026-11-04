@@ -15,6 +15,7 @@ import {
   type ResponseFactor,
   type ResponseFold,
   type ResponseFoldError,
+  type ResponseInputValue,
   type ResponseMeasure,
   type ResponseModel,
   type ResponsePoint,
@@ -40,7 +41,11 @@ export interface ResponseFitOptions {
   readonly model?: "auto" | "ridge" | "table";
   /** The largest total power of a term of a ridge fit, from 1 to 8. The default is 2. */
   readonly degree?: number;
-  /** When true, a ridge fit also has the products of two dimensions, up to `degree`. The default is true. */
+  /**
+   * When true, a ridge fit also has the products of two dimensions, up to `degree`. The default is true. The value
+   * false also removes the products of a conditional dimension with the levels of its parent. Thus this option is the
+   * way out of the limit `RESPONSE_MAX_TERMS`.
+   */
   readonly interactions?: boolean;
   /** The stated terms of a ridge fit, in place of `degree` and `interactions`. */
   readonly terms?: readonly (readonly ResponseFactor[])[];
@@ -71,6 +76,8 @@ type Learner = (fold: number) => (row: number) => number;
 /** The terms and the other choices that apply to each measure. */
 interface Plan {
   readonly ids: readonly string[];
+  /** The ids of the dimensions with a condition. */
+  readonly conditional: readonly string[];
   readonly kind: "ridge" | "table";
   readonly folds: number;
   readonly lambdas: readonly number[];
@@ -83,12 +90,13 @@ const byText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
 /** This function gives the input of a ridge model for a dimension. The coordinates run from -1 to 1 over the dimension. */
 function inputOf(dimension: ResponseDimension): RidgeInput {
-  if (dimension.kind === "categorical") return { kind: "level", dimension: dimension.id, levels: dimension.levels };
+  const conditional = dimension.when === undefined ? {} : { conditional: true };
+  if (dimension.kind === "categorical") return { kind: "level", dimension: dimension.id, levels: dimension.levels, ...conditional };
   const [low, high] = axisEnds(dimension);
   const center = (low + high) / 2;
   const spread = high > low ? (high - low) / 2 : 1;
-  if (!isNumberDimension(dimension)) return { kind: "rank", dimension: dimension.id, levels: dimension.levels as readonly string[], center, spread };
-  return { kind: "number", dimension: dimension.id, center, spread, ...(dimension.log === true ? { log: true } : {}) };
+  if (!isNumberDimension(dimension)) return { kind: "rank", dimension: dimension.id, levels: dimension.levels as readonly string[], center, spread, ...conditional };
+  return { kind: "number", dimension: dimension.id, center, spread, ...(dimension.log === true ? { log: true } : {}), ...conditional };
 }
 
 /** This function gives the factors of one dimension, each with its power. */
@@ -97,14 +105,44 @@ function factorsOf(dimension: ResponseDimension, degree: number): readonly (read
   return Array.from({ length: degree }, (_, i) => [{ dimension: dimension.id, power: i + 1 }, i + 1] as const);
 }
 
-/** This function gives the terms of the expansion: each factor, and each product of two dimensions up to `degree`. */
+/**
+ * This function gives one column for each level of an ordinal parent inside a condition. An ordinal parent has no
+ * one-hot columns of its own, so these columns carry the mean of each level with an absent child.
+ */
+function parentColumns(dimensions: readonly ResponseDimension[]): readonly (readonly ResponseFactor[])[] {
+  return dimensions.flatMap((parent) => {
+    if (parent.kind !== "ordinal") return [];
+    const conditions = dimensions.flatMap((d) => (d.when?.dimension === parent.id ? [d.when.levels] : []));
+    const levels = (parent.levels as readonly ResponseValue[]).filter((level) => conditions.some((c) => c.includes(level)));
+    return levels.map((level) => [{ dimension: parent.id, level }]);
+  });
+}
+
+/** This function gives true when the general product of two dimensions adds nothing: a child with its parent, or two children with no common level. */
+function separate(a: ResponseDimension, b: ResponseDimension): boolean {
+  if (a.when?.dimension === b.id || b.when?.dimension === a.id) return true;
+  return a.when !== undefined && a.when.dimension === b.when?.dimension && !a.when.levels.some((level) => b.when?.levels.includes(level));
+}
+
+/**
+ * This function gives the terms of the expansion: each factor, and each product of two dimensions up to `degree`. A
+ * conditional dimension with two parent levels or more also has each power times each of these levels. Thus each
+ * level has its own curve. With one parent level, the terms of the dimension are already the curve of this level.
+ */
 function expansion(dimensions: readonly ResponseDimension[], degree: number, interactions: boolean): readonly (readonly ResponseFactor[])[] {
   const each = dimensions.map((d) => factorsOf(d, degree));
-  const terms: (readonly ResponseFactor[])[] = each.flatMap((factors) => factors.map(([factor]) => [factor]));
+  const terms: (readonly ResponseFactor[])[] = [...each.flatMap((factors) => factors.map(([factor]) => [factor])), ...parentColumns(dimensions)];
   if (!interactions) return terms;
   each.forEach((first, a) => {
-    for (const second of each.slice(a + 1)) {
+    each.slice(a + 1).forEach((second, offset) => {
+      if (separate(dimensions[a] as ResponseDimension, dimensions[a + 1 + offset] as ResponseDimension)) return;
       for (const [f, p] of first) for (const [g, q] of second) if (p + q <= degree) terms.push([f, g]);
+    });
+  });
+  dimensions.forEach(({ when }, a) => {
+    if (when === undefined || when.levels.length < 2) return;
+    for (const [factor] of each[a] as readonly (readonly [ResponseFactor, number])[]) {
+      for (const level of when.levels) terms.push([factor, { dimension: when.dimension, level }]);
     }
   });
   return terms;
@@ -115,8 +153,9 @@ function checkedInputs(dimensions: readonly ResponseDimension[], terms: readonly
   const used = new Set(terms.flatMap((t) => t.map((f) => f.dimension)));
   const inputs = dimensions.filter((d) => used.has(d.id)).map(inputOf);
   const known = new Map(inputs.map((input) => [input.dimension, input]));
+  const byId = new Map(dimensions.map((d) => [d.id, d]));
   terms.forEach((term, i) => {
-    const [fault] = factorFaults(term, `terms[${i}]`, known);
+    const [fault] = factorFaults(term, `terms[${i}]`, known, byId);
     if (fault !== undefined) throw new RangeError(`fitResponse: ${fault.path}: ${fault.message}`);
   });
   return inputs;
@@ -137,7 +176,7 @@ function ridgeLearner(rows: readonly Row[], plan: Plan): { readonly learner: Lea
     const offset = r * k;
     design[offset] = 1;
     terms.forEach((term, j) => {
-      design[offset + j + 1] = product(term, at);
+      design[offset + j + 1] = product(term, at, row.point.values);
     });
     const gram = grams[row.fold] as Float64Array;
     const moment = moments[row.fold] as Float64Array;
@@ -196,16 +235,16 @@ function ridgeLearner(rows: readonly Row[], plan: Plan): { readonly learner: Lea
 
 /** This function gives the mean of the rows of each combination of levels, as cells in the order of their text. */
 function tableCells(rows: readonly Row[], dimensions: readonly string[]): readonly ResponseTableCell[] {
-  const cells = new Map<string, { readonly at: readonly ResponseValue[]; readonly ys: number[] }>();
+  const cells = new Map<string, { readonly at: readonly ResponseInputValue[]; readonly ys: number[] }>();
   for (const row of rows) {
-    const at = dimensions.map((d) => row.point.values[d] as ResponseValue);
+    const at = dimensions.map((d) => row.point.values[d] as ResponseInputValue);
     const key = JSON.stringify(at);
     const cell = cells.get(key);
     if (cell === undefined) cells.set(key, { at, ys: [row.y] });
     else cell.ys.push(row.y);
   }
   return [...cells.keys()].sort(byText).map((key) => {
-    const { at, ys } = cells.get(key) as { readonly at: readonly ResponseValue[]; readonly ys: number[] };
+    const { at, ys } = cells.get(key) as { readonly at: readonly ResponseInputValue[]; readonly ys: number[] };
     return { at, value: mean(ys), n: ys.length };
   });
 }
@@ -256,7 +295,8 @@ function fitMeasure(rows: readonly Row[], measure: ResponseMeasure, log: boolean
   const learner = ridge?.learner ?? tableLearner(rows, plan.ids);
   const errors = Array.from({ length: plan.folds }, (_, f) => foldError(rows, f, learner));
   if (errors.every((e) => e === undefined)) throw new RangeError(`fitResponse: all the values of the measure "${measure.id}" are in one fold. Give more groups.`);
-  if (ridge === undefined) return { model: { kind: "table", ...base, dimensions: plan.ids, cells: tableCells(rows, plan.ids), fallback: mean(rows.map((r) => r.y)) }, errors };
+  const conditional = plan.conditional.length === 0 ? {} : { conditional: plan.conditional };
+  if (ridge === undefined) return { model: { kind: "table", ...base, dimensions: plan.ids, ...conditional, cells: tableCells(rows, plan.ids), fallback: mean(rows.map((r) => r.y)) }, errors };
   const { lambda, beta } = ridge.final();
   if (!beta.every(Number.isFinite)) throw new RangeError(`fitResponse: the fit of the measure "${measure.id}" with lambda ${lambda} is singular. Give a larger lambda.`);
   const terms = plan.terms.map((factors, j) => ({ factors, weight: beta[j + 1] as number }));
@@ -293,6 +333,10 @@ function kindOf(dimensions: readonly ResponseDimension[], model: "auto" | "ridge
  * It also has the products of two dimensions up to `degree`. Each coordinate goes from -1 to 1 over the declared
  * range. The intercept has no penalty.
  *
+ * A conditional dimension: a term with an absent dimension is 0. Thus the columns of the parent carry the mean of each
+ * level with no value. A dimension with two parent levels or more also has each power times each of these levels, if
+ * `interactions` is true. A table keeps `null` as a level of its cells.
+ *
  * The penalty: each fold of a ridge fit chooses from `lambdas` with the other folds. Thus the held-out error of a
  * fold is not optimistic. The model of the record chooses with all the folds.
  *
@@ -322,7 +366,7 @@ export function fitResponse(data: ResponseData, options: ResponseFitOptions = {}
   const folds = Math.min(wanted, groups.length);
   const shuffled = random(options.seed ?? 1).shuffle(groups);
   const foldOf = new Map(shuffled.map((group, i) => [group, i % folds]));
-  const plan: Plan = { ids: dimensions.map((d) => d.id), kind, folds, lambdas, terms, inputs };
+  const plan: Plan = { ids: dimensions.map((d) => d.id), conditional: dimensions.flatMap((d) => (d.when === undefined ? [] : [d.id])), kind, folds, lambdas, terms, inputs };
   const fits = measures.map((m) => fitMeasure(rowsOf(points, m.id, log.has(m.id), options.logFloor, foldOf), m, log.has(m.id), options.logFloor, plan));
   const foldRecords: readonly ResponseFold[] = Array.from({ length: folds }, (_, f) => ({
     heldOut: points.filter((p) => foldOf.get(groupKey(p)) === f).map((p) => p.id),

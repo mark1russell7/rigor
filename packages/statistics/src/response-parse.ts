@@ -2,7 +2,7 @@
  * The validator of the format `response-records/1`. The functions here read unknown data and write faults. Thus a page
  * can show the reason that a file is bad.
  */
-import { RESPONSE_RECORDS_SCHEMA, type ResponseData, type ResponseDimension, type ResponsePoint, type ResponseRecord, type RidgeInput, groupKey, isNumberDimension, valueFault } from "./response.ts";
+import { RESPONSE_RECORDS_SCHEMA, type ResponseData, type ResponseDimension, type ResponsePoint, type ResponseRecord, type RidgeInput, groupKey, isNumberDimension, valueFault, whenHolds } from "./response.ts";
 
 /** The largest power of a factor. A larger power of a coordinate from -1 to 1 adds almost nothing to a model. */
 export const RESPONSE_MAX_POWER = 8;
@@ -100,7 +100,7 @@ function checkLevels(value: unknown, path: string, numbersToo: boolean, log: boo
 /** This function examines one dimension. */
 function checkDimension(value: unknown, path: string, faults: Faults): void {
   const kind = peek(value, "kind");
-  const object = fields(value, path, ["id", "label", "kind", "unit"], ["range", "levels", "log"], faults);
+  const object = fields(value, path, ["id", "label", "kind", "unit"], ["range", "levels", "log", "when"], faults);
   if (object === undefined) return;
   check(object, "id", path, isId, "text with one character or more", faults);
   check(object, "label", path, isString, "text", faults);
@@ -120,6 +120,27 @@ function checkDimension(value: unknown, path: string, faults: Faults): void {
     need(Object.hasOwn(object, "levels"), at(path, "levels"), "this field is missing.", faults);
     if (Object.hasOwn(object, "levels")) checkLevels(object["levels"], at(path, "levels"), kind === "ordinal", log, faults);
   } else if (Object.hasOwn(object, "kind")) faults.push({ path: at(path, "kind"), message: `this is "continuous", "ordinal" or "categorical", not ${shown(kind)}.` });
+}
+
+/** This function examines the condition of one dimension against all the dimensions. */
+function checkWhen(value: unknown, path: string, dimensions: readonly unknown[], faults: Faults): void {
+  const object = fields(value, path, ["dimension", "levels"], [], faults);
+  if (object === undefined) return;
+  const levels = Object.hasOwn(object, "levels") ? list(object["levels"], at(path, "levels"), 1, faults) : [];
+  need(new Set(levels).size === levels.length, at(path, "levels"), "these levels have a duplicate.", faults);
+  if (!Object.hasOwn(object, "dimension")) return;
+  const id = object["dimension"];
+  const parent = dimensions.find((d) => peek(d, "id") === id);
+  if (parent === undefined) {
+    faults.push({ path: at(path, "dimension"), message: `the record has no dimension ${shown(id)}.` });
+    return;
+  }
+  const kind = peek(parent, "kind");
+  need(kind === "categorical" || kind === "ordinal", at(path, "dimension"), `the parent ${shown(id)} is ${shown(kind)}, and a parent is categorical or ordinal.`, faults);
+  need(peek(parent, "when") === undefined, at(path, "dimension"), `the parent ${shown(id)} is itself conditional.`, faults);
+  const known = peek(parent, "levels");
+  if (!Array.isArray(known)) return;
+  levels.forEach((level, i) => need(known.includes(level), `${at(path, "levels")}[${i}]`, `the dimension ${shown(id)} has no level ${shown(level)}.`, faults));
 }
 
 /** This function examines one measure. */
@@ -144,8 +165,16 @@ function checkPoint(value: unknown, path: string, dimensions: readonly ResponseD
     const values = fields(object["values"], inside, ids, [], faults);
     for (const dimension of dimensions) {
       if (values === undefined || !Object.hasOwn(values, dimension.id)) continue;
-      const fault = valueFault(dimension, values[dimension.id]);
+      const value = values[dimension.id];
+      const present = whenHolds(dimension, values);
+      const parent = dimension.when?.dimension as string;
+      if (value === null && dimension.when !== undefined) {
+        need(!present, at(inside, dimension.id), `this needs a value when the dimension "${parent}" is ${shown(values[parent])}.`, faults);
+        continue;
+      }
+      const fault = valueFault(dimension, value);
       if (fault !== undefined) faults.push({ path: at(inside, dimension.id), message: `${fault}.` });
+      else need(present, at(inside, dimension.id), `this is null when the dimension "${parent}" is ${shown(values[parent])}.`, faults);
     }
   }
   if (Object.hasOwn(object, "measures")) {
@@ -170,11 +199,14 @@ export function responseDataFaults(value: unknown, required: readonly string[], 
   const dimensions = Object.hasOwn(object, "dimensions") ? list(object["dimensions"], "dimensions", 1, faults) : [];
   dimensions.forEach((d, i) => checkDimension(d, `dimensions[${i}]`, faults));
   uniqueIds(dimensions, "dimensions", faults);
+  dimensions.forEach((d, i) => {
+    if (peek(d, "when") !== undefined) checkWhen(peek(d, "when"), `dimensions[${i}].when`, dimensions, faults);
+  });
   const measures = Object.hasOwn(object, "measures") ? list(object["measures"], "measures", 1, faults) : [];
   measures.forEach((m, i) => checkMeasure(m, `measures[${i}]`, faults));
   const measureIds = uniqueIds(measures, "measures", faults);
   if (faults.length > 0) return faults;
-  const points = Object.hasOwn(object, "points") ? list(object["points"], "points", 1, faults) : [];
+  const points = list(object["points"], "points", 1, faults);
   points.forEach((p, i) => checkPoint(p, `points[${i}]`, dimensions as readonly ResponseDimension[], measureIds, faults));
   uniqueIds(points, "points", faults);
   return faults;
@@ -188,11 +220,12 @@ function checkInput(value: unknown, path: string, dimensions: ReadonlyMap<string
     return;
   }
   const keys = { number: ["center", "spread"], rank: ["levels", "center", "spread"], level: ["levels"] }[kind];
-  const object = fields(value, path, ["kind", "dimension", ...keys], kind === "number" ? ["log"] : [], faults);
+  const object = fields(value, path, ["kind", "dimension", ...keys], kind === "number" ? ["log", "conditional"] : ["conditional"], faults);
   if (object === undefined) return;
   check(object, "center", path, isNumber, "a finite number", faults);
   check(object, "spread", path, isPositive, "a finite number above 0", faults);
   check(object, "log", path, (v) => typeof v === "boolean", "true or false", faults);
+  check(object, "conditional", path, (v) => typeof v === "boolean", "true or false", faults);
   const dimension = dimensions.get(object["dimension"] as string);
   if (dimension === undefined) {
     faults.push({ path: at(path, "dimension"), message: `the record has no dimension ${shown(object["dimension"])}.` });
@@ -200,6 +233,7 @@ function checkInput(value: unknown, path: string, dimensions: ReadonlyMap<string
   }
   const want = isNumberDimension(dimension) ? "number" : dimension.kind === "categorical" ? "level" : "rank";
   need(kind === want, at(path, "kind"), `the dimension "${dimension.id}" needs an input of the kind "${want}".`, faults);
+  need((object["conditional"] ?? false) === (dimension.when !== undefined), at(path, "conditional"), `this does not agree with the condition of the dimension "${dimension.id}".`, faults);
   if (kind === "number" && dimension.kind !== "categorical") {
     need((object["log"] ?? false) === (dimension.log ?? false), at(path, "log"), `this does not agree with the log scale of the dimension "${dimension.id}".`, faults);
   }
@@ -209,7 +243,7 @@ function checkInput(value: unknown, path: string, dimensions: ReadonlyMap<string
 }
 
 /** This function examines the factors of one term against the inputs of a model. `fitResponse` also uses it. */
-export function factorFaults(value: unknown, path: string, inputs: ReadonlyMap<string, RidgeInput>): readonly ResponseFault[] {
+export function factorFaults(value: unknown, path: string, inputs: ReadonlyMap<string, RidgeInput>, dimensions: ReadonlyMap<string, ResponseDimension>): readonly ResponseFault[] {
   const faults: Faults = [];
   list(value, path, 1, faults).forEach((item, i) => {
     const inside = `${path}[${i}]`;
@@ -220,7 +254,9 @@ export function factorFaults(value: unknown, path: string, inputs: ReadonlyMap<s
     if (input === undefined) {
       faults.push({ path: at(inside, "dimension"), message: `the model has no input ${shown(factor["dimension"])}.` });
     } else if (isLevel) {
-      need(input.kind === "level" && input.levels.includes(factor["level"] as string), at(inside, "level"), `the input "${input.dimension}" has no level ${shown(factor["level"])}.`, faults);
+      const dimension = dimensions.get(input.dimension);
+      const levels: readonly unknown[] = dimension === undefined || dimension.kind === "continuous" ? [] : dimension.levels;
+      need(levels.includes(factor["level"]), at(inside, "level"), `the input "${input.dimension}" has no level ${shown(factor["level"])}.`, faults);
     } else {
       need(input.kind !== "level", inside, `the categorical input "${input.dimension}" takes a level, not a power.`, faults);
       const good = (v: unknown): boolean => Number.isSafeInteger(v) && (v as number) >= 1 && (v as number) <= RESPONSE_MAX_POWER;
@@ -250,7 +286,7 @@ function checkRidge(object: Fields, path: string, dimensions: ReadonlyMap<string
     const fieldsOfTerm = fields(term, inside, ["factors", "weight"], [], faults);
     if (fieldsOfTerm === undefined) return;
     check(fieldsOfTerm, "weight", inside, isNumber, "a finite number", faults);
-    if (Object.hasOwn(fieldsOfTerm, "factors")) faults.push(...factorFaults(fieldsOfTerm["factors"], at(inside, "factors"), known));
+    if (Object.hasOwn(fieldsOfTerm, "factors")) faults.push(...factorFaults(fieldsOfTerm["factors"], at(inside, "factors"), known, dimensions));
   });
 }
 
@@ -275,6 +311,8 @@ function tableDimensions(object: Fields, path: string, dimensions: ReadonlyMap<s
 function checkTable(object: Fields, path: string, dimensions: ReadonlyMap<string, ResponseDimension>, faults: Faults): void {
   check(object, "fallback", path, isNumber, "a finite number", faults);
   const table = tableDimensions(object, path, dimensions, faults);
+  const conditional = table.filter((d) => d.when !== undefined).map((d) => d.id);
+  need(JSON.stringify(object["conditional"] ?? []) === JSON.stringify(conditional), at(path, "conditional"), `this does not agree with the conditions of the dimensions of the table: ${shown(conditional)}.`, faults);
   const cells = Object.hasOwn(object, "cells") ? list(object["cells"], at(path, "cells"), 1, faults) : [];
   const seen = new Set<string>();
   cells.forEach((cell, i) => {
@@ -287,7 +325,8 @@ function checkTable(object: Fields, path: string, dimensions: ReadonlyMap<string
     const values = list(fieldsOfCell["at"], at(inside, "at"), 0, faults);
     need(values.length === table.length, at(inside, "at"), `this list has ${values.length} values, and the table has ${table.length} dimensions.`, faults);
     table.forEach((dimension, j) => {
-      const fault = j < values.length ? valueFault(dimension, values[j]) : undefined;
+      const absent = values[j] === null && dimension.when !== undefined;
+      const fault = j < values.length && !absent ? valueFault(dimension, values[j]) : undefined;
       if (fault !== undefined) faults.push({ path: `${at(inside, "at")}[${j}]`, message: `${fault}.` });
     });
     const key = JSON.stringify(values);
@@ -309,7 +348,7 @@ function checkModels(value: unknown, data: ResponseData, faults: Faults): void {
       return;
     }
     const keys = kind === "ridge" ? ["lambda", "inputs", "intercept", "terms"] : ["dimensions", "cells", "fallback"];
-    const object = fields(item, path, ["kind", "measure", "scale", ...keys], ["floor"], faults);
+    const object = fields(item, path, ["kind", "measure", "scale", ...keys], kind === "ridge" ? ["floor"] : ["floor", "conditional"], faults);
     if (object === undefined) return;
     const measure = object["measure"];
     if (typeof measure !== "string" || !measures.has(measure)) faults.push({ path: at(path, "measure"), message: `the record has no measure ${shown(measure)}.` });

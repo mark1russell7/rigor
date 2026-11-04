@@ -18,6 +18,16 @@ export const RESPONSE_RECORDS_SCHEMA = "response-records/1";
 /** The value of a dimension at a point: a number, or the text of a level. */
 export type ResponseValue = number | string;
 
+/** The value of a dimension at a place. The value `null` means that a conditional dimension is absent there. */
+export type ResponseInputValue = ResponseValue | null;
+
+/** The condition of a dimension: the dimension has a value only at these levels of its parent. */
+export interface ResponseWhen {
+  /** The id of the parent: a categorical or ordinal dimension with no condition. */
+  readonly dimension: string;
+  readonly levels: readonly ResponseValue[];
+}
+
 /** The fields of each kind of dimension. */
 export interface ResponseDimensionBase {
   /** The key of the dimension in the values of a point. */
@@ -26,6 +36,8 @@ export interface ResponseDimensionBase {
   readonly label: string;
   /** The unit. An empty string means that the dimension has no unit. */
   readonly unit: string;
+  /** With this field, a point has a value only at the stated levels of the parent. Each other point has `null`. */
+  readonly when?: ResponseWhen;
 }
 
 /** A dimension with each number in a range. */
@@ -69,7 +81,7 @@ export interface ResponseMeasure {
 export interface ResponsePoint {
   readonly id: string;
   /** The value of each dimension. */
-  readonly values: Readonly<Record<string, ResponseValue>>;
+  readonly values: Readonly<Record<string, ResponseInputValue>>;
   /** The value of each measure. The value `null` means that the run did not give the measure at this point. */
   readonly measures: Readonly<Record<string, number | null>>;
   /** The points of one group stay on one side of each split, for example the repeats of one seed. */
@@ -77,30 +89,34 @@ export interface ResponsePoint {
 }
 
 /** One factor of a term: a power of a number dimension, or 1 at a level and 0 at each other level. */
-export type ResponseFactor = { readonly dimension: string; readonly power: number } | { readonly dimension: string; readonly level: string };
+export type ResponseFactor = { readonly dimension: string; readonly power: number } | { readonly dimension: string; readonly level: ResponseValue };
+
+/** The fields of each kind of input of a ridge model. */
+export interface RidgeInputBase {
+  readonly dimension: string;
+  /** When true, the dimension is conditional, so `null` is a good value. Each term of an absent dimension is 0. */
+  readonly conditional?: boolean;
+}
 
 /** The coordinate of a number dimension: the value (or its logarithm), less `center`, divided by `spread`. */
-export interface RidgeNumberInput {
+export interface RidgeNumberInput extends RidgeInputBase {
   readonly kind: "number";
-  readonly dimension: string;
   readonly center: number;
   readonly spread: number;
   readonly log?: boolean;
 }
 
 /** The coordinate of an ordinal dimension with text levels: the position of the level, as in `RidgeNumberInput`. */
-export interface RidgeRankInput {
+export interface RidgeRankInput extends RidgeInputBase {
   readonly kind: "rank";
-  readonly dimension: string;
   readonly levels: readonly string[];
   readonly center: number;
   readonly spread: number;
 }
 
 /** A categorical dimension: the factors of its levels are the one-hot columns. */
-export interface RidgeLevelInput {
+export interface RidgeLevelInput extends RidgeInputBase {
   readonly kind: "level";
-  readonly dimension: string;
   readonly levels: readonly string[];
 }
 
@@ -135,8 +151,8 @@ export interface RidgeResponseModel extends ResponseModelBase {
 
 /** One cell of a table model. */
 export interface ResponseTableCell {
-  /** The value of each dimension of the table, in the order of its `dimensions`. */
-  readonly at: readonly ResponseValue[];
+  /** The value of each dimension of the table, in the order of its `dimensions`. An absent dimension has `null`. */
+  readonly at: readonly ResponseInputValue[];
   /** The mean of the measured values of the cell, on the scale of the model. */
   readonly value: number;
   /** The number of points of the cell. */
@@ -147,6 +163,8 @@ export interface ResponseTableCell {
 export interface TableResponseModel extends ResponseModelBase {
   readonly kind: "table";
   readonly dimensions: readonly string[];
+  /** The ids of the dimensions of the table with a condition. Only these dimensions take `null`. */
+  readonly conditional?: readonly string[];
   readonly cells: readonly ResponseTableCell[];
   /** The value of a combination with no cell: the mean of all the fitted points, on the scale of the model. */
   readonly fallback: number;
@@ -209,7 +227,7 @@ export interface ResponseHeldOutError {
 /** The options of `sliceResponse` and `surfaceResponse`. */
 export interface ResponseViewOptions {
   /** The value of each held dimension. Each other dimension takes its usual value, as `sliceResponse` tells. */
-  readonly hold?: Readonly<Record<string, ResponseValue>>;
+  readonly hold?: Readonly<Record<string, ResponseInputValue>>;
   /** The number of values on a continuous axis, 2 or more. The default is 33. */
   readonly steps?: number;
   /**
@@ -233,11 +251,21 @@ export interface ResponseSurfaceOptions extends ResponseViewOptions {
   readonly vary: readonly [string, string];
 }
 
-/** The fitted value at one place, with its band. */
+/**
+ * The fitted value at one place, with its band. The band is the mean error of the model, and `nearest` tells how far
+ * the place is from a measurement.
+ */
 export interface ResponseBand {
   readonly value: number;
   readonly low: number;
   readonly high: number;
+  /**
+   * The distance from this place to the nearest measured point with a value of the measure, from 0 to 1. The value 0
+   * means that a point was measured here. A number or rank dimension counts as its share of the axis. A different
+   * categorical level counts 1, and an absent value against a present value counts 1. The distance is the largest
+   * count over the dimensions.
+   */
+  readonly nearest: number;
 }
 
 /** One place of a curve. */
@@ -260,7 +288,7 @@ export interface ResponseSlice {
   readonly measure: string;
   readonly vary: string;
   /** The value of each other dimension. */
-  readonly held: Readonly<Record<string, ResponseValue>>;
+  readonly held: Readonly<Record<string, ResponseInputValue>>;
   readonly curve: readonly ResponseCurvePoint[];
   readonly points: readonly ResponseSlicePoint[];
   readonly error: ResponseHeldOutError;
@@ -280,7 +308,7 @@ export interface ResponseSurface {
   readonly measure: string;
   readonly vary: readonly [string, string];
   /** The value of each other dimension. */
-  readonly held: Readonly<Record<string, ResponseValue>>;
+  readonly held: Readonly<Record<string, ResponseInputValue>>;
   readonly x: readonly ResponseValue[];
   readonly y: readonly ResponseValue[];
   /** One row for each value of `y`. Each row has one cell for each value of `x`. */
@@ -308,6 +336,11 @@ export function axisEnds(dimension: ResponseDimension): readonly [number, number
   return dimension.log === true ? [Math.log10(low), Math.log10(high)] : [low, high];
 }
 
+/** This function gives true when a place has the condition of a dimension. A dimension with no condition is present. */
+export function whenHolds(dimension: ResponseDimension, values: Readonly<Record<string, unknown>>): boolean {
+  return dimension.when === undefined || dimension.when.levels.includes(values[dimension.when.dimension] as ResponseValue);
+}
+
 /** This function gives the reason that `value` is not a value of `dimension`. It gives `undefined` for a good value. */
 export function valueFault(dimension: ResponseDimension, value: unknown): string | undefined {
   if (dimension.kind === "continuous") {
@@ -318,14 +351,20 @@ export function valueFault(dimension: ResponseDimension, value: unknown): string
   return (dimension.levels as readonly unknown[]).includes(value) ? undefined : `the value ${JSON.stringify(value)} is not a level of the dimension`;
 }
 
-/** This function gives the input of a dimension. It reads only a field of the object, not of its prototype. */
-function inputValue(inputs: Readonly<Record<string, ResponseValue>>, dimension: string): ResponseValue {
+/**
+ * This function gives the input of a dimension, for each kind of model. It reads only a field of the object, not of
+ * its prototype. It refuses `null` at a dimension with no condition, so a mistake of a caller cannot give a quiet value.
+ */
+function inputValue(inputs: Readonly<Record<string, ResponseInputValue>>, dimension: string, conditional: boolean): ResponseInputValue {
   if (!Object.hasOwn(inputs, dimension)) throw new RangeError(`predictResponse: the inputs have no value of the dimension "${dimension}".`);
-  return inputs[dimension] as ResponseValue;
+  const value = inputs[dimension] as ResponseInputValue;
+  if (value === null && !conditional) throw new RangeError(`predictResponse: the dimension "${dimension}" has no condition, so it needs a value, not null.`);
+  return value;
 }
 
-/** This function gives the coordinate of one input of a ridge model. */
-function coordinate(input: RidgeInput, value: ResponseValue): number | string {
+/** This function gives the coordinate of one input of a ridge model. An absent input has `null`, and a level has 0. */
+function coordinate(input: RidgeInput, value: ResponseInputValue): number | null {
+  if (value === null) return null;
   const bad = (reason: string): RangeError => new RangeError(`predictResponse: the value ${JSON.stringify(value)} of the dimension "${input.dimension}" ${reason}.`);
   if (input.kind === "number") {
     if (typeof value !== "number" || !Number.isFinite(value)) throw bad("is not a finite number");
@@ -334,35 +373,39 @@ function coordinate(input: RidgeInput, value: ResponseValue): number | string {
   }
   const position = input.levels.indexOf(value as string);
   if (position < 0) throw bad("is not a level of the model");
-  return input.kind === "rank" ? (position - input.center) / input.spread : (value as string);
+  return input.kind === "rank" ? (position - input.center) / input.spread : 0;
 }
 
 /** This function gives the coordinate of each input of a ridge model. */
-export function coordinates(inputs: readonly RidgeInput[], values: Readonly<Record<string, ResponseValue>>): Map<string, number | string> {
-  return new Map(inputs.map((input) => [input.dimension, coordinate(input, inputValue(values, input.dimension))]));
+export function coordinates(inputs: readonly RidgeInput[], values: Readonly<Record<string, ResponseInputValue>>): Map<string, number | null> {
+  return new Map(inputs.map((input) => [input.dimension, coordinate(input, inputValue(values, input.dimension, input.conditional === true))]));
 }
 
-/** This function gives the product of the factors of a term at `at`. A power is a loop of multiplications. */
-export function product(factors: readonly ResponseFactor[], at: ReadonlyMap<string, number | string>): number {
+/**
+ * This function gives the product of the factors of a term at a place. A power is a loop of multiplications. A term
+ * with an absent dimension is 0, so the columns of the levels of the parent carry the mean of that place.
+ */
+export function product(factors: readonly ResponseFactor[], at: ReadonlyMap<string, number | null>, values: Readonly<Record<string, ResponseInputValue>>): number {
   let value = 1;
   for (const factor of factors) {
-    const c = at.get(factor.dimension);
+    const c = at.get(factor.dimension) as number | null;
+    if (c === null) return 0;
     if ("level" in factor) {
-      if (c !== factor.level) return 0;
-    } else for (let i = 0; i < factor.power; i++) value *= c as number;
+      if (values[factor.dimension] !== factor.level) return 0;
+    } else for (let i = 0; i < factor.power; i++) value *= c;
   }
   return value;
 }
 
 /** This function gives the prediction on the scale of the model. The sum with 0 removes a negative zero. */
-function predictScaled(model: ResponseModel, inputs: Readonly<Record<string, ResponseValue>>): number {
+function predictScaled(model: ResponseModel, inputs: Readonly<Record<string, ResponseInputValue>>): number {
   if (model.kind === "table") {
-    const at = model.dimensions.map((d) => inputValue(inputs, d));
+    const at = model.dimensions.map((d) => inputValue(inputs, d, model.conditional?.includes(d) === true));
     return model.cells.find((cell) => cell.at.every((v, i) => v === at[i]))?.value ?? model.fallback;
   }
   const at = coordinates(model.inputs, inputs);
   let sum = model.intercept;
-  for (const term of model.terms) sum += term.weight * product(term.factors, at);
+  for (const term of model.terms) sum += term.weight * product(term.factors, at, inputs);
   return sum + 0;
 }
 
@@ -373,13 +416,15 @@ function unscale(model: ResponseModel, value: number): number {
 
 /**
  * This function gives the value of a model at `inputs`, on the scale of the measure. The inputs have a value for each
- * dimension that the model reads. A table model gives its `fallback` for a combination with no cell.
+ * dimension that the model reads. An absent conditional dimension has `null`. A table model gives its `fallback` for a
+ * combination with no cell.
  *
  * The function throws a RangeError for a missing input and for a value that is not a number or a level of the model.
- * It also throws for a value at or below 0 on a log scale. A number outside the range of the record is good, so the
+ * It throws for `null` at a dimension with no condition, for each kind of model. It also throws for a value at or below
+ * 0 on a log scale. A number outside the range of the record is good, so the
  * function extrapolates.
  */
-export function predictResponse(model: ResponseModel, inputs: Readonly<Record<string, ResponseValue>>): number {
+export function predictResponse(model: ResponseModel, inputs: Readonly<Record<string, ResponseInputValue>>): number {
   return unscale(model, predictScaled(model, inputs));
 }
 
@@ -410,24 +455,91 @@ export function heldOutError(record: Pick<ResponseRecord, "folds">, measure: str
 
 /** The parts of a slice or a surface that do not depend on the number of varied dimensions. */
 interface Frame {
-  readonly held: Readonly<Record<string, ResponseValue>>;
+  readonly held: Readonly<Record<string, ResponseInputValue>>;
   readonly axes: readonly (readonly ResponseValue[])[];
   readonly matched: readonly ResponsePoint[];
   readonly error: ResponseHeldOutError;
-  readonly band: (inputs: Readonly<Record<string, ResponseValue>>) => ResponseBand;
+  readonly band: (inputs: Readonly<Record<string, ResponseInputValue>>) => ResponseBand;
 }
 
-/** This function gives the usual value of a dimension: a measured median, or the most common level. */
-function usualValue(dimension: ResponseDimension, points: readonly ResponsePoint[]): ResponseValue {
-  const values = points.map((p) => p.values[dimension.id] as ResponseValue);
-  if (dimension.kind === "continuous") return quantile(values as number[], 0.5, "nearest-rank");
-  let best = dimension.levels[0] as ResponseValue;
+/**
+ * This function gives the usual value of a dimension: a measured median, or the most common level among `among`. A
+ * tie gives the first level. A dimension with no measured value gives its low end or its first level.
+ */
+function usualValue(dimension: ResponseDimension, points: readonly ResponsePoint[], among?: readonly ResponseValue[]): ResponseValue {
+  const values = points.flatMap((p) => (p.values[dimension.id] === null ? [] : [p.values[dimension.id] as ResponseValue]));
+  if (dimension.kind === "continuous") return values.length === 0 ? dimension.range[0] : quantile(values as number[], 0.5, "nearest-rank");
+  const levels = (dimension.levels as readonly ResponseValue[]).filter((level) => among === undefined || among.includes(level));
+  let best = levels[0] as ResponseValue;
   let most = 0;
-  for (const level of dimension.levels) {
+  for (const level of levels) {
     const count = values.filter((v) => v === level).length;
     if (count > most) [best, most] = [level, count];
   }
   return best;
+}
+
+/** The place of a value on the axis of its dimension: a share of the axis, a categorical level, or `null`. */
+type AxisPlace = number | string | null;
+
+/** This function gives the place of a value on its axis. A number or a rank is a share of the axis, from 0 to 1. */
+function axisPlace(dimension: ResponseDimension, value: ResponseInputValue): AxisPlace {
+  if (value === null || dimension.kind === "categorical") return value;
+  const [low, high] = axisEnds(dimension);
+  if (high === low) return 0;
+  if (!isNumberDimension(dimension)) return (dimension.levels as readonly ResponseValue[]).indexOf(value) / high;
+  return ((dimension.log === true ? Math.log10(value as number) : (value as number)) - low) / (high - low);
+}
+
+/** This function gives the count of one dimension between two places: their distance, or 1 when they do not compare. */
+const axisGap = (a: AxisPlace, b: AxisPlace): number => (a === b ? 0 : typeof a === "number" && typeof b === "number" ? Math.abs(a - b) : 1);
+
+/**
+ * This function gives a function of the field `nearest` of a band. A place compares with each point that has a value
+ * of the measure. A point stops at the first count that is not less than the best distance so far.
+ */
+function nearestOf(dimensions: readonly ResponseDimension[], points: readonly ResponsePoint[], measure: string): (place: Readonly<Record<string, ResponseInputValue>>) => number {
+  const rows = points.filter((p) => typeof p.measures[measure] === "number").map((p) => dimensions.map((d) => axisPlace(d, p.values[d.id] as ResponseInputValue)));
+  return (place) => {
+    const here = dimensions.map((d) => axisPlace(d, place[d.id] as ResponseInputValue));
+    let best = 1;
+    for (const row of rows) {
+      let far = 0;
+      for (let i = 0; i < here.length && far < best; i++) far = Math.max(far, axisGap(row[i] as AxisPlace, here[i] as AxisPlace));
+      if (far < best) best = far;
+    }
+    return best;
+  };
+}
+
+/** This function gives the levels that the parent of each varied conditional dimension needs. */
+function neededLevels(name: string, varied: readonly ResponseDimension[], vary: readonly string[]): ReadonlyMap<string, readonly ResponseValue[]> {
+  const needed = new Map<string, readonly ResponseValue[]>();
+  for (const { id, when } of varied) {
+    if (when === undefined) continue;
+    if (vary.includes(when.dimension)) throw new RangeError(`${name}: the dimension "${id}" has a value only at some levels of "${when.dimension}", so hold "${when.dimension}".`);
+    const earlier = needed.get(when.dimension);
+    needed.set(when.dimension, earlier === undefined ? when.levels : earlier.filter((level) => when.levels.includes(level)));
+  }
+  return needed;
+}
+
+/** This function gives the value of each dimension that does not vary. `sliceResponse` tells the rules. */
+function heldValues(name: string, record: ResponseRecord, vary: readonly string[], hold: Readonly<Record<string, ResponseInputValue>>, needed: ReadonlyMap<string, readonly ResponseValue[]>): Readonly<Record<string, ResponseInputValue>> {
+  const others = record.dimensions.filter((d) => !vary.includes(d.id));
+  const plain = new Map(others.filter((d) => d.when === undefined).map((d) => [d.id, (Object.hasOwn(hold, d.id) ? hold[d.id] : usualValue(d, record.points, needed.get(d.id))) as ResponseValue]));
+  for (const [parent, levels] of needed) {
+    const value = plain.get(parent) as ResponseValue;
+    if (!levels.includes(value)) throw new RangeError(`${name}: a varied dimension needs "${parent}" at one of ${JSON.stringify(levels)}, not ${JSON.stringify(value)}.`);
+  }
+  const valueOf = ({ id, when }: ResponseDimension): ResponseInputValue => {
+    if (when === undefined) return plain.get(id) as ResponseValue;
+    if (!vary.includes(when.dimension) && !when.levels.includes(plain.get(when.dimension) as ResponseValue)) return null;
+    const value = Object.hasOwn(hold, id) ? (hold[id] as ResponseInputValue) : usualValue(record.dimensions.find((d) => d.id === id) as ResponseDimension, record.points);
+    if (value === null) throw new RangeError(`${name}: the held dimension "${id}" is null, and a level of "${when.dimension}" in this view needs a value.`);
+    return value;
+  };
+  return Object.fromEntries(others.map((d) => [d.id, valueOf(d)]));
 }
 
 /** This function gives the values of an axis: each level, or `steps` equal distances on the scale of the dimension. */
@@ -444,7 +556,7 @@ function axisValues(dimension: ResponseDimension, steps: number): readonly Respo
 }
 
 /** This function gives true when the value of a point matches a held value of a dimension. */
-function matches(dimension: ResponseDimension, value: ResponseValue, held: ResponseValue, tolerance: number): boolean {
+function matches(dimension: ResponseDimension, value: ResponseInputValue, held: ResponseInputValue, tolerance: number): boolean {
   if (typeof value !== "number" || typeof held !== "number") return value === held;
   const [low, high] = axisEnds(dimension);
   const log = dimension.kind !== "categorical" && dimension.log === true;
@@ -468,16 +580,25 @@ function frameOf(name: string, record: ResponseRecord, measure: string, vary: re
   if (new Set(vary).size !== vary.length) throw new RangeError(`${name}: the two varied dimensions are one dimension, "${vary[0]}".`);
   for (const id of Object.keys(hold)) {
     if (vary.includes(id)) throw new RangeError(`${name}: the dimension "${id}" is both varied and held.`);
-    const fault = valueFault(known(id), hold[id]);
+    const dimension = known(id);
+    if (hold[id] === null && dimension.when !== undefined) continue;
+    const fault = valueFault(dimension, hold[id]);
     if (fault !== undefined) throw new RangeError(`${name}: the held dimension "${id}": ${fault}.`);
   }
   const others = record.dimensions.filter((d) => !vary.includes(d.id));
-  const held = Object.fromEntries(others.map((d) => [d.id, Object.hasOwn(hold, d.id) ? (hold[d.id] as ResponseValue) : usualValue(d, record.points)]));
-  const matched = record.points.filter((p) => typeof p.measures[measure] === "number" && others.every((d) => matches(d, p.values[d.id] as ResponseValue, held[d.id] as ResponseValue, tolerance)));
+  const held = heldValues(name, record, vary, hold, neededLevels(name, varied, vary));
+  const matched = record.points.filter(
+    (p) =>
+      typeof p.measures[measure] === "number" &&
+      vary.every((id) => p.values[id] !== null) &&
+      others.every((d) => matches(d, p.values[d.id] as ResponseInputValue, whenHolds(d, p.values) ? (held[d.id] as ResponseInputValue) : null, tolerance)),
+  );
   const error = heldOutError(record, measure);
-  const band = (inputs: Readonly<Record<string, ResponseValue>>): ResponseBand => {
-    const value = predictScaled(model, inputs);
-    return { value: unscale(model, value), low: unscale(model, value - width * error.rmse), high: unscale(model, value + width * error.rmse) };
+  const nearest = nearestOf(record.dimensions, record.points, measure);
+  const band = (inputs: Readonly<Record<string, ResponseInputValue>>): ResponseBand => {
+    const place = Object.fromEntries(record.dimensions.map((d) => [d.id, whenHolds(d, inputs) ? (inputs[d.id] as ResponseInputValue) : null]));
+    const value = predictScaled(model, place);
+    return { value: unscale(model, value), low: unscale(model, value - width * error.rmse), high: unscale(model, value + width * error.rmse), nearest: nearest(place) };
   };
   return { held, axes: varied.map((d) => axisValues(d, steps)), matched, error, band };
 }
@@ -495,9 +616,17 @@ const groupOf = (point: ResponsePoint): { readonly group?: string } => (point.gr
  * Each dimension with no value in `hold` takes its usual value. For a continuous dimension, this value is the median
  * of its measured values. For the other kinds, it is the most common level, and a tie gives the first level.
  *
+ * A conditional dimension follows its parent:
+ * - To vary a conditional dimension, the parent needs a level inside `when`. With no held value, the parent takes the
+ *   most common level inside `when`. A held level outside `when` is a RangeError.
+ * - A held conditional dimension reads `null` in `held` when its parent is outside `when`, also with a value in `hold`.
+ *   The points that match have `null` at this dimension.
+ * - When the parent varies, a held conditional dimension keeps its value in `held`. Each place outside `when` reads
+ *   `null` for the fit, and for the matching points.
+ *
  * The band is the fitted value, plus and less `width` times the held-out root mean square error. On a log scale, this
- * distance is on the log scale of the model, so the band is a ratio. The band has one width along all the curve. It
- * tells the mean error of the model, and it does not widen where the record has few points.
+ * distance is on the log scale of the model, so the band is a ratio. The band has one width along all the curve. The
+ * band is the mean error of the model, and `nearest` tells how far the place is from a measurement.
  *
  * The function throws a RangeError for an unknown measure or dimension, and for a held value that is not good for its
  * dimension. It also throws for a dimension that is both varied and held, and for a bad option.
@@ -519,6 +648,7 @@ export function sliceResponse(record: ResponseRecord, measure: string, options: 
  * This function gives the view of `sliceResponse` over two dimensions. The fields `x` and `y` are the two axes, and
  * `cells` has one row for each value of `y`. The rules of the held values, of the matching points and of the band are
  * the rules of `sliceResponse`. The function also throws a RangeError when the two varied dimensions are one dimension.
+ * It throws when a conditional dimension varies with its parent, and when two varied dimensions need no common level.
  */
 export function surfaceResponse(record: ResponseRecord, measure: string, options: ResponseSurfaceOptions): ResponseSurface {
   const { vary } = options;

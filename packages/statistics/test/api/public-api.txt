@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 100 names
+## . (build/index.d.ts): 103 names
 
 type BootstrapOptions: build/index.d.ts#BootstrapOptions
 type CalibrationLevel: build/index.d.ts#CalibrationLevel
@@ -45,6 +45,7 @@ type ResponseFitOptions: build/index.d.ts#ResponseFitOptions
 type ResponseFold: build/index.d.ts#ResponseFold
 type ResponseFoldError: build/index.d.ts#ResponseFoldError
 type ResponseHeldOutError: build/index.d.ts#ResponseHeldOutError
+type ResponseInputValue: build/index.d.ts#ResponseInputValue
 type ResponseMeasure: build/index.d.ts#ResponseMeasure
 type ResponseModel: build/index.d.ts#ResponseModel
 type ResponseModelBase: build/index.d.ts#ResponseModelBase
@@ -59,7 +60,9 @@ type ResponseSurfacePoint: build/index.d.ts#ResponseSurfacePoint
 type ResponseTableCell: build/index.d.ts#ResponseTableCell
 type ResponseValue: build/index.d.ts#ResponseValue
 type ResponseViewOptions: build/index.d.ts#ResponseViewOptions
+type ResponseWhen: build/index.d.ts#ResponseWhen
 type RidgeInput: build/index.d.ts#RidgeInput
+type RidgeInputBase: build/index.d.ts#RidgeInputBase
 type RidgeLevelInput: build/index.d.ts#RidgeLevelInput
 type RidgeNumberInput: build/index.d.ts#RidgeNumberInput
 type RidgeOptions: build/index.d.ts#RidgeOptions
@@ -304,6 +307,7 @@ interface ResponseBand {
   readonly value: number;
   readonly low: number;
   readonly high: number;
+  readonly nearest: number;
 }
 
 ### build/index.d.ts#ResponseCurvePoint
@@ -328,6 +332,7 @@ interface ResponseDimensionBase {
   readonly id: string;
   readonly label: string;
   readonly unit: string;
+  readonly when?: ResponseWhen;
 }
 
 ### build/index.d.ts#ResponseFactor
@@ -336,7 +341,7 @@ type ResponseFactor = {
   readonly power: number;
 } | {
   readonly dimension: string;
-  readonly level: string;
+  readonly level: ResponseValue;
 };
 
 ### build/index.d.ts#ResponseFault
@@ -382,6 +387,9 @@ interface ResponseHeldOutError {
   readonly skill: number | null;
 }
 
+### build/index.d.ts#ResponseInputValue
+type ResponseInputValue = ResponseValue | null;
+
 ### build/index.d.ts#ResponseMeasure
 interface ResponseMeasure {
   readonly id: string;
@@ -403,7 +411,7 @@ interface ResponseModelBase {
 ### build/index.d.ts#ResponsePoint
 interface ResponsePoint {
   readonly id: string;
-  readonly values: Readonly<Record<string, ResponseValue>>;
+  readonly values: Readonly<Record<string, ResponseInputValue>>;
   readonly measures: Readonly<Record<string, number | null>>;
   readonly group?: string;
 }
@@ -418,7 +426,7 @@ interface ResponseRecord extends ResponseData {
 interface ResponseSlice {
   readonly measure: string;
   readonly vary: string;
-  readonly held: Readonly<Record<string, ResponseValue>>;
+  readonly held: Readonly<Record<string, ResponseInputValue>>;
   readonly curve: readonly ResponseCurvePoint[];
   readonly points: readonly ResponseSlicePoint[];
   readonly error: ResponseHeldOutError;
@@ -441,7 +449,7 @@ interface ResponseSlicePoint {
 interface ResponseSurface {
   readonly measure: string;
   readonly vary: readonly [string, string];
-  readonly held: Readonly<Record<string, ResponseValue>>;
+  readonly held: Readonly<Record<string, ResponseInputValue>>;
   readonly x: readonly ResponseValue[];
   readonly y: readonly ResponseValue[];
   readonly cells: readonly (readonly ResponseBand[])[];
@@ -464,7 +472,7 @@ interface ResponseSurfacePoint {
 
 ### build/index.d.ts#ResponseTableCell
 interface ResponseTableCell {
-  readonly at: readonly ResponseValue[];
+  readonly at: readonly ResponseInputValue[];
   readonly value: number;
   readonly n: number;
 }
@@ -474,26 +482,36 @@ type ResponseValue = number | string;
 
 ### build/index.d.ts#ResponseViewOptions
 interface ResponseViewOptions {
-  readonly hold?: Readonly<Record<string, ResponseValue>>;
+  readonly hold?: Readonly<Record<string, ResponseInputValue>>;
   readonly steps?: number;
   readonly tolerance?: number;
   readonly width?: number;
 }
 
+### build/index.d.ts#ResponseWhen
+interface ResponseWhen {
+  readonly dimension: string;
+  readonly levels: readonly ResponseValue[];
+}
+
 ### build/index.d.ts#RidgeInput
 type RidgeInput = RidgeNumberInput | RidgeRankInput | RidgeLevelInput;
 
-### build/index.d.ts#RidgeLevelInput
-interface RidgeLevelInput {
-  readonly kind: "level";
+### build/index.d.ts#RidgeInputBase
+interface RidgeInputBase {
   readonly dimension: string;
+  readonly conditional?: boolean;
+}
+
+### build/index.d.ts#RidgeLevelInput
+interface RidgeLevelInput extends RidgeInputBase {
+  readonly kind: "level";
   readonly levels: readonly string[];
 }
 
 ### build/index.d.ts#RidgeNumberInput
-interface RidgeNumberInput {
+interface RidgeNumberInput extends RidgeInputBase {
   readonly kind: "number";
-  readonly dimension: string;
   readonly center: number;
   readonly spread: number;
   readonly log?: boolean;
@@ -505,9 +523,8 @@ interface RidgeOptions {
 }
 
 ### build/index.d.ts#RidgeRankInput
-interface RidgeRankInput {
+interface RidgeRankInput extends RidgeInputBase {
   readonly kind: "rank";
-  readonly dimension: string;
   readonly levels: readonly string[];
   readonly center: number;
   readonly spread: number;
@@ -545,6 +562,7 @@ interface Summary {
 interface TableResponseModel extends ResponseModelBase {
   readonly kind: "table";
   readonly dimensions: readonly string[];
+  readonly conditional?: readonly string[];
   readonly cells: readonly ResponseTableCell[];
   readonly fallback: number;
 }
@@ -624,7 +642,7 @@ export declare function pairedPermutation(candidate: readonly number[], baseline
 export declare function parseResponseRecord(value: unknown): ParsedResponseRecord;
 
 ### build/index.d.ts#predictResponse
-export declare function predictResponse(model: ResponseModel, inputs: Readonly<Record<string, ResponseValue>>): number;
+export declare function predictResponse(model: ResponseModel, inputs: Readonly<Record<string, ResponseInputValue>>): number;
 
 ### build/index.d.ts#quantile
 export declare function quantile(values: readonly number[], p: number, method?: QuantileMethod): number;

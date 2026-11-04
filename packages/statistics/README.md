@@ -40,6 +40,8 @@ const record = fitResponse(
     dimensions: [
       { id: "boxes", label: "Boxes", kind: "continuous", range: [10, 10000], unit: "", log: true },
       { id: "strategy", label: "Strategy", kind: "categorical", levels: ["shelf", "skyline"], unit: "" },
+      // Only the arm "skyline" has this parameter. Each other point has null.
+      { id: "depth", label: "Depth", kind: "continuous", range: [1, 8], unit: "", when: { dimension: "strategy", levels: ["skyline"] } },
     ],
     measures: [{ id: "ms", label: "Time", unit: "ms", direction: "lower" }],
     points, // { id, values, measures, group }: repeats of one input have one group
@@ -47,21 +49,29 @@ const record = fitResponse(
   { log: ["ms"], logFloor: 0.001 },
 );
 
-// In the browser: read the JSON, then ask for one dimension with the other dimensions held.
+// A server writes the text. A browser reads it, and it asks for one dimension with the other dimensions held.
+const text = JSON.stringify(record);
 const parsed = parseResponseRecord(JSON.parse(text));
-if (parsed.ok) {
-  const slice = sliceResponse(parsed.record, "ms", { vary: "boxes", hold: { strategy: "skyline" } });
-  slice.curve;  // { at, value, low, high } along the dimension
-  slice.points; // the measured points with the held values
-  slice.error;  // the held-out error of the folds
-}
+if (!parsed.ok) throw new Error(JSON.stringify(parsed.faults));
+const slice = sliceResponse(parsed.record, "ms", { vary: "depth", hold: { boxes: 1000 } });
+slice.curve; // { at, value, low, high, nearest } along the dimension
+slice.points; // the measured points with the held values
+slice.error; // the held-out error of the folds
 ```
+
+A test of this package compiles and starts this example, and it examines that the two texts are equal.
 
 `fitResponse` keeps all the points of one `group` in one fold, so repeats of a group are not on both sides of a split. Each fold chooses its penalty from the other folds only. The folds thus measure the prediction of an unseen group.
 
 There are two kinds of model. A `ridge` model is a sum of weighted terms. Each term is a product of powers of number inputs and one-hot columns of levels. A `table` model has one cell for each combination of levels. `fitResponse` gives a table when each dimension is categorical, and a ridge model in other cases.
 
-The band of a curve is `value ± width × RMSE`, from the held-out error of the folds. On a log scale, the band is a ratio. The band has one width along the curve, so it does not widen in a region with few points.
+A dimension with `when` is conditional: only some levels of its parent have the dimension. This suits a benchmark in which each arm has its own parameters. A point at another level has `null`. In a ridge model, a term with an absent dimension is 0, so the columns of the parent carry the mean of that level. A table keeps `null` in its cells. For each kind of model, `predictResponse` refuses `null` at a dimension with no condition.
+
+To vary a conditional dimension, `sliceResponse` needs its parent at a level inside `when`. With no held value, the parent takes the most common level inside `when`. A held conditional dimension reads `null` when its parent is outside `when`.
+
+The band of a curve is `value ± width × RMSE`, from the held-out error of the folds. On a log scale, the band is a ratio. The band has one width along the curve. It is the mean error of the model.
+
+The field `nearest` of each place tells how far the place is from a measurement. It goes from 0 to 1, and 0 means that a point was measured there. A viewer can fade the band away from the data. A table cell with the `fallback` value has `nearest` above 0.
 
 ## The functions
 
@@ -88,7 +98,7 @@ The band of a curve is `value ± width × RMSE`, from the held-out error of the 
 | `fitResponse(data, options)` | A record of the format `response-records/1`, with one model for each measure and held-out folds. |
 | `parseResponseRecord(value)` | The examination of unknown data. It gives the record, or one fault with a path for each error. |
 | `predictResponse(model, inputs)`, `heldOutError(record, measure)` | The value of a model at one set of inputs, and the error of the folds of a measure. |
-| `sliceResponse(record, measure, options)`, `surfaceResponse(record, measure, options)` | A fitted curve over one dimension, or a fitted surface over two, with the matching measured points and a band. |
+| `sliceResponse(record, measure, options)`, `surfaceResponse(record, measure, options)` | A fitted curve over one dimension, or a fitted surface over two, with the matching measured points, a band and the distance to the nearest measurement. |
 
 Each function throws a RangeError for an empty list, for a NaN and for a parameter out of its range. Thus a missing value cannot make a quiet NaN in a record.
 

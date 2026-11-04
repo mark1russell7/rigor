@@ -52,7 +52,7 @@ function generate(dimensions: readonly ResponseDimension[], n: number, seed: str
   return data(dimensions, points);
 }
 
-const num = (v: number | string | undefined): number => v as number;
+const num = (v: number | string | null | undefined): number => v as number;
 
 function good(record: ResponseRecord): ResponseRecord {
   const parsed = parseResponseRecord(record);
