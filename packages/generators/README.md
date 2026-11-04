@@ -70,6 +70,15 @@ A corpus can draw real sizes. Each table has 100 midpoint quantiles of the recor
 
 The tables keep the values of one measure, so a table gives no link between the width and the height of a box.
 
+`scripts/recorded-tables.ts` rebuilds the numbers from the two sources.
+
+Each table is a sample, and it does not show a general law:
+
+- `DIAGRAM_BOX_AREA` reads each model of `realworld/ptolemy/flattened`. One tool drew these diagrams, so a small set of icon sizes has a large share. It leaves out the 254 models of `realworld/ptolemy/hierarchical`, and 46 of these have no flattened model. It also leaves out the hand-made graphs of `tests`, `tickets` and `examples`.
+- `GIT_BLOB_BYTES` reads each file of one tree, also the binary files. It leaves out 34 empty files. One repository is one project, so a table of another repository has other values.
+
+The npm package holds the notice of the Ptolemy II license, because the field `notice` is part of the build.
+
 ## The input of `fnv1a32`
 
 The option `input` of `fnv1a32` selects the units that the hash reads. Use it to replace a local copy of FNV-1a with the same hashes.
