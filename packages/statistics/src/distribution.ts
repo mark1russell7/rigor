@@ -21,7 +21,7 @@ export interface ModeOptions {
    * makes a mode, so many equal modes each count.
    */
   readonly minShare?: number;
-  /** The valley between two modes is under this share of the lower peak. The default is `0.5`. */
+  /** The valley between two peaks of the kernel is under this share of the lower peak. The default is `0.5`. */
   readonly valleyRatio?: number;
 }
 
@@ -41,6 +41,30 @@ const TIGHT_RATIO = 0.1;
 /** The kernels stop at this count of widths. */
 const KERNEL_REACH = 3;
 const HALF_LOG_2PI_E = 0.5 * Math.log(2 * Math.PI * Math.E);
+/** Two values closer than this share of the range are one value, so the noise of a float makes no new value. */
+const SAME_VALUE = 1e-9;
+/** The most distinct values of a direct read of their counts. The grid resolves no more than this count of clusters. */
+const FEW_VALUES = GRID / 4;
+/** The mean count of each value in a direct read. Under it the values are a small sample, and the kernel reads them. */
+const MIN_REPEATS = 4;
+/** The fewest values that show a rise, a top and a fall. A sample with fewer values gives one mode for each value. */
+const MIN_BELL_VALUES = 5;
+/** The ratio of the highest third of the counts to the lowest third, under which the counts are flat. */
+const FLAT_RATIO = 3;
+/** The ratio of the means of the three parts of the list of counts, under which the counts have no shape. */
+const SHAPE_RATIO = 1.75;
+/** A value with under this share of the sample is a tail. A rare value does not change the shape of the counts. */
+const RARE_VALUE = 0.01;
+/** The fewest values of a hump of a rounded law. When most humps are narrower, the values are a discrete law. */
+const MIN_HUMP_VALUES = 3;
+/** A count differs from another count at this z value. The two counts then differ by more than the noise of a sample. */
+const COUNT_Z = 3;
+
+/** One hump of the counts of the distinct values. */
+interface Hump {
+  readonly count: number;
+  readonly values: number;
+}
 
 /** One peak of the density, with the grid points of its mass. */
 interface Peak {
@@ -54,8 +78,8 @@ interface Peak {
  * This function gives the width of the kernel. The width from the quartiles follows the distance between clusters, so
  * it hides many tight clusters. A low quantile of the spans of neighbouring values follows the width of a cluster.
  * The function uses the tight width only when it is far under the other width, so a smooth sample keeps its width.
- * The tight width stays over the grid step and over the median gap of the distinct values. A step of rounding is no gap
- * between clusters, so a rounded smooth sample keeps one mode.
+ * The tight width stays over the grid step. No width goes under the median gap of the distinct values of a tight
+ * sample. A step of rounding is no gap between clusters, so a rounded smooth sample keeps one mode at each size.
  */
 function kernelWidth(values: readonly number[], low: number, high: number): number {
   const count = values.length;
@@ -67,7 +91,7 @@ function kernelWidth(values: readonly number[], low: number, high: number): numb
   if (tight >= TIGHT_RATIO * wide) return wide;
   const distinct = order.filter((x, i) => i === 0 || x !== order[i - 1]);
   const resolution = quantile(distinct.slice(1).map((x, i) => x - distinct[i]!), 0.5);
-  return Math.min(wide, Math.max(tight, resolution, (high - low) / GRID));
+  return Math.max(resolution, Math.min(wide, Math.max(tight, (high - low) / GRID)));
 }
 
 /** This function gives the Gaussian kernel density of the values on a grid. */
@@ -102,22 +126,88 @@ function peaksOf(density: Float64Array): Peak[] {
   return peaks;
 }
 
+/** This function gives the count of each distinct value, in the order of the values. */
+function valueCounts(values: readonly number[], low: number, high: number): number[] {
+  const tie = SAME_VALUE * (high - low);
+  const counts: number[] = [];
+  let last = -Infinity;
+  for (const x of sorted(values)) {
+    if (x - last > tie) {
+      counts.push(0);
+      last = x;
+    }
+    counts[counts.length - 1]!++;
+  }
+  return counts;
+}
+
 /**
- * This function counts the modes of a sample with a kernel estimate on a grid. Two peaks stay apart when the valley
- * between them is under `valleyRatio` of the lower peak. A mode counts when it holds `minShare` of the mass. The peaks
- * join from left to right, so a reversed axis can change the count of a close mixture. The result is at least 1.
- * The grid has 96 points, so the function joins more than approximately 24 evenly spaced clusters. A tight cluster
- * also needs more than approximately `n ** 0.8 / 8` values for a sample of `n` values. A cluster with an SD over 5
- * percent of the gap to the next cluster can join it. Even groups of equal values are also a rounded uniform law, so
- * many such groups give 1. A rounding step of 0.5 SD or more gives more than one mode for a smooth law.
- * The function throws a RangeError for an empty list or for a value that is not finite.
+ * This function tells that the counts are flat. The highest third of the counts stays under `FLAT_RATIO` times the
+ * lowest third, so a list of heavy and light values is not flat. The means of the first, the middle and the last third
+ * of the list stay under `SHAPE_RATIO` of each other. The noise of a sample cancels in those means, and a bell does not.
  */
-export function modeCount(values: readonly number[], options: ModeOptions = {}): number {
-  const { minShare = 0.1, valleyRatio = 0.5 } = options;
-  for (const v of values) if (!Number.isFinite(v)) throw new RangeError("modeCount: each value must be finite.");
-  const low = quantile(values, 0);
-  const high = quantile(values, 1);
-  if (high === low) return 1;
+function flatCounts(counts: readonly number[]): boolean {
+  const order = [...counts].sort((a, b) => a - b);
+  const third = Math.ceil(order.length / 3);
+  if (mean(order.slice(-third)) >= FLAT_RATIO * mean(order.slice(0, third))) return false;
+  const parts = [counts.slice(0, third), counts.slice(third, -third), counts.slice(-third)].map((part) => mean(part));
+  return Math.max(...parts) < SHAPE_RATIO * Math.min(...parts);
+}
+
+/** This function tells that a count stands over a lower count by more than the noise of a sample. */
+const standsOver = (upper: number, lower: number): boolean => (upper - lower) / Math.sqrt(upper + lower) >= COUNT_Z;
+
+/** This function splits the counts at each valley that is deeper than the noise of a sample. */
+function humpsOf(counts: readonly number[]): Hump[] {
+  const humps: Hump[] = [];
+  const sum = (from: number, to: number): number => counts.slice(from, to).reduce((total, c) => total + c, 0);
+  let start = 0;
+  let top = counts[0]!;
+  let low = top;
+  let lowAt = 0;
+  counts.forEach((count, i) => {
+    if (count < low) {
+      low = count;
+      lowAt = i;
+    }
+    if (standsOver(top, low) && standsOver(count, low)) {
+      humps.push({ count: sum(start, lowAt), values: lowAt - start });
+      start = lowAt;
+      top = count;
+      low = count;
+      lowAt = i;
+    } else if (count > top) {
+      top = count;
+      low = count;
+      lowAt = i;
+    }
+  });
+  humps.push({ count: sum(start, counts.length), values: counts.length - start });
+  return humps;
+}
+
+/**
+ * This function counts the modes of a sample with few distinct values, from the counts of those values. The result does
+ * not change with the size of the sample. Flat counts are a discrete law with one mode for each value, so the noise of
+ * a sample does not take a value out. Counts with one rise and one fall are a rounded smooth law with one mode.
+ */
+function fewValueModes(allCounts: readonly number[], total: number, minShare: number): number {
+  const counts = allCounts.filter((count) => count / total >= RARE_VALUE);
+  const each = counts.map((count) => count / total);
+  const overLimit = (masses: readonly number[], limit: number): number => masses.filter((share) => share >= limit).length;
+  if (counts.length < MIN_BELL_VALUES) return overLimit(each, Math.min(minShare, Math.max(...each) / 2));
+  if (flatCounts(counts)) return overLimit(each, Math.min(minShare, quantile(each, 0.5) / FLAT_RATIO));
+  const humps = humpsOf(counts);
+  const narrow = humps.filter((hump) => hump.values < MIN_HUMP_VALUES).length;
+  const masses = 2 * narrow > humps.length ? each : humps.map((hump) => hump.count / total);
+  return overLimit(masses, Math.min(minShare, Math.max(...masses) / 2));
+}
+
+/**
+ * This function gives the mass of each mode from a kernel estimate on a grid. Two peaks stay apart when the valley
+ * between them is under `valleyRatio` of the lower peak.
+ */
+function kernelMasses(values: readonly number[], low: number, high: number, valleyRatio: number): number[] {
   const density = densityGrid(values, low, high);
   const peaks = peaksOf(density);
   const kept = [peaks[0]!];
@@ -135,7 +225,32 @@ export function modeCount(values: readonly number[], options: ModeOptions = {}):
     for (let i = peak.start; i <= peak.end; i++) sum += density[i]!;
     return sum / total;
   };
-  const masses = kept.map(mass);
+  return kept.map(mass);
+}
+
+/**
+ * This function counts the modes of a sample. A mode counts when it holds `minShare` of the mass, so the default counts
+ * the modes that hold 10 percent, and a caller who needs all modes passes a smaller value. The result is at least 1.
+ * A sample with 24 or fewer distinct values, and 4 or more copies of each value on average, gets a direct read of the
+ * counts of those values. That read does not change with the size of the sample. It gives one mode for each value of a
+ * flat discrete law, so even groups give the count of the groups, and so does a rounded uniform law with 24 or fewer
+ * steps. It gives one mode for each hump of a rounded smooth law.
+ * The direct read of a sample with 4 or fewer values gives one mode for each value that holds the share.
+ * A kernel estimate on a grid reads each other sample. The peaks join from left to right, so a reversed axis can change
+ * the count of a close mixture. The grid has 96 points, so the kernel joins more than approximately 24 evenly spaced
+ * clusters. A tight cluster also needs more than approximately `n ** 0.8 / 8` values for a sample of `n` values. A
+ * cluster with an SD over 5 percent of the gap to the next cluster can join it.
+ * The function throws a RangeError for an empty list or for a value that is not finite.
+ */
+export function modeCount(values: readonly number[], options: ModeOptions = {}): number {
+  const { minShare = 0.1, valleyRatio = 0.5 } = options;
+  for (const v of values) if (!Number.isFinite(v)) throw new RangeError("modeCount: each value must be finite.");
+  const low = quantile(values, 0);
+  const high = quantile(values, 1);
+  if (high === low) return 1;
+  const counts = valueCounts(values, low, high);
+  if (counts.length <= FEW_VALUES && values.length >= MIN_REPEATS * counts.length) return fewValueModes(counts, values.length, minShare);
+  const masses = kernelMasses(values, low, high, valleyRatio);
   const limit = Math.min(minShare, Math.max(...masses) / 2);
   return masses.filter((share) => share >= limit).length;
 }

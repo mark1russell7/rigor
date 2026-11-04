@@ -77,16 +77,60 @@ describe("the count of the modes", () => {
   });
 
   it.each([
-    [6, 200, 6],
-    [9, 1000, 9],
-    [12, 1000, 12],
-    [20, 1000, 1],
-  ])("reads %i even groups of %i equal values as %i modes", (count, size, modes) => {
-    expect(modeCount(spaced(count, size, 0))).toBe(modes);
+    [2, 2],
+    [3, 3],
+    [6, 6],
+    [10, 10],
+    [12, 12],
+    [16, 16],
+    [24, 24],
+    [25, 1],
+  ])("reads %i even groups of equal values as %i modes at each size", (count, modes) => {
+    expect([10, 50, 200, 1000].map((size) => modeCount(spaced(count, size, 0)))).toEqual([modes, modes, modes, modes]);
   });
 
+  it.each<readonly [string, number, (r: Random) => number]>([
+    ["two sizes", 2, (r) => r.int(1, 2)],
+    ["six sizes", 6, (r) => r.int(1, 6)],
+    ["twelve sizes", 12, (r) => r.int(1, 12)],
+    ["a normal law at a step of 0.5 SD", 1, (r) => Math.round(r.normal(0, 2))],
+    ["a normal law at a step of 1 SD", 1, (r) => Math.round(r.normal(0, 1))],
+    ["two rounded humps", 2, (r) => Math.round(r.normal(r.next() < 0.5 ? 0 : 16, 2))],
+  ])("gives one result for %s at each size from 300 to 3,000", (label, modes, draw) => {
+    const r = random(`stable ${label}`);
+    for (const n of [300, 500, 1000, 2000, 3000]) {
+      for (let i = 0; i < 20; i++) expect(modeCount(Array.from({ length: n }, () => draw(r)))).toBe(modes);
+    }
+  });
+
+  it("counts a light value of a discrete law only when the share lets it in", () => {
+    const groups = Array.from({ length: 6 }, (_, g) => new Array<number>(g % 2 === 1 ? 50 : 150).fill(100 * g)).flat();
+    expect(modeCount(groups)).toBe(3);
+    expect(modeCount(groups, { minShare: 0.05 })).toBe(6);
+  });
+
+  it("holds the table of the README for smooth samples", () => {
+    const SIZES = [10, 30, 100, 300, 1000];
+    const TABLE: Readonly<Record<SmoothLaw, readonly number[]>> = {
+      uniform: [0.508, 0.804, 0.992, 1, 1],
+      normal: [0.468, 0.808, 0.98, 1, 1],
+      exponential: [0.534, 0.768, 0.884, 0.984, 1],
+      "log-normal": [0.552, 0.722, 0.922, 0.986, 1],
+      pareto: [0.496, 0.766, 0.912, 0.988, 1],
+    };
+    for (const [law, draw] of DRAWS) {
+      const shares = SIZES.map((n) => {
+        const r = random(`one mode ${law} ${n}`);
+        let one = 0;
+        for (let i = 0; i < 500; i++) if (modeCount(Array.from({ length: n }, () => draw(r))) === 1) one++;
+        return one / 500;
+      });
+      expect(shares).toEqual(TABLE[law]);
+    }
+  }, 60_000);
+
   it.each([
-    [200, 99],
+    [200, 100],
     [1000, 100],
   ])("keeps one mode for a rounded normal law at %i values", (n, ones) => {
     const r = random(`rounded ${n}`);

@@ -138,9 +138,39 @@ Each function throws a RangeError for an empty list, for a NaN and for a paramet
 
 ### The limits of the shape of a sample
 
-`modeCount` joins more than approximately 24 evenly spaced clusters, because its grid has 96 points. A tight cluster also needs more than approximately `n ** 0.8 / 8` values in a sample of `n` values. A cluster with an SD over 5 percent of the gap to the next cluster can join it. Under these limits a test holds the count at 20 clusters.
+`modeCount` has two reads. A sample with 24 or fewer distinct values, and 4 or more copies of each value on average, gets a direct read of the counts of those values. A kernel estimate reads each other sample.
 
-A step of rounding is no gap between clusters. The width of the kernel stays over the median gap of the distinct values, so a rounded smooth sample keeps one mode. Even groups of equal values are also a rounded uniform law, so 20 such groups give 1. A rounding step of 0.5 SD or more gives more than one mode for a smooth law.
+The direct read does not change with the size of the sample, so one discrete law gives one result. A test holds this table, with a gap of 100 between the groups.
+
+| Groups of equal values | 10 values each | 50 values each | 200 values each | 1,000 values each |
+| --- | --- | --- | --- | --- |
+| 2 | 2 | 2 | 2 | 2 |
+| 3 | 3 | 3 | 3 | 3 |
+| 6 | 6 | 6 | 6 | 6 |
+| 10 | 10 | 10 | 10 | 10 |
+| 12 | 12 | 12 | 12 | 12 |
+| 16 | 16 | 16 | 16 | 16 |
+| 24 | 24 | 24 | 24 | 24 |
+| 25 | 1 | 1 | 1 | 1 |
+
+- Flat counts give one mode for each value. So a rounded uniform law with 24 or fewer steps gives one mode for each value, and two close values are two modes.
+- Counts with one rise and one fall give one mode. This read needs 5 or more values. A normal law at a step of 2 SD has 3 values, so it gives 3.
+- A value under 1 percent of the sample is out of this read.
+- Under 1,000 values the noise of a sample can move the count of a rounded uniform law with 10 or more steps by 1.
+
+The kernel joins more than approximately 24 evenly spaced clusters, because its grid has 96 points. A tight cluster also needs more than approximately `n ** 0.8 / 8` values in a sample of `n` values. A cluster with an SD over 5 percent of the gap to the next cluster can join it. Under these limits a test holds the count at 20 clusters. A step of rounding is no gap between clusters, so the width of the kernel stays over the median gap of the distinct values of a tight sample.
+
+The default counts the modes that hold 10 percent of the mass. A caller who needs all modes passes a smaller `minShare`.
+
+A small smooth sample can give a false extra mode. This table gives the share of 500 seeded samples of each law with a count of 1. A test holds it.
+
+| Values | uniform | normal | exponential | log-normal | Pareto |
+| --- | --- | --- | --- | --- | --- |
+| 10 | 0.51 | 0.47 | 0.53 | 0.55 | 0.50 |
+| 30 | 0.80 | 0.81 | 0.77 | 0.72 | 0.77 |
+| 100 | 0.99 | 0.98 | 0.88 | 0.92 | 0.91 |
+| 300 | 1.00 | 1.00 | 0.98 | 0.99 | 0.99 |
+| 1,000 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
 
 `bestSmoothLaw` is not reliable under 300 values. The laws with a fitted end have a benefit at small sizes. This table gives the share of correct results for 500 seeded samples of each law. A test holds it.
 
