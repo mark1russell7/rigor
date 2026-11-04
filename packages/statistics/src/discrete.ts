@@ -1,6 +1,6 @@
 /**
- * The intervals that come from a discrete distribution. The interval of a median comes from the order statistics.
- * The central interval of a count comes from a binomial or a negative binomial distribution.
+ * The intervals that come from a discrete distribution. The interval of a median or of a quantile comes from the order
+ * statistics. The central interval of a count comes from a binomial or a negative binomial distribution.
  */
 import { sorted } from "./describe.ts";
 
@@ -63,6 +63,75 @@ export function medianInterval(values: readonly number[], level = 0.95): MedianI
   let left = 0;
   for (let i = 0; i < rank; i++) left += terms[i] as number;
   return { low: s[rank - 1] as number, high: s[n - rank] as number, rank, coverage: Math.max(0, 1 - 2 * left) };
+}
+
+/** The distribution-free interval of a quantile, from two order statistics of the sample. */
+export interface QuantileInterval {
+  /** The value x_(lowRank), or `-Infinity` when the sample has no rank for a lower bound. */
+  readonly low: number;
+  /** The value x_(highRank), or `Infinity` when the sample has no rank for an upper bound. */
+  readonly high: number;
+  /** The rank of `low`, from 1, or 0 when `low` is `-Infinity`. */
+  readonly lowRank: number;
+  /** The rank of `high`, from 1, or n + 1 when `high` is `Infinity`. */
+  readonly highRank: number;
+  /** The chance that the interval holds the quantile of the population. */
+  readonly coverage: number;
+}
+
+/**
+ * This function gives the distribution-free interval of the quantile `p` of a sample. Each tail outside the interval holds
+ * (1 - level) / 2 or less. Let X ~ Binomial(n, p). The lower rank is the largest l with P(X <= l - 1) in the tail. The upper
+ * rank is the smallest u with P(X >= u) in the tail. The values must be independent draws, or the coverage is false.
+ *
+ * A side with no such rank is infinite. Thus a small sample gives no upper bound: refer to `quantileSamples`.
+ */
+export function quantileInterval(values: readonly number[], p: number, level = 0.95): QuantileInterval {
+  if (values.length === 0) throw new RangeError("quantileInterval: the list is empty.");
+  for (const v of values) if (Number.isNaN(v)) throw new RangeError("quantileInterval: the list has a NaN.");
+  if (!(p > 0 && p < 1)) throw new RangeError(`quantileInterval: p is more than 0 and less than 1, not ${p}.`);
+  const tail = levelOf("quantileInterval", level);
+  const s = sorted(values);
+  const n = s.length;
+  const terms = binomialTerms(n, p);
+  let lowRank = 0;
+  let left = 0;
+  let below = terms[0] as number;
+  while (lowRank < n && below <= tail) {
+    lowRank += 1;
+    left = below;
+    below += terms[lowRank] as number;
+  }
+  let highRank = n + 1;
+  let right = 0;
+  let above = terms[n] as number;
+  while (highRank > 1 && above <= tail) {
+    highRank -= 1;
+    right = above;
+    above += terms[highRank - 1] as number;
+  }
+  return {
+    low: lowRank === 0 ? -Infinity : (s[lowRank - 1] as number),
+    high: highRank === n + 1 ? Infinity : (s[highRank - 1] as number),
+    lowRank,
+    highRank,
+    coverage: Math.max(0, 1 - left - right),
+  };
+}
+
+/**
+ * This function gives the fewest independent values that give the quantile `p` an upper bound at `level`: the smallest n with
+ * p^n <= (1 - level) / 2. With that n, the upper bound is the largest value. At the level 0.95, p95 needs 72 values, p99 needs
+ * 368 values and p99.9 needs 3,688 values.
+ */
+export function quantileSamples(p: number, level = 0.95): number {
+  if (!(p > 0 && p < 1)) throw new RangeError(`quantileSamples: p is more than 0 and less than 1, not ${p}.`);
+  const tail = levelOf("quantileSamples", level);
+  const [logTail, logP] = [Math.log(tail), Math.log(p)];
+  let n = Math.max(1, Math.ceil(logTail / logP));
+  // A float error in the ratio can give one value too many.
+  while (n > 1 && (n - 1) * logP <= logTail) n -= 1;
+  return n;
 }
 
 /** A central interval of a count, from `low` to `high`, both included. */

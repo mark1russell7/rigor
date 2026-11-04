@@ -117,6 +117,8 @@ The default expansion has one product for each pair of levels of two dimensions.
 | `pairedPermutation(candidate, baseline, options)` | The paired permutation test (random sign flips). It uses the size of each difference. |
 | `wilson(k, n, z)` | The Wilson interval of a proportion. |
 | `medianInterval(values, level)` | The distribution-free interval of a median, from two order statistics. It gives `low`, `high`, the `rank` of `low` and the `coverage`. |
+| `quantileInterval(values, p, level)` | The distribution-free interval of a quantile, from two order statistics. A side with no rank is infinite. The values must be independent draws. |
+| `quantileSamples(p, level)` | The fewest independent values that give a quantile an upper bound. At the level 0.95: 72 values for p95, 368 for p99 and 3,688 for p99.9. |
 | `binomialInterval(n, p, level)`, `negativeBinomialInterval(successes, p, level)` | The central interval of a binomial count, and of a count of failures before `successes` successes. Each tail outside holds `(1 - level) / 2` or less. |
 | `holm(pValues, level)` | The Holm correction of a family of tests. |
 | `spearman`, `kendallTau`, `ranks` | The rank correlations, with mean ranks for ties. |

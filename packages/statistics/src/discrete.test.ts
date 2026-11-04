@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { random } from "@mark1russell7/rigor-generators";
-import { binomialInterval, medianInterval, negativeBinomialInterval } from "./index.ts";
+import { binomialInterval, medianInterval, negativeBinomialInterval, quantileInterval, quantileSamples } from "./index.ts";
 
 /* ---------- The copies in the engines, word for word, as the references of the moves ---------- */
 
@@ -171,5 +171,86 @@ describe("negativeBinomialInterval", () => {
     expect(() => negativeBinomialInterval(-1, 0.5)).toThrow(RangeError);
     expect(() => negativeBinomialInterval(3, 0)).toThrow(RangeError);
     expect(() => negativeBinomialInterval(3, 0.5, 0)).toThrow(RangeError);
+  });
+});
+
+describe("quantileInterval", () => {
+  const ladder = (n: number): number[] => Array.from({ length: n }, (_, i) => i + 1);
+
+  it("gives the interval of the median at p = 1/2", () => {
+    for (const n of [6, 11, 12, 30, 101]) {
+      const values = ladder(n);
+      const [median, quantile] = [medianInterval(values), quantileInterval(values, 0.5)];
+      expect([quantile.low, quantile.high]).toEqual([median.low, median.high]);
+      expect(quantile.coverage).toBeCloseTo(median.coverage, 12);
+    }
+  });
+
+  it("gives the ranks that a table gives for p90 of 100 values", () => {
+    // P(X <= 83) of Binomial(100, 0.9) is 0.0206 and P(X <= 84) is 0.0399. P(X >= 96) is 0.0237 and P(X >= 95) is 0.0576.
+    const v = quantileInterval(ladder(100), 0.9);
+    expect(v).toMatchObject({ lowRank: 84, highRank: 96, low: 84, high: 96 });
+    expect(v.coverage).toBeCloseTo(1 - 0.0206 - 0.0237, 3);
+  });
+
+  it("has no upper bound under the count that quantileSamples gives, and has one at that count", () => {
+    expect(quantileInterval(ladder(367), 0.99).high).toBe(Infinity);
+    expect(quantileInterval(ladder(367), 0.99).highRank).toBe(368);
+    const v = quantileInterval(ladder(368), 0.99);
+    expect(v.high).toBe(368);
+    expect(v.highRank).toBe(368);
+  });
+
+  it("has no lower bound when the sample is too small for it", () => {
+    const v = quantileInterval(ladder(4), 0.5);
+    expect(v).toMatchObject({ low: -Infinity, lowRank: 0, high: Infinity, highRank: 5, coverage: 1 });
+  });
+
+  it("does not depend on the order of the values", () => {
+    const values = ladder(500);
+    expect(quantileInterval([...values].reverse(), 0.95)).toEqual(quantileInterval(values, 0.95));
+  });
+
+  it("holds the true quantile at the stated rate", () => {
+    const rng = random("quantile-interval");
+    const trials = 2000;
+    let held = 0;
+    for (let trial = 0; trial < trials; trial++) {
+      const values = Array.from({ length: 200 }, () => rng.next());
+      const v = quantileInterval(values, 0.9);
+      if (v.low <= 0.9 && 0.9 <= v.high) held += 1;
+    }
+    expect(held / trials).toBeGreaterThan(0.94);
+    expect(held / trials).toBeLessThan(0.995);
+  });
+
+  it("refuses bad input", () => {
+    expect(() => quantileInterval([], 0.5)).toThrow(RangeError);
+    expect(() => quantileInterval([1, Number.NaN], 0.5)).toThrow(RangeError);
+    expect(() => quantileInterval([1], 0)).toThrow(RangeError);
+    expect(() => quantileInterval([1], 1)).toThrow(RangeError);
+    expect(() => quantileInterval([1], 0.5, 1)).toThrow(RangeError);
+  });
+});
+
+describe("quantileSamples", () => {
+  it("gives the counts of the common quantiles at the level 0.95", () => {
+    expect([0.5, 0.95, 0.99, 0.999].map((p) => quantileSamples(p))).toEqual([6, 72, 368, 3688]);
+  });
+
+  it("gives the smallest n with p^n in the tail", () => {
+    for (const p of [0.5, 0.75, 0.9, 0.95, 0.99, 0.999]) {
+      for (const level of [0.8, 0.9, 0.95, 0.99]) {
+        const [n, tail] = [quantileSamples(p, level), (1 - level) / 2];
+        expect(p ** n).toBeLessThanOrEqual(tail);
+        expect(p ** (n - 1)).toBeGreaterThan(tail);
+      }
+    }
+  });
+
+  it("refuses bad input", () => {
+    expect(() => quantileSamples(1)).toThrow(RangeError);
+    expect(() => quantileSamples(0)).toThrow(RangeError);
+    expect(() => quantileSamples(0.5, 0)).toThrow(RangeError);
   });
 });
