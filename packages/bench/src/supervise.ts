@@ -170,11 +170,16 @@ export async function superviseCases(options: SuperviseOptions): Promise<Supervi
     }
   };
 
+  // A function makes this reset, so that the checks of the loop see the declared types of the state.
+  const forgetChild = (): void => {
+    state.running = undefined;
+    state.exit = undefined;
+  };
+
   let starts = 0;
   let code: number | null = null;
   while (left().length > 0) {
-    state.running = undefined;
-    state.exit = undefined;
+    forgetChild();
     starts += 1;
     const child = start(left());
     const exited = child.exited.then((value) => {
