@@ -1,3 +1,5 @@
+import { random } from "@mark1russell7/rigor-generators";
+import { quantileInterval } from "@mark1russell7/rigor-statistics";
 import { describe, expect, it } from "vitest";
 import { type BudgetRound, type Ladder, type Rung, type RungRecord, LADDER_FORMAT, checkLadder, ladderVerdict, rungVerdict } from "./index.ts";
 
@@ -229,5 +231,76 @@ describe("a quantile budget", () => {
     expect(checkLadder(ladder([rung(1, { budgets: [{ ...budget, quantile: 1 }] })])).join()).toContain("a quantile is");
     expect(checkLadder(ladder([rung(1, { budgets: [{ ...budget, level: 0 }] })])).join()).toContain("a level is");
     expect(checkLadder(ladder([on]))).toEqual([]);
+  });
+
+  describe("with censored values", () => {
+    const censoredOf = (values: readonly number[], censored: readonly number[]) => rungVerdict(on, record(1, { evidence: [{ kind: "quantile", measure: "read p99", values, censored }] }), { now }).budgets[0];
+    /** The number of the largest values of 1,000 that lie above the upper rank. */
+    const margin = 1000 - quantileInterval(flat(1000, 100), 0.99).highRank;
+
+    it("is not within when a censored value is at the upper rank: its bound is low, and its true value has no bound", () => {
+      expect(verdictOf(flat(400, 100))?.outcome).toBe("within");
+      expect(censoredOf(flat(399, 100), [100])?.outcome).toBe("cannot decide");
+    });
+
+    it("is within when each censored value lies above the upper rank", () => {
+      expect(margin).toBeGreaterThan(0);
+      expect(censoredOf(flat(1000 - margin, 100), flat(margin, 100))?.outcome).toBe("within");
+      expect(censoredOf(flat(1000 - margin - 1, 100), flat(margin + 1, 100))?.outcome).toBe("cannot decide");
+    });
+
+    it("is beyond when the censored bounds alone pass the limit", () => {
+      expect(censoredOf(flat(395, 100), flat(5, 900))?.outcome).toBe("cannot decide");
+      expect(censoredOf(flat(380, 100), flat(20, 900))?.outcome).toBe("beyond");
+    });
+
+    it("decides with no reply at all only for beyond", () => {
+      expect(censoredOf([], flat(400, 900))?.outcome).toBe("beyond");
+      expect(censoredOf([], flat(400, 100))?.outcome).toBe("cannot decide");
+    });
+
+    it("cannot decide with a censored value that is not a finite number", () => {
+      expect(censoredOf(flat(400, 100), [Number.NaN])?.outcome).toBe("cannot decide");
+      expect(censoredOf(flat(400, 100), [Number.POSITIVE_INFINITY])?.outcome).toBe("cannot decide");
+    });
+
+    it("gives the same verdict for an empty list and for no list", () => {
+      expect(censoredOf(flat(400, 100), [])).toEqual(verdictOf(flat(400, 100)));
+    });
+
+    it("counts each censored value, and says that the point is a lower bound", () => {
+      const reason = censoredOf(flat(399, 100), [700])?.reason;
+      expect(reason).toContain("399 values and 1 censored");
+      expect(reason).toContain("at least");
+    });
+
+    it("gives a rung no pass from values that a censored arrival would change", () => {
+      const evidence = [{ kind: "quantile", measure: "read p99", values: flat(399, 100), censored: [100] }] as const;
+      expect(rungVerdict(on, record(1, { evidence }), { now }).outcome).toBe("cannot decide");
+    });
+
+    it("keeps each decision true: a decided verdict on bounds is the verdict on the true values", () => {
+      const rng = random("censored-quantile");
+      const decided = { within: 0, beyond: 0 };
+      for (let draw = 0; draw < 200; draw += 1) {
+        const size = 1000 + Math.floor(rng.next() * 1000);
+        const share = rng.next() * 0.02;
+        const scale = 40 + rng.next() * 300;
+        const truth = Array.from({ length: size }, () => -Math.log(1 - rng.next()) * scale);
+        const values: number[] = [];
+        const censored: number[] = [];
+        for (const value of truth) {
+          if (rng.next() < share) censored.push(value * rng.next());
+          else values.push(value);
+        }
+        const bounds = censoredOf(values, censored)?.outcome;
+        if (bounds === "within" || bounds === "beyond") {
+          decided[bounds] += 1;
+          expect(verdictOf(truth)?.outcome).toBe(bounds);
+        }
+      }
+      expect(decided.within).toBeGreaterThan(0);
+      expect(decided.beyond).toBeGreaterThan(0);
+    });
   });
 });
