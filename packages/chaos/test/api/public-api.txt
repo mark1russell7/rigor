@@ -1,0 +1,122 @@
+# The public API of @mark1russell7/rigor-chaos
+#
+# The names of each entry of the exports field, and the declaration of each name, without comments
+# and private members. The command `api-report check` compares this file with the built .d.ts files.
+# To accept a change of the API, start the build, then `api-report update`, and review the diff.
+
+## . (build/index.d.ts): 19 names
+
+type Arrivals: build/schedule.d.ts#Arrivals
+type Completion: build/measure.d.ts#Completion
+type LoadMeasure: build/measure.d.ts#LoadMeasure
+type Phase: build/schedule.d.ts#Phase
+type Profile: build/schedule.d.ts#Profile
+SCHEDULE_FORMAT: build/schedule.d.ts#SCHEDULE_FORMAT
+type Schedule: build/schedule.d.ts#Schedule
+type ScheduleCheck: build/measure.d.ts#ScheduleCheck
+type ScheduleOptions: build/schedule.d.ts#ScheduleOptions
+checkProfile: build/schedule.d.ts#checkProfile
+constant: build/schedule.d.ts#constant
+expectedArrivals: build/schedule.d.ts#expectedArrivals
+latencyQuantile: build/measure.d.ts#latencyQuantile
+measureLoad: build/measure.d.ts#measureLoad
+ramp: build/schedule.d.ts#ramp
+schedule: build/schedule.d.ts#schedule
+scheduleHeld: build/measure.d.ts#scheduleHeld
+spike: build/schedule.d.ts#spike
+steps: build/schedule.d.ts#steps
+
+## Declarations
+
+### build/measure.d.ts#Completion
+export interface Completion {
+  readonly index: number;
+  readonly sent: number;
+  readonly done: number | null;
+}
+
+### build/measure.d.ts#LoadMeasure
+export interface LoadMeasure {
+  readonly planned: number;
+  readonly unsent: number;
+  readonly unfinished: number;
+  readonly latency: readonly number[];
+  readonly service: readonly number[];
+  readonly lag: readonly number[];
+  readonly censored: readonly number[];
+}
+
+### build/measure.d.ts#ScheduleCheck
+export interface ScheduleCheck {
+  readonly held: boolean;
+  readonly worst: number | null;
+  readonly late: number;
+  readonly reason: string;
+}
+
+### build/measure.d.ts#latencyQuantile
+export declare function latencyQuantile(measure: LoadMeasure, p: number): number;
+
+### build/measure.d.ts#measureLoad
+export declare function measureLoad(plan: Schedule, completions: readonly Completion[], end: number): LoadMeasure;
+
+### build/measure.d.ts#scheduleHeld
+export declare function scheduleHeld(measure: LoadMeasure, limit: number): ScheduleCheck;
+
+### build/schedule.d.ts#Arrivals
+export type Arrivals = "uniform" | "poisson";
+
+### build/schedule.d.ts#Phase
+export interface Phase {
+  readonly ms: number;
+  readonly from: number;
+  readonly to: number;
+}
+
+### build/schedule.d.ts#Profile
+export type Profile = readonly Phase[];
+
+### build/schedule.d.ts#SCHEDULE_FORMAT
+export declare const SCHEDULE_FORMAT = "rigor-schedule/1";
+
+### build/schedule.d.ts#Schedule
+export interface Schedule {
+  readonly format: typeof SCHEDULE_FORMAT;
+  readonly arrivals: Arrivals;
+  readonly seed: number | string | null;
+  readonly profile: Profile;
+  readonly times: readonly number[];
+}
+
+### build/schedule.d.ts#ScheduleOptions
+export type ScheduleOptions = {
+  readonly arrivals: "uniform";
+} | {
+  readonly arrivals: "poisson";
+  readonly seed: number | string;
+};
+
+### build/schedule.d.ts#checkProfile
+export declare function checkProfile(profile: Profile): readonly string[];
+
+### build/schedule.d.ts#constant
+export declare function constant(rate: number, ms: number): Profile;
+
+### build/schedule.d.ts#expectedArrivals
+export declare function expectedArrivals(profile: Profile): number;
+
+### build/schedule.d.ts#ramp
+export declare function ramp(from: number, to: number, ms: number): Profile;
+
+### build/schedule.d.ts#schedule
+export declare function schedule(profile: Profile, options: ScheduleOptions): Schedule;
+
+### build/schedule.d.ts#spike
+export declare function spike(base: number, peak: number, shape: {
+  readonly before: number;
+  readonly width: number;
+  readonly after: number;
+}): Profile;
+
+### build/schedule.d.ts#steps
+export declare function steps(rates: readonly number[], ms: number): Profile;
