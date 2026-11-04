@@ -136,6 +136,22 @@ The default expansion has one product for each pair of levels of two dimensions.
 
 Each function throws a RangeError for an empty list, for a NaN and for a parameter out of its range. Thus a missing value cannot make a quiet NaN in a record.
 
+### The limits of the shape of a sample
+
+`modeCount` joins more than about 24 evenly spaced clusters, because its grid has 96 points. A tight cluster also needs more than about `n ** 0.8 / 8` values in a sample of `n` values. Under these limits a test holds the count at 20 clusters.
+
+`bestSmoothLaw` is not reliable under 300 values. The laws with a fitted end have a benefit at small sizes. This table gives the share of correct results for 500 seeded samples of each law. A test holds it.
+
+| Values | uniform | normal | exponential | log-normal | Pareto |
+| --- | --- | --- | --- | --- | --- |
+| 10 | 0.96 | 0.01 | 0.45 | 0.02 | 0.69 |
+| 30 | 1.00 | 0.30 | 0.90 | 0.25 | 0.87 |
+| 100 | 1.00 | 0.68 | 0.99 | 0.71 | 0.99 |
+| 300 | 1.00 | 0.85 | 1.00 | 0.99 | 1.00 |
+| 1,000 | 1.00 | 0.97 | 1.00 | 1.00 | 1.00 |
+
+The samples use a normal law with a mean of 100 and an SD of 10, where the normal and log-normal laws are close.
+
 ## Moves from the copies
 
 The tests prove that these functions give the same numbers as the copies in the engines, to the bit:

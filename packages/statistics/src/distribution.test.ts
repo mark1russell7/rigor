@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { random, type Random } from "@mark1russell7/rigor-generators";
 import { bestSmoothLaw, modeCount, smoothLawScores, type SmoothLaw } from "./distribution.ts";
 
 /** This function gives `n` values of a quantile function at even steps, so a test needs no random numbers. */
@@ -23,6 +24,18 @@ const SAMPLES: readonly (readonly [SmoothLaw, readonly number[]])[] = [
 
 /** This function gives two or more clusters of equal mass. */
 const clusters = (centres: readonly number[], width: number): number[] => centres.flatMap((c) => evenly(N / centres.length, (p) => c + width * normalQuantile(p)));
+
+/** This function gives `count` clusters of `size` values, each `width` wide, with the centres 100 apart. */
+const spaced = (count: number, size: number, width: number): number[] =>
+  Array.from({ length: count }, (_, c) => evenly(size, (p) => 100 * c + width * normalQuantile(p))).flat();
+
+const DRAWS: readonly (readonly [SmoothLaw, (r: Random) => number])[] = [
+  ["uniform", (r) => r.range(10, 30)],
+  ["normal", (r) => r.normal(100, 10)],
+  ["exponential", (r) => 1 - 5 * Math.log(1 - r.next())],
+  ["log-normal", (r) => Math.exp(r.normal(1, 0.8))],
+  ["pareto", (r) => 2 * (1 - r.next()) ** (-1 / 1.5)],
+];
 
 describe("the count of the modes", () => {
   it("gives 1 for a smooth law and for equal values", () => {
@@ -58,9 +71,42 @@ describe("the count of the modes", () => {
     expect(modeCount([...values].reverse())).toBe(2);
   });
 
-  it("throws for an empty list and for a NaN", () => {
+  it.each([6, 9, 12, 20])("gives %i tight clusters at 50 and at 1,000 values each", (count) => {
+    expect(modeCount(spaced(count, 50, 0.5))).toBe(count);
+    expect(modeCount(spaced(count, 1000, 0.5))).toBe(count);
+  });
+
+  it.each([6, 9, 12, 20])("gives %i groups of equal values", (count) => {
+    expect(modeCount(spaced(count, 50, 0))).toBe(count);
+  });
+
+  it("gives the same count for random clusters", () => {
+    const r = random("clusters");
+    for (const count of [6, 12, 20]) {
+      const values = Array.from({ length: count }, (_, c) => Array.from({ length: 50 }, () => r.normal(100 * c, 0.5))).flat();
+      expect(modeCount(values)).toBe(count);
+    }
+  });
+
+  it("joins clusters past the limit of the grid, and gives at least 1", () => {
+    expect(modeCount(spaced(24, 50, 0.5))).toBe(24);
+    expect(modeCount(spaced(30, 50, 0.5))).toBe(1);
+  });
+
+  it("joins clusters of too few values for their count", () => {
+    expect(modeCount(spaced(24, 10, 0.5))).toBe(1);
+  });
+
+  it.each(DRAWS.map(([law, draw]) => [law, draw] as const))("gives 1 for each random sample of 1,000 values of the %s law", (law, draw) => {
+    const r = random(`modes ${law}`);
+    for (let i = 0; i < 100; i++) expect(modeCount(Array.from({ length: 1000 }, () => draw(r)))).toBe(1);
+  });
+
+  it("throws for an empty list, for a NaN and for an infinite value", () => {
     expect(() => modeCount([])).toThrow(RangeError);
     expect(() => modeCount([1, Number.NaN])).toThrow(RangeError);
+    expect(() => modeCount([1, Number.POSITIVE_INFINITY])).toThrow(RangeError);
+    expect(() => modeCount([Number.NEGATIVE_INFINITY, 1, 2])).toThrow(RangeError);
   });
 });
 
@@ -80,6 +126,39 @@ describe("the smooth law of a sample", () => {
   it("gives the closed form of the uniform law", () => {
     expect(smoothLawScores([2, 3, 6])[0]?.meanLogDensity).toBeCloseTo(-Math.log(4), 12);
   });
+
+  it("gives the exact likelihood of the normal and the log-normal law", () => {
+    const values = [2, 3, 5, 9, 14];
+    const exact = (xs: readonly number[]): number => {
+      const centre = xs.reduce((sum, x) => sum + x, 0) / xs.length;
+      const variance = xs.reduce((sum, x) => sum + (x - centre) ** 2, 0) / xs.length;
+      return -0.5 * Math.log(2 * Math.PI * variance) - 0.5;
+    };
+    const logs = values.map(Math.log);
+    const scores = smoothLawScores(values);
+    expect(scores[1]?.meanLogDensity).toBeCloseTo(exact(values), 12);
+    expect(scores[3]?.meanLogDensity).toBeCloseTo(exact(logs) - logs.reduce((sum, x) => sum + x, 0) / logs.length, 12);
+  });
+
+  it("holds the table of the README for random samples", () => {
+    const SIZES = [10, 30, 100, 300, 1000];
+    const TABLE: Readonly<Record<SmoothLaw, readonly number[]>> = {
+      uniform: [0.96, 0.996, 1, 1, 1],
+      normal: [0.006, 0.3, 0.684, 0.846, 0.968],
+      exponential: [0.454, 0.896, 0.988, 1, 1],
+      "log-normal": [0.018, 0.25, 0.714, 0.988, 1],
+      pareto: [0.688, 0.87, 0.994, 1, 1],
+    };
+    for (const [law, draw] of DRAWS) {
+      const shares = SIZES.map((n) => {
+        const r = random(`law ${law} ${n}`);
+        let right = 0;
+        for (let i = 0; i < 500; i++) if (bestSmoothLaw(Array.from({ length: n }, () => draw(r))) === law) right++;
+        return right / 500;
+      });
+      expect(shares).toEqual(TABLE[law]);
+    }
+  }, 60_000);
 
   it("gives the same gap of log density under a change of units", () => {
     const gap = (values: readonly number[]): number => {
