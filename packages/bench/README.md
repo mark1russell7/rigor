@@ -150,6 +150,29 @@ const { records } = timeRounds({ a: () => oldCode(input), b: () => newCode(input
 
 Each arm gives a number. The engine cannot remove the work of a call, because the sum of these numbers uses it.
 
+## Read the load of a run from a control
+
+Runs on shared machines differ by load. A control is a case that a change does not touch, so its time measures the machine. `controlFactor` gives the load factor of each group of rows.
+
+```ts
+import { controlFactor } from "@mark1russell7/rigor-bench";
+
+// Two runs: the median ratio of the keys that both runs have.
+const two = controlFactor(rows, { base: "run-1" });
+two.factors[0]; // { group: "run-2", factor: 1.35, pairs: 200, low: 1.2, high: 1.5, censored: 3 }
+
+// One run, grouped by shard: each time against the median of its key over the shards.
+const shards = controlFactor(shardRows);
+```
+
+- A key names a class of work, so equal keys in two groups mean equal work. Thus a shard with a different mix of work does not read as load. Each group has at most one row for a key.
+- A key in one group has nothing to compare with, so no factor reads it. The field `unshared` counts those keys.
+- Without `base`, a factor reads against the other groups. Thus a load that all groups share does not show.
+- A group with too few usable keys gets an entry with `factor` undefined and a `reason`, so the other groups keep their factors. The function refuses a result where no group has a factor.
+- A censored time is only a lower limit, so no ratio reads it. The field `censored` counts those keys. A run stops its slowest cases, so a factor reads low when `censored` is not 0.
+- The fields `low` and `high` are the quartiles of the ratios. A wide spread means that one factor does not explain the load.
+- The function refuses a group with fewer usable keys than `minPairs`. The default is 5.
+
 ## The fresh runner
 
 The entry `@mark1russell7/rigor-bench/fresh` starts child processes, so it is for Node only. The root entry stays free of `node:child_process`.
