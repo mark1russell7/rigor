@@ -35,6 +35,30 @@ for (const seed of seedsFrom(process.env.SEED, [1, 2, 3, 4, 5])) {
 
 The package also exports the parts: `mulberry32(seed)` (the raw source), `fnv1a32(text, options)` (the FNV-1a hash), `seedOf(seed)`, `deriveSeed(seed, label)` and `randomOf(source, seed)` (the draws over a source that you give).
 
+## Open families of distributions
+
+A closed list of size names cannot grow without a change to each corpus. A `DistributionSpec` names a family and its parameters, so a corpus can name any point of the family.
+
+| Family | Parameters | Numbers |
+| --- | --- | --- |
+| `lognormal` | `mu`, `sigma` | above 0, with a long tail |
+| `pareto` | `scale`, `shape` | `scale` or more, with a heavy tail |
+| `zipf` | `n`, `exponent` | the ranks from 1 to `n` |
+| `beta` | `a`, `b` | from 0 to 1 |
+| `mixture` | `parts`, each with a `weight` | one value of one part |
+| `recorded` | `values` | one of the recorded values |
+
+```ts
+import { random, sampler } from "@mark1russell7/rigor-generators";
+
+const next = sampler({ family: "lognormal", mu: [1, 2], sigma: 0.5 }, random("widths"));
+const widths = Array.from({ length: 100 }, () => next());
+```
+
+A parameter is a number or a range `[min, max]`. `sampler` draws from a range once, so one sampler is one point of the family.
+
+`Math.exp`, `Math.log` and `Math.pow` can give other results on another JavaScript engine. `dependsOnLibm` tells if a spec uses them. Only `recorded` does not, so write the numbers of the other families into a corpus when a corpus must match on each platform.
+
 ## The input of `fnv1a32`
 
 The option `input` of `fnv1a32` selects the units that the hash reads. Use it to replace a local copy of FNV-1a with the same hashes.

@@ -4,19 +4,54 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 9 names
+## . (build/index.d.ts): 13 names
 
+type DistributionSpec: build/index.d.ts#DistributionSpec
+type Param: build/index.d.ts#Param
 type Random: build/index.d.ts#Random
 type Source: build/index.d.ts#Source
+dependsOnLibm: build/index.d.ts#dependsOnLibm
 deriveSeed: build/index.d.ts#deriveSeed
 fnv1a32: build/index.d.ts#fnv1a32
 mulberry32: build/index.d.ts#mulberry32
 random: build/index.d.ts#random
 randomOf: build/index.d.ts#randomOf
+sampler: build/index.d.ts#sampler
 seedOf: build/index.d.ts#seedOf
 seedsFrom: build/index.d.ts#seedsFrom
 
 ## Declarations
+
+### build/index.d.ts#DistributionSpec
+type DistributionSpec = {
+  readonly family: "lognormal";
+  readonly mu: Param;
+  readonly sigma: Param;
+} | {
+  readonly family: "pareto";
+  readonly scale: Param;
+  readonly shape: Param;
+} | {
+  readonly family: "zipf";
+  readonly n: number;
+  readonly exponent: Param;
+} | {
+  readonly family: "beta";
+  readonly a: Param;
+  readonly b: Param;
+} | {
+  readonly family: "mixture";
+  readonly parts: readonly {
+    readonly weight: number;
+    readonly part: DistributionSpec;
+  }[];
+} | {
+  readonly family: "recorded";
+  readonly values: readonly number[];
+};
+
+### build/index.d.ts#Param
+type Param = number | readonly [min: number, max: number];
 
 ### build/index.d.ts#Random
 interface Random {
@@ -37,6 +72,9 @@ interface Random {
 ### build/index.d.ts#Source
 type Source = () => number;
 
+### build/index.d.ts#dependsOnLibm
+export declare function dependsOnLibm(spec: DistributionSpec): boolean;
+
 ### build/index.d.ts#deriveSeed
 export declare function deriveSeed(seed: number, label: string): number;
 
@@ -53,6 +91,9 @@ export declare function random(seed: number | string, source?: (seed: number) =>
 
 ### build/index.d.ts#randomOf
 export declare function randomOf(next: Source, seed: number, source?: (seed: number) => Source): Random;
+
+### build/index.d.ts#sampler
+export declare function sampler(spec: DistributionSpec, r: Random): () => number;
 
 ### build/index.d.ts#seedOf
 export declare function seedOf(seed: number | string): number;
