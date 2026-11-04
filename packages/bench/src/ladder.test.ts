@@ -193,3 +193,41 @@ describe("ladderVerdict", () => {
     expect(() => ladderVerdict(ladder([]), [], { now })).toThrow(RangeError);
   });
 });
+
+describe("a quantile budget", () => {
+  const budget = { kind: "quantile", measure: "read p99", unit: "ms", quantile: 0.99, limit: 500 } as const;
+  const on = rung(1, { budgets: [budget] });
+  const verdictOf = (values: readonly number[]) => rungVerdict(on, record(1, { evidence: [{ kind: "quantile", measure: "read p99", values }] }), { now }).budgets[0];
+  const flat = (n: number, value: number): number[] => Array.from({ length: n }, () => value);
+
+  it("is within when the upper bound of the quantile is at the limit or under it", () => {
+    expect(verdictOf(flat(400, 100))?.outcome).toBe("within");
+  });
+
+  it("cannot decide with too few values, and says how many it needs", () => {
+    const v = verdictOf(flat(367, 100));
+    expect(v?.outcome).toBe("cannot decide");
+    expect(v?.reason).toContain("368 values needed");
+  });
+
+  it("is beyond when the lower bound is over the limit, and one value can show that", () => {
+    expect(verdictOf(flat(400, 900))?.outcome).toBe("beyond");
+    expect(verdictOf([900])?.outcome).toBe("beyond");
+  });
+
+  it("cannot decide when the limit is in the interval", () => {
+    const values = [...flat(990, 100), ...flat(10, 900)];
+    expect(verdictOf(values)?.outcome).toBe("cannot decide");
+  });
+
+  it("cannot decide with no values or with a NaN", () => {
+    expect(verdictOf([])?.outcome).toBe("cannot decide");
+    expect(verdictOf([1, Number.NaN])?.outcome).toBe("cannot decide");
+  });
+
+  it("gives a problem for a quantile or a level out of range", () => {
+    expect(checkLadder(ladder([rung(1, { budgets: [{ ...budget, quantile: 1 }] })])).join()).toContain("a quantile is");
+    expect(checkLadder(ladder([rung(1, { budgets: [{ ...budget, level: 0 }] })])).join()).toContain("a level is");
+    expect(checkLadder(ladder([on]))).toEqual([]);
+  });
+});

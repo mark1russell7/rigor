@@ -75,7 +75,16 @@ export {
   wilson,
 } from "./tests.ts";
 export { KENDALL_EXACT, kendallTau, ranks, spearman } from "./rank.ts";
-export { type CountInterval, type MedianInterval, binomialInterval, medianInterval, negativeBinomialInterval } from "./discrete.ts";
+export {
+  type CountInterval,
+  type MedianInterval,
+  type QuantileInterval,
+  binomialInterval,
+  medianInterval,
+  negativeBinomialInterval,
+  quantileInterval,
+  quantileSamples,
+} from "./discrete.ts";
 export {
   type CalibrationLevel,
   type CompareOptions,

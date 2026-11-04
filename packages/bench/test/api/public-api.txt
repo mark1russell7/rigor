@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 71 names
+## . (build/index.d.ts): 72 names
 
 type Arm: build/paired.d.ts#Arm
 type Balanced: build/index.d.ts#Balanced
@@ -42,6 +42,7 @@ type PooledRecords: build/index.d.ts#PooledRecords
 type PooledVerdict: build/index.d.ts#PooledVerdict
 type Power: build/index.d.ts#Power
 type PowerOptions: build/index.d.ts#PowerOptions
+type QuantileBudget: build/index.d.ts#QuantileBudget
 type RateBudget: build/index.d.ts#RateBudget
 type Rounds: build/index.d.ts#Rounds
 type RoundsOptions: build/index.d.ts#RoundsOptions
@@ -479,6 +480,16 @@ interface PowerOptions {
   readonly verdict?: VerdictOptions;
 }
 
+### build/index.d.ts#QuantileBudget
+interface QuantileBudget {
+  readonly kind: "quantile";
+  readonly measure: string;
+  readonly unit: string;
+  readonly quantile: number;
+  readonly limit: number;
+  readonly level?: number;
+}
+
 ### build/index.d.ts#RateBudget
 interface RateBudget {
   readonly kind: "rate";
@@ -518,7 +529,7 @@ interface Rung {
 }
 
 ### build/index.d.ts#RungBudget
-type RungBudget = MedianBudget | RateBudget | WorstBudget;
+type RungBudget = MedianBudget | QuantileBudget | RateBudget | WorstBudget;
 
 ### build/index.d.ts#RungEvidence
 type RungEvidence = {
@@ -526,6 +537,10 @@ type RungEvidence = {
   readonly measure: string;
   readonly rounds: readonly BudgetRound[];
   readonly aa: readonly BudgetRound[];
+} | {
+  readonly kind: "quantile";
+  readonly measure: string;
+  readonly values: readonly number[];
 } | {
   readonly kind: "rate";
   readonly measure: string;

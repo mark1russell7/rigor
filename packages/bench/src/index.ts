@@ -6,6 +6,7 @@ export {
   type LadderOptions,
   type LadderVerdict,
   type MedianBudget,
+  type QuantileBudget,
   type RateBudget,
   type Rung,
   type RungBudget,

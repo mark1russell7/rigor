@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 109 names
+## . (build/index.d.ts): 112 names
 
 type BootstrapOptions: build/index.d.ts#BootstrapOptions
 type CalibrationLevel: build/index.d.ts#CalibrationLevel
@@ -29,6 +29,7 @@ type ParsedResponseRecord: build/index.d.ts#ParsedResponseRecord
 type PermutationOptions: build/index.d.ts#PermutationOptions
 type PermutationResult: build/index.d.ts#PermutationResult
 type Proportion: build/index.d.ts#Proportion
+type QuantileInterval: build/index.d.ts#QuantileInterval
 type QuantileMethod: build/index.d.ts#QuantileMethod
 RESPONSE_LAMBDAS: build/index.d.ts#RESPONSE_LAMBDAS
 RESPONSE_MAX_POWER: build/index.d.ts#RESPONSE_MAX_POWER
@@ -101,6 +102,8 @@ pairedPermutation: build/index.d.ts#pairedPermutation
 parseResponseRecord: build/index.d.ts#parseResponseRecord
 predictResponse: build/index.d.ts#predictResponse
 quantile: build/index.d.ts#quantile
+quantileInterval: build/index.d.ts#quantileInterval
+quantileSamples: build/index.d.ts#quantileSamples
 quantileSorted: build/index.d.ts#quantileSorted
 ranks: build/index.d.ts#ranks
 responseCells: build/index.d.ts#responseCells
@@ -291,6 +294,15 @@ interface PermutationResult {
 interface Proportion {
   readonly low: number;
   readonly high: number;
+}
+
+### build/index.d.ts#QuantileInterval
+interface QuantileInterval {
+  readonly low: number;
+  readonly high: number;
+  readonly lowRank: number;
+  readonly highRank: number;
+  readonly coverage: number;
 }
 
 ### build/index.d.ts#QuantileMethod
@@ -687,6 +699,12 @@ export declare function predictResponse(model: ResponseModel, inputs: Readonly<R
 
 ### build/index.d.ts#quantile
 export declare function quantile(values: readonly number[], p: number, method?: QuantileMethod): number;
+
+### build/index.d.ts#quantileInterval
+export declare function quantileInterval(values: readonly number[], p: number, level?: number): QuantileInterval;
+
+### build/index.d.ts#quantileSamples
+export declare function quantileSamples(p: number, level?: number): number;
 
 ### build/index.d.ts#quantileSorted
 export declare function quantileSorted(sortedValues: readonly number[], p: number, method?: QuantileMethod): number;
