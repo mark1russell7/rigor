@@ -29,6 +29,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./fresh": "./src/fresh.ts",
+    "./supervise": "./src/supervise.ts",
     "./package.json": "./package.json"
   },
   "files": [
@@ -46,6 +47,10 @@
       "./fresh": {
         "types": "./build/fresh.d.ts",
         "import": "./build/fresh.js"
+      },
+      "./supervise": {
+        "types": "./build/supervise.d.ts",
+        "import": "./build/supervise.js"
       },
       "./package.json": "./package.json"
     }
