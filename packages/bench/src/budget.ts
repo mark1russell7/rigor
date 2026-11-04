@@ -1,7 +1,7 @@
 /**
- * The budget verdict of one build: is the median of a measure of each case at most an absolute limit? For example, the
- * claim "the median blocking time of this page is at most 450 ms" needs it. The time verdict and the limit verdict judge
- * a ratio of two arms, so they cannot use a value of 0, and their A/A band is a ratio.
+ * The budget verdict of one build: is the median of a measure of each case at most an absolute limit? An example is the
+ * claim "the median blocking time of this page is at most 450 ms". The time verdict and the limit verdict judge a ratio
+ * of two arms, so they cannot use a value of 0. Their A/A band is also a ratio.
  */
 import { median, medianInterval } from "@mark1russell7/rigor-statistics";
 
@@ -107,9 +107,10 @@ function caseBudget(name: string, values: readonly number[], aaValues: readonly 
 /**
  * This function gives the verdict of the claim "the median of each case is at most `limit`". The arm `aa` is a second
  * arm of the same build, and it shows the noise of the run as a difference. Values of 0 are valid.
- * - A case is `cannot decide` when the A/A arm does not have it, when an arm has too few rounds for the level, or when
- *   the medians of the two arms differ by more than `maxDifference`.
- * - Else a case is `within` when the high end of its interval is at most the limit, and `beyond` when the low end is above it.
+ * - A case is `cannot decide` when the A/A arm does not have it, or when an arm has too few rounds for the level.
+ * - A case is also `cannot decide` when the medians of the two arms differ by more than `maxDifference`.
+ * - Other cases are `within` when the high end of the interval is at most the limit.
+ * - They are `beyond` when the low end of the interval is above the limit.
  * - The verdict is `beyond` when a case is `beyond`, and `within` when each case is `within`.
  * - Each other verdict is `cannot decide`, and so is a verdict with no cases.
  */

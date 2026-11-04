@@ -4,13 +4,18 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 48 names
+## . (build/index.d.ts): 54 names
 
 type Arm: build/paired.d.ts#Arm
 type Balanced: build/index.d.ts#Balanced
 type Band: build/index.d.ts#Band
 type BandKind: build/index.d.ts#BandKind
 type BandOptions: build/index.d.ts#BandOptions
+type BudgetOptions: build/index.d.ts#BudgetOptions
+type BudgetOutcome: build/index.d.ts#BudgetOutcome
+type BudgetRound: build/index.d.ts#BudgetRound
+type BudgetVerdict: build/index.d.ts#BudgetVerdict
+type CaseBudget: build/index.d.ts#CaseBudget
 type CaseInterval: build/index.d.ts#CaseInterval
 type CaseLimit: build/index.d.ts#CaseLimit
 type CaseRatio: build/paired.d.ts#CaseRatio
@@ -41,6 +46,7 @@ aaBand: build/index.d.ts#aaBand
 aaSpread: build/index.d.ts#aaSpread
 armVerdicts: build/index.d.ts#armVerdicts
 balanceOrders: build/index.d.ts#balanceOrders
+budgetVerdict: build/index.d.ts#budgetVerdict
 caseIntervals: build/index.d.ts#caseIntervals
 caseRatios: build/paired.d.ts#caseRatios
 checkPairedTime: build/paired.d.ts#checkPairedTime
@@ -209,6 +215,48 @@ interface BandOptions {
   readonly level?: number;
   readonly minimum?: number;
   readonly bootstrap?: BootstrapOptions;
+}
+
+### build/index.d.ts#BudgetOptions
+interface BudgetOptions {
+  readonly limit: number;
+  readonly maxDifference: number;
+  readonly caseLevel?: number;
+}
+
+### build/index.d.ts#BudgetOutcome
+type BudgetOutcome = "within" | "beyond" | "cannot decide";
+
+### build/index.d.ts#BudgetRound
+interface BudgetRound {
+  readonly case: string;
+  readonly round: number;
+  readonly value: number;
+}
+
+### build/index.d.ts#BudgetVerdict
+interface BudgetVerdict {
+  readonly outcome: BudgetOutcome;
+  readonly reason: string;
+  readonly limit: number;
+  readonly maxDifference: number;
+  readonly level: number;
+  readonly cases: readonly CaseBudget[];
+}
+
+### build/index.d.ts#CaseBudget
+interface CaseBudget {
+  readonly case: string;
+  readonly rounds: number;
+  readonly aaRounds: number;
+  readonly median: number;
+  readonly aaMedian: number | undefined;
+  readonly difference: number | undefined;
+  readonly low: number;
+  readonly high: number;
+  readonly coverage: number;
+  readonly outcome: BudgetOutcome;
+  readonly reason: string;
 }
 
 ### build/index.d.ts#CaseInterval
@@ -411,6 +459,9 @@ export declare function armVerdicts(run: RunPairs, aaPair: string, options?: Ver
 
 ### build/index.d.ts#balanceOrders
 export declare function balanceOrders<T extends PairedTime>(records: readonly T[]): Balanced<T>;
+
+### build/index.d.ts#budgetVerdict
+export declare function budgetVerdict(rounds: readonly BudgetRound[], aa: readonly BudgetRound[], options: BudgetOptions): BudgetVerdict;
 
 ### build/index.d.ts#caseIntervals
 export declare function caseIntervals(records: readonly PairedTime[], level?: number): CaseInterval[];
