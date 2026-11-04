@@ -153,9 +153,28 @@ function checkMeasure(value: unknown, path: string, faults: Faults): void {
   check(object, "direction", path, (v) => v === "higher" || v === "lower" || v === "none", `"higher", "lower" or "none"`, faults);
 }
 
-/** This function examines one point, with the dimensions and the measures of the record. */
-function checkPoint(value: unknown, path: string, dimensions: readonly ResponseDimension[], measures: ReadonlySet<string>, faults: Faults): void {
-  const object = fields(value, path, ["id", "values", "measures"], ["group"], faults);
+/** This function examines one declared reason. */
+function checkReason(value: unknown, path: string, faults: Faults): void {
+  const object = fields(value, path, ["id", "label"], [], faults);
+  if (object === undefined) return;
+  check(object, "id", path, isId, "text with one character or more", faults);
+  check(object, "label", path, isString, "text", faults);
+}
+
+/** This function examines the reasons of a point: each has a declaration, and each is on a measure with no number. */
+function checkAbsent(value: unknown, path: string, measuresOfPoint: unknown, measures: ReadonlySet<string>, reasons: ReadonlySet<string>, faults: Faults): void {
+  const absent = fields(value, path, [], [...measures], faults);
+  if (absent === undefined) return;
+  for (const measure of measures) {
+    if (!Object.hasOwn(absent, measure)) continue;
+    need(reasons.has(absent[measure] as string), at(path, measure), `the record declares no reason ${shown(absent[measure])}.`, faults);
+    need(typeof peek(measuresOfPoint, measure) !== "number", at(path, measure), "this measure has a number, so it has no reason.", faults);
+  }
+}
+
+/** This function examines one point, with the dimensions, the measures and the reasons of the record. */
+function checkPoint(value: unknown, path: string, dimensions: readonly ResponseDimension[], measures: ReadonlySet<string>, reasons: ReadonlySet<string>, faults: Faults): void {
+  const object = fields(value, path, ["id", "values", "measures"], ["group", "absent"], faults);
   if (object === undefined) return;
   check(object, "id", path, isId, "text with one character or more", faults);
   check(object, "group", path, isId, "text with one character or more", faults);
@@ -177,6 +196,7 @@ function checkPoint(value: unknown, path: string, dimensions: readonly ResponseD
       else need(present, at(inside, dimension.id), `this is null when the dimension "${parent}" is ${shown(values[parent])}.`, faults);
     }
   }
+  if (Object.hasOwn(object, "absent")) checkAbsent(object["absent"], at(path, "absent"), object["measures"], measures, reasons, faults);
   if (Object.hasOwn(object, "measures")) {
     const inside = at(path, "measures");
     const values = fields(object["measures"], inside, [...measures], [], faults);
@@ -192,7 +212,7 @@ function checkPoint(value: unknown, path: string, dimensions: readonly ResponseD
  */
 export function responseDataFaults(value: unknown, required: readonly string[], optional: readonly string[]): readonly ResponseFault[] {
   const faults: Faults = [];
-  const object = fields(value, "", ["schema", "name", "dimensions", "measures", "points", ...required], optional, faults);
+  const object = fields(value, "", ["schema", "name", "dimensions", "measures", "points", ...required], ["reasons", ...optional], faults);
   if (object === undefined) return faults;
   check(object, "schema", "", (v) => v === RESPONSE_RECORDS_SCHEMA, `"${RESPONSE_RECORDS_SCHEMA}"`, faults);
   check(object, "name", "", isId, "text with one character or more", faults);
@@ -205,9 +225,12 @@ export function responseDataFaults(value: unknown, required: readonly string[], 
   const measures = Object.hasOwn(object, "measures") ? list(object["measures"], "measures", 1, faults) : [];
   measures.forEach((m, i) => checkMeasure(m, `measures[${i}]`, faults));
   const measureIds = uniqueIds(measures, "measures", faults);
+  const reasons = Object.hasOwn(object, "reasons") ? list(object["reasons"], "reasons", 0, faults) : [];
+  reasons.forEach((r, i) => checkReason(r, `reasons[${i}]`, faults));
+  const reasonIds = uniqueIds(reasons, "reasons", faults);
   if (faults.length > 0) return faults;
   const points = list(object["points"], "points", 1, faults);
-  points.forEach((p, i) => checkPoint(p, `points[${i}]`, dimensions as readonly ResponseDimension[], measureIds, faults));
+  points.forEach((p, i) => checkPoint(p, `points[${i}]`, dimensions as readonly ResponseDimension[], measureIds, reasonIds, faults));
   uniqueIds(points, "points", faults);
   return faults;
 }
@@ -373,6 +396,25 @@ function checkFoldError(value: unknown, path: string, count: number, faults: Fau
   for (const key of ["mae", "rmse", "baselineMae"]) check(object, key, path, isNotNegative, "a finite number of 0 or more", faults);
 }
 
+/** This function examines the stored predictions of a fold against its held-out points and its errors. */
+function checkPredictions(value: unknown, path: string, held: readonly ResponsePoint[], errors: unknown, measures: readonly string[], faults: Faults): void {
+  const predictions = fields(value, path, [], measures, faults);
+  if (predictions === undefined) return;
+  for (const measure of measures) {
+    if (!Object.hasOwn(predictions, measure)) continue;
+    const inside = at(path, measure);
+    const stored = fields(predictions[measure], inside, [], Object.keys(peek(predictions, measure) ?? {}), faults);
+    if (stored === undefined) continue;
+    need(peek(errors, measure) !== undefined, inside, "this fold has no error of this measure.", faults);
+    const scored = new Set(held.filter((p) => typeof p.measures[measure] === "number").map((p) => p.id));
+    for (const id of Object.keys(stored)) {
+      need(scored.has(id), at(inside, id), `this fold has no held-out point ${shown(id)} with a value of the measure.`, faults);
+      check(stored, id, inside, isNumber, "a finite number", faults);
+    }
+    for (const id of scored) need(Object.hasOwn(stored, id), at(inside, id), "this held-out point has no prediction.", faults);
+  }
+}
+
 /** This function adds the points of a fold to `foldOfPoint`, and it gives them. Each bad id gives a fault. */
 function heldPoints(value: unknown, path: string, f: number, points: ReadonlyMap<string, ResponsePoint>, foldOfPoint: Map<string, number>, faults: Faults): readonly ResponsePoint[] {
   const held: ResponsePoint[] = [];
@@ -404,15 +446,18 @@ function checkFolds(value: unknown, data: ResponseData, faults: Faults): void {
   const sizes = groupSizes(data.points);
   const foldOfPoint = new Map<string, number>();
   const covered = new Set<string>();
-  list(value, "folds", 1, faults).forEach((item, f) => {
+  const folds = list(value, "folds", 1, faults);
+  const predicted = measures.filter((m) => folds.some((fold) => peek(peek(fold, "predictions"), m) !== undefined));
+  folds.forEach((item, f) => {
     const path = `folds[${f}]`;
-    const object = fields(item, path, ["heldOut", "errors"], [], faults);
+    const object = fields(item, path, ["heldOut", "errors"], ["predictions"], faults);
     if (object === undefined) return;
     const held = Object.hasOwn(object, "heldOut") ? heldPoints(object["heldOut"], at(path, "heldOut"), f, points, foldOfPoint, faults) : [];
     for (const [group, count] of groupSizes(held)) {
       const size = sizes.get(group) as number;
       need(count === size, at(path, "heldOut"), `the ${group} has ${count} of its ${size} points in this fold, so it is on both sides of the split.`, faults);
     }
+    if (Object.hasOwn(object, "predictions")) checkPredictions(object["predictions"], at(path, "predictions"), held, object["errors"], measures, faults);
     if (!Object.hasOwn(object, "errors")) return;
     const errors = fields(object["errors"], at(path, "errors"), [], measures, faults);
     if (errors === undefined) return;
@@ -421,6 +466,7 @@ function checkFolds(value: unknown, data: ResponseData, faults: Faults): void {
       const count = held.filter((p) => p.measures[measure] !== null).length;
       checkFoldError(errors[measure], at(at(path, "errors"), measure), count, faults);
       if (count > 0) covered.add(measure);
+      need(!predicted.includes(measure) || peek(object["predictions"], measure) !== undefined, at(path, "predictions"), `another fold has predictions of the measure "${measure}", so this fold needs them too.`, faults);
     }
   });
   for (const measure of measures) need(covered.has(measure), "folds", `no fold has a held-out error of the measure "${measure}".`, faults);
@@ -440,6 +486,15 @@ function checkFolds(value: unknown, data: ResponseData, faults: Faults): void {
  * - All the points of a group are in one fold, or all are in no fold. Thus no group is on both sides of a split.
  * - The count `n` of an error is the number of held-out points with a value of the measure.
  * - Each measure has an error in one fold or more.
+ *
+ * These rules apply to the predictions of a fold:
+ * - Each prediction is a finite number of a held-out point of the fold with a value of the measure.
+ * - The fold has a prediction of each such point, and an error of the measure.
+ * - When one fold has predictions of a measure, each fold with an error of the measure has them.
+ *
+ * These rules apply to the reasons of a point:
+ * - Each reason is on a known measure with no number. A measure with `null` and no reason is good.
+ * - Each reason has a declaration in the field `reasons` of the record.
  */
 export function parseResponseRecord(value: unknown): ParsedResponseRecord {
   try {

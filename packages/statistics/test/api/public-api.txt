@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 103 names
+## . (build/index.d.ts): 107 names
 
 type BootstrapOptions: build/index.d.ts#BootstrapOptions
 type CalibrationLevel: build/index.d.ts#CalibrationLevel
@@ -34,6 +34,7 @@ RESPONSE_LAMBDAS: build/index.d.ts#RESPONSE_LAMBDAS
 RESPONSE_MAX_POWER: build/index.d.ts#RESPONSE_MAX_POWER
 RESPONSE_MAX_TERMS: build/index.d.ts#RESPONSE_MAX_TERMS
 RESPONSE_RECORDS_SCHEMA: build/index.d.ts#RESPONSE_RECORDS_SCHEMA
+type ResponseAbsentPoint: build/index.d.ts#ResponseAbsentPoint
 type ResponseBand: build/index.d.ts#ResponseBand
 type ResponseCurvePoint: build/index.d.ts#ResponseCurvePoint
 type ResponseData: build/index.d.ts#ResponseData
@@ -50,11 +51,13 @@ type ResponseMeasure: build/index.d.ts#ResponseMeasure
 type ResponseModel: build/index.d.ts#ResponseModel
 type ResponseModelBase: build/index.d.ts#ResponseModelBase
 type ResponsePoint: build/index.d.ts#ResponsePoint
+type ResponseReason: build/index.d.ts#ResponseReason
 type ResponseRecord: build/index.d.ts#ResponseRecord
 type ResponseSlice: build/index.d.ts#ResponseSlice
 type ResponseSliceOptions: build/index.d.ts#ResponseSliceOptions
 type ResponseSlicePoint: build/index.d.ts#ResponseSlicePoint
 type ResponseSurface: build/index.d.ts#ResponseSurface
+type ResponseSurfaceAbsentPoint: build/index.d.ts#ResponseSurfaceAbsentPoint
 type ResponseSurfaceOptions: build/index.d.ts#ResponseSurfaceOptions
 type ResponseSurfacePoint: build/index.d.ts#ResponseSurfacePoint
 type ResponseTableCell: build/index.d.ts#ResponseTableCell
@@ -84,6 +87,7 @@ calibration: build/index.d.ts#calibration
 compareRatios: build/index.d.ts#compareRatios
 fitResponse: build/index.d.ts#fitResponse
 heldOutError: build/index.d.ts#heldOutError
+heldOutErrorAt: build/index.d.ts#heldOutErrorAt
 holm: build/index.d.ts#holm
 kendallTau: build/index.d.ts#kendallTau
 leastSquares: build/index.d.ts#leastSquares
@@ -302,6 +306,14 @@ export declare const RESPONSE_MAX_TERMS = 1024;
 ### build/index.d.ts#RESPONSE_RECORDS_SCHEMA
 export declare const RESPONSE_RECORDS_SCHEMA = "response-records/1";
 
+### build/index.d.ts#ResponseAbsentPoint
+interface ResponseAbsentPoint {
+  readonly id: string;
+  readonly at: ResponseValue;
+  readonly reason: string | null;
+  readonly group?: string;
+}
+
 ### build/index.d.ts#ResponseBand
 interface ResponseBand {
   readonly value: number;
@@ -321,6 +333,7 @@ interface ResponseData {
   readonly name: string;
   readonly dimensions: readonly ResponseDimension[];
   readonly measures: readonly ResponseMeasure[];
+  readonly reasons?: readonly ResponseReason[];
   readonly points: readonly ResponsePoint[];
 }
 
@@ -356,17 +369,19 @@ interface ResponseFitOptions {
   readonly seed?: number | string;
   readonly model?: "auto" | "ridge" | "table";
   readonly degree?: number;
-  readonly interactions?: boolean;
+  readonly interactions?: boolean | "seen";
   readonly terms?: readonly (readonly ResponseFactor[])[];
   readonly lambdas?: readonly number[];
   readonly log?: readonly string[];
   readonly logFloor?: number;
+  readonly outOfFold?: boolean;
 }
 
 ### build/index.d.ts#ResponseFold
 interface ResponseFold {
   readonly heldOut: readonly string[];
   readonly errors: Readonly<Record<string, ResponseFoldError>>;
+  readonly predictions?: Readonly<Record<string, Readonly<Record<string, number>>>>;
 }
 
 ### build/index.d.ts#ResponseFoldError
@@ -414,6 +429,13 @@ interface ResponsePoint {
   readonly values: Readonly<Record<string, ResponseInputValue>>;
   readonly measures: Readonly<Record<string, number | null>>;
   readonly group?: string;
+  readonly absent?: Readonly<Record<string, string>>;
+}
+
+### build/index.d.ts#ResponseReason
+interface ResponseReason {
+  readonly id: string;
+  readonly label: string;
 }
 
 ### build/index.d.ts#ResponseRecord
@@ -429,6 +451,7 @@ interface ResponseSlice {
   readonly held: Readonly<Record<string, ResponseInputValue>>;
   readonly curve: readonly ResponseCurvePoint[];
   readonly points: readonly ResponseSlicePoint[];
+  readonly absent: readonly ResponseAbsentPoint[];
   readonly error: ResponseHeldOutError;
 }
 
@@ -454,7 +477,16 @@ interface ResponseSurface {
   readonly y: readonly ResponseValue[];
   readonly cells: readonly (readonly ResponseBand[])[];
   readonly points: readonly ResponseSurfacePoint[];
+  readonly absent: readonly ResponseSurfaceAbsentPoint[];
   readonly error: ResponseHeldOutError;
+}
+
+### build/index.d.ts#ResponseSurfaceAbsentPoint
+interface ResponseSurfaceAbsentPoint {
+  readonly id: string;
+  readonly at: readonly [ResponseValue, ResponseValue];
+  readonly reason: string | null;
+  readonly group?: string;
 }
 
 ### build/index.d.ts#ResponseSurfaceOptions
@@ -605,6 +637,9 @@ export declare function fitResponse(data: ResponseData, options?: ResponseFitOpt
 
 ### build/index.d.ts#heldOutError
 export declare function heldOutError(record: Pick<ResponseRecord, "folds">, measure: string): ResponseHeldOutError;
+
+### build/index.d.ts#heldOutErrorAt
+export declare function heldOutErrorAt(record: ResponseRecord, measure: string, ids: readonly string[]): ResponseHeldOutError;
 
 ### build/index.d.ts#holm
 export declare function holm(pValues: readonly number[], level?: number): Corrected[];
