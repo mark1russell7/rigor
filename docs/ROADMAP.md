@@ -23,5 +23,5 @@ This file lists the items of the roadmap of this repository. The status page of 
 | ID | Status | Priority | Title |
 | --- | --- | --- | --- |
 | R7 | later | P2 | testgen: property tests on fast-check, pairwise and covering arrays, metamorphic relations |
-| R8 | later | P2 | chaos: fault injection, schedules of latency and failure, load profiles, with their measures |
+| R8 | later | P2 | chaos: fault injection and schedules of latency and failure, with their measures. Open-loop load profiles are in the package |
 | R9 | later | P2 | Sobol indices and shrinking, from the engines that have them now |
