@@ -42,6 +42,7 @@ v.comparison;                                     // the cases that gain and dro
 | `pooledBand(pool, level)` | The pooled band: the larger of the floor and the A/A spread of the records of earlier runs. |
 | `caseIntervals(records, level)` | The ratio of each case with a distribution-free interval of its median over the rounds. The level 0.95 needs 6 rounds or more. |
 | `limitVerdict(candidate, aa, options)` | The verdict of the claim "the ratio of each case is at most `limit`": `within`, `beyond` or `cannot decide`. |
+| `budgetVerdict(rounds, aa, options)` | The verdict of the claim "the median of each case is at most `limit`", for one build: `within`, `beyond` or `cannot decide`. |
 | `timeRounds(arms, options)` | The timed rounds of one case in one process: a warm-up, a batch of at least the target time, and the order of `firstArm`. |
 | `verdictPower(options)` | The share of each outcome over seeded benches with a known ratio: the power test of a rule. |
 | `balanceOrders(records)` | The records of each case with a turned order. It removes the extra records of the larger order, with the highest rounds first. |
@@ -71,6 +72,23 @@ v.cases;                                          // the interval, the bound and
 - The option `share` permits some cases out of the limit. With `share: 0.95` and 20 cases, 1 case can be other than `within`. The verdict is `within` when that number of cases or fewer are other than `within`. It is `beyond` when more cases are `beyond`. The field `allowed` gives the number.
 
 The verdict has no correction for many cases. Each case has its own interval at the level `caseLevel`. Thus with many cases, a verdict `beyond` can come from noise only. Set `caseLevel` higher when a bench has many cases. A correction of Holm is an option for a later version.
+
+## A claim with a budget
+
+`limitVerdict` judges a ratio of two arms. A budget is an absolute limit on one build. An example is "the median blocking time of this page is at most 450 ms". A budget needs `budgetVerdict`:
+
+```ts
+const v = budgetVerdict(rounds, aaRounds, { limit: 450, maxDifference: 200 });
+
+v.outcome;                                        // "within", "beyond" or "cannot decide"
+v.cases;                                          // the medians, the interval, the outcome and the reason of each case
+```
+
+- Each round has the fields `case`, `round` and `value`. A value of 0 is valid, so a case with no blocking time has a verdict.
+- The arm `aa` is a second arm of the same build. When the two medians differ by more than `maxDifference`, the run is too noisy, and the case is `cannot decide`.
+- This check uses a difference, not a ratio. Two medians of 249 and 102 are a healthy run with a ratio of 2.4.
+- The level 0.95 needs 6 rounds or more in each arm. With fewer rounds, the case is `cannot decide`.
+- A case is `within` when the high end of the interval of its median is at most the limit. A case is `beyond` when the low end is above the limit.
 
 ## Time the rounds
 
