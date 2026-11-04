@@ -1,6 +1,6 @@
 # @mark1russell7/rigor-statistics
 
-The statistics of measured work. It gives quantiles, bootstrap intervals, the sign test, the paired permutation test, Wilson intervals and the Holm correction. It gives the interval of a median from order statistics, and the central interval of a binomial count. It also gives least squares, rank correlation, the comparison with a baseline beyond the noise, and the Brier score of predictions.
+The statistics of measured work. It gives quantiles, bootstrap intervals, the sign test, the paired permutation test, Wilson intervals and the Holm correction. It gives the interval of a median from order statistics, and the central interval of a binomial count. It also gives least squares, rank correlation, the comparison with a baseline beyond the noise, and the Brier score of predictions. It fits response records that a browser can evaluate from plain JSON.
 
 ```sh
 npm install @mark1russell7/rigor-statistics
@@ -26,6 +26,53 @@ v.state;                                         // "gain", "loss", "noise" or "
 
 A promotion reads `gains` against `drops` and `effect`. A sign test alone is not enough, because it counts a win of any size. Judge a change of a default against the current default, not against "no change".
 
+## Fit and show a response
+
+The format `response-records/1` keeps the measured points of a study, a model for each measure and the held-out error of each fold. A record is plain JSON, and the functions use no Node API. Thus a browser reads a record and evaluates its models.
+
+```ts
+import { fitResponse, parseResponseRecord, sliceResponse } from "@mark1russell7/rigor-statistics";
+
+const record = fitResponse(
+  {
+    schema: "response-records/1",
+    name: "time of a placement",
+    dimensions: [
+      { id: "boxes", label: "Boxes", kind: "continuous", range: [10, 10000], unit: "", log: true },
+      { id: "strategy", label: "Strategy", kind: "categorical", levels: ["shelf", "skyline"], unit: "" },
+      // Only the arm "skyline" has this parameter. Each other point has null.
+      { id: "depth", label: "Depth", kind: "continuous", range: [1, 8], unit: "", when: { dimension: "strategy", levels: ["skyline"] } },
+    ],
+    measures: [{ id: "ms", label: "Time", unit: "ms", direction: "lower" }],
+    points, // { id, values, measures, group }: repeats of one input have one group
+  },
+  { log: ["ms"], logFloor: 0.001 },
+);
+
+// A server writes the text. A browser reads it, and it asks for one dimension with the other dimensions held.
+const text = JSON.stringify(record);
+const parsed = parseResponseRecord(JSON.parse(text));
+if (!parsed.ok) throw new Error(JSON.stringify(parsed.faults));
+const slice = sliceResponse(parsed.record, "ms", { vary: "depth", hold: { boxes: 1000 } });
+slice.curve; // { at, value, low, high, nearest } along the dimension
+slice.points; // the measured points with the held values
+slice.error; // the held-out error of the folds
+```
+
+A test of this package compiles and starts this example, and it examines that the two texts are equal.
+
+`fitResponse` keeps all the points of one `group` in one fold, so repeats of a group are not on both sides of a split. Each fold chooses its penalty from the other folds only. The folds thus measure the prediction of an unseen group.
+
+There are two kinds of model. A `ridge` model is a sum of weighted terms. Each term is a product of powers of number inputs and one-hot columns of levels. A `table` model has one cell for each combination of levels. `fitResponse` gives a table when each dimension is categorical, and a ridge model in other cases.
+
+A dimension with `when` is conditional: only some levels of its parent have the dimension. This suits a benchmark in which each arm has its own parameters. A point at another level has `null`. In a ridge model, a term with an absent dimension is 0, so the columns of the parent carry the mean of that level. A table keeps `null` in its cells. For each kind of model, `predictResponse` refuses `null` at a dimension with no condition.
+
+To vary a conditional dimension, `sliceResponse` needs its parent at a level inside `when`. With no held value, the parent takes the most common level inside `when`. A held conditional dimension reads `null` when its parent is outside `when`.
+
+The band of a curve is `value ± width × RMSE`, from the held-out error of the folds. On a log scale, the band is a ratio. The band has one width along the curve. It is the mean error of the model.
+
+The field `nearest` of each place tells how far the place is from a measurement. It goes from 0 to 1, and 0 means that a point was measured there. A viewer can fade the band away from the data. A table cell with the `fallback` value has `nearest` above 0.
+
 ## The functions
 
 | Function | What it gives |
@@ -48,6 +95,10 @@ A promotion reads `gains` against `drops` and `effect`. A sign test alone is not
 | `spearman`, `kendallTau`, `ranks` | The rank correlations, with mean ranks for ties. |
 | `compareRatios`, `noiseFloor`, `noiseVerdict` | The comparison with a baseline, the noise floor of the 5-seed rule with a margin of practical effect, and the state of a difference over the seeds. |
 | `brier`, `calibration` | The Brier score of predictions, and the hit rate of each stated level. |
+| `fitResponse(data, options)` | A record of the format `response-records/1`, with one model for each measure and held-out folds. |
+| `parseResponseRecord(value)` | The examination of unknown data. It gives the record, or one fault with a path for each error. |
+| `predictResponse(model, inputs)`, `heldOutError(record, measure)` | The value of a model at one set of inputs, and the error of the folds of a measure. |
+| `sliceResponse(record, measure, options)`, `surfaceResponse(record, measure, options)` | A fitted curve over one dimension, or a fitted surface over two, with the matching measured points, a band and the distance to the nearest measurement. |
 
 Each function throws a RangeError for an empty list, for a NaN and for a parameter out of its range. Thus a missing value cannot make a quiet NaN in a record.
 

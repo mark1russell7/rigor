@@ -4,12 +4,14 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 54 names
+## . (build/index.d.ts): 103 names
 
 type BootstrapOptions: build/index.d.ts#BootstrapOptions
 type CalibrationLevel: build/index.d.ts#CalibrationLevel
+type CategoricalDimension: build/index.d.ts#CategoricalDimension
 type CompareOptions: build/index.d.ts#CompareOptions
 type Comparison: build/index.d.ts#Comparison
+type ContinuousDimension: build/index.d.ts#ContinuousDimension
 type Corrected: build/index.d.ts#Corrected
 type CountInterval: build/index.d.ts#CountInterval
 type Effect: build/index.d.ts#Effect
@@ -22,12 +24,53 @@ type MedianInterval: build/index.d.ts#MedianInterval
 type NoiseOptions: build/index.d.ts#NoiseOptions
 type NoiseState: build/index.d.ts#NoiseState
 type NoiseVerdict: build/index.d.ts#NoiseVerdict
+type OrdinalDimension: build/index.d.ts#OrdinalDimension
+type ParsedResponseRecord: build/index.d.ts#ParsedResponseRecord
 type PermutationOptions: build/index.d.ts#PermutationOptions
 type PermutationResult: build/index.d.ts#PermutationResult
 type Proportion: build/index.d.ts#Proportion
 type QuantileMethod: build/index.d.ts#QuantileMethod
+RESPONSE_LAMBDAS: build/index.d.ts#RESPONSE_LAMBDAS
+RESPONSE_MAX_POWER: build/index.d.ts#RESPONSE_MAX_POWER
+RESPONSE_MAX_TERMS: build/index.d.ts#RESPONSE_MAX_TERMS
+RESPONSE_RECORDS_SCHEMA: build/index.d.ts#RESPONSE_RECORDS_SCHEMA
+type ResponseBand: build/index.d.ts#ResponseBand
+type ResponseCurvePoint: build/index.d.ts#ResponseCurvePoint
+type ResponseData: build/index.d.ts#ResponseData
+type ResponseDimension: build/index.d.ts#ResponseDimension
+type ResponseDimensionBase: build/index.d.ts#ResponseDimensionBase
+type ResponseFactor: build/index.d.ts#ResponseFactor
+type ResponseFault: build/index.d.ts#ResponseFault
+type ResponseFitOptions: build/index.d.ts#ResponseFitOptions
+type ResponseFold: build/index.d.ts#ResponseFold
+type ResponseFoldError: build/index.d.ts#ResponseFoldError
+type ResponseHeldOutError: build/index.d.ts#ResponseHeldOutError
+type ResponseInputValue: build/index.d.ts#ResponseInputValue
+type ResponseMeasure: build/index.d.ts#ResponseMeasure
+type ResponseModel: build/index.d.ts#ResponseModel
+type ResponseModelBase: build/index.d.ts#ResponseModelBase
+type ResponsePoint: build/index.d.ts#ResponsePoint
+type ResponseRecord: build/index.d.ts#ResponseRecord
+type ResponseSlice: build/index.d.ts#ResponseSlice
+type ResponseSliceOptions: build/index.d.ts#ResponseSliceOptions
+type ResponseSlicePoint: build/index.d.ts#ResponseSlicePoint
+type ResponseSurface: build/index.d.ts#ResponseSurface
+type ResponseSurfaceOptions: build/index.d.ts#ResponseSurfaceOptions
+type ResponseSurfacePoint: build/index.d.ts#ResponseSurfacePoint
+type ResponseTableCell: build/index.d.ts#ResponseTableCell
+type ResponseValue: build/index.d.ts#ResponseValue
+type ResponseViewOptions: build/index.d.ts#ResponseViewOptions
+type ResponseWhen: build/index.d.ts#ResponseWhen
+type RidgeInput: build/index.d.ts#RidgeInput
+type RidgeInputBase: build/index.d.ts#RidgeInputBase
+type RidgeLevelInput: build/index.d.ts#RidgeLevelInput
+type RidgeNumberInput: build/index.d.ts#RidgeNumberInput
 type RidgeOptions: build/index.d.ts#RidgeOptions
+type RidgeRankInput: build/index.d.ts#RidgeRankInput
+type RidgeResponseModel: build/index.d.ts#RidgeResponseModel
+type RidgeTerm: build/index.d.ts#RidgeTerm
 type Summary: build/index.d.ts#Summary
+type TableResponseModel: build/index.d.ts#TableResponseModel
 Z95: build/index.d.ts#Z95
 binomialInterval: build/index.d.ts#binomialInterval
 bootstrap: build/index.d.ts#bootstrap
@@ -39,6 +82,8 @@ bootstrapTwo: build/index.d.ts#bootstrapTwo
 brier: build/index.d.ts#brier
 calibration: build/index.d.ts#calibration
 compareRatios: build/index.d.ts#compareRatios
+fitResponse: build/index.d.ts#fitResponse
+heldOutError: build/index.d.ts#heldOutError
 holm: build/index.d.ts#holm
 kendallTau: build/index.d.ts#kendallTau
 leastSquares: build/index.d.ts#leastSquares
@@ -49,6 +94,8 @@ negativeBinomialInterval: build/index.d.ts#negativeBinomialInterval
 noiseFloor: build/index.d.ts#noiseFloor
 noiseVerdict: build/index.d.ts#noiseVerdict
 pairedPermutation: build/index.d.ts#pairedPermutation
+parseResponseRecord: build/index.d.ts#parseResponseRecord
+predictResponse: build/index.d.ts#predictResponse
 quantile: build/index.d.ts#quantile
 quantileSorted: build/index.d.ts#quantileSorted
 ranks: build/index.d.ts#ranks
@@ -56,9 +103,11 @@ ridgeSolve: build/index.d.ts#ridgeSolve
 sd: build/index.d.ts#sd
 signTest: build/index.d.ts#signTest
 signTestPower: build/index.d.ts#signTestPower
+sliceResponse: build/index.d.ts#sliceResponse
 sorted: build/index.d.ts#sorted
 spearman: build/index.d.ts#spearman
 summarize: build/index.d.ts#summarize
+surfaceResponse: build/index.d.ts#surfaceResponse
 wilson: build/index.d.ts#wilson
 
 ## Declarations
@@ -79,6 +128,12 @@ interface CalibrationLevel {
   readonly hits: number;
   readonly rate: number;
   readonly interval: Proportion;
+}
+
+### build/index.d.ts#CategoricalDimension
+interface CategoricalDimension extends ResponseDimensionBase {
+  readonly kind: "categorical";
+  readonly levels: readonly string[];
 }
 
 ### build/index.d.ts#CompareOptions
@@ -102,6 +157,13 @@ interface Comparison {
   readonly gainInterval: Proportion;
   readonly dropShare: number;
   readonly dropInterval: Proportion;
+}
+
+### build/index.d.ts#ContinuousDimension
+interface ContinuousDimension extends ResponseDimensionBase {
+  readonly kind: "continuous";
+  readonly range: readonly [number, number];
+  readonly log?: boolean;
 }
 
 ### build/index.d.ts#Corrected
@@ -189,6 +251,22 @@ interface NoiseVerdict {
   readonly state: NoiseState;
 }
 
+### build/index.d.ts#OrdinalDimension
+interface OrdinalDimension extends ResponseDimensionBase {
+  readonly kind: "ordinal";
+  readonly levels: readonly number[] | readonly string[];
+  readonly log?: boolean;
+}
+
+### build/index.d.ts#ParsedResponseRecord
+type ParsedResponseRecord = {
+  readonly ok: true;
+  readonly record: ResponseRecord;
+} | {
+  readonly ok: false;
+  readonly faults: readonly ResponseFault[];
+};
+
 ### build/index.d.ts#PermutationOptions
 interface PermutationOptions {
   readonly runs?: number;
@@ -212,9 +290,259 @@ interface Proportion {
 ### build/index.d.ts#QuantileMethod
 type QuantileMethod = "linear" | "nearest-rank" | "higher";
 
+### build/index.d.ts#RESPONSE_LAMBDAS
+export declare const RESPONSE_LAMBDAS: readonly number[];
+
+### build/index.d.ts#RESPONSE_MAX_POWER
+export declare const RESPONSE_MAX_POWER = 8;
+
+### build/index.d.ts#RESPONSE_MAX_TERMS
+export declare const RESPONSE_MAX_TERMS = 1024;
+
+### build/index.d.ts#RESPONSE_RECORDS_SCHEMA
+export declare const RESPONSE_RECORDS_SCHEMA = "response-records/1";
+
+### build/index.d.ts#ResponseBand
+interface ResponseBand {
+  readonly value: number;
+  readonly low: number;
+  readonly high: number;
+  readonly nearest: number;
+}
+
+### build/index.d.ts#ResponseCurvePoint
+interface ResponseCurvePoint extends ResponseBand {
+  readonly at: ResponseValue;
+}
+
+### build/index.d.ts#ResponseData
+interface ResponseData {
+  readonly schema: typeof RESPONSE_RECORDS_SCHEMA;
+  readonly name: string;
+  readonly dimensions: readonly ResponseDimension[];
+  readonly measures: readonly ResponseMeasure[];
+  readonly points: readonly ResponsePoint[];
+}
+
+### build/index.d.ts#ResponseDimension
+type ResponseDimension = ContinuousDimension | OrdinalDimension | CategoricalDimension;
+
+### build/index.d.ts#ResponseDimensionBase
+interface ResponseDimensionBase {
+  readonly id: string;
+  readonly label: string;
+  readonly unit: string;
+  readonly when?: ResponseWhen;
+}
+
+### build/index.d.ts#ResponseFactor
+type ResponseFactor = {
+  readonly dimension: string;
+  readonly power: number;
+} | {
+  readonly dimension: string;
+  readonly level: ResponseValue;
+};
+
+### build/index.d.ts#ResponseFault
+interface ResponseFault {
+  readonly path: string;
+  readonly message: string;
+}
+
+### build/index.d.ts#ResponseFitOptions
+interface ResponseFitOptions {
+  readonly folds?: number;
+  readonly seed?: number | string;
+  readonly model?: "auto" | "ridge" | "table";
+  readonly degree?: number;
+  readonly interactions?: boolean;
+  readonly terms?: readonly (readonly ResponseFactor[])[];
+  readonly lambdas?: readonly number[];
+  readonly log?: readonly string[];
+  readonly logFloor?: number;
+}
+
+### build/index.d.ts#ResponseFold
+interface ResponseFold {
+  readonly heldOut: readonly string[];
+  readonly errors: Readonly<Record<string, ResponseFoldError>>;
+}
+
+### build/index.d.ts#ResponseFoldError
+interface ResponseFoldError {
+  readonly n: number;
+  readonly mae: number;
+  readonly rmse: number;
+  readonly baselineMae: number;
+}
+
+### build/index.d.ts#ResponseHeldOutError
+interface ResponseHeldOutError {
+  readonly n: number;
+  readonly folds: number;
+  readonly mae: number;
+  readonly rmse: number;
+  readonly baselineMae: number;
+  readonly skill: number | null;
+}
+
+### build/index.d.ts#ResponseInputValue
+type ResponseInputValue = ResponseValue | null;
+
+### build/index.d.ts#ResponseMeasure
+interface ResponseMeasure {
+  readonly id: string;
+  readonly label: string;
+  readonly unit: string;
+  readonly direction: "higher" | "lower" | "none";
+}
+
+### build/index.d.ts#ResponseModel
+type ResponseModel = RidgeResponseModel | TableResponseModel;
+
+### build/index.d.ts#ResponseModelBase
+interface ResponseModelBase {
+  readonly measure: string;
+  readonly scale: "linear" | "log";
+  readonly floor?: number;
+}
+
+### build/index.d.ts#ResponsePoint
+interface ResponsePoint {
+  readonly id: string;
+  readonly values: Readonly<Record<string, ResponseInputValue>>;
+  readonly measures: Readonly<Record<string, number | null>>;
+  readonly group?: string;
+}
+
+### build/index.d.ts#ResponseRecord
+interface ResponseRecord extends ResponseData {
+  readonly models: readonly ResponseModel[];
+  readonly folds: readonly ResponseFold[];
+}
+
+### build/index.d.ts#ResponseSlice
+interface ResponseSlice {
+  readonly measure: string;
+  readonly vary: string;
+  readonly held: Readonly<Record<string, ResponseInputValue>>;
+  readonly curve: readonly ResponseCurvePoint[];
+  readonly points: readonly ResponseSlicePoint[];
+  readonly error: ResponseHeldOutError;
+}
+
+### build/index.d.ts#ResponseSliceOptions
+interface ResponseSliceOptions extends ResponseViewOptions {
+  readonly vary: string;
+}
+
+### build/index.d.ts#ResponseSlicePoint
+interface ResponseSlicePoint {
+  readonly id: string;
+  readonly at: ResponseValue;
+  readonly value: number;
+  readonly group?: string;
+}
+
+### build/index.d.ts#ResponseSurface
+interface ResponseSurface {
+  readonly measure: string;
+  readonly vary: readonly [string, string];
+  readonly held: Readonly<Record<string, ResponseInputValue>>;
+  readonly x: readonly ResponseValue[];
+  readonly y: readonly ResponseValue[];
+  readonly cells: readonly (readonly ResponseBand[])[];
+  readonly points: readonly ResponseSurfacePoint[];
+  readonly error: ResponseHeldOutError;
+}
+
+### build/index.d.ts#ResponseSurfaceOptions
+interface ResponseSurfaceOptions extends ResponseViewOptions {
+  readonly vary: readonly [string, string];
+}
+
+### build/index.d.ts#ResponseSurfacePoint
+interface ResponseSurfacePoint {
+  readonly id: string;
+  readonly at: readonly [ResponseValue, ResponseValue];
+  readonly value: number;
+  readonly group?: string;
+}
+
+### build/index.d.ts#ResponseTableCell
+interface ResponseTableCell {
+  readonly at: readonly ResponseInputValue[];
+  readonly value: number;
+  readonly n: number;
+}
+
+### build/index.d.ts#ResponseValue
+type ResponseValue = number | string;
+
+### build/index.d.ts#ResponseViewOptions
+interface ResponseViewOptions {
+  readonly hold?: Readonly<Record<string, ResponseInputValue>>;
+  readonly steps?: number;
+  readonly tolerance?: number;
+  readonly width?: number;
+}
+
+### build/index.d.ts#ResponseWhen
+interface ResponseWhen {
+  readonly dimension: string;
+  readonly levels: readonly ResponseValue[];
+}
+
+### build/index.d.ts#RidgeInput
+type RidgeInput = RidgeNumberInput | RidgeRankInput | RidgeLevelInput;
+
+### build/index.d.ts#RidgeInputBase
+interface RidgeInputBase {
+  readonly dimension: string;
+  readonly conditional?: boolean;
+}
+
+### build/index.d.ts#RidgeLevelInput
+interface RidgeLevelInput extends RidgeInputBase {
+  readonly kind: "level";
+  readonly levels: readonly string[];
+}
+
+### build/index.d.ts#RidgeNumberInput
+interface RidgeNumberInput extends RidgeInputBase {
+  readonly kind: "number";
+  readonly center: number;
+  readonly spread: number;
+  readonly log?: boolean;
+}
+
 ### build/index.d.ts#RidgeOptions
 interface RidgeOptions {
   readonly free?: readonly number[];
+}
+
+### build/index.d.ts#RidgeRankInput
+interface RidgeRankInput extends RidgeInputBase {
+  readonly kind: "rank";
+  readonly levels: readonly string[];
+  readonly center: number;
+  readonly spread: number;
+}
+
+### build/index.d.ts#RidgeResponseModel
+interface RidgeResponseModel extends ResponseModelBase {
+  readonly kind: "ridge";
+  readonly lambda: number;
+  readonly inputs: readonly RidgeInput[];
+  readonly intercept: number;
+  readonly terms: readonly RidgeTerm[];
+}
+
+### build/index.d.ts#RidgeTerm
+interface RidgeTerm {
+  readonly factors: readonly ResponseFactor[];
+  readonly weight: number;
 }
 
 ### build/index.d.ts#Summary
@@ -228,6 +556,15 @@ interface Summary {
   readonly q3: number;
   readonly max: number;
   readonly iqr: number;
+}
+
+### build/index.d.ts#TableResponseModel
+interface TableResponseModel extends ResponseModelBase {
+  readonly kind: "table";
+  readonly dimensions: readonly string[];
+  readonly conditional?: readonly string[];
+  readonly cells: readonly ResponseTableCell[];
+  readonly fallback: number;
 }
 
 ### build/index.d.ts#Z95
@@ -263,6 +600,12 @@ export declare function calibration(forecasts: readonly Forecast[]): Calibration
 ### build/index.d.ts#compareRatios
 export declare function compareRatios(ratios: readonly number[], options?: CompareOptions): Comparison;
 
+### build/index.d.ts#fitResponse
+export declare function fitResponse(data: ResponseData, options?: ResponseFitOptions): ResponseRecord;
+
+### build/index.d.ts#heldOutError
+export declare function heldOutError(record: Pick<ResponseRecord, "folds">, measure: string): ResponseHeldOutError;
+
 ### build/index.d.ts#holm
 export declare function holm(pValues: readonly number[], level?: number): Corrected[];
 
@@ -295,6 +638,12 @@ export declare function noiseVerdict(values: readonly number[], options?: NoiseO
 ### build/index.d.ts#pairedPermutation
 export declare function pairedPermutation(candidate: readonly number[], baseline: readonly number[], options?: PermutationOptions): PermutationResult;
 
+### build/index.d.ts#parseResponseRecord
+export declare function parseResponseRecord(value: unknown): ParsedResponseRecord;
+
+### build/index.d.ts#predictResponse
+export declare function predictResponse(model: ResponseModel, inputs: Readonly<Record<string, ResponseInputValue>>): number;
+
 ### build/index.d.ts#quantile
 export declare function quantile(values: readonly number[], p: number, method?: QuantileMethod): number;
 
@@ -316,6 +665,9 @@ export declare function signTest(better: number, worse: number, sides?: 1 | 2): 
 ### build/index.d.ts#signTestPower
 export declare function signTestPower(n: number, level?: number, sides?: 1 | 2): number | undefined;
 
+### build/index.d.ts#sliceResponse
+export declare function sliceResponse(record: ResponseRecord, measure: string, options: ResponseSliceOptions): ResponseSlice;
+
 ### build/index.d.ts#sorted
 export declare function sorted(values: readonly number[]): number[];
 
@@ -324,6 +676,9 @@ export declare function spearman(a: readonly number[], b: readonly number[]): nu
 
 ### build/index.d.ts#summarize
 export declare function summarize(values: readonly number[]): Summary;
+
+### build/index.d.ts#surfaceResponse
+export declare function surfaceResponse(record: ResponseRecord, measure: string, options: ResponseSurfaceOptions): ResponseSurface;
 
 ### build/index.d.ts#wilson
 export declare function wilson(k: number, n: number, z?: number): Proportion;
