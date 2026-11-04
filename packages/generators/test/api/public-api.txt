@@ -6,32 +6,29 @@
 
 ## . (build/index.d.ts): 18 names
 
-DIAGRAM_BOX_AREA: build/index.d.ts#DIAGRAM_BOX_AREA
-type DistributionSpec: build/index.d.ts#DistributionSpec
-GIT_BLOB_BYTES: build/index.d.ts#GIT_BLOB_BYTES
-type Param: build/index.d.ts#Param
-RECORDED_TABLES: build/index.d.ts#RECORDED_TABLES
-type Random: build/index.d.ts#Random
-type RecordedTable: build/index.d.ts#RecordedTable
-type Source: build/index.d.ts#Source
-dependsOnLibm: build/index.d.ts#dependsOnLibm
-deriveSeed: build/index.d.ts#deriveSeed
-fnv1a32: build/index.d.ts#fnv1a32
-mulberry32: build/index.d.ts#mulberry32
-random: build/index.d.ts#random
-randomOf: build/index.d.ts#randomOf
-recordedSpec: build/index.d.ts#recordedSpec
-sampler: build/index.d.ts#sampler
-seedOf: build/index.d.ts#seedOf
-seedsFrom: build/index.d.ts#seedsFrom
+DIAGRAM_BOX_AREA: build/recorded.d.ts#DIAGRAM_BOX_AREA
+type DistributionSpec: build/distributions.d.ts#DistributionSpec
+GIT_BLOB_BYTES: build/recorded.d.ts#GIT_BLOB_BYTES
+type Param: build/distributions.d.ts#Param
+RECORDED_TABLES: build/recorded.d.ts#RECORDED_TABLES
+type Random: build/random.d.ts#Random
+type RecordedTable: build/recorded.d.ts#RecordedTable
+type Source: build/random.d.ts#Source
+dependsOnLibm: build/distributions.d.ts#dependsOnLibm
+deriveSeed: build/random.d.ts#deriveSeed
+fnv1a32: build/random.d.ts#fnv1a32
+mulberry32: build/random.d.ts#mulberry32
+random: build/random.d.ts#random
+randomOf: build/random.d.ts#randomOf
+recordedSpec: build/recorded.d.ts#recordedSpec
+sampler: build/distributions.d.ts#sampler
+seedOf: build/random.d.ts#seedOf
+seedsFrom: build/random.d.ts#seedsFrom
 
 ## Declarations
 
-### build/index.d.ts#DIAGRAM_BOX_AREA
-export declare const DIAGRAM_BOX_AREA: RecordedTable;
-
-### build/index.d.ts#DistributionSpec
-type DistributionSpec = {
+### build/distributions.d.ts#DistributionSpec
+export type DistributionSpec = {
   readonly family: "lognormal";
   readonly mu: Param;
   readonly sigma: Param;
@@ -58,17 +55,17 @@ type DistributionSpec = {
   readonly values: readonly number[];
 };
 
-### build/index.d.ts#GIT_BLOB_BYTES
-export declare const GIT_BLOB_BYTES: RecordedTable;
+### build/distributions.d.ts#Param
+export type Param = number | readonly [min: number, max: number];
 
-### build/index.d.ts#Param
-type Param = number | readonly [min: number, max: number];
+### build/distributions.d.ts#dependsOnLibm
+export declare function dependsOnLibm(spec: DistributionSpec): boolean;
 
-### build/index.d.ts#RECORDED_TABLES
-export declare const RECORDED_TABLES: Readonly<Record<string, RecordedTable>>;
+### build/distributions.d.ts#sampler
+export declare function sampler(spec: DistributionSpec, r: Random): () => number;
 
-### build/index.d.ts#Random
-interface Random {
+### build/random.d.ts#Random
+export interface Random {
   readonly seed: number;
   next(): number;
   int(min: number, max: number): number;
@@ -83,8 +80,43 @@ interface Random {
   fork(label: string): Random;
 }
 
-### build/index.d.ts#RecordedTable
-interface RecordedTable {
+### build/random.d.ts#Source
+export type Source = () => number;
+
+### build/random.d.ts#deriveSeed
+export declare function deriveSeed(seed: number, label: string): number;
+
+### build/random.d.ts#fnv1a32
+export declare function fnv1a32(text: string, options?: {
+  readonly input?: "utf8" | "utf16" | "wtf8";
+}): number;
+
+### build/random.d.ts#mulberry32
+export declare function mulberry32(seed: number): Source;
+
+### build/random.d.ts#random
+export declare function random(seed: number | string, source?: (seed: number) => Source): Random;
+
+### build/random.d.ts#randomOf
+export declare function randomOf(next: Source, seed: number, source?: (seed: number) => Source): Random;
+
+### build/random.d.ts#seedOf
+export declare function seedOf(seed: number | string): number;
+
+### build/random.d.ts#seedsFrom
+export declare function seedsFrom(given: string | undefined, defaults: readonly number[]): number[];
+
+### build/recorded.d.ts#DIAGRAM_BOX_AREA
+export declare const DIAGRAM_BOX_AREA: RecordedTable;
+
+### build/recorded.d.ts#GIT_BLOB_BYTES
+export declare const GIT_BLOB_BYTES: RecordedTable;
+
+### build/recorded.d.ts#RECORDED_TABLES
+export declare const RECORDED_TABLES: Readonly<Record<string, RecordedTable>>;
+
+### build/recorded.d.ts#RecordedTable
+export interface RecordedTable {
   readonly name: string;
   readonly measure: string;
   readonly source: string;
@@ -96,37 +128,5 @@ interface RecordedTable {
   readonly quantiles: readonly number[];
 }
 
-### build/index.d.ts#Source
-type Source = () => number;
-
-### build/index.d.ts#dependsOnLibm
-export declare function dependsOnLibm(spec: DistributionSpec): boolean;
-
-### build/index.d.ts#deriveSeed
-export declare function deriveSeed(seed: number, label: string): number;
-
-### build/index.d.ts#fnv1a32
-export declare function fnv1a32(text: string, options?: {
-  readonly input?: "utf8" | "utf16" | "wtf8";
-}): number;
-
-### build/index.d.ts#mulberry32
-export declare function mulberry32(seed: number): Source;
-
-### build/index.d.ts#random
-export declare function random(seed: number | string, source?: (seed: number) => Source): Random;
-
-### build/index.d.ts#randomOf
-export declare function randomOf(next: Source, seed: number, source?: (seed: number) => Source): Random;
-
-### build/index.d.ts#recordedSpec
+### build/recorded.d.ts#recordedSpec
 export declare function recordedSpec(table: RecordedTable): DistributionSpec;
-
-### build/index.d.ts#sampler
-export declare function sampler(spec: DistributionSpec, r: Random): () => number;
-
-### build/index.d.ts#seedOf
-export declare function seedOf(seed: number | string): number;
-
-### build/index.d.ts#seedsFrom
-export declare function seedsFrom(given: string | undefined, defaults: readonly number[]): number[];
