@@ -2,7 +2,7 @@
  * The validator of the format `response-records/1`. The functions here read unknown data and write faults. Thus a page
  * can show the reason that a file is bad.
  */
-import { RESPONSE_RECORDS_SCHEMA, type ResponseData, type ResponseDimension, type ResponsePoint, type ResponseRecord, type RidgeInput, groupKey, isNumberDimension, valueFault, whenHolds } from "./response.ts";
+import { RESPONSE_RECORDS_SCHEMA, type ResponseData, type ResponseDimension, type ResponseMeasure, type ResponsePoint, type ResponseRecord, type RidgeInput, groupKey, isNumberDimension, valueFault, whenHolds } from "./response.ts";
 
 /** The largest power of a factor. A larger power of a coordinate from -1 to 1 adds almost nothing to a model. */
 export const RESPONSE_MAX_POWER = 8;
@@ -111,9 +111,7 @@ function checkDimension(value: unknown, path: string, faults: Faults): void {
     need(!Object.hasOwn(object, "levels"), at(path, "levels"), "a continuous dimension has a range, not levels.", faults);
     need(!Object.hasOwn(object, "range") || !log || !isNumber(peek(object["range"], "0")) || (peek(object["range"], "0") as number) > 0, at(path, "range"), "a log dimension has a range above 0.", faults);
     need(Object.hasOwn(object, "range"), at(path, "range"), "this field is missing.", faults);
-    const range = object["range"];
-    const good = Array.isArray(range) && range.length === 2 && isNumber(range[0]) && isNumber(range[1]) && range[0] < range[1];
-    if (Object.hasOwn(object, "range")) need(good, at(path, "range"), `this is a low and a high finite number, with low less than high, not ${shown(range)}.`, faults);
+    if (Object.hasOwn(object, "range")) checkRange(object["range"], at(path, "range"), faults);
   } else if (kind === "ordinal" || kind === "categorical") {
     need(!Object.hasOwn(object, "range"), at(path, "range"), `a dimension of the kind ${kind} has levels, not a range.`, faults);
     need(kind === "ordinal" || !Object.hasOwn(object, "log"), at(path, "log"), "a categorical dimension has no log scale.", faults);
@@ -143,14 +141,30 @@ function checkWhen(value: unknown, path: string, dimensions: readonly unknown[],
   levels.forEach((level, i) => need(known.includes(level), `${at(path, "levels")}[${i}]`, `the dimension ${shown(id)} has no level ${shown(level)}.`, faults));
 }
 
+/** This function examines a range. */
+function checkRange(range: unknown, path: string, faults: Faults): void {
+  const good = Array.isArray(range) && range.length === 2 && isNumber(range[0]) && isNumber(range[1]) && range[0] < range[1];
+  need(good, path, `this is a low and a high finite number, with low less than high, not ${shown(range)}.`, faults);
+}
+
 /** This function examines one measure. */
 function checkMeasure(value: unknown, path: string, faults: Faults): void {
-  const object = fields(value, path, ["id", "label", "unit", "direction"], [], faults);
+  const object = fields(value, path, ["id", "label", "unit", "direction"], ["range"], faults);
   if (object === undefined) return;
   check(object, "id", path, isId, "text with one character or more", faults);
   check(object, "label", path, isString, "text", faults);
   check(object, "unit", path, isString, "text", faults);
   check(object, "direction", path, (v) => v === "higher" || v === "lower" || v === "none", `"higher", "lower" or "none"`, faults);
+  if (Object.hasOwn(object, "range")) checkRange(object["range"], at(path, "range"), faults);
+}
+
+/** This function refuses a measured value outside the range of its measure. */
+function checkMeasured(point: unknown, path: string, measures: readonly ResponseMeasure[], faults: Faults): void {
+  for (const { id, range } of measures) {
+    const value = peek(peek(point, "measures"), id);
+    if (range === undefined || typeof value !== "number") continue;
+    need(value >= range[0] && value <= range[1], at(at(path, "measures"), id), `this value is outside the range of the measure, [${range[0]}, ${range[1]}].`, faults);
+  }
 }
 
 /** This function examines one declared reason. */
@@ -232,6 +246,8 @@ export function responseDataFaults(value: unknown, required: readonly string[], 
   const points = list(object["points"], "points", 1, faults);
   points.forEach((p, i) => checkPoint(p, `points[${i}]`, dimensions as readonly ResponseDimension[], measureIds, reasonIds, faults));
   uniqueIds(points, "points", faults);
+  if (faults.length > 0) return faults;
+  points.forEach((p, i) => checkMeasured(p, `points[${i}]`, measures as readonly ResponseMeasure[], faults));
   return faults;
 }
 
