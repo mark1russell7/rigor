@@ -4,11 +4,15 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 13 names
+## . (build/index.d.ts): 18 names
 
+DIAGRAM_BOX_AREA: build/index.d.ts#DIAGRAM_BOX_AREA
 type DistributionSpec: build/index.d.ts#DistributionSpec
+GIT_BLOB_BYTES: build/index.d.ts#GIT_BLOB_BYTES
 type Param: build/index.d.ts#Param
+RECORDED_TABLES: build/index.d.ts#RECORDED_TABLES
 type Random: build/index.d.ts#Random
+type RecordedTable: build/index.d.ts#RecordedTable
 type Source: build/index.d.ts#Source
 dependsOnLibm: build/index.d.ts#dependsOnLibm
 deriveSeed: build/index.d.ts#deriveSeed
@@ -16,11 +20,15 @@ fnv1a32: build/index.d.ts#fnv1a32
 mulberry32: build/index.d.ts#mulberry32
 random: build/index.d.ts#random
 randomOf: build/index.d.ts#randomOf
+recordedSpec: build/index.d.ts#recordedSpec
 sampler: build/index.d.ts#sampler
 seedOf: build/index.d.ts#seedOf
 seedsFrom: build/index.d.ts#seedsFrom
 
 ## Declarations
+
+### build/index.d.ts#DIAGRAM_BOX_AREA
+export declare const DIAGRAM_BOX_AREA: RecordedTable;
 
 ### build/index.d.ts#DistributionSpec
 type DistributionSpec = {
@@ -50,8 +58,14 @@ type DistributionSpec = {
   readonly values: readonly number[];
 };
 
+### build/index.d.ts#GIT_BLOB_BYTES
+export declare const GIT_BLOB_BYTES: RecordedTable;
+
 ### build/index.d.ts#Param
 type Param = number | readonly [min: number, max: number];
+
+### build/index.d.ts#RECORDED_TABLES
+export declare const RECORDED_TABLES: Readonly<Record<string, RecordedTable>>;
 
 ### build/index.d.ts#Random
 interface Random {
@@ -67,6 +81,19 @@ interface Random {
   sample<T>(items: readonly T[], k: number): T[];
   normal(mean?: number, sd?: number): number;
   fork(label: string): Random;
+}
+
+### build/index.d.ts#RecordedTable
+interface RecordedTable {
+  readonly name: string;
+  readonly measure: string;
+  readonly source: string;
+  readonly license: string;
+  readonly notice: string;
+  readonly date: string;
+  readonly count: number;
+  readonly median: number;
+  readonly quantiles: readonly number[];
 }
 
 ### build/index.d.ts#Source
@@ -91,6 +118,9 @@ export declare function random(seed: number | string, source?: (seed: number) =>
 
 ### build/index.d.ts#randomOf
 export declare function randomOf(next: Source, seed: number, source?: (seed: number) => Source): Random;
+
+### build/index.d.ts#recordedSpec
+export declare function recordedSpec(table: RecordedTable): DistributionSpec;
 
 ### build/index.d.ts#sampler
 export declare function sampler(spec: DistributionSpec, r: Random): () => number;

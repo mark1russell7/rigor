@@ -59,6 +59,26 @@ A parameter is a number or a range `[min, max]`. `sampler` draws from a range on
 
 `Math.exp`, `Math.log` and `Math.pow` can give other results on another JavaScript engine. `dependsOnLibm` tells if a spec uses them. Only `recorded` does not, so write the numbers of the other families into a corpus when a corpus must match on each platform.
 
+### Recorded tables
+
+A corpus can draw real sizes. Each table has 100 midpoint quantiles of the recorded values, with its source, its license and its date. `recordedSpec` gives the spec of the family `recorded` for a table.
+
+| Table | Values | Source | License |
+| --- | --- | --- | --- |
+| `DIAGRAM_BOX_AREA` | the areas of 9859 boxes of 293 real diagrams | the Ptolemy II models of the ELK model set | the Ptolemy II license. The field `notice` keeps its text |
+| `GIT_BLOB_BYTES` | the sizes of 20751 files of one git tree | `microsoft/vscode` | MIT |
+
+The tables keep the values of one measure, so a table gives no link between the width and the height of a box.
+
+`scripts/recorded-tables.ts` rebuilds the numbers from the two sources.
+
+Each table is a sample, and it does not show a general law:
+
+- `DIAGRAM_BOX_AREA` reads each model of `realworld/ptolemy/flattened`. One tool drew these diagrams, so a small set of icon sizes has a large share. It leaves out the 254 models of `realworld/ptolemy/hierarchical`, and 46 of these have no flattened model. It also leaves out the hand-made graphs of `tests`, `tickets` and `examples`.
+- `GIT_BLOB_BYTES` reads each file of one tree, also the binary files. It leaves out 34 empty files. One repository is one project, so a table of another repository has other values.
+
+The npm package holds the notice of the Ptolemy II license, because the field `notice` is part of the build.
+
 ## The input of `fnv1a32`
 
 The option `input` of `fnv1a32` selects the units that the hash reads. Use it to replace a local copy of FNV-1a with the same hashes.
