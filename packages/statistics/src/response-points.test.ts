@@ -28,6 +28,9 @@ const POOL_TOLERANCE = 1e-12;
 // The largest difference between the fold errors of the expansion and of its seen terms. A term with no point has the weight 0.
 const SEEN_TOLERANCE = 1e-9;
 
+// The cell RMSE with the shift is more than this multiple of the cell RMSE with no shift, at each seed.
+const SHIFT_RATIO = 1.5;
+
 const seeds = Array.from({ length: 24 }, (_, i) => i + 1);
 
 const data = (dimensions: readonly ResponseDimension[], points: readonly ResponsePoint[], measures: readonly ResponseMeasure[] = [Y]): ResponseData => ({
@@ -73,6 +76,20 @@ function noisy(seed: number, n = 120): ResponseData {
 const allIds = (record: ResponseRecord): readonly string[] => record.points.map((p) => p.id);
 
 const relative = (a: number, b: number): number => Math.abs(a - b) / Math.max(Math.abs(a), Math.abs(b), Number.MIN_VALUE);
+
+const inCell = (p: ResponsePoint): boolean => p.values["arm"] === "tuned" && (p.values["x"] as number) > 8;
+
+// The draws of one seed are the same for each shift, so the two fits differ only by the shift of the cell.
+function shiftedCell(seed: number, shift: number): ResponseRecord {
+  const r = random(`cell ${seed}`);
+  const points = Array.from({ length: 200 }, (_, i): ResponsePoint => {
+    const x = r.range(0, 10);
+    const arm = i % 2 === 0 ? "plain" : "tuned";
+    const shifted = arm === "tuned" && x > 8;
+    return { id: `p${i}`, values: { x, arm }, measures: { y: x + (shifted ? shift : 0) + r.normal(0, 0.05) } };
+  });
+  return good(fitResponse(data([X, ARM], points), { seed, degree: 1, outOfFold: true }));
+}
 
 /** The largest relative difference between the pooled fold error and the error of all the points. */
 function poolGap(record: ResponseRecord, measure: string): number {
@@ -145,15 +162,7 @@ describe("heldOutErrorAt", () => {
 
   it("splits the pooled error between a cell and the other points, to the tolerance, at each seed", () => {
     const gaps = seeds.map((s) => {
-      const r = random(`cell ${s}`);
-      const points = Array.from({ length: 200 }, (_, i): ResponsePoint => {
-        const x = r.range(0, 10);
-        const arm = i % 2 === 0 ? "plain" : "tuned";
-        const shifted = arm === "tuned" && x > 8;
-        return { id: `p${i}`, values: { x, arm }, measures: { y: x + (shifted ? 2 : 0) + r.normal(0, 0.05) } };
-      });
-      const record = good(fitResponse(data([X, ARM], points), { seed: s, degree: 1, outOfFold: true }));
-      const inCell = (p: ResponsePoint): boolean => p.values["arm"] === "tuned" && (p.values["x"] as number) > 8;
+      const record = shiftedCell(s, 2);
       const cell = heldOutErrorAt(record, "y", record.points.filter(inCell).map((p) => p.id));
       const rest = heldOutErrorAt(record, "y", record.points.filter((p) => !inCell(p)).map((p) => p.id));
       const pooled = heldOutError(record, "y");
@@ -164,6 +173,16 @@ describe("heldOutErrorAt", () => {
     });
     const worst = Math.max(...gaps);
     expect(worst, `seed ${gaps.indexOf(worst) + 1}`).toBeLessThanOrEqual(POOL_TOLERANCE);
+  });
+
+  it("finds a bad cell: a shift of the cell raises the error of the cell, at each seed", () => {
+    const cellRmse = (seed: number, shift: number): number => {
+      const record = shiftedCell(seed, shift);
+      return heldOutErrorAt(record, "y", record.points.filter(inCell).map((p) => p.id)).rmse;
+    };
+    const ratios = seeds.map((s) => cellRmse(s, 2) / cellRmse(s, 0));
+    const worst = Math.min(...ratios);
+    expect(worst, `seed ${ratios.indexOf(worst) + 1}`).toBeGreaterThan(SHIFT_RATIO);
   });
 
   it("accepts a point with an id that is the name of a field of each object", () => {
