@@ -167,14 +167,14 @@ importers:
   .:
     devDependencies:
       '@mark1russell7/api-report':
-        specifier: ^0.2.0
-        version: 0.2.2
+        specifier: ^0.3.0
+        version: 0.3.0
       '@mark1russell7/boundaries':
         specifier: ^0.2.0
         version: 0.2.0(@swc/core@1.16.20)(dependency-cruiser@18.7.0)
       '@mark1russell7/conventions':
-        specifier: ^0.25.0
-        version: 0.25.0
+        specifier: ^0.26.0
+        version: 0.26.0
       '@mark1russell7/cue':
         specifier: ^2.0.0
         version: 2.1.1
@@ -478,8 +478,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@mark1russell7/api-report@0.2.2':
-    resolution: {integrity: sha512-5Res2AutTOsfAnvUy1HeAwI0wHwF96GOyO92a59nhVdE7nRxa4evp1wQSez1KTzRLFkJ2k4hzJhkfCusZ6xnaA==}
+  '@mark1russell7/api-report@0.3.0':
+    resolution: {integrity: sha512-EBn8ee0SbButi59hEHyYVAcQ7TOM1st9vvmfjrj3kIneT1iY2Taw35yCyUiwvZLH+W8/8BSsQdcfUDYoRJtPVQ==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -495,8 +495,8 @@ packages:
       dependency-cruiser:
         optional: true
 
-  '@mark1russell7/conventions@0.25.0':
-    resolution: {integrity: sha512-p49TqkjzhugGqhKdWjKq5bXOd2ljkwEHdbkEUVzmHSz8b805t2NhGLvbq63oBHMHMv0lKfJDgU0LMIXmpEgqhA==}
+  '@mark1russell7/conventions@0.26.0':
+    resolution: {integrity: sha512-waIPrXWmB7DF5qJI74EGvyLh6sWUMzgYCZGG82rOEXsExQcHmlHvmr/O1mYl7Vz4YVFrUjWPfV/SPgRJRjzD4A==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -1625,14 +1625,14 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  '@mark1russell7/api-report@0.2.2': {}
+  '@mark1russell7/api-report@0.3.0': {}
 
   '@mark1russell7/boundaries@0.2.0(@swc/core@1.16.20)(dependency-cruiser@18.7.0)':
     optionalDependencies:
       '@swc/core': 1.16.20
       dependency-cruiser: 18.7.0
 
-  '@mark1russell7/conventions@0.25.0': {}
+  '@mark1russell7/conventions@0.26.0': {}
 
   '@mark1russell7/cue@2.1.1': {}
 
