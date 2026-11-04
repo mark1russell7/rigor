@@ -84,8 +84,10 @@ function factorOf(group: string, ratios: readonly number[], censored: number, un
 
 /** This function refuses a result with no factor at all, because such a result measures nothing. */
 function withFactors(base: string | undefined, factors: readonly GroupFactor[]): ControlFactors {
-  const thin = factors.find((f): f is NoFactor => f.factor === undefined);
-  if (thin !== undefined && factors.every((f) => f.factor === undefined)) throw new RangeError(`controlFactor: no group has a factor: ${thin.reason}`);
+  if (factors.every((f) => f.factor === undefined)) {
+    const thin = factors.find((f): f is NoFactor => f.factor === undefined);
+    throw new RangeError(`controlFactor: no group has a factor: ${thin?.reason ?? "the rows hold no group to compare."}`);
+  }
   return { base, factors };
 }
 

@@ -76,6 +76,11 @@ describe("controlFactor", () => {
     expect(r.factors[1]!.censored).toBe(1);
   });
 
+  it("refuses rows with no group to compare", () => {
+    expect(() => controlFactor([])).toThrow(/no group to compare/);
+    expect(() => controlFactor(rows("old", [10, 10, 10, 10, 10]), { base: "old" })).toThrow(/no group to compare/);
+  });
+
   it("refuses too few keys, so a factor of a thin join is not a number", () => {
     expect(() => controlFactor([...rows("old", [10, 10]), ...rows("new", [20, 20])], { base: "old" })).toThrow(/2 usable keys/);
     expect(() => controlFactor([...rows("old", [10, 10]), ...rows("new", [20, 20])], { base: "old", minPairs: 2 })).not.toThrow();
