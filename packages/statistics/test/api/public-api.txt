@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 112 names
+## . (build/index.d.ts): 118 names
 
 type BootstrapOptions: build/index.d.ts#BootstrapOptions
 type CalibrationLevel: build/index.d.ts#CalibrationLevel
@@ -21,6 +21,7 @@ KENDALL_EXACT: build/index.d.ts#KENDALL_EXACT
 type LeastSquaresFit: build/index.d.ts#LeastSquaresFit
 type LeastSquaresOptions: build/index.d.ts#LeastSquaresOptions
 type MedianInterval: build/index.d.ts#MedianInterval
+type ModeOptions: build/index.d.ts#ModeOptions
 type NoiseOptions: build/index.d.ts#NoiseOptions
 type NoiseState: build/index.d.ts#NoiseState
 type NoiseVerdict: build/index.d.ts#NoiseVerdict
@@ -73,9 +74,12 @@ type RidgeOptions: build/index.d.ts#RidgeOptions
 type RidgeRankInput: build/index.d.ts#RidgeRankInput
 type RidgeResponseModel: build/index.d.ts#RidgeResponseModel
 type RidgeTerm: build/index.d.ts#RidgeTerm
+type SmoothLaw: build/index.d.ts#SmoothLaw
+type SmoothLawScore: build/index.d.ts#SmoothLawScore
 type Summary: build/index.d.ts#Summary
 type TableResponseModel: build/index.d.ts#TableResponseModel
 Z95: build/index.d.ts#Z95
+bestSmoothLaw: build/index.d.ts#bestSmoothLaw
 binomialInterval: build/index.d.ts#binomialInterval
 bootstrap: build/index.d.ts#bootstrap
 bootstrapClusters: build/index.d.ts#bootstrapClusters
@@ -95,6 +99,7 @@ leastSquares: build/index.d.ts#leastSquares
 mean: build/index.d.ts#mean
 median: build/index.d.ts#median
 medianInterval: build/index.d.ts#medianInterval
+modeCount: build/index.d.ts#modeCount
 negativeBinomialInterval: build/index.d.ts#negativeBinomialInterval
 noiseFloor: build/index.d.ts#noiseFloor
 noiseVerdict: build/index.d.ts#noiseVerdict
@@ -112,6 +117,7 @@ sd: build/index.d.ts#sd
 signTest: build/index.d.ts#signTest
 signTestPower: build/index.d.ts#signTestPower
 sliceResponse: build/index.d.ts#sliceResponse
+smoothLawScores: build/index.d.ts#smoothLawScores
 sorted: build/index.d.ts#sorted
 spearman: build/index.d.ts#spearman
 summarize: build/index.d.ts#summarize
@@ -237,6 +243,12 @@ interface MedianInterval {
   readonly high: number;
   readonly rank: number;
   readonly coverage: number;
+}
+
+### build/index.d.ts#ModeOptions
+interface ModeOptions {
+  readonly minShare?: number;
+  readonly valleyRatio?: number;
 }
 
 ### build/index.d.ts#NoiseOptions
@@ -595,6 +607,15 @@ interface RidgeTerm {
   readonly weight: number;
 }
 
+### build/index.d.ts#SmoothLaw
+type SmoothLaw = "uniform" | "normal" | "exponential" | "log-normal" | "pareto";
+
+### build/index.d.ts#SmoothLawScore
+interface SmoothLawScore {
+  readonly law: SmoothLaw;
+  readonly meanLogDensity: number;
+}
+
 ### build/index.d.ts#Summary
 interface Summary {
   readonly n: number;
@@ -619,6 +640,9 @@ interface TableResponseModel extends ResponseModelBase {
 
 ### build/index.d.ts#Z95
 export declare const Z95 = 1.959963984540054;
+
+### build/index.d.ts#bestSmoothLaw
+export declare function bestSmoothLaw(values: readonly number[]): SmoothLaw;
 
 ### build/index.d.ts#binomialInterval
 export declare function binomialInterval(n: number, p: number, level?: number): CountInterval;
@@ -677,6 +701,9 @@ export declare function median(values: readonly number[]): number;
 ### build/index.d.ts#medianInterval
 export declare function medianInterval(values: readonly number[], level?: number): MedianInterval;
 
+### build/index.d.ts#modeCount
+export declare function modeCount(values: readonly number[], options?: ModeOptions): number;
+
 ### build/index.d.ts#negativeBinomialInterval
 export declare function negativeBinomialInterval(successes: number, p: number, level?: number): CountInterval;
 
@@ -729,6 +756,9 @@ export declare function signTestPower(n: number, level?: number, sides?: 1 | 2):
 
 ### build/index.d.ts#sliceResponse
 export declare function sliceResponse(record: ResponseRecord, measure: string, options: ResponseSliceOptions): ResponseSlice;
+
+### build/index.d.ts#smoothLawScores
+export declare function smoothLawScores(values: readonly number[]): readonly SmoothLawScore[];
 
 ### build/index.d.ts#sorted
 export declare function sorted(values: readonly number[]): number[];
