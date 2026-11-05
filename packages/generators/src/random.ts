@@ -80,7 +80,7 @@ export function deriveSeed(seed: number, label: string): number {
  * One item of a list, chosen by highest random weight: each key has a weight from `seed`, and the largest weight wins.
  *
  * - The order of the list does not change the choice. The smaller key wins a tie of weights.
- * - When a list gains an item, only the draws that the new item wins change. For `n` items, the share of those draws is about `1 / (n + 1)`.
+ * - When a list gains an item, only the draws that the new item wins change. For `n` items, the share of those draws is approximately `1 / (n + 1)`.
  * - When a list loses an item, only the draws of that item change.
  *
  * The function reads one hash for each item, so a choice costs O(n). The list is not empty, and each key occurs once.

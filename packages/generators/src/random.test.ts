@@ -320,7 +320,30 @@ describe("stablePick", () => {
     expect(() => stablePick(1, ["a", "b", "a"])).toThrow(/occurs twice/);
   });
 
-  it("gives the same choices in each run", () => {
-    expect([0, 1, 2, 3, 4].map((seed) => stablePick(seed, names(4)))).toEqual(["s2", "s4", "s4", "s4", "s4"]);
+  describe("the frozen table", () => {
+    // Stored rows depend on these choices. A change to `stablePick`, `deriveSeed` or `mulberry32` turns this test red, and such a change needs a new version of each corpus that reads them.
+    const FROZEN_SEEDS = [0, 1, 2, 7, 1000, 123456789, 4294967295];
+    const FORMS = ["fixed", "freeHeight", "freeAspect", "freeArea"];
+    const FROZEN_FORMS = ["fixed", "freeAspect", "freeArea", "fixed", "fixed", "fixed", "fixed"];
+
+    it("gives these choices for each seed and list", () => {
+      const at = (list: readonly string[]): string[] => FROZEN_SEEDS.map((seed) => stablePick(seed, list));
+      expect(at(["s1", "s2", "s3", "s4"])).toEqual(["s2", "s4", "s4", "s3", "s1", "s3", "s2"]);
+      expect(at(FORMS)).toEqual(FROZEN_FORMS);
+      expect(at(["I", "II", "III", "IV", "V", "VI"])).toEqual(["III", "V", "I", "III", "II", "VI", "IV"]);
+      expect(at(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"])).toEqual(["4", "5", "10", "6", "8", "8", "5"]);
+    });
+
+    it("holds the seeds of the weights", () => {
+      expect(deriveSeed(0, "s1")).toBe(4035012447);
+      expect(deriveSeed(1, "fixed")).toBe(1171189756);
+      expect(deriveSeed(4294967295, "I")).toBe(846015251);
+    });
+
+    it("goes red on a changed form of the key", () => {
+      const changed = FROZEN_SEEDS.map((seed) => stablePick(seed, FORMS, (key) => `${key}!`));
+      expect(changed).toEqual(["freeHeight", "fixed", "fixed", "freeArea", "freeArea", "freeAspect", "freeAspect"]);
+      expect(changed).not.toEqual(FROZEN_FORMS);
+    });
   });
 });

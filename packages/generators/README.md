@@ -44,7 +44,7 @@ stablePick(deriveSeed(7, "origin"), ["tall-row", "ladder", "half-wide"]);
 ```
 
 - The order of the list does not change the choice.
-- When a list gains an item, only the draws that the new item wins change. For `n` items, the share of those draws is about `1 / (n + 1)`. No form can make it 0: a new item takes the draws it wins.
+- When a list gains an item, only the draws that the new item wins change. For `n` items, the share of those draws is approximately `1 / (n + 1)`. No form can make it 0: a new item takes the draws it wins.
 - When a list loses an item, only the draws of that item change.
 - A choice reads one hash for each item, so it costs O(n). `r.pick` costs O(1).
 
