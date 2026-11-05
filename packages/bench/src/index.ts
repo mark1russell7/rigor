@@ -51,6 +51,25 @@ export {
   pooledVerdict,
   poolRecords,
 } from "./merge.ts";
+export {
+  type Comparison,
+  type ControlRead,
+  type EntryCount,
+  type GuardRead,
+  type MeasureCheck,
+  type MeasureCheckOptions,
+  type MeasureChecks,
+  type MeasureFinding,
+  type MeasureFindingKind,
+  type MeasureRow,
+  type MeasureRule,
+  type NoControl,
+  type PartnerRead,
+  type SpreadRead,
+  type WinClaim,
+  checkMeasures,
+  winClaim,
+} from "./measures.ts";
 export { type Arm, type CaseRatio, type PairedTime, caseRatios, checkPairedTime, firstArm } from "./paired.ts";
 export { type Power, type PowerOptions, verdictPower } from "./power.ts";
 export { type Rounds, type RoundsOptions, timeRounds } from "./rounds.ts";
