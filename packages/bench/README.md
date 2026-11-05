@@ -69,6 +69,8 @@ v.comparison;                                     // the cases that gain and dro
 | `childLine(stdout)` | From `/fresh`: the last JSON line of a child, with its time `ms`, its `hash` and the reason of a skip. |
 | `pairOrder(pairs, round, caseIndex)` | From `/fresh`: the order of the pairs of one case in one round, and the first arm of each pair. |
 | `freshRun(options)` | From `/fresh`: the records of each pair, with each arm in its own fresh child process. |
+| `codeStamp(options)` | From `/code-stamp`: the stamp of the code of a run, from the code that its entries reach, the lock closure of its engines and its data files. |
+| `lockClosure(text, importer, names)` | From `/code-stamp`: each package that an engine pulls in, from a pnpm lock file. |
 | `superviseCases(options)` | From `/supervise`: each case in a child process, held to a time budget, with a hard stop and a resume. |
 | `caseProgress(file)` | From `/supervise`: the writer of the progress file of a child. |
 | `startSupervisedProcess(argv, options)` | From `/supervise`: a child process that `superviseCases` can stop with its tree. |
@@ -425,6 +427,52 @@ A row has four fields: `case`, `base`, `head` and `reason`. The fields `base` an
 - **A change that comes again needs two pull requests.** The first one deletes the spent row, and the second one adds it. A revert can delete the row in the same pull request.
 
 **Time.** The verdict reads results only. An accepted result buys no time reading. Keep the accepted case in `freshRun`, so it gets its head and A/A pairs and its normal time verdict. The time of the new result counts. The hash rule of `freshRun` is per arm, so two arms with different hashes run. The test "refuses two hashes of one arm on one case, and permits other hashes for other arms" pins this rule.
+
+## The stamp of the code of a run
+
+The entry `@mark1russell7/rigor-bench/code-stamp` is for Node only. It uses the optional peer `esbuild`. Add `esbuild` to the dependencies of the caller, so that its lock file pins the version.
+
+A run keeps a saved record when the stamp of the record equals the stamp of the run. A version number is a poor stamp. A release that changes no result throws away each record, and a change with no release keeps wrong records. The function `codeStamp` hashes what can change a result.
+
+```ts
+import { codeStamp } from "@mark1russell7/rigor-bench/code-stamp";
+
+const stamp = await codeStamp({
+  cwd: "packages/bench-of-my-repo",
+  entries: ["src/runner.ts", "src/cover.ts"],
+  engines: { names: ["my-engine"], lockFile: "../../pnpm-lock.yaml", importer: "packages/bench-of-my-repo" },
+  dataFiles: ["corpus/corpus.json"],
+  reads: ["readFileSync"],
+});
+```
+
+| Part of `stamp.parts` | What it reads | A change that moves it |
+| --- | --- | --- |
+| `code` | The bundle of the entries after a tree shake, with the engines outside | A token that the entries reach, a new export of an entry, a rename |
+| `engines` | The version and the integrity of each package in the lock closure of each engine | An engine version, a transitive package of an engine |
+| `data` | The name and the hash of each file in `dataFiles` | A byte or the name of such a file |
+| `bundler` | The version of `esbuild`. This part is not in the hash | A new version in the lock file of the caller |
+| `node` | The Node major | Another major, which can change a float or a sort |
+
+These changes keep the stamp: a comment, blank space, line ends, a type and a version in a package file. An export that the entries do not reach and another folder for the same files also keep it.
+
+The same tree gives the same stamp on Linux and on Windows. A slash in an option can have either direction. The hash of a text data file reads each line end as LF, and a file with a NUL byte hashes as its bytes. So a parser that reads a line end as data can read another result with an equal stamp.
+
+The stamp holds no computer. Each record keeps the computer as a field, because a time depends on it and a result does not.
+
+### What a bundle cannot see
+
+- **A file that the code reads when it runs.** The bundle holds no such file. So the function looks for the words of `CODE_STAMP_READ_WORDS` in the bundle, for example `readFileSync`, `fetch` and `process.env`. A word that the option `reads` does not state refuses the stamp, and so does a stated word that the bundle does not hold. List each file that such a read opens in `dataFiles`.
+- **The name of a file that a program makes at run time.** A word tells that a read exists, not which file it opens. The list in `dataFiles` is the statement of the caller.
+- **The code below an engine.** An engine stays outside the bundle, so `lockClosure` hashes the resolved closure of the engine from the lock file. The name of the engine alone is not sufficient. It reads pnpm lock files of version 9 and refuses another version.
+
+A workspace package is not an engine: `lockClosure` refuses it, because its code enters the bundle.
+
+### The limits of the stamp
+
+- A rename of an identifier moves the stamp, and so does the rename of an entry file. This gives a false rerun, not a false keep.
+- A top-level statement with an effect stays in the bundle when its module has no `"sideEffects": false`. A change of that statement moves the stamp, also when no result depends on it.
+- A new version of the bundler that gives an equal bundle keeps the stamp and the records. A new version that gives another bundle moves `code`, so it keeps no record, also when no result can change. This gives a false rerun, not a false keep. The field `bundler` of `parts` tells the cause. A caller with long runs holds automatic updates of the bundler in its own update settings. It merges an update when its next full run starts. The read of 2026-11-05 stamped 2 real entries (17 inputs) with 8 versions of the bundler, 0.27.2 to 0.28.2. Each of the 7 steps gave an equal bundle, so 0 of 7 steps gave a false rerun. The true rate is at most approximately 35 % at 95 %, and this read is of one tree only. Also, esbuild 0.27.4 crashed on a failed build of an entry in that read. That version is outside the peer range, so the read does not count it as a false rerun.
 
 ## Run cases with a time budget
 

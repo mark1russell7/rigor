@@ -54,6 +54,12 @@ jobs:
       - run: pnpm --filter "@template/$PACKAGE" typecheck
       - run: pnpm --filter "@template/$PACKAGE" test
 
+  # A code stamp must be the same on each operating system. The reads run when the stamp code, the lock file or their workflow changes.
+  stamp-check:
+    uses: ./.github/workflows/stamp-check.yml
+    permissions:
+      contents: read
+
   # The one check of the ruleset of main (CI.md of mark1russell7/template, "The check of the ruleset").
   # It passes only when each job of needs passed, or was skipped by its own if and ALLOW_SKIP names it.
   # A new job of this file goes in needs, so the ruleset never has to change, and gh pr merge --auto
@@ -61,7 +67,7 @@ jobs:
   ci-ok:
     name: CI OK
     if: always()
-    needs: [ci, presets]
+    needs: [ci, presets, stamp-check]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     permissions: {}
