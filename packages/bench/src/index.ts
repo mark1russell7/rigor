@@ -94,6 +94,21 @@ export { type Arm, type CaseRatio, type OrderSize, type PairedTime, armOrder, ca
 export { type Power, type PowerOptions, verdictPower } from "./power.ts";
 export { type Rounds, type RoundsOptions, timeRounds } from "./rounds.ts";
 export {
+  type FirstAgainstSecond,
+  type RunMethod,
+  type RunMethodOptions,
+  type Sentinel,
+  type SentinelOptions,
+  type TimedCase,
+  type TwoRunTimes,
+  firstAgainstSecond,
+  firstAgainstSecondLine,
+  overLimit,
+  runMethod,
+  sameResult,
+  sentinelCases,
+} from "./second-run.ts";
+export {
   type Band,
   type BandKind,
   type BandOptions,
