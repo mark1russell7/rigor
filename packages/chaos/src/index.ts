@@ -1,4 +1,4 @@
-export { latencyQuantile, measureLoad, scheduleHeld, type Completion, type LoadMeasure, type ScheduleCheck } from "./measure.ts";
+export { latencyQuantile, measureLoad, scheduleHeld, type Completion, type LoadMeasure, type ScheduleCheck, type SecondSample } from "./measure.ts";
 export {
   SCHEDULE_FORMAT,
   checkProfile,
