@@ -43,6 +43,8 @@ v.comparison;                                     // the cases that gain and dro
 | `caseIntervals(records, level)` | The ratio of each case with a distribution-free interval of its median over the rounds. The level 0.95 needs 6 rounds or more. |
 | `limitVerdict(candidate, aa, options)` | The verdict of the claim "the ratio of each case is at most `limit`": `within`, `beyond` or `cannot decide`. |
 | `budgetVerdict(rounds, aa, options)` | The verdict of the claim "the median of each case is at most `limit`", for one build: `within`, `beyond` or `cannot decide`. |
+| `budgetLooksVerdict(rounds, aa, options)` | The budget verdict of a run that adds rounds to the cases with no outcome, up to a stated budget. |
+| `budgetLookSpend(looks)` | The chance of error that a list of looks spends. |
 | `timeRounds(arms, options)` | The timed rounds of one case in one process: a warm-up, a batch of at least the target time, and the order of `firstArm`. |
 | `verdictPower(options)` | The share of each outcome over seeded benches with a known ratio: the power test of a rule. |
 | `balanceOrders(records)` | The records of each case with a turned order. It removes the extra records of the larger order, with the highest rounds first. |
@@ -92,6 +94,37 @@ v.cases;                                          // the medians, the interval, 
 - This check uses a difference, not a ratio. Two medians of 249 and 102 are a healthy run with a ratio of 2.4.
 - The level 0.95 needs 6 rounds or more in each arm. With fewer rounds, the case is `cannot decide`.
 - A case is `within` when the high end of the interval of its median is at most the limit. A case is `beyond` when the low end is above the limit.
+
+### Add rounds up to a budget
+
+Six rounds give an interval from the lowest to the highest value. One slow load makes the case `cannot decide`, and a rerun hides this. `budgetLooksVerdict` adds rounds to the cases with no outcome:
+
+```ts
+let v = budgetLooksVerdict(rounds, aaRounds, { limit: 450, maxDifference: 200 });
+while (v.more.length > 0) {
+  // Add rounds to both arms, so each case in v.more has its v.more[i].rounds.
+  v = budgetLooksVerdict(rounds, aaRounds, { limit: 450, maxDifference: 200 });
+}
+
+v.fails;                                          // true only when an interval is above the limit
+```
+
+- `BUDGET_LOOKS` has looks at 6, 12 and 24 rounds. The interval of 6 rounds is the same as in `budgetVerdict`.
+- Each extra look at the data adds a chance of error. The levels of the looks are high, so the sum of the chances is 0.0442, under the overall 0.05.
+- The sum comes from the real coverage of each interval, not from the nominal level. A list that spends more than the overall level gives a `RangeError`.
+- Each coverage needs independent rounds. This limit stays: a slow computer for one whole run moves all its rounds.
+- The first look with an outcome decides a case. Later rounds of the case do not change it.
+- A final `cannot decide` does not fail. Show it to the reader of the run. A median near the limit can have this outcome.
+
+We tested the default looks by resampling 48 blocking times of a noisy web page, with the median moved. Each row has 20000 seeded runs, and the limit is 450.
+
+| True median | Six rounds: outcome `beyond` | Looks: outcome `beyond` | Looks: final `cannot decide` | Mean rounds |
+| ---: | ---: | ---: | ---: | ---: |
+| 300 | 0% | 0% | 0% | 6.9 |
+| 376 | 0% | 0% | 2.8% | 12.4 |
+| 450 | 1.5% | 2.0% | 96.1% | 23.4 |
+| 500 | 38.6% | 89.0% | 11.0% | 15.1 |
+| 550 | 44.6% | 93.9% | 6.1% | 13.8 |
 
 ## A claim at each size: the ladder
 
