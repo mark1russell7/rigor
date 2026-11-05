@@ -594,7 +594,7 @@ function checkRule(rule: MeasureRule, reading: Reading, asOf: string): { check: 
  * This function reads the controls and the spread of each measure of a bench.
  *
  * - A control wins a measure when no real entry beats it on the keys that both finished. A tie counts for the control.
- * - A real entry beats a control when the Holm-corrected sign test passes and the median paired difference is over the larger floor of the two, else over the resolution.
+ * - A real entry beats a control when the Holm-corrected sign test passes and the median paired difference clears the bar. The bar is the larger floor of the two, else the resolution.
  * - One Holm family holds the tests of one control on one measure over all real entries and all strata.
  * - One more Holm family holds the tests of one control against the real entries, with the same need and resolution. A control that beats none of them is weak.
  * - One Holm family holds the tests of the spread of one measure over all pairs of real entries and all strata.
