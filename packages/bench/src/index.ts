@@ -47,6 +47,7 @@ export {
   ladderVerdict,
   rungVerdict,
 } from "./ladder.ts";
+export { type FamilyCase, type FamilyCount, type FamilyItem, type FamilyPower, type FamilyPowerOptions, type FamilyRead, type FamilyShares, familyPower, familyRead } from "./family.ts";
 export { type CaseInterval, type CaseLimit, type LimitOptions, type LimitOutcome, type LimitVerdict, caseIntervals, limitVerdict } from "./limit.ts";
 export { type ArmModels, type ArmPair, type LimitOnModel, type ModelLimits, type ModelRead, type ModelRow, type ModelStatus, type ModelTest, type VisibleShift, type ModelTestOptions, CEILING_ONLY, UNKNOWN_MODEL, armModels, limitOnModel, modelRowText, modelTest, visibleShift } from "./model.ts";
 export { type CaseTail, type CaseTailLimit, type TailLimit, type TailLimitOptions, type TailFalseFails, type TailGainCase, type TailLimitVerdict, type TailRuleOptions, caseTails, tailFalseFails, tailLimitVerdict } from "./tail.ts";
