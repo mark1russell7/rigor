@@ -133,6 +133,17 @@ verdictMargin: build/index.d.ts#verdictMargin
 verdictPower: build/index.d.ts#verdictPower
 winClaim: build/index.d.ts#winClaim
 
+## ./code-stamp (build/code-stamp.d.ts): 8 names
+
+CODE_STAMP_READ_WORDS: build/code-stamp.d.ts#CODE_STAMP_READ_WORDS
+CodeStamp: build/code-stamp.d.ts#CodeStamp
+CodeStampEngines: build/code-stamp.d.ts#CodeStampEngines
+CodeStampOptions: build/code-stamp.d.ts#CodeStampOptions
+CodeStampParts: build/code-stamp.d.ts#CodeStampParts
+EngineClosure: build/code-stamp.d.ts#EngineClosure
+codeStamp: build/code-stamp.d.ts#codeStamp
+lockClosure: build/code-stamp.d.ts#lockClosure
+
 ## ./fresh (build/fresh.d.ts): 17 names
 
 BenchEnv: build/fresh.d.ts#BenchEnv
@@ -168,6 +179,57 @@ startSupervisedProcess: build/supervise.d.ts#startSupervisedProcess
 superviseCases: build/supervise.d.ts#superviseCases
 
 ## Declarations
+
+### build/code-stamp.d.ts#CODE_STAMP_READ_WORDS
+export declare const CODE_STAMP_READ_WORDS: readonly string[];
+
+### build/code-stamp.d.ts#CodeStamp
+export interface CodeStamp {
+  readonly hash: string;
+  readonly parts: CodeStampParts;
+  readonly inputs: readonly string[];
+  readonly reads: readonly string[];
+  readonly engines: readonly EngineClosure[];
+}
+
+### build/code-stamp.d.ts#CodeStampEngines
+export interface CodeStampEngines {
+  readonly names: readonly string[];
+  readonly lockFile: string;
+  readonly importer: string;
+}
+
+### build/code-stamp.d.ts#CodeStampOptions
+export interface CodeStampOptions {
+  readonly cwd: string;
+  readonly entries: readonly string[];
+  readonly engines?: CodeStampEngines;
+  readonly dataFiles?: readonly string[];
+  readonly reads?: readonly string[];
+  readonly node?: string;
+}
+
+### build/code-stamp.d.ts#CodeStampParts
+export interface CodeStampParts {
+  readonly code: string;
+  readonly engines: string;
+  readonly data: string;
+  readonly bundler: string;
+  readonly node: string;
+}
+
+### build/code-stamp.d.ts#EngineClosure
+export interface EngineClosure {
+  readonly name: string;
+  readonly version: string;
+  readonly closure: readonly string[];
+}
+
+### build/code-stamp.d.ts#codeStamp
+export declare function codeStamp(options: CodeStampOptions): Promise<CodeStamp>;
+
+### build/code-stamp.d.ts#lockClosure
+export declare function lockClosure(lockText: string, importer: string, names: readonly string[]): readonly EngineClosure[];
 
 ### build/fresh.d.ts#BenchEnv
 export interface BenchEnv {
