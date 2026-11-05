@@ -9,6 +9,7 @@ import {
   calibration,
   compareRatios,
   holm,
+  partialConjunction,
   kendallTau,
   mean,
   median,
@@ -455,5 +456,25 @@ describe("the calibration", () => {
       [0.8, 3, 2],
     ]);
     expect(() => brier([{ p: 1.2, hit: true }])).toThrow(RangeError);
+  });
+});
+
+describe("partialConjunction", () => {
+  it("gives the larger p for 2 tests that both need an effect", () => {
+    expect(partialConjunction([0.01, 0.03], 2)).toBe(0.03);
+  });
+
+  it("gives m - need + 1 times the need-th smallest p, at most 1", () => {
+    expect(partialConjunction([0.04, 0.01, 0.5], 2)).toBeCloseTo(0.08);
+    expect(partialConjunction([0.04, 0.01, 0.5], 1)).toBeCloseTo(0.03);
+    expect(partialConjunction([0.04, 0.01, 0.5], 3)).toBe(0.5);
+    expect(partialConjunction([0.9, 0.8, 0.7], 1)).toBe(1);
+  });
+
+  it("refuses a need out of range and a p out of range", () => {
+    expect(() => partialConjunction([0.1], 2)).toThrow(RangeError);
+    expect(() => partialConjunction([0.1], 0)).toThrow(RangeError);
+    expect(() => partialConjunction([0.1], 0.5)).toThrow(RangeError);
+    expect(() => partialConjunction([1.5], 1)).toThrow(RangeError);
   });
 });

@@ -42,6 +42,8 @@ v.comparison;                                     // the cases that gain and dro
 | `pooledBand(pool, level)` | The pooled band: the larger of the floor and the A/A spread of the records of earlier runs. |
 | `caseIntervals(records, level)` | The ratio of each case with a distribution-free interval of its median over the rounds. The level 0.95 needs 6 rounds or more. |
 | `limitVerdict(candidate, aa, options)` | The verdict of the claim "the ratio of each case is at most `limit`": `within`, `beyond` or `cannot decide`. |
+| `gateOf(cases)` | The gate of a list of case outcomes: `pass`, `block` or `no read`. |
+| `notSlowerVerdict(jobs, options)` | The gate of the claim "not slower by more than the margin", with looks and a family level. |
 | `budgetVerdict(rounds, aa, options)` | The verdict of the claim "the median of each case is at most `limit`", for one build: `within`, `beyond` or `cannot decide`. |
 | `budgetLooksVerdict(rounds, aa, options)` | The budget verdict of a run that adds rounds to the cases with no outcome, up to a stated budget. |
 | `budgetLookSpend(looks)` | The chance of error that a list of looks spends. |
@@ -77,6 +79,29 @@ v.cases;                                          // the interval, the bound and
 - The option `share` permits some cases out of the limit. With `share: 0.95` and 20 cases, 1 case can be other than `within`. The verdict is `within` when that number of cases or fewer are other than `within`. It is `beyond` when more cases are `beyond`. The field `allowed` gives the number.
 
 The verdict has no correction for many cases. Each case has its own interval at the level `caseLevel`. Thus with many cases, a verdict `beyond` can come from noise only. Set `caseLevel` higher when a bench has many cases. A correction of Holm is an option for a later version.
+
+## A gate that can fail
+
+A required check needs a result that can fail. `gateOf` reads the case outcomes of a verdict, and `notSlowerVerdict` gives the claim of a speed gate.
+
+```ts
+const gate = notSlowerVerdict(jobs, { margin: Math.log(1.015) });
+
+gate.outcome;                                     // "pass", "block" or "no read"
+gate.cases;                                       // "not slower", "slower" or "no read" for each case, with the facts of each job
+gate.more;                                        // the next look of each case with no outcome
+```
+
+- The claim is "not slower by more than the margin". A one-sided bound answers it, thus a case can read `not slower` when its interval holds 1. The word `same` of `timeVerdict` asks for more.
+- The outcome of each case uses the words of `LimitOutcome`: `within` is `not slower`, `beyond` is `slower`, and `cannot decide` is `no read`. Thus `gateOf` also reads `limitVerdict` and `budgetVerdict`.
+- A case needs its bound in each of `jobs` jobs, by default 2. More rounds do not remove a difference between jobs.
+- The sign test compares the median difference with the margin in each job. It uses no random numbers. A pair holds two records with the same first arm.
+- The `level` is for the family. `holm` corrects each look over all cases, and each look has an equal share of the level.
+- The first look with an outcome decides a case. `GATE_LOOKS` is 12, 24 and 48 rounds.
+- With 16 cases and the default looks, the first test of a family at 12 rounds needs 12 of 12 pairs below the margin in both jobs. Thus a noisy case needs more rounds, or it stays `no read`.
+- `no read` is not a pass. A caller adds the rounds of `more`, then more jobs. A job that it adds after the last look is one more look, and the level does not count it.
+
+The level needs independent rounds. Rounds with a shared cause, for example a slow computer for one job, do not have it.
 
 ## A claim with a budget
 

@@ -121,6 +121,7 @@ The default expansion has one product for each pair of levels of two dimensions.
 | `quantileSamples(p, level)` | The fewest independent values that give a quantile an upper bound. At the level 0.95: 72 values for p95, 368 for p99 and 3,688 for p99.9. |
 | `binomialInterval(n, p, level)`, `negativeBinomialInterval(successes, p, level)` | The central interval of a binomial count, and of a count of failures before `successes` successes. Each tail outside holds `(1 - level) / 2` or less. |
 | `holm(pValues, level)` | The Holm correction of a family of tests. |
+| `partialConjunction(pValues, need)` | The p of the claim that at least `need` of these tests have a real effect. |
 | `spearman`, `kendallTau`, `ranks` | The rank correlations, with mean ranks for ties. |
 | `compareRatios`, `noiseFloor`, `noiseVerdict` | The comparison with a baseline, the noise floor of the 5-seed rule with a margin of practical effect, and the state of a difference over the seeds. |
 | `modeCount(values, { minShare, valleyRatio })` | The count of the modes of a sample, from a kernel density estimate. |
