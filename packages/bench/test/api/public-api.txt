@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 124 names
+## . (build/index.d.ts): 126 names
 
 type Arm: build/paired.d.ts#Arm
 BUDGET_LOOKS: build/index.d.ts#BUDGET_LOOKS
@@ -89,6 +89,8 @@ type RungEvidence: build/index.d.ts#RungEvidence
 type RungRecord: build/index.d.ts#RungRecord
 type RungVerdict: build/index.d.ts#RungVerdict
 type SpreadRead: build/index.d.ts#SpreadRead
+type TailFalseFails: build/index.d.ts#TailFalseFails
+type TailGainCase: build/index.d.ts#TailGainCase
 type TailLimit: build/index.d.ts#TailLimit
 type TailLimitOptions: build/index.d.ts#TailLimitOptions
 type TailLimitVerdict: build/index.d.ts#TailLimitVerdict
@@ -913,6 +915,18 @@ interface SpreadRead {
   readonly widest: number | undefined;
 }
 
+### build/index.d.ts#TailFalseFails
+interface TailFalseFails {
+  readonly fails: readonly string[];
+  readonly gains: readonly TailGainCase[];
+}
+
+### build/index.d.ts#TailGainCase
+interface TailGainCase {
+  readonly case: string;
+  readonly reason: string;
+}
+
 ### build/index.d.ts#TailLimit
 interface TailLimit {
   readonly median: number;
@@ -1058,7 +1072,7 @@ export declare function pooledVerdict(jobs: readonly JobRecords[], options?: Ver
 export declare function rungVerdict(rung: Rung, record: RungRecord | undefined, options: LadderOptions): RungVerdict;
 
 ### build/index.d.ts#tailFalseFails
-export declare function tailFalseFails(aa: readonly PairedTime[], options: TailRuleOptions): string[];
+export declare function tailFalseFails(aa: readonly PairedTime[], options: TailRuleOptions): TailFalseFails;
 
 ### build/index.d.ts#tailLimitVerdict
 export declare function tailLimitVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[], options: TailLimitOptions): TailLimitVerdict;

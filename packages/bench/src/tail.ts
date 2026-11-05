@@ -58,6 +58,21 @@ export interface CaseTailLimit extends CaseTail {
   readonly outcome: LimitOutcome;
 }
 
+/** A case that an A/A arm cannot read, with the reason. */
+export interface TailGainCase {
+  readonly case: string;
+  /** The reason in one sentence. It names the limit under 1. */
+  readonly reason: string;
+}
+
+/** The result of `tailFalseFails`. */
+export interface TailFalseFails {
+  /** The cases that the rule fails on the A/A arm. Print the count of this list on the gate. */
+  readonly fails: readonly string[];
+  /** The cases with a limit under 1. These cases are not in `fails`, because an A/A pair shows no gain. */
+  readonly gains: readonly TailGainCase[];
+}
+
 /** A tail limit verdict, with the facts that it uses. */
 export interface TailLimitVerdict {
   readonly outcome: LimitOutcome;
@@ -163,20 +178,32 @@ export function tailLimitVerdict(candidate: readonly PairedTime[], aa: readonly 
 /**
  * This function applies the rule of `tailLimitVerdict` to each case of the A/A arm, and gives the cases that fail. Each
  * case reads the tail of the other cases, because a case cannot be the noise of itself. An arm with one case gives no
- * case. A case with a limit under 1 fails by that limit, so a caller states those cases apart.
+ * failed case.
+ *
+ * A limit under 1 states a gain, and an A/A pair shows no gain. So the A/A arm has no read of that case, and the case goes
+ * in `gains` with that reason. The tail of that case stays in the noise of the other cases. The false fails of a gain limit
+ * come from repeat reads of an unchanged tree against its fixed base.
  */
-export function tailFalseFails(aa: readonly PairedTime[], options: TailRuleOptions): string[] {
+export function tailFalseFails(aa: readonly PairedTime[], options: TailRuleOptions): TailFalseFails {
   const rank = options.rank ?? 2;
   const tails = caseTails(aa, rank);
   const ratios = new Map(caseRatios(aa).map((c) => [c.case, c.ratio]));
-  return tails
+  const gains = tails.flatMap((c): TailGainCase[] => {
+    const limit = limitOf(options, c.case);
+    const under = Math.min(limit.median, limit.tail);
+    return under < 1 ? [{ case: c.case, reason: `The limit ${under} is under 1, and an A/A pair shows no gain, so the A/A arm has no read of this case.` }] : [];
+  });
+  const noRead = new Set(gains.map((c) => c.case));
+  const fails = tails
     .filter((c) => {
+      if (noRead.has(c.case)) return false;
       const others = largestTail(tails.filter((other) => other !== c));
       if (others === undefined) return false;
       const limit = limitOf(options, c.case);
       return (ratios.get(c.case) ?? 0) > limit.median || (c.tail !== undefined && c.tail > limit.tail && c.tail > others);
     })
     .map((c) => c.case);
+  return { fails, gains };
 }
 
 function round(x: number): number {

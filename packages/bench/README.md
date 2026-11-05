@@ -44,7 +44,7 @@ v.comparison;                                     // the cases that gain and dro
 | `limitVerdict(candidate, aa, options)` | The verdict of the claim "the ratio of each case is at most `limit`": `within`, `beyond` or `cannot decide`. |
 | `tailLimitVerdict(candidate, aa, options)` | The verdict of the claim "the median and a high value of each case are at most their limits", for a bench with few rounds. |
 | `caseTails(records, rank)` | The value at one rank of the ratios of each case, from the largest. |
-| `tailFalseFails(aa, options)` | The cases of an A/A arm that the rule of `tailLimitVerdict` fails. |
+| `tailFalseFails(aa, options)` | The cases of an A/A arm that the rule of `tailLimitVerdict` fails, and apart from these the cases with a limit under 1. |
 | `gateOf(cases)` | The gate of a list of case outcomes: `pass`, `block` or `no read`. |
 | `notSlowerVerdict(jobs, options)` | The gate of the claim "not slower by more than the margin", with looks and a family level. |
 | `budgetVerdict(rounds, aa, options)` | The verdict of the claim "the median of each case is at most `limit`", for one build: `within`, `beyond` or `cannot decide`. |
@@ -108,7 +108,9 @@ The rule of the verdict:
 
 With the default rank, a real cost in 1 round cannot fail the tail limit. This is by design: of 7 rounds, 1 round passes the tail, because 1 round cannot be told from noise. A cost in 2 rounds or more can fail it.
 
-The verdict has no interval, so a limit needs a margin from the spread of earlier runs. `tailFalseFails` applies the rule to each case of an A/A arm. Each case reads the tail of the other cases. Print its count on the gate, to state what the rule costs on noise. A limit under 1 states a gain, and an A/A ratio is near 1. So `tailFalseFails` names that case on each run, and this count states no fault of the rule.
+The verdict has no interval, so a limit needs a margin from the spread of earlier runs. `tailFalseFails` applies the rule to each case of an A/A arm. Each case reads the tail of the other cases. Print the count of `fails` on the gate, to state what the rule costs on noise.
+
+A limit under 1 states a gain, and an A/A pair shows no gain. So the A/A arm has no read of that case, and the case goes in `gains` with that reason. The false fails of a gain limit come from repeat reads of an unchanged tree against its fixed base.
 
 ## A gate that can fail
 

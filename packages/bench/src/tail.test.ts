@@ -228,32 +228,65 @@ describe("the gate of a tail limit verdict", () => {
   });
 });
 
+describe("tailFalseFails with a limit under 1", () => {
+  const gainOn = (name: string, limit: { median: number; tail: number }) => (c: string): { median: number; tail: number } => (c === name ? limit : LIMIT);
+
+  it("takes a case with a limit of the tail under 1 out of the count too", () => {
+    const result = tailFalseFails(quietArm(), { limit: gainOn("aa1", { median: 1.2, tail: 0.95 }) });
+    expect(result.gains.map((c) => c.case)).toEqual(["aa1"]);
+    expect(result.gains[0]?.reason).toContain("The limit 0.95 is under 1");
+  });
+
+  it("reads a limit of exactly 1 as a limit that an A/A arm can read", () => {
+    const result = tailFalseFails(quietArm(), { limit: gainOn("aa1", { median: 1, tail: 1.2 }) });
+    expect(result).toEqual({ fails: [], gains: [] });
+  });
+
+  it("keeps the tail of a gain case in the noise of the other cases", () => {
+    const aa = [...quietArm(), ...caseOf("gain", [1, 1, 1, 1, 1, 1.5, 1.5]), ...caseOf("loud", [1, 1, 1, 1, 1, 1.4, 1.4])];
+    const limit = gainOn("gain", { median: 0.98, tail: 1.2 });
+    const result = tailFalseFails(aa, { limit });
+    expect(result.gains.map((c) => c.case)).toEqual(["gain"]);
+    expect(result.fails).toEqual([]);
+    const without = aa.filter((r) => r.case !== "gain");
+    expect(tailFalseFails(without, { limit }).fails).toEqual(["loud"]);
+  });
+
+  it("lists a gain case of an arm with one case, and fails no case", () => {
+    const result = tailFalseFails(caseOf("gain", [1, 1, 1, 1, 1, 1, 1]), { limit: { median: 0.98, tail: 1.2 } });
+    expect(result.fails).toEqual([]);
+    expect(result.gains.map((c) => c.case)).toEqual(["gain"]);
+  });
+});
+
 describe("tailFalseFails", () => {
   it("gives no case on a quiet A/A arm", () => {
-    expect(tailFalseFails(quietArm(), { limit: LIMIT })).toEqual([]);
+    expect(tailFalseFails(quietArm(), { limit: LIMIT })).toEqual({ fails: [], gains: [] });
   });
 
   it("gives a case with a tail over its limit and over the tail of the other cases", () => {
     const aa = [...quietArm(), ...caseOf("loud", [1, 1, 1, 1, 1, 1.3, 1.3])];
-    expect(tailFalseFails(aa, { limit: LIMIT })).toEqual(["loud"]);
+    expect(tailFalseFails(aa, { limit: LIMIT }).fails).toEqual(["loud"]);
   });
 
   it("reads each case against the other cases, because a case cannot be the noise of itself", () => {
     const aa = [...quietArm(), ...caseOf("loud", [1, 1, 1, 1, 1, 1.3, 1.3]), ...caseOf("louder", [1, 1, 1, 1, 1, 1.4, 1.4])];
-    expect(tailFalseFails(aa, { limit: LIMIT })).toEqual(["louder"]);
+    expect(tailFalseFails(aa, { limit: LIMIT }).fails).toEqual(["louder"]);
   });
 
   it("gives a case that fails by a limit under 1, so the caller can state those cases", () => {
-    expect(tailFalseFails(quietArm(), { limit: (name) => (name === "aa0" ? { median: 0.9, tail: 1.2 } : LIMIT) })).toEqual(["aa0"]);
+    const result = tailFalseFails(quietArm(), { limit: (name) => (name === "aa0" ? { median: 0.9, tail: 1.2 } : LIMIT) });
+    expect(result.fails).toEqual([]);
+    expect(result.gains).toEqual([{ case: "aa0", reason: "The limit 0.9 is under 1, and an A/A pair shows no gain, so the A/A arm has no read of this case." }]);
   });
 
   it("gives no case on an arm with one case, because that case has no others to read", () => {
-    expect(tailFalseFails(caseOf("c", [1, 1, 1, 1, 1, 1.3, 1.3]), { limit: LIMIT })).toEqual([]);
+    expect(tailFalseFails(caseOf("c", [1, 1, 1, 1, 1, 1.3, 1.3]), { limit: LIMIT }).fails).toEqual([]);
   });
 
   it("uses the rank of the options", () => {
     const aa = [...quietArm(), ...caseOf("spike", [1, 1, 1, 1, 1, 1, 1.5])];
-    expect(tailFalseFails(aa, { limit: LIMIT })).toEqual([]);
-    expect(tailFalseFails(aa, { limit: LIMIT, rank: 1 })).toEqual(["spike"]);
+    expect(tailFalseFails(aa, { limit: LIMIT }).fails).toEqual([]);
+    expect(tailFalseFails(aa, { limit: LIMIT, rank: 1 }).fails).toEqual(["spike"]);
   });
 });
