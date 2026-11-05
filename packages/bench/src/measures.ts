@@ -223,7 +223,7 @@ export interface JointControl {
   readonly lostTo: readonly string[];
   /** The measures with no read of the entry and this control: no test, or too few keys. A tie on enough keys is a read and does not count here. */
   readonly unread: readonly string[];
-  /** This field is true when the entry beats this control on no measure, this control beats it on at least one, and no measure is unread. */
+  /** This field is true when no measure is unread and the entry beats this control on none. This control also beats the entry on at least one. */
   readonly dominates: boolean;
 }
 
@@ -642,7 +642,7 @@ export function winClaim(check: MeasureChecks, measure: string, entry: string, s
  * A control dominates the entry when the entry beats it on no measure of the set, and it beats the entry on at least one. A tie does not clear a control.
  * The entry survives when no control dominates it and it beats at least one control on each measure. The function adds no test: it reads the tests of `check`.
  * With a stratum, the function reads that stratum. Without one, it reads the rows with no stratum.
- * The function throws a `RangeError` for an empty set, for a repeat, for a measure with no rule and for an entry that the rows do not hold.
+ * The function throws a `RangeError` for an empty set, a repeat, a measure with no rule and an entry that the rows do not hold.
  */
 export function jointClaim(check: MeasureChecks, measures: readonly string[], entry: string, stratum?: string): JointClaim {
   if (measures.length === 0) throw new RangeError("jointClaim: the set of measures is empty.");
