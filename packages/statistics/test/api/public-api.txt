@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 122 names
+## . (build/index.d.ts): 125 names
 
 type BootstrapOptions: build/index.d.ts#BootstrapOptions
 type CalibrationLevel: build/index.d.ts#CalibrationLevel
@@ -25,6 +25,7 @@ type ModeOptions: build/index.d.ts#ModeOptions
 type NoiseOptions: build/index.d.ts#NoiseOptions
 type NoiseState: build/index.d.ts#NoiseState
 type NoiseVerdict: build/index.d.ts#NoiseVerdict
+type OptionFloorOptions: build/index.d.ts#OptionFloorOptions
 type OrdinalDimension: build/index.d.ts#OrdinalDimension
 type ParsedResponseRecord: build/index.d.ts#ParsedResponseRecord
 type PermutationOptions: build/index.d.ts#PermutationOptions
@@ -105,6 +106,7 @@ modeCount: build/index.d.ts#modeCount
 negativeBinomialInterval: build/index.d.ts#negativeBinomialInterval
 noiseFloor: build/index.d.ts#noiseFloor
 noiseVerdict: build/index.d.ts#noiseVerdict
+optionFloor: build/index.d.ts#optionFloor
 pairedPermutation: build/index.d.ts#pairedPermutation
 parseResponseRecord: build/index.d.ts#parseResponseRecord
 partialConjunction: build/index.d.ts#partialConjunction
@@ -125,6 +127,7 @@ sorted: build/index.d.ts#sorted
 spearman: build/index.d.ts#spearman
 summarize: build/index.d.ts#summarize
 surfaceResponse: build/index.d.ts#surfaceResponse
+tQuantile: build/index.d.ts#tQuantile
 twoSamplePermutation: build/index.d.ts#twoSamplePermutation
 whenHolds: build/index.d.ts#whenHolds
 wilson: build/index.d.ts#wilson
@@ -274,6 +277,15 @@ interface NoiseVerdict {
   readonly margin: number;
   readonly threshold: number;
   readonly state: NoiseState;
+}
+
+### build/index.d.ts#OptionFloorOptions
+interface OptionFloorOptions {
+  readonly sigma: number;
+  readonly delta: number;
+  readonly tests: number;
+  readonly alpha?: number;
+  readonly power?: number;
 }
 
 ### build/index.d.ts#OrdinalDimension
@@ -731,6 +743,9 @@ export declare function noiseVerdict(values: readonly number[], options?: NoiseO
   readonly better?: "higher" | "lower";
 }): NoiseVerdict;
 
+### build/index.d.ts#optionFloor
+export declare function optionFloor(options: OptionFloorOptions): number;
+
 ### build/index.d.ts#pairedPermutation
 export declare function pairedPermutation(candidate: readonly number[], baseline: readonly number[], options?: PermutationOptions): PermutationResult;
 
@@ -790,6 +805,9 @@ export declare function summarize(values: readonly number[]): Summary;
 
 ### build/index.d.ts#surfaceResponse
 export declare function surfaceResponse(record: ResponseRecord, measure: string, options: ResponseSurfaceOptions): ResponseSurface;
+
+### build/index.d.ts#tQuantile
+export declare function tQuantile(p: number, df: number): number;
 
 ### build/index.d.ts#twoSamplePermutation
 export declare function twoSamplePermutation(a: readonly number[], b: readonly number[], options?: TwoSamplePermutationOptions): TwoSamplePermutationResult;
