@@ -35,6 +35,19 @@ for (const seed of seedsFrom(process.env.SEED, [1, 2, 3, 4, 5])) {
 
 The package also exports the parts: `mulberry32(seed)` (the raw source), `fnv1a32(text, options)` (the FNV-1a hash), `seedOf(seed)`, `deriveSeed(seed, label)` and `randomOf(source, seed)` (the draws over a source that you give).
 
+## A choice that a longer list does not move
+
+`r.pick(items)` reads the length of the list, so a new item changes most of the choices. `stablePick(seed, items, keyOf)` gives each key a weight from the seed, and the largest weight wins:
+
+```ts
+stablePick(deriveSeed(7, "origin"), ["tall-row", "ladder", "half-wide"]);
+```
+
+- The order of the list does not change the choice.
+- When a list gains an item, only the draws that the new item wins change. For `n` items, the share of those draws is approximately `1 / (n + 1)`. No form can make it 0: a new item takes the draws it wins.
+- When a list loses an item, only the draws of that item change.
+- A choice reads one hash for each item, so it costs O(n). `r.pick` costs O(1).
+
 ## Open families of distributions
 
 A closed list of size names cannot grow without a change to each corpus. A `DistributionSpec` names a family and its parameters, so a corpus can name any point of the family.

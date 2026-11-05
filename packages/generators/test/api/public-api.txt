@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 18 names
+## . (build/index.d.ts): 19 names
 
 DIAGRAM_BOX_AREA: build/recorded.d.ts#DIAGRAM_BOX_AREA
 type DistributionSpec: build/distributions.d.ts#DistributionSpec
@@ -24,6 +24,7 @@ recordedSpec: build/recorded.d.ts#recordedSpec
 sampler: build/distributions.d.ts#sampler
 seedOf: build/random.d.ts#seedOf
 seedsFrom: build/random.d.ts#seedsFrom
+stablePick: build/random.d.ts#stablePick
 
 ## Declarations
 
@@ -105,6 +106,9 @@ export declare function seedOf(seed: number | string): number;
 
 ### build/random.d.ts#seedsFrom
 export declare function seedsFrom(given: string | undefined, defaults: readonly number[]): number[];
+
+### build/random.d.ts#stablePick
+export declare function stablePick<T>(seed: number, items: readonly T[], keyOf?: (item: T) => string): T;
 
 ### build/recorded.d.ts#DIAGRAM_BOX_AREA
 export declare const DIAGRAM_BOX_AREA: RecordedTable;
