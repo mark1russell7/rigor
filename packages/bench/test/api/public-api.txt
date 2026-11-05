@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 151 names
+## . (build/index.d.ts): 159 names
 
 type Arm: build/paired.d.ts#Arm
 type ArmModels: build/index.d.ts#ArmModels
@@ -29,6 +29,7 @@ type CaseGate: build/index.d.ts#CaseGate
 type CaseInterval: build/index.d.ts#CaseInterval
 type CaseLimit: build/index.d.ts#CaseLimit
 type CaseRatio: build/paired.d.ts#CaseRatio
+type CaseResults: build/index.d.ts#CaseResults
 type CaseTail: build/index.d.ts#CaseTail
 type CaseTailLimit: build/index.d.ts#CaseTailLimit
 type Comparison: build/index.d.ts#Comparison
@@ -95,8 +96,13 @@ type Power: build/index.d.ts#Power
 type PowerOptions: build/index.d.ts#PowerOptions
 type QuantileBudget: build/index.d.ts#QuantileBudget
 type RateBudget: build/index.d.ts#RateBudget
+type ResultRead: build/index.d.ts#ResultRead
+type ResultRow: build/index.d.ts#ResultRow
+type ResultRows: build/index.d.ts#ResultRows
+type ResultVerdict: build/index.d.ts#ResultVerdict
 type Rounds: build/index.d.ts#Rounds
 type RoundsOptions: build/index.d.ts#RoundsOptions
+type RowRead: build/index.d.ts#RowRead
 type RunPairs: build/index.d.ts#RunPairs
 type Rung: build/index.d.ts#Rung
 type RungBudget: build/index.d.ts#RungBudget
@@ -148,6 +154,8 @@ poolRecords: build/index.d.ts#poolRecords
 pooledBand: build/index.d.ts#pooledBand
 pooledLimitVerdict: build/index.d.ts#pooledLimitVerdict
 pooledVerdict: build/index.d.ts#pooledVerdict
+resultRows: build/index.d.ts#resultRows
+resultVerdict: build/index.d.ts#resultVerdict
 rungVerdict: build/index.d.ts#rungVerdict
 tailFalseFails: build/index.d.ts#tailFalseFails
 tailLimitVerdict: build/index.d.ts#tailLimitVerdict
@@ -177,18 +185,6 @@ benchEnv: build/fresh.d.ts#benchEnv
 childLine: build/fresh.d.ts#childLine
 freshRun: build/fresh.d.ts#freshRun
 pairOrder: build/fresh.d.ts#pairOrder
-
-## ./results (build/results.d.ts): 9 names
-
-CaseResults: build/results.d.ts#CaseResults
-ResultRead: build/results.d.ts#ResultRead
-ResultRow: build/results.d.ts#ResultRow
-ResultRows: build/results.d.ts#ResultRows
-ResultVerdict: build/results.d.ts#ResultVerdict
-RowRead: build/results.d.ts#RowRead
-resultPair: build/results.d.ts#resultPair
-resultRows: build/results.d.ts#resultRows
-resultVerdict: build/results.d.ts#resultVerdict
 
 ## ./supervise (build/supervise.d.ts): 11 names
 
@@ -456,6 +452,13 @@ interface CaseLimit extends CaseInterval {
   readonly bound: number;
   readonly floor: number;
   readonly outcome: LimitOutcome;
+}
+
+### build/index.d.ts#CaseResults
+interface CaseResults {
+  readonly case: string;
+  readonly base: string;
+  readonly head: string;
 }
 
 ### build/index.d.ts#CaseTail
@@ -978,6 +981,36 @@ interface RateBudget {
   readonly limit: number;
 }
 
+### build/index.d.ts#ResultRead
+interface ResultRead extends CaseResults {
+  readonly outcome: "accepted" | "refused";
+  readonly line: string;
+}
+
+### build/index.d.ts#ResultRow
+interface ResultRow {
+  readonly case: string;
+  readonly base: string;
+  readonly head: string;
+  readonly reason: string;
+}
+
+### build/index.d.ts#ResultRows
+interface ResultRows {
+  readonly base: readonly ResultRow[];
+  readonly head: readonly ResultRow[];
+}
+
+### build/index.d.ts#ResultVerdict
+interface ResultVerdict {
+  readonly outcome: "pass" | "fail";
+  readonly cases: readonly ResultRead[];
+  readonly unused: readonly RowRead[];
+  readonly absent: readonly RowRead[];
+  readonly spent: readonly ResultRow[];
+  readonly lines: readonly string[];
+}
+
 ### build/index.d.ts#Rounds
 interface Rounds {
   readonly records: PairedTime[];
@@ -993,6 +1026,12 @@ interface RoundsOptions {
   readonly targetMs?: number;
   readonly warmMs?: number;
   readonly now?: () => number;
+}
+
+### build/index.d.ts#RowRead
+interface RowRead {
+  readonly row: ResultRow;
+  readonly line: string;
 }
 
 ### build/index.d.ts#RunPairs
@@ -1243,6 +1282,12 @@ export declare function pooledLimitVerdict(jobs: readonly JobRecords[], options:
 ### build/index.d.ts#pooledVerdict
 export declare function pooledVerdict(jobs: readonly JobRecords[], options?: VerdictOptions): PooledVerdict;
 
+### build/index.d.ts#resultRows
+export declare function resultRows(content: unknown): ResultRow[];
+
+### build/index.d.ts#resultVerdict
+export declare function resultVerdict(results: readonly CaseResults[], rows: ResultRows): ResultVerdict;
+
 ### build/index.d.ts#rungVerdict
 export declare function rungVerdict(rung: Rung, record: RungRecord | undefined, options: LadderOptions): RungVerdict;
 
@@ -1313,57 +1358,6 @@ declare function firstArm(round: number, offset?: number): Arm;
 
 ### build/paired.d.ts#orderSize
 declare function orderSize(records: readonly PairedTime[]): OrderSize;
-
-### build/results.d.ts#CaseResults
-export interface CaseResults {
-  readonly case: string;
-  readonly base: string;
-  readonly head: string;
-}
-
-### build/results.d.ts#ResultRead
-export interface ResultRead extends CaseResults {
-  readonly pair: string;
-  readonly outcome: "accepted" | "refused";
-  readonly line: string;
-}
-
-### build/results.d.ts#ResultRow
-export interface ResultRow {
-  readonly case: string;
-  readonly pair: string;
-  readonly reason: string;
-}
-
-### build/results.d.ts#ResultRows
-export interface ResultRows {
-  readonly base: readonly ResultRow[];
-  readonly head: readonly ResultRow[];
-}
-
-### build/results.d.ts#ResultVerdict
-export interface ResultVerdict {
-  readonly outcome: "pass" | "fail";
-  readonly cases: readonly ResultRead[];
-  readonly unused: readonly RowRead[];
-  readonly spent: readonly RowRead[];
-  readonly lines: readonly string[];
-}
-
-### build/results.d.ts#RowRead
-export interface RowRead {
-  readonly row: ResultRow;
-  readonly line: string;
-}
-
-### build/results.d.ts#resultPair
-export declare function resultPair(base: string, head: string): string;
-
-### build/results.d.ts#resultRows
-export declare function resultRows(content: unknown): ResultRow[];
-
-### build/results.d.ts#resultVerdict
-export declare function resultVerdict(results: readonly CaseResults[], rows: ResultRows): ResultVerdict;
 
 ### build/supervise.d.ts#CaseProgress
 export interface CaseProgress {

@@ -402,13 +402,13 @@ A rotation of N arms turns the order of two arms only when they are N/2 apart in
 
 ## A result that changes on purpose
 
-A bench compares two arms, and two arms with different results do not do the same work. So a difference stops the merge. A pull request can change a result on purpose. Without a stated path, its author edits the case, and no gate reads that edit. The entry `@mark1russell7/rigor-bench/results` gives that path: a row in the diff, bound to the exact pair of results. It uses `node:crypto`, so it is for Node only.
+A bench compares two arms, and two arms with different results do not do the same work. So a difference stops the merge. A pull request can change a result on purpose. Without a stated path, its author edits the case, and no gate reads that edit. A row in the diff gives that path, and it names the exact change.
 
 ```ts
-import { resultRows, resultVerdict } from "@mark1russell7/rigor-bench/results";
+import { resultRows, resultVerdict } from "@mark1russell7/rigor-bench";
 
 const verdict = resultVerdict(
-  [{ case: "facts of a tree", base: "4 reads", head: "5 reads" }],     // the results of each case in the two arms
+  [{ case: "facts of a tree", base: "9f3a", head: "c81e" }],            // the hash of the result of each case in the two arms
   { base: resultRows(rowsOfTheBase), head: resultRows(rowsOfTheHead) }, // the parsed file of rows in each arm
 );
 
@@ -416,12 +416,13 @@ verdict.outcome;                                  // "pass" or "fail"
 verdict.lines;                                    // the lines that the check prints
 ```
 
-A row has three fields: the case, the hash from `resultPair`, and the reason. A refused line prints the row to add. These rules stop the reuse of a row:
+A row has four fields: `case`, `base`, `head` and `reason`. The fields `base` and `head` are hashes that the caller makes, so a large result stays out of the file. A reviewer can read a row against the run. A refused line prints the row to add. These rules stop the reuse of a row:
 
-- **The hash binds the row to one pair.** The same row against one other result reads `refused`, and the line names the two hashes. The pair has an order, so a row of a change does not accept its revert.
-- **A row counts only if it is new.** A row that the base also has is spent, so it reads `spent` and accepts nothing. A later merge cannot use the row again, even on the same pair.
-- **A new row that accepts nothing fails the verdict.** It reads `unused`. Otherwise it merges and is spent, and a later true change of that pair is refused.
-- **A pair that comes again needs two pull requests.** The first one deletes the spent row, and the second one adds it. A revert can delete the row in the same pull request.
+- **The hashes bind the row to one change.** The same row against one other result reads `refused`, and the line says which side moved: the base, the head or both. The fields have an order, so a row of a change does not accept its revert.
+- **A row counts only if it is new.** A row that the base also has is spent and accepts nothing, even on the same change. The verdict keeps the array `spent`, and it prints one line with the count.
+- **A new row that accepts nothing fails the verdict.** A row of a case with one result reads `unused`. Otherwise it merges and is spent, and a later true change is refused.
+- **A row of a case with no result fails the verdict.** It reads `absent`, because a missing read is no pass. The case can be skipped or filtered out, so the line does not tell the author to delete the row.
+- **A change that comes again needs two pull requests.** The first one deletes the spent row, and the second one adds it. A revert can delete the row in the same pull request.
 
 **Time.** The verdict reads results only. An accepted result buys no time reading. Keep the accepted case in `freshRun`, so it gets its head and A/A pairs and its normal time verdict. The time of the new result counts. The hash rule of `freshRun` is per arm, so two arms with different hashes run. The test "refuses two hashes of one arm on one case, and permits other hashes for other arms" pins this rule.
 
