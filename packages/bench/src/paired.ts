@@ -30,6 +30,23 @@ export function firstArm(round: number, offset = 0): Arm {
   return (((round + offset) % 2) + 2) % 2 === 0 ? "a" : "b";
 }
 
+/**
+ * This function gives the order of three or more arms in one round. Each odd round is the reverse of the round before it,
+ * and each even round turns the arms by one more place. So each pair of arms has each order one time in each two rounds,
+ * at each count of arms. After any count of rounds, the two orders of a pair differ by 1 or less, and `caseRatios` accepts
+ * the records.
+ *
+ * A plain turn of the arms does not give this. With 3 arms, each arm comes before the next arm in 2 of 3 rounds. Over 7
+ * rounds, a pair can have one order 5 times, and `caseRatios` refuses those records.
+ */
+export function armOrder<T>(arms: readonly T[], round: number): readonly T[] {
+  if (arms.length === 0) throw new RangeError("armOrder: there is no arm.");
+  if (!Number.isSafeInteger(round) || round < 0) throw new RangeError(`armOrder: the round is a whole number of 0 or more, not ${round}.`);
+  const shift = Math.floor(round / 2) % arms.length;
+  const turned = [...arms.slice(shift), ...arms.slice(0, shift)];
+  return round % 2 === 0 ? turned : turned.toReversed();
+}
+
 /** This function examines one record. A time that is not a finite number above 0 is an error. */
 export function checkPairedTime(record: PairedTime): PairedTime {
   const where = `the record of the case ${JSON.stringify(record.case)}, round ${record.round}`;
