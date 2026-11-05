@@ -10,6 +10,7 @@ npm install @mark1russell7/rigor-bench
 
 - Each round runs the two arms of a pair on one case, one after the other. Arm `a` is the baseline, and arm `b` is the candidate.
 - The order turns each round (`firstArm`). Thus a warm cache or a slow start does not always help the same arm.
+- A run with three or more arms in one child order uses `armOrder`. A plain turn of the arms does not turn each pair evenly.
 - An A/A pair runs the same code in its two arms. Its ratios show how far apart two equal arms come on the machine.
 - The ratio of a case is `b / a` over its rounds (`caseRatios`).
 - The default rule `difference` gives the bootstrap interval of the candidate median over the A/A median. The verdict compares it with 1.
@@ -33,6 +34,7 @@ v.comparison;                                     // the cases that gain and dro
 | Function | What it gives |
 | --- | --- |
 | `firstArm(round, offset)` | The arm that runs first. The order turns each round, and an odd offset starts with arm `b`. |
+| `armOrder(arms, round)` | The order of any count of arms in a round. Each pair of arms has each order within 1 after each count of rounds. |
 | `checkPairedTime(record)` | The record, or a `RangeError` for a time that is not a finite number above 0. |
 | `caseRatios(records)` | The ratio of each case. It refuses 2 records of one round, and an order that did not turn. |
 | `aaBand(aa, options)` | The band of the A/A arm, symmetric on a log scale. The kind `median` (the default) holds the A/A median, and the kind `case` holds one A/A case. It needs 5 cases or more. |

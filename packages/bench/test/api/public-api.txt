@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 143 names
+## . (build/index.d.ts): 144 names
 
 type Arm: build/paired.d.ts#Arm
 type ArmModels: build/index.d.ts#ArmModels
@@ -116,6 +116,7 @@ type WorstBudget: build/index.d.ts#WorstBudget
 aaBand: build/index.d.ts#aaBand
 aaSpread: build/index.d.ts#aaSpread
 armModels: build/index.d.ts#armModels
+armOrder: build/paired.d.ts#armOrder
 armVerdicts: build/index.d.ts#armVerdicts
 balanceOrders: build/index.d.ts#balanceOrders
 budgetLookSpend: build/index.d.ts#budgetLookSpend
@@ -1230,6 +1231,9 @@ interface PairedTime {
   readonly a: number;
   readonly b: number;
 }
+
+### build/paired.d.ts#armOrder
+declare function armOrder<T>(arms: readonly T[], round: number): readonly T[];
 
 ### build/paired.d.ts#caseRatios
 declare function caseRatios(records: readonly PairedTime[]): CaseRatio[];

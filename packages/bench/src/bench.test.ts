@@ -1,6 +1,6 @@
 import { random } from "@mark1russell7/rigor-generators";
 import { describe, expect, it } from "vitest";
-import { type PairedTime, aaBand, caseRatios, checkPairedTime, firstArm, timeVerdict, verdictPower } from "./index.ts";
+import { type PairedTime, aaBand, armOrder, caseRatios, checkPairedTime, firstArm, timeVerdict, verdictPower } from "./index.ts";
 
 /** The records of `cases` cases and `rounds` rounds. Arm b takes `factor` times arm a, with a seeded noise of about `spread`. */
 function records(cases: number, rounds: number, factor: number, spread: number, seed: number, prefix = "c"): PairedTime[] {
@@ -15,6 +15,70 @@ function records(cases: number, rounds: number, factor: number, spread: number, 
   }
   return out;
 }
+
+describe("armOrder", () => {
+  const countOf = (arms: readonly number[], rounds: number): Map<string, number> => {
+    const before = new Map<string, number>();
+    for (let round = 0; round < rounds; round++) {
+      const order = armOrder(arms, round);
+      for (const [at, a] of order.entries()) for (const b of order.slice(at + 1)) before.set(`${a},${b}`, (before.get(`${a},${b}`) ?? 0) + 1);
+    }
+    return before;
+  };
+
+  it("mirrors the order at each odd round, and turns it at each even round", () => {
+    expect(Array.from({ length: 7 }, (_, round) => armOrder(["a", "b", "c"], round).join(""))).toEqual(["abc", "cba", "bca", "acb", "cab", "bac", "abc"]);
+    expect(Array.from({ length: 4 }, (_, round) => armOrder(["a", "b"], round).join(""))).toEqual(["ab", "ba", "ba", "ab"]);
+    expect(armOrder(["a"], 3)).toEqual(["a"]);
+  });
+
+  it("gives each pair of arms each order within 1 after each count of rounds, at each count of arms", () => {
+    const faults: string[] = [];
+    for (let count = 2; count <= 9; count++) {
+      const arms = Array.from({ length: count }, (_, at) => at);
+      for (let rounds = 1; rounds <= 4 * count; rounds++) {
+        const before = countOf(arms, rounds);
+        for (const a of arms) for (const b of arms) if (a < b && Math.abs((before.get(`${a},${b}`) ?? 0) - (before.get(`${b},${a}`) ?? 0)) > 1) faults.push(`${count} arms, ${rounds} rounds: ${a} and ${b}`);
+      }
+    }
+    expect(faults).toEqual([]);
+  });
+
+  it("gives each arm each place the same count of times over 2 rounds for each arm", () => {
+    for (let count = 2; count <= 9; count++) {
+      const arms = Array.from({ length: count }, (_, at) => at);
+      const seen = arms.map(() => arms.map(() => 0));
+      for (let round = 0; round < 2 * count; round++) {
+        for (const [place, arm] of armOrder(arms, round).entries()) {
+          const row = seen[arm];
+          if (row !== undefined) row[place] = (row[place] ?? 0) + 1;
+        }
+      }
+      expect(seen.flat().every((n) => n === 2)).toBe(true);
+    }
+  });
+
+  it("gives records of a pair that caseRatios accepts, where a plain turn gives records that it refuses", () => {
+    const arms = ["base", "branch", "aa"];
+    const records = (orderOf: (round: number) => readonly string[]): PairedTime[] =>
+      Array.from({ length: 7 }, (_, round) => {
+        const order = orderOf(round);
+        return { case: "c", round, first: order.indexOf("base") < order.indexOf("branch") ? "a" : "b", a: 1, b: 1 };
+      });
+    expect(caseRatios(records((round) => armOrder(arms, round)))).toHaveLength(1);
+    const plain = (round: number): readonly string[] => arms.map((_, at) => arms[(at + round) % arms.length] as string);
+    expect(() => caseRatios(records(plain))).toThrow("The order turns each round");
+  });
+
+  it("does not change its input, and refuses no arms and a bad round", () => {
+    const arms = [1, 2, 3];
+    armOrder(arms, 1);
+    expect(arms).toEqual([1, 2, 3]);
+    expect(() => armOrder([], 0)).toThrow(RangeError);
+    expect(() => armOrder([1], -1)).toThrow(RangeError);
+    expect(() => armOrder([1], 0.5)).toThrow(RangeError);
+  });
+});
 
 describe("firstArm", () => {
   it("turns the order each round, and an odd offset starts with arm b", () => {

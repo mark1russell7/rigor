@@ -202,6 +202,10 @@ function fixtureReads(): ModelRead[] {
 }
 
 describe("the flip of the CPU model test on 26 reads", () => {
+  /** This function prints a figure of a flip, so that a reader of the log of CI can check it. */
+  const report = (label: string, text: string): void => {
+    console.info(`flip ${label}: ${text}`);
+  };
   const reads = fixtureReads();
   const fast = { searchVisible: false };
   const named = (test: ModelTest): string[] => test.differs.map((r) => `${r.case} ${r.model}`);
@@ -217,6 +221,8 @@ describe("the flip of the CPU model test on 26 reads", () => {
   it("reads 468 values in a family of 54, and the clean copy has no row that differs", { timeout: 120_000 }, () => {
     expect(reads).toHaveLength(468);
     const test = clean();
+    report("clean, family 54", `${String(reads.length)} values, family ${String(test.family)}, ${String(test.differs.length)} rows differ`);
+    report("clean, family 54", modelRowText(rowOf(test, "9V45"), test.family));
     expect(test.family).toBe(54);
     expect(test.differs).toEqual([]);
     for (const row of test.rows) expect(modelRowText(row, test.family)).toMatch(/^(no read|too few): /u);
@@ -224,15 +230,18 @@ describe("the flip of the CPU model test on 26 reads", () => {
 
   it("the fault reads differs on a model with 8 reads, so the family of 54 can fail", { timeout: 120_000 }, () => {
     const flipped = modelTest(moved("7763", 0.2), fast);
+    report("+0.2 on avoid 7763, family 54", modelRowText(rowOf(flipped, "7763"), flipped.family));
     expect(named(flipped)).toEqual(["avoid 7763"]);
   });
 
   it("a fault of 0.09 on 5 reads does not read differs at a family of 54, at any size", { timeout: 120_000 }, () => {
     // 5 reads against 21 have 65 780 splits, so the p is exact. The level is 0.05 / 54, and 3 high values of 5 hold the median.
     const flipped = modelTest(moved("9V45", 0.09), fast);
+    report("+0.09 on avoid 9V45, family 54", `${modelRowText(rowOf(flipped, "9V45"), flipped.family)}, Holm p ${(rowOf(flipped, "9V45").p ?? 1).toFixed(4)}`);
     expect(named(flipped)).toEqual([]);
     expect(rowOf(flipped, "9V45").status).toBe("no read");
     const far = modelTest(moved("9V45", 1), fast);
+    report("+1 on avoid 9V45, family 54", `${modelRowText(rowOf(far, "9V45"), far.family)}, Holm p ${(rowOf(far, "9V45").p ?? 1).toFixed(4)}`);
     expect(named(far)).toEqual([]);
     expect(rowOf(far, "9V45").p).toBeGreaterThan(0.05);
   });
@@ -245,6 +254,7 @@ describe("the flip of the CPU model test on 26 reads", () => {
       1,
       { runs: 108_000 },
     );
+    report("the search at family 54", `the smallest p is ${family54.floor.toFixed(5)}, the level is ${(0.05 / 54).toFixed(5)}, and the shift is ${String(family54.shift)}`);
     expect(family54.shift).toBeUndefined();
     expect(family54.floor).toBeGreaterThan(0.05 / 54);
   });
@@ -283,6 +293,8 @@ describe("the flip of the CPU model test on 26 reads", () => {
 
     it("the copy with no fault has a family of 2 and no row that differs", { timeout: 120_000 }, () => {
       const test = modelTest(copyWith(), { asked });
+      report("no fault, family 2", modelRowText(rowIn(test, "avoid"), test.family));
+      report("no fault, family 2", modelRowText(rowIn(test, "build"), test.family));
       expect(test.family).toBe(2);
       expect(test.differs).toEqual([]);
       expect(rowIn(test, "avoid").visible).toBeGreaterThan(below.avoid);
@@ -292,14 +304,19 @@ describe("the flip of the CPU model test on 26 reads", () => {
     });
 
     it("a fault above the visible shift reads differs, on its own row only", { timeout: 120_000 }, () => {
-      expect(named(modelTest(copyWith({ caseName: "avoid", shift: above.avoid }), { ...fast, asked }))).toEqual(["avoid 9V45"]);
-      expect(named(modelTest(copyWith({ caseName: "build", shift: above.build }), { ...fast, asked }))).toEqual(["build 9V45"]);
+      const avoid = modelTest(copyWith({ caseName: "avoid", shift: above.avoid }), { ...fast, asked });
+      const build = modelTest(copyWith({ caseName: "build", shift: above.build }), { ...fast, asked });
+      report(`+${String(above.avoid)} on avoid, family 2`, modelRowText(rowIn(avoid, "avoid"), avoid.family));
+      report(`+${String(above.build)} on build, family 2`, modelRowText(rowIn(build, "build"), build.family));
+      expect(named(avoid)).toEqual(["avoid 9V45"]);
+      expect(named(build)).toEqual(["build 9V45"]);
     });
 
     it("a fault below the visible shift reads no read, and its words do not say that the model is the same", { timeout: 120_000 }, () => {
       for (const caseName of ["avoid", "build"] as const) {
         const test = modelTest(copyWith({ caseName, shift: below[caseName] }), { asked });
         const text = modelRowText(rowIn(test, caseName), test.family);
+        report(`+${String(below[caseName])} on ${caseName}, family 2`, `${text}, Holm p ${(rowIn(test, caseName).p ?? 1).toFixed(4)}`);
         expect(test.differs).toEqual([]);
         expect(text).toMatch(/^no read: /u);
         expect(text).not.toMatch(/same|equal|no difference/u);
