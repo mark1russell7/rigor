@@ -714,6 +714,12 @@ export declare function armVerdicts(run: RunPairs, aaPair: string, options?: Ver
 ### build/index.d.ts#balanceOrders
 export declare function balanceOrders<T extends PairedTime>(records: readonly T[]): Balanced<T>;
 
+### build/index.d.ts#budgetLookSpend
+export declare function budgetLookSpend(looks: readonly BudgetLook[]): number;
+
+### build/index.d.ts#budgetLooksVerdict
+export declare function budgetLooksVerdict(rounds: readonly BudgetRound[], aa: readonly BudgetRound[], options: BudgetLooksOptions): BudgetLooksVerdict;
+
 ### build/index.d.ts#budgetVerdict
 export declare function budgetVerdict(rounds: readonly BudgetRound[], aa: readonly BudgetRound[], options: BudgetOptions): BudgetVerdict;
 
