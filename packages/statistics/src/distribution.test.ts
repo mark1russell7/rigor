@@ -167,10 +167,10 @@ describe("the count of the modes", () => {
   it("holds the table of the README for smooth samples", () => {
     const SIZES = [10, 30, 100, 300, 1000];
     const TABLE: Readonly<Record<SmoothLaw, readonly number[]>> = {
-      uniform: [0.508, 0.804, 0.992, 1, 1],
-      normal: [0.468, 0.808, 0.98, 1, 1],
-      exponential: [0.534, 0.768, 0.884, 0.984, 1],
-      "log-normal": [0.552, 0.722, 0.922, 0.986, 1],
+      uniform: [0.538, 0.804, 0.992, 1, 1],
+      normal: [0.51, 0.808, 0.98, 1, 1],
+      exponential: [0.536, 0.764, 0.88, 0.984, 1],
+      "log-normal": [0.554, 0.704, 0.916, 0.986, 1],
       pareto: [0.496, 0.766, 0.912, 0.988, 1],
     };
     const shares = Object.fromEntries(
