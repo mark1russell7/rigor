@@ -831,6 +831,7 @@ export interface SupervisedCase {
   readonly id: string;
   readonly budgetMs: number;
   readonly groups?: Readonly<Record<string, string>>;
+  readonly rank?: number;
 }
 
 ### build/supervise.d.ts#SupervisedChild

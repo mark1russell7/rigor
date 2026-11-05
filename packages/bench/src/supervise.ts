@@ -25,6 +25,11 @@ export interface SupervisedCase {
    * A case with stages `pack` and `route` can thus count against a router, or against a packer, and not against both.
    */
   readonly groups?: Readonly<Record<string, string>>;
+  /**
+   * The place of the case in its groups, for example its input size. The default is 0.
+   * Overruns count for each group and rank. They stop the cases of that group at that rank and above, and a smaller rank goes on.
+   */
+  readonly rank?: number;
 }
 
 /** The end of a case that did not finish: an overrun, which is measured, or a skip, which is not. */
@@ -116,7 +121,9 @@ function progressReader(file: string): () => ProgressEvent[] {
  * This function runs the cases and holds each case to its budget.
  *
  * - A stage over its budget stops the child, and `onEnd` gets `over-budget`. The next child runs the cases that are left.
- * - After `overruns` overruns in one group, each other case of the group ends as `not-run`, with the ids of those overruns.
+ * - After `overruns` overruns in one group at one rank, each other case of the group at that rank or above ends as `not-run`.
+ *   The end has the ids of those overruns.
+ * - A case of a smaller rank goes on, and an overrun at another rank does not count. With no ranks, all cases of a group have one rank.
  * - A case in `done` or `earlier` does not run. A case that ended, or that has an end from `onEnd`, does not run again.
  * - An `over-budget` end of `earlier` counts as an overrun of this run. `onEnd` does not get the end again.
  * - A child that ends without a stop ends the run. Its exit code is the code of the result.
@@ -127,8 +134,11 @@ export async function superviseCases(options: SuperviseOptions): Promise<Supervi
   const limit = options.overruns ?? DEFAULT_OVERRUNS;
   const pollMs = options.pollMs ?? DEFAULT_POLL_MS;
   const byId = new Map(cases.map((c) => [c.id, c]));
+  for (const c of cases) {
+    if (c.rank !== undefined && !Number.isFinite(c.rank)) throw new RangeError(`The case "${c.id}" has the rank ${c.rank}. A rank must be a finite number.`);
+  }
   const finished = new Set(options.done ?? []);
-  const groupOverruns = new Map<string, string[]>();
+  const groupOverruns = new Map<string, Map<number, string[]>>();
   const ends: SupervisedEnd[] = [];
   const left = (): string[] => cases.filter((c) => !finished.has(c.id)).map((c) => c.id);
   const report = (end: SupervisedEnd): void => {
@@ -137,13 +147,17 @@ export async function superviseCases(options: SuperviseOptions): Promise<Supervi
     onEnd(end);
   };
   const countOverrun = (id: string, stage: string): void => {
-    const group = byId.get(id)?.groups?.[stage];
+    const overrun = byId.get(id);
+    const group = overrun?.groups?.[stage];
     if (group === undefined) return;
-    const ids = [...(groupOverruns.get(group) ?? []), id];
-    groupOverruns.set(group, ids);
+    const rank = overrun?.rank ?? 0;
+    const ranks = groupOverruns.get(group) ?? new Map<number, string[]>();
+    const ids = [...(ranks.get(rank) ?? []), id];
+    ranks.set(rank, ids);
+    groupOverruns.set(group, ranks);
     if (ids.length < limit) return;
     for (const c of cases) {
-      if (!finished.has(c.id) && Object.values(c.groups ?? {}).includes(group)) report({ kind: "not-run", id: c.id, budgetMs: c.budgetMs, group, because: ids.slice(0, limit) });
+      if (!finished.has(c.id) && (c.rank ?? 0) >= rank && Object.values(c.groups ?? {}).includes(group)) report({ kind: "not-run", id: c.id, budgetMs: c.budgetMs, group, because: ids.slice(0, limit) });
     }
   };
 

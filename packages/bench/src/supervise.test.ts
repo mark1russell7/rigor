@@ -88,6 +88,66 @@ describe("superviseCases", () => {
     expect(ran()).toEqual(["slow-1", "a", "slow-2", "b"]);
   }, 20_000);
 
+  it("stops the same and higher ranks of a group after 2 overruns at one rank, and a smaller rank and other groups go on", async () => {
+    const { progressFile, start, ran } = setup();
+    const a = { "": "a" };
+    const cases: SupervisedCase[] = [
+      { ...fast("a10-1"), groups: a, rank: 10 },
+      { ...fast("a10-2"), groups: a, rank: 10 },
+      { ...slow("slow-a100-1", a), rank: 100 },
+      { ...slow("slow-a100-2", a), rank: 100 },
+      { ...fast("a1000-1"), groups: a, rank: 1000 },
+      { ...fast("a1000-2"), groups: a, rank: 1000 },
+      { ...fast("b1000"), groups: { "": "b" }, rank: 1000 },
+    ];
+    const result = await superviseCases({ cases, progressFile, start, onEnd: () => undefined, pollMs: 20 });
+    expect(result.ends.map((end) => [end.kind, end.id])).toEqual([
+      ["over-budget", "slow-a100-1"],
+      ["over-budget", "slow-a100-2"],
+      ["not-run", "a1000-1"],
+      ["not-run", "a1000-2"],
+    ]);
+    expect(result.ends[2]).toMatchObject({ group: "a", because: ["slow-a100-1", "slow-a100-2"] });
+    expect(ran()).toEqual(["a10-1", "a10-2", "slow-a100-1", "slow-a100-2", "b1000"]);
+  }, 20_000);
+
+  it("counts overruns for each rank: one at each of two ranks stops nothing", async () => {
+    const { progressFile, start, ran } = setup();
+    const a = { "": "a" };
+    const cases: SupervisedCase[] = [
+      { ...slow("slow-a10", a), rank: 10 },
+      { ...slow("slow-a100", a), rank: 100 },
+      { ...fast("a1000"), groups: a, rank: 1000 },
+    ];
+    const result = await superviseCases({ cases, progressFile, start, onEnd: () => undefined, pollMs: 20 });
+    expect(result.ends.map((end) => end.kind)).toEqual(["over-budget", "over-budget"]);
+    expect(ran()).toEqual(["slow-a10", "slow-a100", "a1000"]);
+  }, 20_000);
+
+  it("stops a rank from the overruns of `earlier`, as a run with no stop does", async () => {
+    const { progressFile, start, ran } = setup();
+    const a = { "": "a" };
+    const cases: SupervisedCase[] = [
+      { ...fast("a10"), groups: a, rank: 10 },
+      { id: "x", budgetMs: SHORT, groups: a, rank: 100 },
+      { id: "y", budgetMs: SHORT, groups: a, rank: 100 },
+      { ...fast("a1000"), groups: a, rank: 1000 },
+    ];
+    const earlier: SupervisedEnd[] = [
+      { kind: "over-budget", id: "x", budgetMs: SHORT, stage: "" },
+      { kind: "over-budget", id: "y", budgetMs: SHORT, stage: "" },
+    ];
+    const seen: SupervisedEnd[] = [];
+    await superviseCases({ cases, earlier, progressFile, start, onEnd: (end) => seen.push(end), pollMs: 20 });
+    expect(seen).toEqual([{ kind: "not-run", id: "a1000", budgetMs: LONG, group: "a", because: ["x", "y"] }]);
+    expect(ran()).toEqual(["a10"]);
+  }, 20_000);
+
+  it("refuses a rank that is not a finite number", async () => {
+    const { progressFile, start } = setup();
+    await expect(superviseCases({ cases: [{ ...fast("x"), rank: Number.NaN }], progressFile, start, onEnd: () => undefined })).rejects.toThrow(/finite number/);
+  });
+
   it("counts an overrun for the group of its stage only", async () => {
     const { progressFile, start, ran } = setup();
     const of = (router: string) => ({ pack: "packer", route: router });
