@@ -336,6 +336,55 @@ describe("a read that a bundle cannot see", () => {
   });
 });
 
+describe("the same tree on another computer", () => {
+  const CJS_TREE = {
+    "sub/entry.ts": 'import old from "../lib/old.cjs";\nexport const value = old.v;\n',
+    "lib/old.cjs": "module.exports = { v: 1 };\n",
+    "pnpm-lock.yaml": LOCK,
+    "data/deep/table.json": "[1,\n2]\n",
+  };
+  const cjsOptions = { entries: ["sub/entry.ts"], dataFiles: ["data/deep/table.json"], node: "26" };
+
+  it("each slash direction in the options gives one stamp", async () => {
+    const root = tree(CJS_TREE);
+    const forward = await stampOf(root, cjsOptions);
+    const back = await stampOf(root, { ...cjsOptions, entries: ["sub\\entry.ts"], dataFiles: ["data\\deep\\table.json"] });
+    expect(back).toEqual(forward);
+    expect(forward.inputs.join(" ")).not.toContain("\\");
+  });
+
+  // A CommonJS file puts its path in the bundle. These hashes are the same on Linux in CI and on Windows, so a path with another slash fails on one of the two.
+  it("the parts are equal to the pins on each operating system", async () => {
+    const stamp = await stampOf(tree(CJS_TREE), cjsOptions);
+    // The bytes of the bundle come from the bundler, so this pin holds for one version only. A new version of the bundler takes a new pin from CI.
+    expect(stamp.parts).toEqual({ code: "1a6c229e82a2133167a267a0a55a79d5042684fe48e3f19847e277c2bbdae5e4", engines: "2a648ed1795a873e46b31082dc04094b75b1a7567735b51809bef1fc58b6d314", data: "bfd8cf169b40d7d25156934f4dc9f84864393dc6ec6b7aa624454f0d35150c5f", bundler: "esbuild@0.28.2", node: "26" });
+  });
+
+  it("the line ends of a text data file and of the lock file keep the stamp", async () => {
+    const [before, after] = await flip((root) => {
+      writeFileSync(join(root, "data/table.json"), "[1,\r\n2]\r\n");
+      writeFileSync(join(root, "pnpm-lock.yaml"), LOCK.replaceAll("\n", "\r\n"));
+    }, {});
+    const [lf] = await flip((root) => writeFileSync(join(root, "data/table.json"), "[1,\n2]\n"), {});
+    expect(after.parts.engines).toBe(before.parts.engines);
+    expect(lf.parts.data).toBe(before.parts.data);
+    const a = tree({ "data/table.json": "[1,\n2]\n" });
+    const b = tree({ "data/table.json": "[1,\r\n2]\r\n" });
+    expect((await stampOf(b)).hash).toBe((await stampOf(a)).hash);
+  });
+
+  it("a line end in a binary data file moves the stamp, and a byte of a text file also moves it", async () => {
+    const a = tree();
+    const b = tree();
+    writeFileSync(join(a, "data/table.json"), Buffer.from([0, 13, 10, 1]));
+    writeFileSync(join(b, "data/table.json"), Buffer.from([0, 10, 1]));
+    expect((await stampOf(b)).parts.data).not.toBe((await stampOf(a)).parts.data);
+    const c = tree({ "data/table.json": "[1,\r\n2]\r\n" });
+    const d = tree({ "data/table.json": "[1,\r\n3]\r\n" });
+    expect((await stampOf(d)).parts.data).not.toBe((await stampOf(c)).parts.data);
+  });
+});
+
 describe("the options that a stamp refuses", () => {
   it("no entries", async () => {
     await expect(codeStamp({ cwd: tree(), entries: [] })).rejects.toThrow(/at least one entry/);

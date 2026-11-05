@@ -9,6 +9,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
+import { hasWord } from "./read-words.ts";
 
 /** The engines of a run, which stay outside the bundle. The lock file gives what each engine pulls in. */
 export interface CodeStampEngines {
@@ -26,7 +27,10 @@ export interface CodeStampOptions {
   /** The source files that a run starts from. Each export of these files stays in the bundle, so a new export of an entry moves the stamp. */
   readonly entries: readonly string[];
   readonly engines?: CodeStampEngines;
-  /** The files that the code reads when it runs, for example a corpus or a table. A bundle cannot see them, so each has its own hash. */
+  /**
+   * The files that the code reads when it runs, for example a corpus or a table. A bundle cannot see them, so each has its own hash.
+   * The hash of a text file reads each line end as LF, so a checkout with CRLF gives the same stamp. A file with a NUL byte hashes as its bytes.
+   */
   readonly dataFiles?: readonly string[];
   /** The words of `CODE_STAMP_READ_WORDS` that the caller expects in the bundle. A difference in either direction refuses the stamp. */
   readonly reads?: readonly string[];
@@ -198,15 +202,14 @@ async function loadBundler(): Promise<Bundler> {
   }
 }
 
-function wordsIn(text: string): readonly string[] {
-  return CODE_STAMP_READ_WORDS.filter((word) => {
-    const start = /^\w/.test(word) ? "\\b" : "";
-    const end = /\w$/.test(word) ? "\\b" : "";
-    return new RegExp(`${start}${word.replace(/[.()]/g, "\\$&")}${end}`).test(text);
-  });
-}
+const forwardSlashes = (path: string): string => path.split("\\").join("/");
 
-const fromCwd = (cwd: string, path: string): string => relative(cwd, resolve(cwd, path)).split("\\").join("/");
+const fromCwd = (cwd: string, path: string): string => forwardSlashes(relative(cwd, resolve(cwd, forwardSlashes(path))));
+
+/** This function gives the bytes that a data file hashes as. Git uses the same test for a binary file: a NUL byte. */
+function dataBytes(bytes: Buffer): Buffer {
+  return bytes.includes(0) ? bytes : Buffer.from(bytes.toString("latin1").replaceAll("\r\n", "\n"), "latin1");
+}
 
 /**
  * This function gives the stamp of the code of a run. Only the options, the source files and the data files decide it, so another folder gives the same stamp.
@@ -239,7 +242,7 @@ export async function codeStamp(options: CodeStampOptions): Promise<CodeStamp> {
     external: [...(options.engines?.names ?? [])],
   });
   const text = (result.outputFiles ?? []).map((file) => file.text).join("\n");
-  const reads = wordsIn(text);
+  const reads = CODE_STAMP_READ_WORDS.filter((word) => hasWord(text, word));
   const stated = [...new Set(options.reads ?? [])];
   const notStated = reads.filter((word) => !stated.includes(word));
   const notFound = stated.filter((word) => !reads.includes(word));
@@ -250,10 +253,10 @@ export async function codeStamp(options: CodeStampOptions): Promise<CodeStamp> {
   }
   const inputs = new Set<string>();
   for (const output of Object.values(result.metafile?.outputs ?? {})) {
-    for (const [input, facts] of Object.entries(output.inputs)) if (facts.bytesInOutput > 0 && input !== "<stdin>") inputs.add(input);
+    for (const [input, facts] of Object.entries(output.inputs)) if (facts.bytesInOutput > 0 && input !== "<stdin>") inputs.add(forwardSlashes(input));
   }
   const engines = options.engines === undefined ? [] : lockClosure(readFileSync(resolve(cwd, options.engines.lockFile), "utf8"), options.engines.importer, options.engines.names);
-  const data = [...new Set((options.dataFiles ?? []).map((file) => fromCwd(cwd, file)))].sort().map((file) => `${file} ${sha256(readFileSync(resolve(cwd, file)))}`);
+  const data = [...new Set((options.dataFiles ?? []).map((file) => fromCwd(cwd, file)))].sort().map((file) => `${file} ${sha256(dataBytes(readFileSync(resolve(cwd, file))))}`);
   const parts: CodeStampParts = {
     code: sha256(text),
     engines: sha256(JSON.stringify(engines)),

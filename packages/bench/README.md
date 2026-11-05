@@ -390,6 +390,8 @@ const stamp = await codeStamp({
 
 These changes keep the stamp: a comment, blank space, line ends, a type and a version in a package file. An export that the entries do not reach and another folder for the same files also keep it.
 
+The same tree gives the same stamp on Linux and on Windows. A slash in an option can have either direction. The hash of a text data file reads each line end as LF, and a file with a NUL byte hashes as its bytes. So a parser that reads a line end as data can read another result with an equal stamp.
+
 The stamp holds no computer. Each record keeps the computer as a field, because a time depends on it and a result does not.
 
 ### What a bundle cannot see
