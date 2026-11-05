@@ -100,7 +100,7 @@ gate.more;                                        // the next look of each case 
 - A pair holds two records with the same first arm. A runner can give the two arms opposite orders in one round, and a difference of two orders holds the effect of the order.
 - The `level` is for the family. `holm` corrects each look over all cases. Each look has an equal share of the level.
 - The first look with an outcome decides a case. `GATE_LOOKS` is 12, 24 and 48 rounds.
-- With 16 cases and the default looks, the first test of a family at 12 rounds needs 12 of 12 pairs below the margin in both jobs. Thus a noisy case needs more rounds, or it stays `no read`.
+- Take 16 cases and the default looks. The first test of a family at 12 rounds needs 12 of 12 pairs below the margin in both jobs. Thus a noisy case needs more rounds, or it stays `no read`.
 - `no read` is not a pass. A caller adds the rounds of `more`, then more jobs. A job that it adds after the last look is one more look, and the level does not count it.
 
 The level needs independent rounds. Rounds with a shared cause, for example a slow computer for one job, do not have it.
