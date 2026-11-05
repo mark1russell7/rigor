@@ -407,7 +407,7 @@ const stamp = await codeStamp({
 | `code` | The bundle of the entries after a tree shake, with the engines outside | A token that the entries reach, a new export of an entry, a rename |
 | `engines` | The version and the integrity of each package in the lock closure of each engine | An engine version, a transitive package of an engine |
 | `data` | The name and the hash of each file in `dataFiles` | A byte or the name of such a file |
-| `bundler` | The version of `esbuild` | A new version in the lock file of the caller |
+| `bundler` | The version of `esbuild`. This part is not in the hash | A new version in the lock file of the caller |
 | `node` | The Node major | Another major, which can change a float or a sort |
 
 These changes keep the stamp: a comment, blank space, line ends, a type and a version in a package file. An export that the entries do not reach and another folder for the same files also keep it.
@@ -428,7 +428,7 @@ A workspace package is not an engine: `lockClosure` refuses it, because its code
 
 - A rename of an identifier moves the stamp, and so does the rename of an entry file. This gives a false rerun, not a false keep.
 - A top-level statement with an effect stays in the bundle when its module has no `"sideEffects": false`. A change of that statement moves the stamp, also when no result depends on it.
-- A new version of the bundler moves the stamp, also when the bundle is equal. The field `parts` then shows `bundler` as the only change.
+- A new version of the bundler that gives an equal bundle keeps the stamp and the records. A new version that gives another bundle moves `code`, so it keeps no record, also when no result can change. This gives a false rerun, not a false keep. The field `bundler` of `parts` tells the cause. So a caller merges an update of the bundler when its next full run starts.
 
 ## Run cases with a time budget
 

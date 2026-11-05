@@ -2,7 +2,8 @@
  * The stamp of the code of a run, for Node only. A run keeps a saved record when the stamp of the record equals the stamp of the run.
  * A version number is a poor stamp. A release that changes no result throws away each record. A change that has no release keeps wrong records.
  * This entry hashes what can change a result. These are the code that the entries reach after a tree shake and the lock closure of the engines.
- * The stated data files, the bundler version and the Node major are also in the hash.
+ * The stated data files and the Node major are also in the hash.
+ * The bundler only makes the text that the hash reads, and no run uses that text. So its version is a part of the stamp and is not in the hash. A new version that gives another bundle moves `code`.
  * The computer is no part of the stamp. Each record keeps it as a field.
  * The bundler is the optional peer `esbuild`, so a caller that only reads verdicts installs no native binary.
  */
@@ -50,7 +51,7 @@ export interface CodeStampParts {
   readonly code: string;
   readonly engines: string;
   readonly data: string;
-  /** The name and the version of the bundler, for example `esbuild@0.28.2`. */
+  /** The name and the version of the bundler, for example `esbuild@0.28.2`. It tells the cause of a change of `code`, and it is not in the hash. */
   readonly bundler: string;
   readonly node: string;
 }
@@ -264,5 +265,6 @@ export async function codeStamp(options: CodeStampOptions): Promise<CodeStamp> {
     bundler: `esbuild@${bundler.version}`,
     node: options.node ?? process.versions.node.split(".")[0]!,
   };
-  return { hash: sha256(JSON.stringify(parts)), parts, inputs: [...inputs].sort(), reads, engines };
+  const { bundler: _version, ...hashed } = parts;
+  return { hash: sha256(JSON.stringify(hashed)), parts, inputs: [...inputs].sort(), reads, engines };
 }

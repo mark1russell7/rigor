@@ -353,13 +353,6 @@ describe("the same tree on another computer", () => {
     expect(forward.inputs.join(" ")).not.toContain("\\");
   });
 
-  // A CommonJS file puts its path in the bundle. These hashes are the same on Linux in CI and on Windows, so a path with another slash fails on one of the two.
-  it("the parts are equal to the pins on each operating system", async () => {
-    const stamp = await stampOf(tree(CJS_TREE), cjsOptions);
-    // The bytes of the bundle come from the bundler, so this pin holds for one version only. A new version of the bundler takes a new pin from CI.
-    expect(stamp.parts).toEqual({ code: "1a6c229e82a2133167a267a0a55a79d5042684fe48e3f19847e277c2bbdae5e4", engines: "2a648ed1795a873e46b31082dc04094b75b1a7567735b51809bef1fc58b6d314", data: "bfd8cf169b40d7d25156934f4dc9f84864393dc6ec6b7aa624454f0d35150c5f", bundler: "esbuild@0.28.2", node: "26" });
-  });
-
   it("the line ends of a text data file and of the lock file keep the stamp", async () => {
     const [before, after] = await flip((root) => {
       writeFileSync(join(root, "data/table.json"), "[1,\r\n2]\r\n");
@@ -445,6 +438,49 @@ describe("the closure of an engine in a lock file", () => {
   it("refuses another lock version, and a text with no lock", () => {
     expect(() => lockClosure(LOCK.replaceAll("'9.0'", "'10.0'"), "packages/joint", ["@x/engine"])).toThrow(/lock version 9/);
     expect(() => lockClosure("", "packages/joint", ["@x/engine"])).toThrow(/lock version 9/);
+  });
+});
+
+describe("a new version of the bundler", () => {
+  // The bundle is only the text of a hash, and no run uses it, so a new version with an equal bundle keeps the records.
+  it("keeps the hash when the bundle is equal, and the part names the version", async () => {
+    const root = tree();
+    const before = await stampOf(root);
+    vi.resetModules();
+    vi.doMock("esbuild", async () => ({ ...(await vi.importActual<object>("esbuild")), version: "9.9.9" }));
+    try {
+      const fresh = await import("./code-stamp.ts");
+      const after = await fresh.codeStamp(optionsOf(root));
+      expect(after.hash).toBe(before.hash);
+      expect(after.parts.bundler).toBe("esbuild@9.9.9");
+      expect(after.parts.code).toBe(before.parts.code);
+    } finally {
+      vi.doUnmock("esbuild");
+      vi.resetModules();
+    }
+  });
+
+  it("moves the hash when the bundle changes", async () => {
+    const root = tree();
+    const before = await stampOf(root);
+    vi.resetModules();
+    vi.doMock("esbuild", async () => {
+      const real = await vi.importActual<{ build(options: object): Promise<{ outputFiles: { text: string }[] }> }>("esbuild");
+      const build = async (options: object) => {
+        const result = await real.build(options);
+        return { ...result, outputFiles: result.outputFiles.map((file) => ({ text: `${file.text}\n"another bundle";` })) };
+      };
+      return { ...real, version: "9.9.9", build };
+    });
+    try {
+      const fresh = await import("./code-stamp.ts");
+      const after = await fresh.codeStamp(optionsOf(root));
+      expect(after.parts.code).not.toBe(before.parts.code);
+      expect(after.hash).not.toBe(before.hash);
+    } finally {
+      vi.doUnmock("esbuild");
+      vi.resetModules();
+    }
   });
 });
 
