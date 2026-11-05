@@ -151,6 +151,17 @@ export interface PartnerRead {
    * `not-lost`: no real entry does. `too-few`: no test has the power at that level. `no-rows`: nothing to read.
    */
   readonly status: "lost" | "not-lost" | "too-few" | "no-rows";
+  /** The real entries that beat the control on the partner, at the level of `lost`. */
+  readonly beatenBy: number;
+  /** The real entries with a read of the partner. An entry with too few untied keys is not one of them. */
+  readonly of: number;
+  /** The real entries with too few untied keys for a read of the partner. A small `of` with a large `excluded` reads few entries. */
+  readonly excluded: number;
+  /**
+   * This field is true when `beatenBy` is over half of `of`: the median real entry beats the control on the partner.
+   * One outlier entry can make the status `lost`, but it cannot make `caught` true. It is a report, and no finding reads it.
+   */
+  readonly caught: boolean;
 }
 
 /** The result of one control on its measure and one stratum, with its partners. */
@@ -455,6 +466,14 @@ const partnerStatus = (read: ControlRead | undefined, partners: number, alpha: n
   return read.comparisons.every((c) => c.shared < needs) ? "too-few" : "not-lost";
 };
 
+/** This function counts the real entries that beat a control on one of `partners` partners, of the real entries with a read. */
+const partnerCount = (read: ControlRead | undefined, partners: number, alpha: number): Pick<PartnerRead, "beatenBy" | "of" | "excluded" | "caught"> => {
+  const tests = read?.comparisons ?? [];
+  const of = tests.filter((c) => !unread(c)).length;
+  const beatenBy = tests.filter((c) => clearsPartner(c, partners, alpha)).length;
+  return { beatenBy, of, excluded: tests.length - of, caught: beatenBy * 2 > of };
+};
+
 /** The inputs of the reads, with the reads that the check already made. */
 interface Reading {
   readonly rules: Map<string, MeasureRule>;
@@ -538,7 +557,11 @@ function checkRule(rule: MeasureRule, reading: Reading, asOf: string): { check: 
   for (const control of rule.controls) {
     for (const read of readsOf(reading, rule.measure, control)) {
       const partnerReads = rule.partners.map((partner) => readsOf(reading, partner, control).find((r) => r.stratum === read.stratum));
-      const partners = rule.partners.map((partner, i) => ({ partner, status: partnerStatus(partnerReads[i], rule.partners.length, reading.alpha) }));
+      const partners = rule.partners.map((partner, i) => ({
+        partner,
+        status: partnerStatus(partnerReads[i], rule.partners.length, reading.alpha),
+        ...partnerCount(partnerReads[i], rule.partners.length, reading.alpha),
+      }));
       const guard = { control, stratum: read.stratum, status: read.status, partners };
       guards.push(guard);
       reads.push(read, ...partnerReads.filter((r) => r !== undefined));
