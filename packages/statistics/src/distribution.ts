@@ -226,6 +226,7 @@ function kernelMasses(values: readonly number[], low: number, high: number, vall
  */
 export function modeCount(values: readonly number[], options: ModeOptions = {}): number {
   const { minShare = 0.1, valleyRatio = 0.5 } = options;
+  if (values.length === 0) throw new RangeError("modeCount: the list is empty.");
   for (const v of values) if (!Number.isFinite(v)) throw new RangeError("modeCount: each value must be finite.");
   const distances = fromOneEnd(values);
   const high = distances[distances.length - 1]!;

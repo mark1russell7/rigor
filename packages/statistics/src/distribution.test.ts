@@ -173,15 +173,18 @@ describe("the count of the modes", () => {
       "log-normal": [0.552, 0.722, 0.922, 0.986, 1],
       pareto: [0.496, 0.766, 0.912, 0.988, 1],
     };
-    for (const [law, draw] of DRAWS) {
-      const shares = SIZES.map((n) => {
-        const r = random(`one mode ${law} ${n}`);
-        let one = 0;
-        for (let i = 0; i < 500; i++) if (modeCount(Array.from({ length: n }, () => draw(r))) === 1) one++;
-        return one / 500;
-      });
-      expect(shares).toEqual(TABLE[law]);
-    }
+    const shares = Object.fromEntries(
+      DRAWS.map(([law, draw]) => [
+        law,
+        SIZES.map((n) => {
+          const r = random(`one mode ${law} ${n}`);
+          let one = 0;
+          for (let i = 0; i < 500; i++) if (modeCount(Array.from({ length: n }, () => draw(r))) === 1) one++;
+          return one / 500;
+        }),
+      ]),
+    );
+    expect(shares).toEqual(TABLE);
   }, 60_000);
 
   it.each([
