@@ -400,6 +400,31 @@ A run of many jobs sets `roundOffset` to `job * rounds`. Then the merged records
 
 A rotation of N arms turns the order of two arms only when they are N/2 apart in the rotation. For 4 arms, two arms 1 apart come in the order 3:1 over 4 rounds. Thus each pair of `freshRun` has its own two children, and the order of each pair turns each round.
 
+## A result that changes on purpose
+
+A bench compares two arms, and two arms with different results do not do the same work. So a difference stops the merge. A pull request can change a result on purpose. Without a stated path, its author edits the case, and no gate reads that edit. The entry `@mark1russell7/rigor-bench/results` gives that path: a row in the diff, bound to the exact pair of results. It uses `node:crypto`, so it is for Node only.
+
+```ts
+import { resultRows, resultVerdict } from "@mark1russell7/rigor-bench/results";
+
+const verdict = resultVerdict(
+  [{ case: "facts of a tree", base: "4 reads", head: "5 reads" }],     // the results of each case in the two arms
+  { base: resultRows(rowsOfTheBase), head: resultRows(rowsOfTheHead) }, // the parsed file of rows in each arm
+);
+
+verdict.outcome;                                  // "pass" or "fail"
+verdict.lines;                                    // the lines that the check prints
+```
+
+A row has three fields: the case, the hash from `resultPair`, and the reason. A refused line prints the row to add. These rules stop the reuse of a row:
+
+- **The hash binds the row to one pair.** The same row against one other result reads `refused`, and the line names the two hashes. The pair has an order, so a row of a change does not accept its revert.
+- **A row counts only if it is new.** A row that the base also has is spent, so it reads `spent` and accepts nothing. A later merge cannot use the row again, even on the same pair.
+- **A new row that accepts nothing fails the verdict.** It reads `unused`. Otherwise it merges and is spent, and a later true change of that pair is refused.
+- **A pair that comes again needs two pull requests.** The first one deletes the spent row, and the second one adds it. A revert can delete the row in the same pull request.
+
+**Time.** The verdict reads results only. An accepted result buys no time reading. Keep the accepted case in `freshRun`, so it gets its head and A/A pairs and its normal time verdict. The time of the new result counts. The hash rule of `freshRun` is per arm, so two arms with different hashes run. The test "refuses two hashes of one arm on one case, and permits other hashes for other arms" pins this rule.
+
 ## Run cases with a time budget
 
 The entry `@mark1russell7/rigor-bench/supervise` starts child processes, so it is for Node only.

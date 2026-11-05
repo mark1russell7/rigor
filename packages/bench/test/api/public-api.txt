@@ -178,6 +178,18 @@ childLine: build/fresh.d.ts#childLine
 freshRun: build/fresh.d.ts#freshRun
 pairOrder: build/fresh.d.ts#pairOrder
 
+## ./results (build/results.d.ts): 9 names
+
+CaseResults: build/results.d.ts#CaseResults
+ResultRead: build/results.d.ts#ResultRead
+ResultRow: build/results.d.ts#ResultRow
+ResultRows: build/results.d.ts#ResultRows
+ResultVerdict: build/results.d.ts#ResultVerdict
+RowRead: build/results.d.ts#RowRead
+resultPair: build/results.d.ts#resultPair
+resultRows: build/results.d.ts#resultRows
+resultVerdict: build/results.d.ts#resultVerdict
+
 ## ./supervise (build/supervise.d.ts): 11 names
 
 CaseProgress: build/supervise.d.ts#CaseProgress
@@ -1301,6 +1313,57 @@ declare function firstArm(round: number, offset?: number): Arm;
 
 ### build/paired.d.ts#orderSize
 declare function orderSize(records: readonly PairedTime[]): OrderSize;
+
+### build/results.d.ts#CaseResults
+export interface CaseResults {
+  readonly case: string;
+  readonly base: string;
+  readonly head: string;
+}
+
+### build/results.d.ts#ResultRead
+export interface ResultRead extends CaseResults {
+  readonly pair: string;
+  readonly outcome: "accepted" | "refused";
+  readonly line: string;
+}
+
+### build/results.d.ts#ResultRow
+export interface ResultRow {
+  readonly case: string;
+  readonly pair: string;
+  readonly reason: string;
+}
+
+### build/results.d.ts#ResultRows
+export interface ResultRows {
+  readonly base: readonly ResultRow[];
+  readonly head: readonly ResultRow[];
+}
+
+### build/results.d.ts#ResultVerdict
+export interface ResultVerdict {
+  readonly outcome: "pass" | "fail";
+  readonly cases: readonly ResultRead[];
+  readonly unused: readonly RowRead[];
+  readonly spent: readonly RowRead[];
+  readonly lines: readonly string[];
+}
+
+### build/results.d.ts#RowRead
+export interface RowRead {
+  readonly row: ResultRow;
+  readonly line: string;
+}
+
+### build/results.d.ts#resultPair
+export declare function resultPair(base: string, head: string): string;
+
+### build/results.d.ts#resultRows
+export declare function resultRows(content: unknown): ResultRow[];
+
+### build/results.d.ts#resultVerdict
+export declare function resultVerdict(results: readonly CaseResults[], rows: ResultRows): ResultVerdict;
 
 ### build/supervise.d.ts#CaseProgress
 export interface CaseProgress {
