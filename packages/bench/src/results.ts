@@ -7,7 +7,10 @@
  * A new row that accepts nothing is a fault. These rules read results only, so the time of an accepted case stays with the time verdict of the bench.
  */
 
-/** One row: a statement that the result of one case changes on purpose. */
+/**
+ * One row: a statement that the result of one case changes on purpose.
+ * The caller uses one hash function for the row and for the run. Two hash functions give a refused line on each row, and each line reads "both sides moved".
+ */
 export interface ResultRow {
   readonly case: string;
   /** The hash of the result of the base arm. The caller makes the hash, so a large result stays out of the file of rows. */
