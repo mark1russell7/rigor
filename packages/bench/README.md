@@ -42,6 +42,9 @@ v.comparison;                                     // the cases that gain and dro
 | `pooledBand(pool, level)` | The pooled band: the larger of the floor and the A/A spread of the records of earlier runs. |
 | `caseIntervals(records, level)` | The ratio of each case with a distribution-free interval of its median over the rounds. The level 0.95 needs 6 rounds or more. |
 | `limitVerdict(candidate, aa, options)` | The verdict of the claim "the ratio of each case is at most `limit`": `within`, `beyond` or `cannot decide`. |
+| `tailLimitVerdict(candidate, aa, options)` | The verdict of the claim "the median and a high value of each case are at most their limits", for a bench with few rounds. |
+| `caseTails(records, rank)` | The value at one rank of the ratios of each case, from the largest. |
+| `tailFalseFails(aa, options)` | The cases of an A/A arm that the rule of `tailLimitVerdict` fails. |
 | `budgetVerdict(rounds, aa, options)` | The verdict of the claim "the median of each case is at most `limit`", for one build: `within`, `beyond` or `cannot decide`. |
 | `budgetLooksVerdict(rounds, aa, options)` | The budget verdict of a run that adds rounds to the cases with no outcome, up to a stated budget. |
 | `budgetLookSpend(looks)` | The chance of error that a list of looks spends. |
@@ -77,6 +80,31 @@ v.cases;                                          // the interval, the bound and
 - The option `share` permits some cases out of the limit. With `share: 0.95` and 20 cases, 1 case can be other than `within`. The verdict is `within` when that number of cases or fewer are other than `within`. It is `beyond` when more cases are `beyond`. The field `allowed` gives the number.
 
 The verdict has no correction for many cases. Each case has its own interval at the level `caseLevel`. Thus with many cases, a verdict `beyond` can come from noise only. Set `caseLevel` higher when a bench has many cases. A correction of Holm is an option for a later version.
+
+## A claim with a limit on a tail
+
+`limitVerdict` needs an interval of the median, and a few rounds give a wide interval. `tailLimitVerdict` reads each value as it is. An example is a gate with 7 rounds and one limit for each module:
+
+```ts
+const v = tailLimitVerdict(records, aaRecords, {
+  limit: (name) => limits[name],
+  aaCap: 1.3,
+});
+v.outcome;                                        // "within", "beyond" or "cannot decide"
+v.aaTail;                                         // the largest tail of the A/A arm
+```
+
+The rule of the verdict:
+
+- The tail of a case is the value at `rank` of its ratios, from the largest. The default rank is 2, so one slow process cannot move it.
+- A case is `beyond` when its median is over `limit.median`.
+- A case is also `beyond` when its tail is over `limit.tail` and over the largest tail of the A/A arm of the run.
+- Each case is `cannot decide` when the largest tail of the A/A arm is over `aaCap`. A loud run has no power, and this is not a pass. The caller takes another read.
+- The option `aaCap` has no default, because a run with no cap passes each row when it is loud.
+
+With the default rank, a real cost in 1 round cannot fail the tail limit. A cost in 2 rounds or more can fail it.
+
+The verdict has no interval, so a limit needs a margin from the spread of earlier runs. `tailFalseFails` applies the rule to each case of an A/A arm. Each case reads the tail of the other cases. Print its count on the gate, to state what the rule costs on noise.
 
 ## A claim with a budget
 
@@ -406,7 +434,7 @@ v.pool;                                           // { cases, runs, spread, floo
 - The rule `difference` uses the larger of `margin` and the noise of the pooled band as its margin.
 - The run still needs its own A/A arm of 5 cases or more. The noise cap uses that arm.
 
-For a fixed limit, for example 1.10 against a fixed base, use `limitVerdict`.
+For a fixed limit, for example 1.10 against a fixed base, use `limitVerdict`. With few rounds and a limit on a high value of each case, use `tailLimitVerdict`.
 
 ## The outcomes
 
