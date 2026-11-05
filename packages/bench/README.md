@@ -34,7 +34,7 @@ v.comparison;                                     // the cases that gain and dro
 | Function | What it gives |
 | --- | --- |
 | `firstArm(round, offset)` | The arm that runs first. The order turns each round, and an odd offset starts with arm `b`. |
-| `armOrder(arms, round)` | The order of any count of arms in a round. Each pair of arms has each order within 1 after each count of rounds. |
+| `armOrder(arms, round)` | The order of any count of arms in a round. Each pair of arms has each order within 1 after each count of rounds. A report that keeps no `first` for each pair states the order that it used, so that a reader can make `first` again. |
 | `checkPairedTime(record)` | The record, or a `RangeError` for a time that is not a finite number above 0. |
 | `caseRatios(records)` | The ratio of each case. It refuses 2 records of one round, and an order that did not turn. |
 | `aaBand(aa, options)` | The band of the A/A arm, symmetric on a log scale. The kind `median` (the default) holds the A/A median, and the kind `case` holds one A/A case. It needs 5 cases or more. |
@@ -309,6 +309,7 @@ const claim = winClaim(check, "fill", "my-entry");
 Each row has a `measure`, a `group`, a `key` and a `value`. The optional fields are `censored`, `method` and `stratum`. The function throws a `RangeError` for a repeat of a measure, a group and a key. The caller states how repeats reduce to one row.
 
 - **Beats:** the Holm-corrected sign test passes. With a `resolution`, the median paired difference is also over it. Without one, the output says `test only`.
+- **Floors:** a rule can state `floors`, one number for each group. The noise of a measure can differ by group, so one number for all groups removes real gains or passes noise. A comparison then needs a size over the larger floor of its two groups, and `floor` gives that size. A group with no floor reads `resolution`. A group with neither makes the check throw.
 - **A control wins** when no real entry beats it. A tie counts for the control.
 - **A control loses a partner** when one real entry beats it on that partner, at the level divided by the count of partners. One passed partner clears `uncaught`, so each partner is one more chance.
 - **Families:** one Holm family holds one control on one measure, over all real entries and all strata. A second family holds the same tests in the other direction, and `beatsEntries` of `of` gives its count. One family holds the spread of one measure.
