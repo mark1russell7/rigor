@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 151 names
+## . (build/index.d.ts): 152 names
 
 type Arm: build/paired.d.ts#Arm
 type ArmModels: build/index.d.ts#ArmModels
@@ -76,6 +76,7 @@ type ModelRow: build/index.d.ts#ModelRow
 type ModelStatus: build/index.d.ts#ModelStatus
 type ModelTest: build/index.d.ts#ModelTest
 type ModelTestOptions: build/index.d.ts#ModelTestOptions
+NARROW_SPREAD_SHARE: build/index.d.ts#NARROW_SPREAD_SHARE
 type NoControl: build/index.d.ts#NoControl
 type NoFactor: build/index.d.ts#NoFactor
 type NoiseCheck: build/index.d.ts#NoiseCheck
@@ -829,6 +830,9 @@ interface ModelTestOptions {
   readonly searchVisible?: boolean;
 }
 
+### build/index.d.ts#NARROW_SPREAD_SHARE
+export declare const NARROW_SPREAD_SHARE = .1;
+
 ### build/index.d.ts#NoControl
 interface NoControl {
   readonly because: string;
@@ -1052,6 +1056,10 @@ interface SpreadRead {
   readonly separated: number;
   readonly tooFew: number;
   readonly widest: number | undefined;
+  readonly entries: number;
+  readonly share: number | undefined;
+  readonly apart: readonly string[];
+  readonly narrow: boolean;
 }
 
 ### build/index.d.ts#TailFalseFails
