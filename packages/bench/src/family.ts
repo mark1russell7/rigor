@@ -82,7 +82,8 @@ const count = (outcomes: readonly TimeOutcome[]): FamilyCount => ({
 
 /**
  * This function gives the Holm read and the read of each job over a family of cases, as a report. The default `level` is 0.025 for each side.
- * It reads `pSlower` and `pFaster` of each time verdict, and of the pooled verdict of a pooled case. A case with no p keeps its outcome in the Holm read.
+ * It reads `pSlower` and `pFaster` of each time verdict, and of the pooled verdict of a pooled case. The option `pValues` of a verdict gives them.
+ * A case with no p keeps its outcome in the Holm read, and a line gives the count of such cases.
  */
 export function familyRead(items: readonly FamilyItem[], level = 0.025): FamilyRead {
   if (!(level > 0 && level < 1)) throw new RangeError(`familyRead: the level is more than 0 and less than 1, not ${level}.`);
@@ -115,6 +116,8 @@ export function familyRead(items: readonly FamilyItem[], level = 0.025): FamilyR
   const counts = (side: keyof FamilyCount): string =>
     `${String(plain[side])}, with Holm ${String(corrected[side])}, with each job ${String(eachJob[side])}, with each job and Holm ${String(eachJobHolm[side])}`;
   const lines = [`Family read (report only): ${String(cases.length)} cases. Slower: ${counts("slower")}. Faster: ${counts("faster")}.`];
+  const bare = times.filter((t) => t.pSlower === undefined).length;
+  if (bare > 0) lines.push(`${String(bare)} of ${String(times.length)} cases have no p, so the Holm read keeps their outcome. Give the verdicts the option pValues.`);
   if (floor !== undefined && firstStep !== undefined) {
     lines.push(
       floor < firstStep
@@ -197,7 +200,7 @@ export function familyPower(options: FamilyPowerOptions): FamilyPower {
   for (let t = 0; t < trials; t++) {
     const items = Array.from({ length: family }, (_, c): FamilyItem => {
       const records = Array.from({ length: jobs }, (_, j): JobRecords => ({ job: `job ${String(j)}`, candidate: draw((c === 0 ? ratio : 1) * (jobShift > 0 ? Math.exp(r.normal(0, jobShift)) : 1), String(j), c), aa: draw(1, String(j), c) }));
-      return { case: `case ${String(c)}`, verdict: pooledVerdict(records, options.verdict) };
+      return { case: `case ${String(c)}`, verdict: pooledVerdict(records, { ...options.verdict, pValues: true }) };
     });
     const read = familyRead(items, options.level);
     for (const key of ["plain", "holm", "eachJob", "eachJobHolm"] as const) {

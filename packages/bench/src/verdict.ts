@@ -159,6 +159,11 @@ export interface VerdictOptions extends BandOptions {
    * The rule `difference` uses the larger of `margin` and the noise of the pooled band as its margin. The default is no pool.
    */
   readonly pool?: PoolOptions;
+  /**
+   * This option adds `pSlower` and `pFaster` to a verdict of the rule `difference`. The default is off, so the output of a verdict
+   * stays the same. `familyRead` needs the two fields.
+   */
+  readonly pValues?: boolean;
 }
 
 /** The noise cap of a verdict: the A/A spread of the run, the A/A median ratio of the run and the cap. */
@@ -204,7 +209,8 @@ export interface TimeVerdict {
   readonly noise?: NoiseCheck;
   /**
    * The bootstrap p of the claim "the candidate is slower": the median difference is above 0. A family correction reads it.
-   * The value comes from the draws of `interval`, so it does not change the outcome. Only the rule `difference` with a band gives it.
+   * The value comes from the draws of `interval`, so it does not change the outcome. The verdict has this field only with the option
+   * `pValues`, the rule `difference` and a band.
    */
   readonly pSlower?: number;
   /** The bootstrap p of the claim "the candidate is faster". It has the same source as `pSlower`. */
@@ -294,10 +300,11 @@ function ruleVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[]
     const shown = pooled === undefined ? margin : round(margin);
     const logs = cases.map((c) => Math.log(c.ratio));
     const aaLogs = aaRatios.map((c) => Math.log(c.ratio));
-    const d = bootstrapTwo(logs, aaLogs, (x, y) => median(x) - median(y), { ...options.bootstrap, against: 0 });
+    const d = bootstrapTwo(logs, aaLogs, (x, y) => median(x) - median(y), options.pValues === true ? { ...options.bootstrap, against: 0 } : options.bootstrap);
     const { level, runs, finite, seed } = d;
     const interval: Interval = { estimate: Math.exp(d.estimate), low: Math.exp(d.low), high: Math.exp(d.high), level, runs, finite, seed };
-    const sides = { pSlower: d.pAbove ?? 1, pFaster: d.pBelow ?? 1 }; // The option `against` gives both p, so 1 never applies.
+    // The option `against` gives both p, so 1 never applies.
+    const sides = options.pValues === true ? { pSlower: d.pAbove ?? 1, pFaster: d.pBelow ?? 1 } : {};
     const span = `The interval of the candidate median over the A/A median is [${round(interval.low)}, ${round(interval.high)}].`;
     // The margin comes first: an interval in the margin is `same`, also when it is wholly below or above 1.
     if (d.low >= -margin && d.high <= margin) return { ...facts, ...sides, interval, outcome: "same", reason: `${span} The interval is in the margin of ${shown}.` };

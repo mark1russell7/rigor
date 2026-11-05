@@ -544,7 +544,7 @@ Since 0.2.0, `verdictPower` takes `same` as the true outcome of a ratio in the m
 
 ## A family of cases
 
-A run reads many cases, and each case has its own interval. With no correction, the chance of one false `slower` case grows with the count of cases. At 16 cases and 0.025 for each side, this chance can be 1 - 0.975^16, approximately 0.33. A time verdict of the rule `difference` gives `pSlower` and `pFaster` from the draws of its interval, so its outcome does not change. `familyRead` reads a family as a report:
+A run reads many cases, and each case has its own interval. With no correction, the chance of one false `slower` case grows with the count of cases. At 16 cases and 0.025 for each side, this chance can be 1 - 0.975^16, approximately 0.33. With the option `pValues`, a time verdict of the rule `difference` gives `pSlower` and `pFaster` from the draws of its interval. Its outcome does not change, and the option is off by default. `familyRead` reads a family as a report:
 
 - **Holm** (Holm, 1979) keeps a `slower` case only when the Holm correction over the cases rejects its side at `level` (default 0.025).
 - **Each job** keeps a `slower` case of a pooled verdict only when each job gives `slower` alone.

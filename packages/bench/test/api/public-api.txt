@@ -1197,6 +1197,7 @@ interface VerdictOptions extends BandOptions {
   readonly noiseCap?: number;
   readonly spreadLevel?: number;
   readonly pool?: PoolOptions;
+  readonly pValues?: boolean;
 }
 
 ### build/index.d.ts#VerdictRule

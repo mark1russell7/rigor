@@ -52,7 +52,8 @@ describe("familyRead", () => {
   it("keeps the outcome of a case with no p, and refuses a level out of (0, 1)", () => {
     const bare = { outcome: "slower", interval: undefined } as unknown as TimeVerdict;
     const read = familyRead([{ case: "bare", verdict: bare }]);
-    expect([read.cases[0]!.holm, read.floor, read.lines.length]).toEqual(["slower", undefined, 1]);
+    expect([read.cases[0]!.holm, read.floor, read.lines.length]).toEqual(["slower", undefined, 2]);
+    expect(read.lines[1]).toBe("1 of 1 cases have no p, so the Holm read keeps their outcome. Give the verdicts the option pValues.");
     expect(() => familyRead([], 0)).toThrow(RangeError);
     expect(() => familyRead([], 1)).toThrow(RangeError);
   });
@@ -62,12 +63,22 @@ describe("the p of a time verdict", () => {
   const rounds = (ratio: number, prefix: string) =>
     Array.from({ length: 12 }, (_, i) => ({ case: `${prefix}${String(i)}`, round: 0, first: i % 2 === 0 ? ("a" as const) : ("b" as const), a: 10 + (i % 3) * 0.01, b: (10 + ((i + 1) % 3) * 0.01) * ratio }));
 
-  it("gives pSlower and pFaster from the draws of the interval, and the interval has no p key", () => {
-    const slow = timeVerdict(rounds(1.2, "c"), rounds(1, "aa"), { bootstrap: { runs: 999 } });
+  it("gives pSlower and pFaster from the draws of the interval with the option pValues, and the interval has no p key", () => {
+    const slow = timeVerdict(rounds(1.2, "c"), rounds(1, "aa"), { bootstrap: { runs: 999 }, pValues: true });
     expect(slow.outcome).toBe("slower");
     expect(slow.pSlower).toBe(1 / 1000);
     expect(slow.pFaster).toBe(1);
     expect(Object.keys(slow.interval!)).not.toContain("pAbove");
+  });
+
+  it("gives no p field by default, with the same interval and outcome", () => {
+    const options = { bootstrap: { runs: 999, seed: 4 } };
+    const plain = timeVerdict(rounds(1.01, "c"), rounds(1, "aa"), options);
+    const withP = timeVerdict(rounds(1.01, "c"), rounds(1, "aa"), { ...options, pValues: true });
+    expect(plain).not.toHaveProperty("pSlower");
+    expect(plain).not.toHaveProperty("pFaster");
+    expect(withP.pSlower).toBeTypeOf("number");
+    expect([plain.interval, plain.outcome]).toEqual([withP.interval, withP.outcome]);
   });
 });
 
