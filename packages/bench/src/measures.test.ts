@@ -133,7 +133,7 @@ describe("the finding uncaught", () => {
   it("does not trip when the control loses a partner", () => {
     const check = checkMeasures([...real(), ...caught()], options());
     expect(check.measures[0]!.guards[0]!.status).toBe("wins");
-    expect(check.measures[0]!.guards[0]!.partners).toEqual([{ partner: "order", status: "lost" }]);
+    expect(check.measures[0]!.guards[0]!.partners).toEqual([{ partner: "order", status: "lost", beatenBy: 3, of: 3, caught: true }]);
     expect(has(check, "uncaught")).toBe(false);
     expect(check.findings).toEqual([]);
   });
@@ -192,7 +192,7 @@ describe("the partners of a control", () => {
 
   it("does not trip uncaught on the same read with one partner", () => {
     const result = check(["p"], 7, 8);
-    expect(result.measures[0]!.guards[0]!.partners).toEqual([{ partner: "p", status: "lost" }]);
+    expect(result.measures[0]!.guards[0]!.partners).toEqual([{ partner: "p", status: "lost", beatenBy: 1, of: 1, caught: true }]);
     expect(has(result, "uncaught")).toBe(false);
   });
 
@@ -217,6 +217,49 @@ describe("the partners of a control", () => {
     const claim = (partners: readonly string[]) => winClaim(check(partners, 7, 8), "fill", "a");
     expect(claim(THREE).likeControl).toBe(true);
     expect(claim(["p"]).likeControl).toBe(false);
+  });
+});
+
+describe("the median of a partner", () => {
+  const partnerRule: MeasureRule = { measure: "p", sense: "lower", controls: [], partners: [], noControl: { because: "The control has no code.", until: "2026-12-01" } };
+  /**
+   * The rows of `count` real entries and the control. The control wins fill on each key. On the partner `p`, the first `beat`
+   * entries beat the control on each of 40 keys, and the others lose to it. The entries of `thin` have 3 keys on `p` only.
+   */
+  const field = (count: number, beat: number, thin = 0): MeasureRow[] => [
+    ...Array.from({ length: count + thin }, (_, e) => [
+      ...rows("fill", `e${e}`, 40, (i) => 0.5 + i * 1e-4),
+      ...rows("p", `e${e}`, e < count ? 40 : 3, (i) => (e < beat ? 1 : 9) + i * 1e-3),
+    ]).flat(),
+    ...rows("fill", "trick", 40, (i) => 0.9 + i * 1e-4),
+    ...rows("p", "trick", 40, (i) => 5 + i * 1e-3),
+  ];
+  const guard = (data: readonly MeasureRow[]): MeasureChecks => checkMeasures(data, options([{ ...FILL, partners: ["p"] }, partnerRule]));
+  const partner = (check: MeasureChecks) => check.measures[0]!.guards[0]!.partners[0]!;
+
+  it("reads not caught when 2 of 40 entries beat the control, and the status stays lost", () => {
+    const check = guard(field(40, 2));
+    expect(check.measures[0]!.guards[0]!.status).toBe("wins");
+    expect(partner(check)).toEqual({ partner: "p", status: "lost", beatenBy: 2, of: 40, caught: false });
+    expect(has(check, "uncaught")).toBe(false);
+  });
+
+  it("reads caught when 30 of 40 entries beat the control", () => {
+    expect(partner(guard(field(40, 30)))).toEqual({ partner: "p", status: "lost", beatenBy: 30, of: 40, caught: true });
+  });
+
+  it("puts the line at the median: 20 of 40 is not caught, and 21 of 40 is caught", () => {
+    expect(partner(guard(field(40, 20))).caught).toBe(false);
+    expect(partner(guard(field(40, 21))).caught).toBe(true);
+  });
+
+  it("does not count an entry with too few keys in of", () => {
+    expect(partner(guard(field(40, 2, 5)))).toMatchObject({ beatenBy: 2, of: 40, caught: false });
+  });
+
+  it("gives the same findings as the status alone", () => {
+    const kept = (check: MeasureChecks) => check.findings.map((f) => f.kind);
+    expect(kept(guard(field(40, 2)))).toEqual(kept(guard(field(40, 30))));
   });
 });
 
