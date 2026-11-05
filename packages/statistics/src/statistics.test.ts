@@ -359,7 +359,7 @@ describe("the tests", () => {
     const base = Array.from({ length: 40 }, () => r.normal(10, 1));
     const shifted = base.map((b) => b + 0.5 + r.normal(0, 0.3));
     const same = base.map((b) => b + r.normal(0, 0.3));
-    expect(pairedPermutation(shifted, base, { runs: 2000 }).p).toBeLessThan(0.05);
+    expect(pairedPermutation(shifted, base, { runs: 2000 }).p).toBeLessThan(0.01);
     expect(pairedPermutation(same, base, { runs: 2000 }).p).toBeGreaterThan(0.05);
   });
 });
