@@ -237,6 +237,9 @@ export declare function freshRun(options: FreshOptions): Promise<FreshRun>;
 ### build/fresh.d.ts#pairOrder
 export declare function pairOrder(pairs: number, round: number, caseIndex: number): PairSlot[];
 
+### build/index.d.ts#BUDGET_LOOKS
+export declare const BUDGET_LOOKS: readonly BudgetLook[];
+
 ### build/index.d.ts#Balanced
 interface Balanced<T extends PairedTime> {
   readonly records: T[];
@@ -262,6 +265,33 @@ interface BandOptions {
   readonly level?: number;
   readonly minimum?: number;
   readonly bootstrap?: BootstrapOptions;
+}
+
+### build/index.d.ts#BudgetLook
+interface BudgetLook {
+  readonly rounds: number;
+  readonly level: number;
+}
+
+### build/index.d.ts#BudgetLooksOptions
+interface BudgetLooksOptions {
+  readonly limit: number;
+  readonly maxDifference: number;
+  readonly looks?: readonly BudgetLook[];
+  readonly level?: number;
+}
+
+### build/index.d.ts#BudgetLooksVerdict
+interface BudgetLooksVerdict extends BudgetVerdict {
+  readonly spent: number;
+  readonly more: readonly BudgetMore[];
+  readonly fails: boolean;
+}
+
+### build/index.d.ts#BudgetMore
+interface BudgetMore {
+  readonly case: string;
+  readonly rounds: number;
 }
 
 ### build/index.d.ts#BudgetOptions
