@@ -206,6 +206,51 @@ const shards = controlFactor(shardRows);
 - The fields `low` and `high` are the quartiles of the ratios. A wide spread means that one factor does not explain the load.
 - The function refuses a group with fewer usable keys than `minPairs`. The default is 5.
 
+## Check that a trick does not buy a measure
+
+A control is a strategy made to win one measure and nothing else. A real entry can win that measure by the same trick. So `checkMeasures` reads the controls of a bench, and `winClaim` tells a page what to show beside a win. Each project keeps its own controls.
+
+```ts
+import { checkMeasures, winClaim } from "@mark1russell7/rigor-bench";
+
+const check = checkMeasures(rows, {
+  asOf: "2026-11-05",
+  controls: ["only-fill"],
+  rules: [
+    { measure: "fill", sense: "higher", controls: ["only-fill"], partners: ["order"] },
+    { measure: "order", sense: "lower", controls: [], partners: [], noControl: { because: "The control has no code yet.", until: "2026-11-20" } },
+  ],
+});
+if (check.findings.length > 0) process.exitCode = 1;
+const claim = winClaim(check, "fill", "my-entry");
+```
+
+Each row has a `measure`, a `group`, a `key` and a `value`. The optional fields are `censored`, `method` and `stratum`. The function throws a `RangeError` for a repeat of a measure, a group and a key. The caller states how repeats reduce to one row.
+
+- **Beats:** the Holm-corrected sign test passes. With a `resolution`, the median paired difference is also over it. Without one, the output says `test only`.
+- **A control wins** when no real entry beats it. A tie counts for the control.
+- **A control loses a partner** when one real entry beats it on that partner.
+- **Families:** one Holm family holds one control on one measure, over all real entries and all strata. One family holds the spread of one measure.
+- **Too few:** the need comes from `signTestPower` at the level of that family, over the untied keys. So 31 real entries need 10 untied keys at the level 0.05. A test under the need beats nothing. A pair with enough keys that ties reads as equal.
+- **Strata:** the keys of one stratum come from one family of inputs, so they are not independent draws. A result is about these keys.
+
+Each finding fails a gate, and each one carries its tests with `n`, `ties`, `p` and the Holm result.
+
+| Finding | Meaning |
+| --- | --- |
+| `uncaught` | A control wins the measure and loses no partner. The trick pays. |
+| `weak-control` | No control wins its measure, so the controls attack nothing. |
+| `censored-win` | A control wins with more censored keys than an entry it is read against. |
+| `no-spread` | No pair of real entries separates on the measure. |
+| `too-few` | No read of the controls or of the spread has enough keys. A small stratum alone gives only a row. |
+| `mixed-method` | The rows mix methods, or a method and no method. The check has no read of the measure. |
+| `no-rule` | The rows hold a measure with no rule. |
+| `no-rows` | A rule names a measure or a control with no rows. This does not read as "not beaten". |
+| `no-control` | A rule has no control and no `noControl`. |
+| `control-late` | The date of `noControl` is before `asOf`. |
+
+`winClaim(check, measure, entry, stratum)` gives `alone`, `show`, `likeControl`, `censored` and `open`. The field `likeControl` is about this entry: it is true when a control wins and this entry beats that control on no partner. A win by another entry clears nothing. The field `alone` is true only when each read control lost, so a measure with no control is not `alone`.
+
 ## The fresh runner
 
 The entry `@mark1russell7/rigor-bench/fresh` starts child processes, so it is for Node only. The root entry stays free of `node:child_process`.

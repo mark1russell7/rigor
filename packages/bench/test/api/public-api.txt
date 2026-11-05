@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 87 names
+## . (build/index.d.ts): 104 names
 
 type Arm: build/paired.d.ts#Arm
 BUDGET_LOOKS: build/index.d.ts#BUDGET_LOOKS
@@ -25,11 +25,15 @@ type CaseBudget: build/index.d.ts#CaseBudget
 type CaseInterval: build/index.d.ts#CaseInterval
 type CaseLimit: build/index.d.ts#CaseLimit
 type CaseRatio: build/paired.d.ts#CaseRatio
+type Comparison: build/index.d.ts#Comparison
 type ControlFactors: build/index.d.ts#ControlFactors
 type ControlOptions: build/index.d.ts#ControlOptions
+type ControlRead: build/index.d.ts#ControlRead
 type ControlRow: build/index.d.ts#ControlRow
+type EntryCount: build/index.d.ts#EntryCount
 type GroupCounts: build/index.d.ts#GroupCounts
 type GroupFactor: build/index.d.ts#GroupFactor
+type GuardRead: build/index.d.ts#GuardRead
 type JobLimitVerdict: build/index.d.ts#JobLimitVerdict
 type JobRecords: build/index.d.ts#JobRecords
 type JobVerdict: build/index.d.ts#JobVerdict
@@ -41,11 +45,20 @@ type LadderVerdict: build/index.d.ts#LadderVerdict
 type LimitOptions: build/index.d.ts#LimitOptions
 type LimitOutcome: build/index.d.ts#LimitOutcome
 type LimitVerdict: build/index.d.ts#LimitVerdict
+type MeasureCheck: build/index.d.ts#MeasureCheck
+type MeasureCheckOptions: build/index.d.ts#MeasureCheckOptions
+type MeasureChecks: build/index.d.ts#MeasureChecks
+type MeasureFinding: build/index.d.ts#MeasureFinding
+type MeasureFindingKind: build/index.d.ts#MeasureFindingKind
+type MeasureRow: build/index.d.ts#MeasureRow
+type MeasureRule: build/index.d.ts#MeasureRule
 type MeasuredFactor: build/index.d.ts#MeasuredFactor
 type MedianBudget: build/index.d.ts#MedianBudget
+type NoControl: build/index.d.ts#NoControl
 type NoFactor: build/index.d.ts#NoFactor
 type NoiseCheck: build/index.d.ts#NoiseCheck
 type PairedTime: build/paired.d.ts#PairedTime
+type PartnerRead: build/index.d.ts#PartnerRead
 type PoolFacts: build/index.d.ts#PoolFacts
 type PoolOptions: build/index.d.ts#PoolOptions
 type PooledJob: build/index.d.ts#PooledJob
@@ -64,10 +77,12 @@ type RungBudget: build/index.d.ts#RungBudget
 type RungEvidence: build/index.d.ts#RungEvidence
 type RungRecord: build/index.d.ts#RungRecord
 type RungVerdict: build/index.d.ts#RungVerdict
+type SpreadRead: build/index.d.ts#SpreadRead
 type TimeOutcome: build/index.d.ts#TimeOutcome
 type TimeVerdict: build/index.d.ts#TimeVerdict
 type VerdictOptions: build/index.d.ts#VerdictOptions
 type VerdictRule: build/index.d.ts#VerdictRule
+type WinClaim: build/index.d.ts#WinClaim
 type WorstBudget: build/index.d.ts#WorstBudget
 aaBand: build/index.d.ts#aaBand
 aaSpread: build/index.d.ts#aaSpread
@@ -79,6 +94,7 @@ budgetVerdict: build/index.d.ts#budgetVerdict
 caseIntervals: build/index.d.ts#caseIntervals
 caseRatios: build/paired.d.ts#caseRatios
 checkLadder: build/index.d.ts#checkLadder
+checkMeasures: build/index.d.ts#checkMeasures
 checkPairedTime: build/paired.d.ts#checkPairedTime
 controlFactor: build/index.d.ts#controlFactor
 firstArm: build/paired.d.ts#firstArm
@@ -93,6 +109,7 @@ timeRounds: build/index.d.ts#timeRounds
 timeVerdict: build/index.d.ts#timeVerdict
 verdictMargin: build/index.d.ts#verdictMargin
 verdictPower: build/index.d.ts#verdictPower
+winClaim: build/index.d.ts#winClaim
 
 ## ./fresh (build/fresh.d.ts): 17 names
 
@@ -357,6 +374,26 @@ interface CaseLimit extends CaseInterval {
   readonly outcome: LimitOutcome;
 }
 
+### build/index.d.ts#Comparison
+interface Comparison {
+  readonly better: string;
+  readonly other: string;
+  readonly stratum: string | undefined;
+  readonly shared: number;
+  readonly n: number;
+  readonly ties: number;
+  readonly wins: number;
+  readonly losses: number;
+  readonly medianDifference: number;
+  readonly p: number;
+  readonly adjusted: number;
+  readonly family: number;
+  readonly needs: number;
+  readonly tooFew: boolean;
+  readonly tied: boolean;
+  readonly beats: boolean;
+}
+
 ### build/index.d.ts#ControlFactors
 interface ControlFactors {
   readonly base: string | undefined;
@@ -369,12 +406,30 @@ interface ControlOptions {
   readonly minPairs?: number;
 }
 
+### build/index.d.ts#ControlRead
+interface ControlRead {
+  readonly measure: string;
+  readonly control: string;
+  readonly stratum: string | undefined;
+  readonly status: "wins" | "beaten" | "too-few" | "no-rows";
+  readonly aheadOf: number;
+  readonly comparisons: readonly Comparison[];
+}
+
 ### build/index.d.ts#ControlRow
 interface ControlRow {
   readonly group: string;
   readonly key: string;
   readonly value: number;
   readonly censored?: boolean;
+}
+
+### build/index.d.ts#EntryCount
+interface EntryCount {
+  readonly group: string;
+  readonly stratum: string | undefined;
+  readonly finished: number;
+  readonly censored: number;
 }
 
 ### build/index.d.ts#GroupCounts
@@ -387,6 +442,14 @@ interface GroupCounts {
 
 ### build/index.d.ts#GroupFactor
 type GroupFactor = MeasuredFactor | NoFactor;
+
+### build/index.d.ts#GuardRead
+interface GuardRead {
+  readonly control: string;
+  readonly stratum: string | undefined;
+  readonly status: ControlRead["status"];
+  readonly partners: readonly PartnerRead[];
+}
 
 ### build/index.d.ts#JobLimitVerdict
 interface JobLimitVerdict {
@@ -464,6 +527,69 @@ interface LimitVerdict {
   readonly allowed: number;
 }
 
+### build/index.d.ts#MeasureCheck
+interface MeasureCheck {
+  readonly measure: string;
+  readonly sense: "higher" | "lower";
+  readonly basis: "test only" | "test and resolution";
+  readonly method: string | undefined;
+  readonly mixed: boolean;
+  readonly guards: readonly GuardRead[];
+  readonly spread: readonly SpreadRead[];
+  readonly entries: readonly EntryCount[];
+  readonly partners: readonly string[];
+  readonly open: NoControl | undefined;
+}
+
+### build/index.d.ts#MeasureCheckOptions
+interface MeasureCheckOptions {
+  readonly rules: readonly MeasureRule[];
+  readonly controls: readonly string[];
+  readonly asOf: string;
+  readonly alpha?: number;
+}
+
+### build/index.d.ts#MeasureChecks
+interface MeasureChecks {
+  readonly measures: readonly MeasureCheck[];
+  readonly reads: readonly ControlRead[];
+  readonly findings: readonly MeasureFinding[];
+}
+
+### build/index.d.ts#MeasureFinding
+interface MeasureFinding {
+  readonly kind: MeasureFindingKind;
+  readonly measure: string;
+  readonly stratum?: string | undefined;
+  readonly control?: string;
+  readonly text: string;
+  readonly comparisons: readonly Comparison[];
+}
+
+### build/index.d.ts#MeasureFindingKind
+type MeasureFindingKind = "uncaught" | "weak-control" | "censored-win" | "no-spread" | "too-few" | "mixed-method" | "no-rule" | "no-rows" | "no-control" | "control-late";
+
+### build/index.d.ts#MeasureRow
+interface MeasureRow {
+  readonly measure: string;
+  readonly group: string;
+  readonly key: string;
+  readonly value: number;
+  readonly censored?: boolean;
+  readonly method?: string;
+  readonly stratum?: string;
+}
+
+### build/index.d.ts#MeasureRule
+interface MeasureRule {
+  readonly measure: string;
+  readonly sense: "higher" | "lower";
+  readonly controls: readonly string[];
+  readonly partners: readonly string[];
+  readonly resolution?: number;
+  readonly noControl?: NoControl;
+}
+
 ### build/index.d.ts#MeasuredFactor
 interface MeasuredFactor extends GroupCounts {
   readonly factor: number;
@@ -481,6 +607,12 @@ interface MedianBudget {
   readonly caseLevel?: number;
 }
 
+### build/index.d.ts#NoControl
+interface NoControl {
+  readonly because: string;
+  readonly until: string;
+}
+
 ### build/index.d.ts#NoFactor
 interface NoFactor extends GroupCounts {
   readonly factor: undefined;
@@ -494,6 +626,12 @@ interface NoiseCheck {
   readonly noisy: boolean;
   readonly aaMedian: number | undefined;
   readonly biased: boolean;
+}
+
+### build/index.d.ts#PartnerRead
+interface PartnerRead {
+  readonly partner: string;
+  readonly status: "lost" | "not-lost" | "too-few" | "no-rows";
 }
 
 ### build/index.d.ts#PoolFacts
@@ -665,6 +803,15 @@ interface RungVerdict {
   readonly synthetic: readonly string[];
 }
 
+### build/index.d.ts#SpreadRead
+interface SpreadRead {
+  readonly stratum: string | undefined;
+  readonly pairs: number;
+  readonly separated: number;
+  readonly tooFew: number;
+  readonly widest: number | undefined;
+}
+
 ### build/index.d.ts#TimeOutcome
 type TimeOutcome = "faster" | "slower" | "same" | "cannot decide";
 
@@ -676,7 +823,7 @@ interface TimeVerdict {
   readonly rule: VerdictRule;
   readonly interval: Interval | undefined;
   readonly band: Band | undefined;
-  readonly comparison: Comparison | undefined;
+  readonly comparison: Comparison$1 | undefined;
   readonly pool?: PoolFacts;
   readonly noise?: NoiseCheck;
 }
@@ -692,6 +839,21 @@ interface VerdictOptions extends BandOptions {
 
 ### build/index.d.ts#VerdictRule
 type VerdictRule = "band" | "difference";
+
+### build/index.d.ts#WinClaim
+interface WinClaim {
+  readonly alone: boolean;
+  readonly show: readonly string[];
+  readonly likeControl: boolean;
+  readonly censored: {
+    readonly entry: number;
+    readonly controls: readonly {
+      readonly control: string;
+      readonly censored: number;
+    }[];
+  };
+  readonly open: NoControl | undefined;
+}
 
 ### build/index.d.ts#WorstBudget
 interface WorstBudget {
@@ -729,6 +891,9 @@ export declare function caseIntervals(records: readonly PairedTime[], level?: nu
 ### build/index.d.ts#checkLadder
 export declare function checkLadder(ladder: Ladder): readonly string[];
 
+### build/index.d.ts#checkMeasures
+export declare function checkMeasures(rows: readonly MeasureRow[], options: MeasureCheckOptions): MeasureChecks;
+
 ### build/index.d.ts#controlFactor
 export declare function controlFactor(rows: readonly ControlRow[], options?: ControlOptions): ControlFactors;
 
@@ -764,6 +929,9 @@ export declare function verdictMargin(options?: VerdictOptions): number;
 
 ### build/index.d.ts#verdictPower
 export declare function verdictPower(options: PowerOptions): Power;
+
+### build/index.d.ts#winClaim
+export declare function winClaim(check: MeasureChecks, measure: string, entry: string, stratum?: string): WinClaim;
 
 ### build/paired.d.ts#Arm
 type Arm = "a" | "b";
