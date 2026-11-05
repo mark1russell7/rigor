@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 119 names
+## . (build/index.d.ts): 122 names
 
 type BootstrapOptions: build/index.d.ts#BootstrapOptions
 type CalibrationLevel: build/index.d.ts#CalibrationLevel
@@ -78,6 +78,8 @@ type SmoothLaw: build/index.d.ts#SmoothLaw
 type SmoothLawScore: build/index.d.ts#SmoothLawScore
 type Summary: build/index.d.ts#Summary
 type TableResponseModel: build/index.d.ts#TableResponseModel
+type TwoSamplePermutationOptions: build/index.d.ts#TwoSamplePermutationOptions
+type TwoSamplePermutationResult: build/index.d.ts#TwoSamplePermutationResult
 Z95: build/index.d.ts#Z95
 bestSmoothLaw: build/index.d.ts#bestSmoothLaw
 binomialInterval: build/index.d.ts#binomialInterval
@@ -123,6 +125,7 @@ sorted: build/index.d.ts#sorted
 spearman: build/index.d.ts#spearman
 summarize: build/index.d.ts#summarize
 surfaceResponse: build/index.d.ts#surfaceResponse
+twoSamplePermutation: build/index.d.ts#twoSamplePermutation
 whenHolds: build/index.d.ts#whenHolds
 wilson: build/index.d.ts#wilson
 
@@ -639,6 +642,18 @@ interface TableResponseModel extends ResponseModelBase {
   readonly fallback: number;
 }
 
+### build/index.d.ts#TwoSamplePermutationOptions
+interface TwoSamplePermutationOptions {
+  readonly runs?: number;
+  readonly seed?: number | string;
+  readonly statistic?: (a: readonly number[], b: readonly number[]) => number;
+}
+
+### build/index.d.ts#TwoSamplePermutationResult
+interface TwoSamplePermutationResult extends PermutationResult {
+  readonly exact: boolean;
+}
+
 ### build/index.d.ts#Z95
 export declare const Z95 = 1.959963984540054;
 
@@ -775,6 +790,9 @@ export declare function summarize(values: readonly number[]): Summary;
 
 ### build/index.d.ts#surfaceResponse
 export declare function surfaceResponse(record: ResponseRecord, measure: string, options: ResponseSurfaceOptions): ResponseSurface;
+
+### build/index.d.ts#twoSamplePermutation
+export declare function twoSamplePermutation(a: readonly number[], b: readonly number[], options?: TwoSamplePermutationOptions): TwoSamplePermutationResult;
 
 ### build/index.d.ts#whenHolds
 export declare function whenHolds(dimension: ResponseDimension, values: Readonly<Record<string, unknown>>): boolean;
