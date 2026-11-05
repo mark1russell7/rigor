@@ -265,7 +265,7 @@ const result = await superviseCases({
 The child calls `caseProgress(file).start(id, stage)` before each stage, and `end(id)` after the result is on the disk.
 
 - A stage over its budget gives `over-budget`. This time is a lower bound, so a statistic treats it as censored, not as a value. The next child runs the cases that are left.
-- After 2 overruns in one group (the option `overruns`), each other case of the group gives `not-run`, with the ids of the 2 overruns. An overrun is measured, and a skip is not. Keep these tags different.
+- After 2 overruns in one group (the option `overruns`), each other case of the group gives `not-run`, with the ids of the 2 overruns. When cases have a `rank`, for example an input size, the count is for each rank. The stop is for that rank and above, and a smaller rank goes on. An overrun is measured, and a skip is not. Keep these tags different.
 - An overrun counts for the group of its stage only. A slow router thus does not count against the packer of its cases.
 - A case in `done` does not run, so a resume runs no case two times.
 - The option `earlier` takes the ends of a stopped run. Its overruns count for their groups, so a stop and a resume give the same ends as a run with no stop. Keep each case in `cases`, and put the ids of the finished cases in `done`.
