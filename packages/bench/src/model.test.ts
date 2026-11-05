@@ -246,6 +246,15 @@ describe("the flip of the CPU model test on 26 reads", () => {
     expect(rowOf(far, "9V45").p).toBeGreaterThan(0.05);
   });
 
+  it("a fault of 0.09 from the median of the rest does not read differs at a family of 54", { timeout: 120_000 }, () => {
+    const medianOf = (keep: (r: ModelRead) => boolean): number => median(reads.filter((r) => r.case === "avoid" && keep(r)).map((r) => r.value));
+    const toRest = medianOf((r) => r.model !== "9V45") - medianOf((r) => r.model === "9V45");
+    const flipped = modelTest(moved("9V45", toRest + 0.09), fast);
+    report("+0.09 from the median of the rest on avoid 9V45, family 54", `${modelRowText(rowOf(flipped, "9V45"), flipped.family)}, Holm p ${(rowOf(flipped, "9V45").p ?? 1).toFixed(4)}`);
+    expect(named(flipped)).toEqual([]);
+    expect(rowOf(flipped, "9V45").status).toBe("no read");
+  });
+
   it("no shift of the 5 reads reaches the level of a family of 54, because of the smallest p of the median", { timeout: 120_000 }, () => {
     const family54 = visibleShift(
       reads.filter((r) => r.case === "avoid" && r.model === "9V45").map((r) => r.value),
