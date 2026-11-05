@@ -82,7 +82,7 @@ The verdict has no correction for many cases. Each case has its own interval at 
 
 ## A gate that can fail
 
-A required check needs a result that can fail. `gateOf` reads the case outcomes of a verdict, and `notSlowerVerdict` gives the claim of a speed gate.
+A check that blocks a merge needs a result that can fail. `gateOf` reads the case outcomes of a verdict, and `notSlowerVerdict` gives the claim of a speed gate.
 
 ```ts
 const gate = notSlowerVerdict(jobs, { margin: Math.log(1.015) });
@@ -95,8 +95,10 @@ gate.more;                                        // the next look of each case 
 - The claim is "not slower by more than the margin". A one-sided bound answers it, thus a case can read `not slower` when its interval holds 1. The word `same` of `timeVerdict` asks for more.
 - The outcome of each case uses the words of `LimitOutcome`: `within` is `not slower`, `beyond` is `slower`, and `cannot decide` is `no read`. Thus `gateOf` also reads `limitVerdict` and `budgetVerdict`.
 - A case needs its bound in each of `jobs` jobs, by default 2. More rounds do not remove a difference between jobs.
-- The sign test compares the median difference with the margin in each job. It uses no random numbers. A pair holds two records with the same first arm.
-- The `level` is for the family. `holm` corrects each look over all cases, and each look has an equal share of the level.
+- The claim "the bound holds in at least `r` of `J` jobs" is a partial conjunction. Its p is `(J - r + 1)` times the `r`-th smallest p of the jobs (Benjamini and Heller, 2008). With 2 jobs of 2, this p is the larger p.
+- The sign test compares the median difference with the margin in each job. It uses no random numbers.
+- A pair holds two records with the same first arm. A runner can give the two arms opposite orders in one round, and a difference of two orders holds the effect of the order.
+- The `level` is for the family. `holm` corrects each look over all cases. Each look has an equal share of the level.
 - The first look with an outcome decides a case. `GATE_LOOKS` is 12, 24 and 48 rounds.
 - With 16 cases and the default looks, the first test of a family at 12 rounds needs 12 of 12 pairs below the margin in both jobs. Thus a noisy case needs more rounds, or it stays `no read`.
 - `no read` is not a pass. A caller adds the rounds of `more`, then more jobs. A job that it adds after the last look is one more look, and the level does not count it.

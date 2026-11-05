@@ -1,5 +1,5 @@
 /**
- * The gate of a bench: the result that a required check reads. A verdict gives one of the words of `LimitOutcome` for each
+ * The gate of a bench: the result that a check of a merge reads. A verdict gives one of the words of `LimitOutcome` for each
  * case, and the gate gives "pass", "block" or "no read". A case with no outcome does not pass.
  */
 import { holm, median, partialConjunction, signTest } from "@mark1russell7/rigor-statistics";
