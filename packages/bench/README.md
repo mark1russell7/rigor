@@ -10,6 +10,7 @@ npm install @mark1russell7/rigor-bench
 
 - Each round runs the two arms of a pair on one case, one after the other. Arm `a` is the baseline, and arm `b` is the candidate.
 - The order turns each round (`firstArm`). Thus a warm cache or a slow start does not always help the same arm.
+- A run with three or more arms in one child order uses `armOrder`. A plain turn of the arms does not turn each pair evenly.
 - An A/A pair runs the same code in its two arms. Its ratios show how far apart two equal arms come on the machine.
 - The ratio of a case is `b / a` over its rounds (`caseRatios`).
 - The default rule `difference` gives the bootstrap interval of the candidate median over the A/A median. The verdict compares it with 1.
@@ -33,6 +34,7 @@ v.comparison;                                     // the cases that gain and dro
 | Function | What it gives |
 | --- | --- |
 | `firstArm(round, offset)` | The arm that runs first. The order turns each round, and an odd offset starts with arm `b`. |
+| `armOrder(arms, round)` | The order of any count of arms in a round. Each pair of arms has each order within 1 after each count of rounds. |
 | `checkPairedTime(record)` | The record, or a `RangeError` for a time that is not a finite number above 0. |
 | `caseRatios(records)` | The ratio of each case. It refuses 2 records of one round, and an order that did not turn. |
 | `aaBand(aa, options)` | The band of the A/A arm, symmetric on a log scale. The kind `median` (the default) holds the A/A median, and the kind `case` holds one A/A case. It needs 5 cases or more. |
@@ -44,6 +46,11 @@ v.comparison;                                     // the cases that gain and dro
 | `limitVerdict(candidate, aa, options)` | The verdict of the claim "the ratio of each case is at most `limit`": `within`, `beyond` or `cannot decide`. |
 | `tailLimitVerdict(candidate, aa, options)` | The verdict of the claim "the median and a high value of each case are at most their limits", for a bench with few rounds. |
 | `caseTails(records, rank)` | The value at one rank of the ratios of each case, from the largest. |
+| `modelTest(reads, options)` | The read of each CPU model against the rest, for each case: `differs`, `no read`, `too-few` or `not asked`. |
+| `visibleShift(values, rest, level, direction, options)` | The smallest shift in one direction that a test can see at this count and level, and the smallest p of this count. |
+| `modelRowText(row, family)` | The words of one row. No word says that a model is the same as the rest. |
+| `limitOnModel(limits, model)` | The limit of a gain on one CPU model: the gain limit, or the ceiling with its words. |
+| `armModels(pairs)` | The CPU models of each arm of a set of pairs, and if all the reads come from one known model. |
 | `tailFalseFails(aa, options)` | The cases of an A/A arm that the rule of `tailLimitVerdict` fails, and apart from these the cases with a limit under 1. |
 | `gateOf(cases)` | The gate of a list of case outcomes: `pass`, `block` or `no read`. |
 | `notSlowerVerdict(jobs, options)` | The gate of the claim "not slower by more than the margin", with looks and a family level. |
@@ -113,6 +120,21 @@ With the default rank, a real cost in 1 round cannot fail the tail limit. This i
 The verdict has no interval, so a limit needs a margin from the spread of earlier runs. `tailFalseFails` applies the rule to each case of an A/A arm. Each case reads the tail of the other cases. Print the count of `fails` on the gate, to state what the rule costs on noise.
 
 A limit under 1 states a gain, and an A/A pair shows no gain. So the A/A arm has no read of that case, and the case goes in `gains` with that reason. The false fails of a gain limit come from repeat reads of an unchanged tree against its fixed base.
+
+## A read of each CPU model
+
+Runners of one label have different CPU models. A check of the pool passes when most reads come from the other models, so it can hide a model that reads apart. `modelTest` reads each model against the rest of its case. It uses a two-sample permutation test of the median, with one Holm family over all the rows.
+
+- `differs`: the adjusted p is under `alpha`, and the shift is at `resolution` or more, when the caller gives one.
+- `no read`: the test finds no difference. Few reads have little power, so this does not say that the model is the same. The row gives `floor`, the smallest p of that count, and `level`, the first level of Holm in the family. When `floor` is over `level`, the words of `modelRowText` say that this size cannot reach the level, with no flip. A row of that size reads `differs` only if other rows read `differs` before it, because each of those rows raises the level. When the level is in reach, `visible` gives the smallest shift that this test can see at that count and family. The option `searchVisible` set to false stops only that search.
+- `too-few`: the model has under `minReads` reads, or the case has no other model. The row keeps its facts, and it stays out of the family.
+- `not asked`: the option `asked` leaves the row out of the question. State the question before the reads, because a family that is chosen after a read has no valid p.
+
+A read of `differs` tells where to look. It does not name a cause, because the reads of one model can share a runner image and a date.
+
+`limitOnModel` gives the limit of a gain that reads on some models only. A model with no earlier reads gets the ceiling, and its read carries the words of `CEILING_ONLY`. A pass at the ceiling stops a loss, and it does not hold the gain.
+
+`armModels` reads the models of the two arms of a set of pairs. When the arms come from different computers, a ratio compares the computers. A record with no model reads as `unknown`, and `unknown` is not one known model.
 
 ## A gate that can fail
 

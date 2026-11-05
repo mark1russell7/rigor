@@ -4,7 +4,8 @@ const isWordCharacter = (character: string | undefined): boolean => character !=
 
 /**
  * This function tells if a text holds a word. Each character of the word is literal, so no character of the word needs an escape.
- * A word edge that is a word character must also be a word boundary in the text, so `fetch` is not in `fetcher`, and `import(` is not in `reimport(`.
+ * A word edge that is a word character must also be a word boundary in the text.
+ * So `fetch` is not in `fetcher`, and `import(` is not in `reimport(`.
  * An empty word is in no text.
  */
 export function hasWord(text: string, word: string): boolean {

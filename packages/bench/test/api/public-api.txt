@@ -4,9 +4,11 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 126 names
+## . (build/index.d.ts): 144 names
 
 type Arm: build/paired.d.ts#Arm
+type ArmModels: build/index.d.ts#ArmModels
+type ArmPair: build/index.d.ts#ArmPair
 BUDGET_LOOKS: build/index.d.ts#BUDGET_LOOKS
 type Balanced: build/index.d.ts#Balanced
 type Band: build/index.d.ts#Band
@@ -21,6 +23,7 @@ type BudgetOutcome: build/index.d.ts#BudgetOutcome
 type BudgetResult: build/index.d.ts#BudgetResult
 type BudgetRound: build/index.d.ts#BudgetRound
 type BudgetVerdict: build/index.d.ts#BudgetVerdict
+CEILING_ONLY: build/index.d.ts#CEILING_ONLY
 type CaseBudget: build/index.d.ts#CaseBudget
 type CaseGate: build/index.d.ts#CaseGate
 type CaseInterval: build/index.d.ts#CaseInterval
@@ -50,6 +53,7 @@ type Ladder: build/index.d.ts#Ladder
 type LadderDimension: build/index.d.ts#LadderDimension
 type LadderOptions: build/index.d.ts#LadderOptions
 type LadderVerdict: build/index.d.ts#LadderVerdict
+type LimitOnModel: build/index.d.ts#LimitOnModel
 type LimitOptions: build/index.d.ts#LimitOptions
 type LimitOutcome: build/index.d.ts#LimitOutcome
 type LimitVerdict: build/index.d.ts#LimitVerdict
@@ -62,6 +66,12 @@ type MeasureRow: build/index.d.ts#MeasureRow
 type MeasureRule: build/index.d.ts#MeasureRule
 type MeasuredFactor: build/index.d.ts#MeasuredFactor
 type MedianBudget: build/index.d.ts#MedianBudget
+type ModelLimits: build/index.d.ts#ModelLimits
+type ModelRead: build/index.d.ts#ModelRead
+type ModelRow: build/index.d.ts#ModelRow
+type ModelStatus: build/index.d.ts#ModelStatus
+type ModelTest: build/index.d.ts#ModelTest
+type ModelTestOptions: build/index.d.ts#ModelTestOptions
 type NoControl: build/index.d.ts#NoControl
 type NoFactor: build/index.d.ts#NoFactor
 type NoiseCheck: build/index.d.ts#NoiseCheck
@@ -97,12 +107,16 @@ type TailLimitVerdict: build/index.d.ts#TailLimitVerdict
 type TailRuleOptions: build/index.d.ts#TailRuleOptions
 type TimeOutcome: build/index.d.ts#TimeOutcome
 type TimeVerdict: build/index.d.ts#TimeVerdict
+UNKNOWN_MODEL: build/index.d.ts#UNKNOWN_MODEL
 type VerdictOptions: build/index.d.ts#VerdictOptions
 type VerdictRule: build/index.d.ts#VerdictRule
+type VisibleShift: build/index.d.ts#VisibleShift
 type WinClaim: build/index.d.ts#WinClaim
 type WorstBudget: build/index.d.ts#WorstBudget
 aaBand: build/index.d.ts#aaBand
 aaSpread: build/index.d.ts#aaSpread
+armModels: build/index.d.ts#armModels
+armOrder: build/paired.d.ts#armOrder
 armVerdicts: build/index.d.ts#armVerdicts
 balanceOrders: build/index.d.ts#balanceOrders
 budgetLookSpend: build/index.d.ts#budgetLookSpend
@@ -118,7 +132,10 @@ controlFactor: build/index.d.ts#controlFactor
 firstArm: build/paired.d.ts#firstArm
 gateOf: build/index.d.ts#gateOf
 ladderVerdict: build/index.d.ts#ladderVerdict
+limitOnModel: build/index.d.ts#limitOnModel
 limitVerdict: build/index.d.ts#limitVerdict
+modelRowText: build/index.d.ts#modelRowText
+modelTest: build/index.d.ts#modelTest
 notSlowerVerdict: build/index.d.ts#notSlowerVerdict
 poolRecords: build/index.d.ts#poolRecords
 pooledBand: build/index.d.ts#pooledBand
@@ -131,6 +148,7 @@ timeRounds: build/index.d.ts#timeRounds
 timeVerdict: build/index.d.ts#timeVerdict
 verdictMargin: build/index.d.ts#verdictMargin
 verdictPower: build/index.d.ts#verdictPower
+visibleShift: build/index.d.ts#visibleShift
 winClaim: build/index.d.ts#winClaim
 
 ## ./code-stamp (build/code-stamp.d.ts): 8 names
@@ -338,6 +356,19 @@ export declare function freshRun(options: FreshOptions): Promise<FreshRun>;
 ### build/fresh.d.ts#pairOrder
 export declare function pairOrder(pairs: number, round: number, caseIndex: number): PairSlot[];
 
+### build/index.d.ts#ArmModels
+interface ArmModels {
+  readonly a: readonly string[];
+  readonly b: readonly string[];
+  readonly one: boolean;
+}
+
+### build/index.d.ts#ArmPair
+interface ArmPair {
+  readonly a: string | undefined;
+  readonly b: string | undefined;
+}
+
 ### build/index.d.ts#BUDGET_LOOKS
 export declare const BUDGET_LOOKS: readonly BudgetLook[];
 
@@ -428,6 +459,9 @@ interface BudgetVerdict {
   readonly level: number;
   readonly cases: readonly CaseBudget[];
 }
+
+### build/index.d.ts#CEILING_ONLY
+export declare const CEILING_ONLY = "gain not read on this model, ceiling only";
 
 ### build/index.d.ts#CaseBudget
 interface CaseBudget {
@@ -649,6 +683,13 @@ interface LadderVerdict {
   readonly rungs: readonly RungVerdict[];
 }
 
+### build/index.d.ts#LimitOnModel
+interface LimitOnModel {
+  readonly limit: number;
+  readonly holdsGain: boolean;
+  readonly note: string | undefined;
+}
+
 ### build/index.d.ts#LimitOptions
 interface LimitOptions extends BandOptions {
   readonly limit: number;
@@ -750,6 +791,62 @@ interface MedianBudget {
   readonly limit: number;
   readonly maxDifference: number;
   readonly caseLevel?: number;
+}
+
+### build/index.d.ts#ModelLimits
+interface ModelLimits {
+  readonly gain: number;
+  readonly ceiling: number;
+  readonly models: readonly string[];
+}
+
+### build/index.d.ts#ModelRead
+interface ModelRead {
+  readonly case: string;
+  readonly model: string;
+  readonly value: number;
+}
+
+### build/index.d.ts#ModelRow
+interface ModelRow {
+  readonly case: string;
+  readonly model: string;
+  readonly reads: number;
+  readonly median: number;
+  readonly low: number;
+  readonly high: number;
+  readonly restReads: number;
+  readonly restMedian: number | undefined;
+  readonly shift: number | undefined;
+  readonly p: number | undefined;
+  readonly status: ModelStatus;
+  readonly visible: number | undefined;
+  readonly floor: number | undefined;
+  readonly level: number | undefined;
+}
+
+### build/index.d.ts#ModelStatus
+type ModelStatus = "differs" | "no read" | "too-few" | "not asked";
+
+### build/index.d.ts#ModelTest
+interface ModelTest {
+  readonly rows: readonly ModelRow[];
+  readonly family: number;
+  readonly differs: readonly ModelRow[];
+}
+
+### build/index.d.ts#ModelTestOptions
+interface ModelTestOptions {
+  readonly minReads?: number;
+  readonly alpha?: number;
+  readonly resolution?: number;
+  readonly runs?: number;
+  readonly seed?: number | string;
+  readonly asked?: (row: {
+    readonly case: string;
+    readonly model: string;
+  }) => boolean;
+  readonly searchVisible?: boolean;
 }
 
 ### build/index.d.ts#NoControl
@@ -1034,6 +1131,9 @@ interface TimeVerdict {
   readonly noise?: NoiseCheck;
 }
 
+### build/index.d.ts#UNKNOWN_MODEL
+export declare const UNKNOWN_MODEL = "unknown";
+
 ### build/index.d.ts#VerdictOptions
 interface VerdictOptions extends BandOptions {
   readonly rule?: VerdictRule;
@@ -1045,6 +1145,12 @@ interface VerdictOptions extends BandOptions {
 
 ### build/index.d.ts#VerdictRule
 type VerdictRule = "band" | "difference";
+
+### build/index.d.ts#VisibleShift
+interface VisibleShift {
+  readonly shift: number | undefined;
+  readonly floor: number;
+}
 
 ### build/index.d.ts#WinClaim
 interface WinClaim {
@@ -1075,6 +1181,9 @@ export declare function aaBand(aa: readonly PairedTime[], options?: BandOptions)
 
 ### build/index.d.ts#aaSpread
 export declare function aaSpread(aa: readonly PairedTime[], level?: number): number;
+
+### build/index.d.ts#armModels
+export declare function armModels(pairs: readonly ArmPair[]): ArmModels;
 
 ### build/index.d.ts#armVerdicts
 export declare function armVerdicts(run: RunPairs, aaPair: string, options?: VerdictOptions): Record<string, TimeVerdict>;
@@ -1112,8 +1221,17 @@ export declare function gateOf(cases: readonly GateCaseOutcome[]): Gate;
 ### build/index.d.ts#ladderVerdict
 export declare function ladderVerdict(ladder: Ladder, records: readonly RungRecord[], options: LadderOptions): LadderVerdict;
 
+### build/index.d.ts#limitOnModel
+export declare function limitOnModel(limits: ModelLimits, model: string): LimitOnModel;
+
 ### build/index.d.ts#limitVerdict
 export declare function limitVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[], options: LimitOptions): LimitVerdict;
+
+### build/index.d.ts#modelRowText
+export declare function modelRowText(row: ModelRow, family: number): string;
+
+### build/index.d.ts#modelTest
+export declare function modelTest(reads: readonly ModelRead[], options?: ModelTestOptions): ModelTest;
 
 ### build/index.d.ts#notSlowerVerdict
 export declare function notSlowerVerdict(jobs: readonly JobRecords[], options: NotSlowerOptions): NotSlowerVerdict;
@@ -1151,6 +1269,9 @@ export declare function verdictMargin(options?: VerdictOptions): number;
 ### build/index.d.ts#verdictPower
 export declare function verdictPower(options: PowerOptions): Power;
 
+### build/index.d.ts#visibleShift
+export declare function visibleShift(values: readonly number[], rest: readonly number[], level: number, direction: 1 | -1, options?: TwoSamplePermutationOptions): VisibleShift;
+
 ### build/index.d.ts#winClaim
 export declare function winClaim(check: MeasureChecks, measure: string, entry: string, stratum?: string): WinClaim;
 
@@ -1172,6 +1293,9 @@ interface PairedTime {
   readonly a: number;
   readonly b: number;
 }
+
+### build/paired.d.ts#armOrder
+declare function armOrder<T>(arms: readonly T[], round: number): readonly T[];
 
 ### build/paired.d.ts#caseRatios
 declare function caseRatios(records: readonly PairedTime[]): CaseRatio[];
