@@ -76,6 +76,30 @@ export function deriveSeed(seed: number, label: string): number {
   return fnv1a32(`${seed}:${label}`);
 }
 
+/**
+ * One item of a list, chosen by highest random weight: each key has a weight from `seed`, and the largest weight wins.
+ *
+ * - The order of the list does not change the choice. The smaller key wins a tie of weights.
+ * - When a list gains an item, only the draws that the new item wins change. For `n` items, the share of those draws is about `1 / (n + 1)`.
+ * - When a list loses an item, only the draws of that item change.
+ *
+ * The function reads one hash for each item, so a choice costs O(n). The list is not empty, and each key occurs once.
+ */
+export function stablePick<T>(seed: number, items: readonly T[], keyOf: (item: T) => string = String): T {
+  if (items.length === 0) throw new RangeError("stablePick: the list is empty.");
+  const start = seedOf(seed);
+  const seen = new Set<string>();
+  let best: { item: T; key: string; weight: number } | undefined;
+  for (const item of items) {
+    const key = keyOf(item);
+    if (seen.has(key)) throw new RangeError(`stablePick: the key ${JSON.stringify(key)} occurs twice.`);
+    seen.add(key);
+    const weight = mulberry32(deriveSeed(start, key))();
+    if (best === undefined || weight > best.weight || (weight === best.weight && key < best.key)) best = { item, key, weight };
+  }
+  return (best as { item: T }).item;
+}
+
 export interface Random {
   /** The 32-bit seed that the generator started with. Write it in each failure message, so a run can replay. */
   readonly seed: number;

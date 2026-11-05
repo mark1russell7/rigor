@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveSeed, fnv1a32, mulberry32, random, randomOf, seedOf, seedsFrom } from "./random.ts";
+import { deriveSeed, fnv1a32, mulberry32, random, randomOf, seedOf, seedsFrom, stablePick } from "./random.ts";
 
 /** mulberry32 in its first published form (`| 0` on the state, `(t + imul) ^ t`), as in layout-contract. */
 function original(seed: number): () => number {
@@ -226,5 +226,101 @@ describe("random", () => {
     expect(r.below(10)).toBe(1);
     expect(randomOf(() => 0.99, 4).int(0, 9)).toBe(9);
     expect(r.fork("x").seed).toBe(deriveSeed(0, "x"));
+  });
+});
+
+describe("stablePick", () => {
+  const SEEDS = 10_000;
+  const names = (n: number): string[] => Array.from({ length: n }, (_, i) => `s${i + 1}`);
+  /** The share of the seeds where the two lists give another item, and the items that those draws give with `after`. */
+  function moved(before: readonly string[], after: readonly string[]): { share: number; to: Set<string>; from: Set<string> } {
+    const to = new Set<string>();
+    const from = new Set<string>();
+    let count = 0;
+    for (let seed = 0; seed < SEEDS; seed++) {
+      const a = stablePick(seed, before);
+      const b = stablePick(seed, after);
+      if (a !== b) {
+        count += 1;
+        from.add(a);
+        to.add(b);
+      }
+    }
+    return { share: count / SEEDS, to, from };
+  }
+
+  it("moves only the draws that a new item wins, at each size of the list", () => {
+    for (const n of [2, 9, 50]) {
+      const { to } = moved(names(n), names(n + 1));
+      expect([...to]).toEqual([`s${n + 1}`]);
+    }
+  });
+
+  it("moves a share of the draws near 1 / (n + 1)", () => {
+    expect(moved(names(1), names(2)).share).toBeGreaterThan(0.47);
+    expect(moved(names(1), names(2)).share).toBeLessThan(0.53);
+    expect(moved(names(9), names(10)).share).toBeGreaterThan(0.085);
+    expect(moved(names(9), names(10)).share).toBeLessThan(0.115);
+  });
+
+  it("gives no item a large share, on keys that differ in one character", () => {
+    const counts = new Map<string, number>();
+    for (let seed = 0; seed < SEEDS; seed++) {
+      const item = stablePick(seed, names(10));
+      counts.set(item, (counts.get(item) ?? 0) + 1);
+    }
+    expect(counts.size).toBe(10);
+    for (const count of counts.values()) {
+      expect(count / SEEDS).toBeGreaterThan(0.085);
+      expect(count / SEEDS).toBeLessThan(0.115);
+    }
+  });
+
+  it("does not depend on the order of the list", () => {
+    const list = names(12);
+    const reversed = [...list].reverse();
+    const shuffled = random(5).shuffle(list);
+    for (let seed = 0; seed < SEEDS; seed++) {
+      const item = stablePick(seed, list);
+      expect(stablePick(seed, reversed)).toBe(item);
+      expect(stablePick(seed, shuffled)).toBe(item);
+    }
+  });
+
+  it("moves only the draws of an item that the list loses", () => {
+    const list = names(9);
+    const { from } = moved(list, list.filter((name) => name !== "s4"));
+    expect([...from]).toEqual(["s4"]);
+  });
+
+  it("reads the key with keyOf, and gives the item", () => {
+    const items = names(5).map((name) => ({ name }));
+    const item = stablePick(7, items, (x) => x.name);
+    expect(items).toContain(item);
+    expect(item.name).toBe(stablePick(7, names(5)));
+  });
+
+  it("gives the small key on a tie of the weights, in each order of the list", () => {
+    const weight = (key: string): number => mulberry32(deriveSeed(1, key))();
+    expect(weight("k1445")).toBe(weight("k56133"));
+    expect(stablePick(1, ["k1445", "k56133"])).toBe("k1445");
+    expect(stablePick(1, ["k56133", "k1445"])).toBe("k1445");
+  });
+
+  it("gives a seed and the next seed the same item with a share near 1 / n", () => {
+    const list = names(4);
+    let same = 0;
+    for (let seed = 0; seed < SEEDS; seed++) if (stablePick(seed, list) === stablePick(seed + 1, list)) same += 1;
+    expect(same / SEEDS).toBeGreaterThan(0.225);
+    expect(same / SEEDS).toBeLessThan(0.275);
+  });
+
+  it("refuses an empty list and a key that occurs twice", () => {
+    expect(() => stablePick(1, [])).toThrow(RangeError);
+    expect(() => stablePick(1, ["a", "b", "a"])).toThrow(/occurs twice/);
+  });
+
+  it("gives the same choices in each run", () => {
+    expect([0, 1, 2, 3, 4].map((seed) => stablePick(seed, names(4)))).toEqual(["s2", "s4", "s4", "s4", "s4"]);
   });
 });
