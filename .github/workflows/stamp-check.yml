@@ -1,0 +1,108 @@
+# A code stamp must be the same on each operating system. ci.yml uses this workflow, so the check CI OK of the ruleset needs it.
+# The job changes examines the changed files of a pull request. The reads run only when the stamp code, the lock file or
+# this file changed. A push or a release does not repeat them: the pull request of the change ran them.
+# The schedule reads main each week, because a new version of a tool can change a stamp with no change in this repository.
+# A red scheduled run goes to the owner of the repository.
+# Each job reads the stamps of its own, with CRLF line ends on Windows. The compare has no fixed value, so a new version of
+# the bundler does not fail it. Each compare also reads a copy with one injected fault, and that copy must give a finding.
+name: Stamp check
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  schedule:
+    - cron: "48 6 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stamp-check-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.paths.outputs.run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Examine the changed files
+        id: paths
+        env:
+          EVENT: ${{ github.event_name }}
+          WORKFLOW: ${{ github.workflow }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # A manual run of this file and the weekly run always read the stamps
+          if [ "$EVENT" = schedule ] || { [ "$EVENT" = workflow_dispatch ] && [ "$WORKFLOW" = "Stamp check" ]; }; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$EVENT" != pull_request ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "A push or a release does not repeat the stamp reads. The pull request of the change ran them." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          files="$(git diff --name-only "$BASE" "$GITHUB_SHA")"
+          if echo "$files" | grep -qxE 'packages/bench/src/(code-stamp|stamp-os|read-words)(\.test)?\.ts|scripts/stamp-os\.ts|pnpm-lock\.yaml|\.github/workflows/stamp-check\.yml'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "No stamp code, lock file or stamp workflow changed, so the stamp reads did not run." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  stamp-read:
+    name: Stamp read (${{ matrix.os }})
+    needs: changes
+    if: ${{ needs.changes.outputs.run == 'true' }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      max-parallel: 3
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/stamp-os.ts read . stamp-read.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: stamp-read-${{ matrix.os }}
+          path: stamp-read.json
+          retention-days: 3
+
+  stamp-compare:
+    name: Stamp compare
+    needs: [changes, stamp-read]
+    if: ${{ needs.changes.outputs.run == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: stamp-read-*
+          path: stamp-reads
+      - run: node scripts/stamp-os.ts compare stamp-reads/stamp-read-ubuntu-latest/stamp-read.json stamp-reads/stamp-read-windows-latest/stamp-read.json
