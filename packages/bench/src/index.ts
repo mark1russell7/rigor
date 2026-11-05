@@ -90,7 +90,7 @@ export {
   jointClaim,
   winClaim,
 } from "./measures.ts";
-export { type Arm, type CaseRatio, type PairedTime, armOrder, caseRatios, checkPairedTime, firstArm } from "./paired.ts";
+export { type Arm, type CaseRatio, type OrderSize, type PairedTime, armOrder, caseRatios, checkPairedTime, firstArm, orderSize } from "./paired.ts";
 export { type Power, type PowerOptions, verdictPower } from "./power.ts";
 export { type Rounds, type RoundsOptions, timeRounds } from "./rounds.ts";
 export {
