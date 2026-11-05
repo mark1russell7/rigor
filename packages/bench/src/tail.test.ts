@@ -1,6 +1,6 @@
 import { random } from "@mark1russell7/rigor-generators";
 import { describe, expect, it } from "vitest";
-import { type PairedTime, caseTails, firstArm, tailFalseFails, tailLimitVerdict } from "./index.ts";
+import { type PairedTime, caseTails, firstArm, gateOf, tailFalseFails, tailLimitVerdict } from "./index.ts";
 
 /** The records of one case: one record for each ratio, with arm a at 100 ms. */
 function caseOf(name: string, ratios: readonly number[]): PairedTime[] {
@@ -163,6 +163,68 @@ describe("tailLimitVerdict", () => {
       expect(two.cases[0]).toMatchObject({ overMedian: false, overTail: true, outcome: "beyond" });
       expect(tailLimitVerdict(seeded(1, [1, 1.4, 1, 1, 1, 1, 1], seed), aa, { limit: LIMIT, aaCap: 1.3 }).outcome).toBe("within");
     }
+  });
+});
+
+describe("tailLimitVerdict with expected cases", () => {
+  const options = { limit: LIMIT, aaCap: 1.3 };
+
+  it("reads a case that the run lost as cannot decide, and without the list the same run reads within", () => {
+    const run = caseOf("kept", [1, 1, 1, 1, 1, 1, 1]);
+    expect(tailLimitVerdict(run, quietArm(), options).outcome).toBe("within");
+    const v = tailLimitVerdict(run, quietArm(), { ...options, expected: ["kept", "lost"] });
+    expect(v.outcome).toBe("cannot decide");
+    expect(v.reason).toBe('1 of 2 cases have no record. The first is "lost".');
+    expect(v.cases.map((c) => [c.case, c.outcome, c.rounds, c.ratio])).toEqual([
+      ["kept", "within", 7, 1],
+      ["lost", "cannot decide", 0, undefined],
+    ]);
+  });
+
+  it("reads within when the run has each expected case, and a case outside the list still counts", () => {
+    const run = [...caseOf("kept", [1, 1, 1, 1, 1, 1, 1]), ...caseOf("other", [1, 1, 1, 1, 1, 1, 1])];
+    const v = tailLimitVerdict(run, quietArm(), { ...options, expected: ["kept", "kept"] });
+    expect(v.outcome).toBe("within");
+    expect(v.cases.map((c) => c.case)).toEqual(["kept", "other"]);
+  });
+
+  it("keeps beyond over a lost case, because a case over its limit blocks", () => {
+    const v = tailLimitVerdict(caseOf("slow", [2, 2, 2, 2, 2, 2, 2]), quietArm(), { ...options, expected: ["slow", "lost"] });
+    expect(v.outcome).toBe("beyond");
+    expect(gateOf(v.cases).outcome).toBe("block");
+  });
+
+  it("reads each expected case of an empty run as cannot decide", () => {
+    const v = tailLimitVerdict([], quietArm(), { ...options, expected: ["lost"] });
+    expect(v.outcome).toBe("cannot decide");
+    expect(v.reason).toBe('1 of 1 cases have no record. The first is "lost".');
+  });
+
+  it("lists a lost case in a loud run too", () => {
+    const v = tailLimitVerdict(caseOf("kept", [1, 1, 1, 1, 1, 1, 1]), quietArm(1.5), { ...options, expected: ["lost"] });
+    expect(v.outcome).toBe("cannot decide");
+    expect(v.cases.map((c) => c.case)).toEqual(["kept", "lost"]);
+  });
+
+  it("asks the limit of a lost case, so a limit function sees each expected name", () => {
+    const asked: string[] = [];
+    const limit = (name: string): typeof LIMIT => {
+      asked.push(name);
+      return LIMIT;
+    };
+    tailLimitVerdict([], quietArm(), { limit, aaCap: 1.3, expected: ["lost"] });
+    expect(asked).toEqual(["lost"]);
+  });
+});
+
+describe("the gate of a tail limit verdict", () => {
+  it("gateOf reads the cases: pass, block and no read", () => {
+    const options = { limit: LIMIT, aaCap: 1.3 };
+    const ok = caseOf("kept", [1, 1, 1, 1, 1, 1, 1]);
+    expect(gateOf(tailLimitVerdict(ok, quietArm(), options).cases).outcome).toBe("pass");
+    expect(gateOf(tailLimitVerdict(caseOf("slow", [2, 2, 2, 2, 2, 2, 2]), quietArm(), options).cases).outcome).toBe("block");
+    expect(gateOf(tailLimitVerdict(ok, quietArm(1.5), options).cases).outcome).toBe("no read");
+    expect(gateOf(tailLimitVerdict(ok, quietArm(), { ...options, expected: ["lost"] }).cases).noRead).toEqual(["lost"]);
   });
 });
 

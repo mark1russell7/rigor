@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 113 names
+## . (build/index.d.ts): 124 names
 
 type Arm: build/paired.d.ts#Arm
 BUDGET_LOOKS: build/index.d.ts#BUDGET_LOOKS
@@ -22,6 +22,7 @@ type BudgetResult: build/index.d.ts#BudgetResult
 type BudgetRound: build/index.d.ts#BudgetRound
 type BudgetVerdict: build/index.d.ts#BudgetVerdict
 type CaseBudget: build/index.d.ts#CaseBudget
+type CaseGate: build/index.d.ts#CaseGate
 type CaseInterval: build/index.d.ts#CaseInterval
 type CaseLimit: build/index.d.ts#CaseLimit
 type CaseRatio: build/paired.d.ts#CaseRatio
@@ -33,6 +34,11 @@ type ControlOptions: build/index.d.ts#ControlOptions
 type ControlRead: build/index.d.ts#ControlRead
 type ControlRow: build/index.d.ts#ControlRow
 type EntryCount: build/index.d.ts#EntryCount
+GATE_LOOKS: build/index.d.ts#GATE_LOOKS
+type Gate: build/index.d.ts#Gate
+type GateCaseOutcome: build/index.d.ts#GateCaseOutcome
+type GateJobRead: build/index.d.ts#GateJobRead
+type GateOutcome: build/index.d.ts#GateOutcome
 type GroupCounts: build/index.d.ts#GroupCounts
 type GroupFactor: build/index.d.ts#GroupFactor
 type GuardRead: build/index.d.ts#GuardRead
@@ -59,6 +65,9 @@ type MedianBudget: build/index.d.ts#MedianBudget
 type NoControl: build/index.d.ts#NoControl
 type NoFactor: build/index.d.ts#NoFactor
 type NoiseCheck: build/index.d.ts#NoiseCheck
+type NotSlowerOptions: build/index.d.ts#NotSlowerOptions
+type NotSlowerRead: build/index.d.ts#NotSlowerRead
+type NotSlowerVerdict: build/index.d.ts#NotSlowerVerdict
 type PairedTime: build/paired.d.ts#PairedTime
 type PartnerRead: build/index.d.ts#PartnerRead
 type PoolFacts: build/index.d.ts#PoolFacts
@@ -105,8 +114,10 @@ checkMeasures: build/index.d.ts#checkMeasures
 checkPairedTime: build/paired.d.ts#checkPairedTime
 controlFactor: build/index.d.ts#controlFactor
 firstArm: build/paired.d.ts#firstArm
+gateOf: build/index.d.ts#gateOf
 ladderVerdict: build/index.d.ts#ladderVerdict
 limitVerdict: build/index.d.ts#limitVerdict
+notSlowerVerdict: build/index.d.ts#notSlowerVerdict
 poolRecords: build/index.d.ts#poolRecords
 pooledBand: build/index.d.ts#pooledBand
 pooledLimitVerdict: build/index.d.ts#pooledLimitVerdict
@@ -369,6 +380,15 @@ interface CaseBudget {
   readonly reason: string;
 }
 
+### build/index.d.ts#CaseGate
+interface CaseGate extends GateCaseOutcome {
+  readonly read: NotSlowerRead;
+  readonly margin: number;
+  readonly look: number | undefined;
+  readonly jobs: readonly GateJobRead[];
+  readonly reason: string;
+}
+
 ### build/index.d.ts#CaseInterval
 interface CaseInterval extends CaseRatio {
   readonly low: number;
@@ -392,7 +412,7 @@ interface CaseTail {
 
 ### build/index.d.ts#CaseTailLimit
 interface CaseTailLimit extends CaseTail {
-  readonly ratio: number;
+  readonly ratio: number | undefined;
   readonly limit: TailLimit;
   readonly overMedian: boolean;
   readonly overTail: boolean;
@@ -459,6 +479,37 @@ interface EntryCount {
   readonly finished: number;
   readonly censored: number;
 }
+
+### build/index.d.ts#GATE_LOOKS
+export declare const GATE_LOOKS: readonly number[];
+
+### build/index.d.ts#Gate
+interface Gate {
+  readonly outcome: GateOutcome;
+  readonly reason: string;
+  readonly blocks: readonly string[];
+  readonly noRead: readonly string[];
+}
+
+### build/index.d.ts#GateCaseOutcome
+interface GateCaseOutcome {
+  readonly case: string;
+  readonly outcome: LimitOutcome;
+}
+
+### build/index.d.ts#GateJobRead
+interface GateJobRead {
+  readonly job: string;
+  readonly rounds: number;
+  readonly below: number;
+  readonly above: number;
+  readonly notSlower: number;
+  readonly slower: number;
+  readonly centre: number | undefined;
+}
+
+### build/index.d.ts#GateOutcome
+type GateOutcome = "pass" | "block" | "no read";
 
 ### build/index.d.ts#GroupCounts
 interface GroupCounts {
@@ -658,6 +709,26 @@ interface NoiseCheck {
   readonly biased: boolean;
 }
 
+### build/index.d.ts#NotSlowerOptions
+interface NotSlowerOptions {
+  readonly margin: number | ((name: string) => number);
+  readonly level?: number;
+  readonly looks?: readonly number[];
+  readonly jobs?: number;
+}
+
+### build/index.d.ts#NotSlowerRead
+type NotSlowerRead = "not slower" | "slower" | "no read";
+
+### build/index.d.ts#NotSlowerVerdict
+interface NotSlowerVerdict extends Gate {
+  readonly level: number;
+  readonly looks: readonly number[];
+  readonly need: number;
+  readonly cases: readonly CaseGate[];
+  readonly more: readonly BudgetMore[];
+}
+
 ### build/index.d.ts#PartnerRead
 interface PartnerRead {
   readonly partner: string;
@@ -852,6 +923,7 @@ interface TailLimit {
 interface TailLimitOptions extends TailRuleOptions {
   readonly aaCap: number;
   readonly minimum?: number;
+  readonly expected?: readonly string[];
 }
 
 ### build/index.d.ts#TailLimitVerdict
@@ -958,11 +1030,17 @@ export declare function checkMeasures(rows: readonly MeasureRow[], options: Meas
 ### build/index.d.ts#controlFactor
 export declare function controlFactor(rows: readonly ControlRow[], options?: ControlOptions): ControlFactors;
 
+### build/index.d.ts#gateOf
+export declare function gateOf(cases: readonly GateCaseOutcome[]): Gate;
+
 ### build/index.d.ts#ladderVerdict
 export declare function ladderVerdict(ladder: Ladder, records: readonly RungRecord[], options: LadderOptions): LadderVerdict;
 
 ### build/index.d.ts#limitVerdict
 export declare function limitVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[], options: LimitOptions): LimitVerdict;
+
+### build/index.d.ts#notSlowerVerdict
+export declare function notSlowerVerdict(jobs: readonly JobRecords[], options: NotSlowerOptions): NotSlowerVerdict;
 
 ### build/index.d.ts#poolRecords
 export declare function poolRecords(jobs: readonly JobRecords[]): PooledRecords;

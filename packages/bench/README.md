@@ -45,6 +45,8 @@ v.comparison;                                     // the cases that gain and dro
 | `tailLimitVerdict(candidate, aa, options)` | The verdict of the claim "the median and a high value of each case are at most their limits", for a bench with few rounds. |
 | `caseTails(records, rank)` | The value at one rank of the ratios of each case, from the largest. |
 | `tailFalseFails(aa, options)` | The cases of an A/A arm that the rule of `tailLimitVerdict` fails. |
+| `gateOf(cases)` | The gate of a list of case outcomes: `pass`, `block` or `no read`. |
+| `notSlowerVerdict(jobs, options)` | The gate of the claim "not slower by more than the margin", with looks and a family level. |
 | `budgetVerdict(rounds, aa, options)` | The verdict of the claim "the median of each case is at most `limit`", for one build: `within`, `beyond` or `cannot decide`. |
 | `budgetLooksVerdict(rounds, aa, options)` | The budget verdict of a run that adds rounds to the cases with no outcome, up to a stated budget. |
 | `budgetLookSpend(looks)` | The chance of error that a list of looks spends. |
@@ -101,10 +103,37 @@ The rule of the verdict:
 - A case is also `beyond` when its tail is over `limit.tail` and over the largest tail of the A/A arm of the run.
 - Each case is `cannot decide` when the largest tail of the A/A arm is over `aaCap`. A loud run has no power, and this is not a pass. The caller takes another read.
 - The option `aaCap` has no default, because a run with no cap passes each row when it is loud.
+- The option `expected` names the cases that the run must have. A case of that list with no record reads `cannot decide`. Without this option, a run that loses a case reads the other cases only.
+- `gateOf(v.cases)` gives the gate of the verdict: `pass`, `block` or `no read`.
 
-With the default rank, a real cost in 1 round cannot fail the tail limit. A cost in 2 rounds or more can fail it.
+With the default rank, a real cost in 1 round cannot fail the tail limit. This is by design: of 7 rounds, 1 round passes the tail, because 1 round cannot be told from noise. A cost in 2 rounds or more can fail it.
 
-The verdict has no interval, so a limit needs a margin from the spread of earlier runs. `tailFalseFails` applies the rule to each case of an A/A arm. Each case reads the tail of the other cases. Print its count on the gate, to state what the rule costs on noise.
+The verdict has no interval, so a limit needs a margin from the spread of earlier runs. `tailFalseFails` applies the rule to each case of an A/A arm. Each case reads the tail of the other cases. Print its count on the gate, to state what the rule costs on noise. A limit under 1 states a gain, and an A/A ratio is near 1. So `tailFalseFails` names that case on each run, and this count states no fault of the rule.
+
+## A gate that can fail
+
+A check that blocks a merge needs a result that can fail. `gateOf` reads the case outcomes of a verdict, and `notSlowerVerdict` gives the claim of a speed gate.
+
+```ts
+const gate = notSlowerVerdict(jobs, { margin: Math.log(1.015) });
+
+gate.outcome;                                     // "pass", "block" or "no read"
+gate.cases;                                       // "not slower", "slower" or "no read" for each case, with the facts of each job
+gate.more;                                        // the next look of each case with no outcome
+```
+
+- The claim is "not slower by more than the margin". A one-sided bound answers it, thus a case can read `not slower` when its interval holds 1. The word `same` of `timeVerdict` asks for more.
+- The outcome of each case uses the words of `LimitOutcome`: `within` is `not slower`, `beyond` is `slower`, and `cannot decide` is `no read`. Thus `gateOf` also reads `limitVerdict` and `budgetVerdict`.
+- A case needs its bound in each of `jobs` jobs, by default 2. More rounds do not remove a difference between jobs.
+- The claim "the bound holds in at least `r` of `J` jobs" is a partial conjunction. Its p is `(J - r + 1)` times the `r`-th smallest p of the jobs (Benjamini and Heller, 2008). With 2 jobs of 2, this p is the larger p.
+- The sign test compares the median difference with the margin in each job. It uses no random numbers.
+- A pair holds two records with the same first arm. A runner can give the two arms opposite orders in one round, and a difference of two orders holds the effect of the order.
+- The `level` is for the family. `holm` corrects each look over all cases. Each look has an equal share of the level.
+- The first look with an outcome decides a case. `GATE_LOOKS` is 12, 24 and 48 rounds.
+- Take 16 cases and the default looks. The first test of a family at 12 rounds needs 12 of 12 pairs below the margin in both jobs. Thus a noisy case needs more rounds, or it stays `no read`.
+- `no read` is not a pass. A caller adds the rounds of `more`, then more jobs. A job that it adds after the last look is one more look, and the level does not count it.
+
+The level needs independent rounds. Rounds with a shared cause, for example a slow computer for one job, do not have it.
 
 ## A claim with a budget
 

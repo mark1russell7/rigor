@@ -39,12 +39,17 @@ export interface TailLimitOptions extends TailRuleOptions {
   readonly aaCap: number;
   /** The smallest number of A/A cases with a tail. The default is 5. */
   readonly minimum?: number;
+  /**
+   * The names of the cases that the run must have. A case of this list with no record reads `cannot decide`. Without this
+   * option, the verdict reads only the cases of the candidate, so a run that loses a case can read `within`.
+   */
+  readonly expected?: readonly string[];
 }
 
 /** The verdict of one case. */
 export interface CaseTailLimit extends CaseTail {
-  /** The median ratio of the case: the value `ratio` of `caseRatios`. */
-  readonly ratio: number;
+  /** The median ratio of the case: the value `ratio` of `caseRatios`. The value is undefined when the case has no record. */
+  readonly ratio: number | undefined;
   readonly limit: TailLimit;
   /** The median is over its limit. */
   readonly overMedian: boolean;
@@ -110,6 +115,7 @@ function largestTail(tails: readonly CaseTail[]): number | undefined {
  * - A case is `beyond` when its median is over its limit. It is also `beyond` when its tail is over its limit and over the
  *   largest tail of the A/A arm of the run.
  * - A case with too few rounds for the rank is `cannot decide`, unless its median is over its limit.
+ * - A case of `expected` with no record is `cannot decide`.
  * - The verdict is `beyond` when a case is `beyond`, and `within` when each case is `within`.
  * - Each case and the verdict are `cannot decide` when the largest tail of the A/A arm is over `aaCap`. The same applies
  *   when the A/A arm has fewer than `minimum` cases with a tail. This is not a pass, so the caller takes another read.
@@ -129,7 +135,7 @@ export function tailLimitVerdict(candidate: readonly PairedTime[], aa: readonly 
   const aaTail = aaTails.length < minimum ? undefined : largestTail(aaTails);
   const tails = new Map(caseTails(candidate, rank).map((c) => [c.case, c]));
   const facts = { aaTail, aaCap, rank };
-  const cases = caseRatios(candidate).map((c): CaseTailLimit => {
+  const present = caseRatios(candidate).map((c): CaseTailLimit => {
     const { tail } = tails.get(c.case) ?? { tail: undefined };
     const limit = limitOf(options, c.case);
     if (aaTail === undefined || aaTail > aaCap) return { case: c.case, tail, rounds: c.rounds, ratio: c.ratio, limit, overMedian: false, overTail: false, outcome: "cannot decide" };
@@ -138,11 +144,17 @@ export function tailLimitVerdict(candidate: readonly PairedTime[], aa: readonly 
     const outcome: LimitOutcome = overMedian || overTail ? "beyond" : tail === undefined ? "cannot decide" : "within";
     return { case: c.case, tail, rounds: c.rounds, ratio: c.ratio, limit, overMedian, overTail, outcome };
   });
+  const found = new Set(present.map((c) => c.case));
+  const missing = [...new Set(options.expected ?? [])]
+    .filter((name) => !found.has(name))
+    .map((name): CaseTailLimit => ({ case: name, tail: undefined, rounds: 0, ratio: undefined, limit: limitOf(options, name), overMedian: false, overTail: false, outcome: "cannot decide" }));
+  const cases = [...present, ...missing];
   if (aaTail === undefined) return { ...facts, outcome: "cannot decide", cases, reason: `The A/A arm has ${aaTails.length} cases with a tail, and the verdict needs ${minimum} or more.` };
   if (aaTail > aaCap) return { ...facts, outcome: "cannot decide", cases, reason: `The largest tail ${round(aaTail)} of the A/A arm is over the cap ${aaCap}, so this run has no power.` };
   if (cases.length === 0) return { ...facts, outcome: "cannot decide", cases, reason: "The candidate has no cases." };
   const beyond = cases.filter((c) => c.outcome === "beyond");
   if (beyond.length > 0) return { ...facts, outcome: "beyond", cases, reason: `${beyond.length} of ${cases.length} cases are over a limit. The first is ${JSON.stringify(beyond[0]!.case)}.` };
+  if (missing.length > 0) return { ...facts, outcome: "cannot decide", cases, reason: `${missing.length} of ${cases.length} cases have no record. The first is ${JSON.stringify(missing[0]!.case)}.` };
   const open = cases.filter((c) => c.outcome === "cannot decide");
   if (open.length > 0) return { ...facts, outcome: "cannot decide", cases, reason: `${open.length} of ${cases.length} cases have too few rounds for the rank ${rank}. The first is ${JSON.stringify(open[0]!.case)}.` };
   return { ...facts, outcome: "within", cases, reason: `Each of the ${cases.length} cases is at most its limits, or its tail is at most the tail ${round(aaTail)} of the A/A arm.` };

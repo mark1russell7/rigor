@@ -108,6 +108,20 @@ export function holm(pValues: readonly number[], level = 0.05): Corrected[] {
   return pValues.map((p, i) => ({ p, adjusted: adjusted[i] as number, reject: (adjusted[i] as number) < level }));
 }
 
+/**
+ * The p of the claim "at least `need` of these tests have a real effect" (Benjamini and Heller, 2008). The value is
+ * `(m - need + 1)` times the `need`-th smallest p, at most 1. It has no condition on how the tests depend on each other.
+ * With 2 tests and `need` 2, the value is the larger p.
+ */
+export function partialConjunction(pValues: readonly number[], need: number): number {
+  for (const p of pValues) if (!(p >= 0 && p <= 1)) throw new RangeError(`partialConjunction: each p is from 0 to 1, not ${p}.`);
+  whole("partialConjunction", need);
+  const m = pValues.length;
+  if (need < 1 || need > m) throw new RangeError(`partialConjunction: need is from 1 to the count of tests ${m}, not ${need}.`);
+  const sorted = [...pValues].sort((a, b) => a - b);
+  return Math.min(1, (m - need + 1) * (sorted[need - 1] as number));
+}
+
 export interface PermutationOptions {
   /** The number of random sign flips. The default is 10 000. */
   readonly runs?: number;
