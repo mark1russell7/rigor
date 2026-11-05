@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 144 names
+## . (build/index.d.ts): 149 names
 
 type Arm: build/paired.d.ts#Arm
 type ArmModels: build/index.d.ts#ArmModels
@@ -48,6 +48,10 @@ type GuardRead: build/index.d.ts#GuardRead
 type JobLimitVerdict: build/index.d.ts#JobLimitVerdict
 type JobRecords: build/index.d.ts#JobRecords
 type JobVerdict: build/index.d.ts#JobVerdict
+type JointClaim: build/index.d.ts#JointClaim
+type JointControl: build/index.d.ts#JointControl
+type JointMeasure: build/index.d.ts#JointMeasure
+type JointVerdict: build/index.d.ts#JointVerdict
 LADDER_FORMAT: build/index.d.ts#LADDER_FORMAT
 type Ladder: build/index.d.ts#Ladder
 type LadderDimension: build/index.d.ts#LadderDimension
@@ -131,6 +135,7 @@ checkPairedTime: build/paired.d.ts#checkPairedTime
 controlFactor: build/index.d.ts#controlFactor
 firstArm: build/paired.d.ts#firstArm
 gateOf: build/index.d.ts#gateOf
+jointClaim: build/index.d.ts#jointClaim
 ladderVerdict: build/index.d.ts#ladderVerdict
 limitOnModel: build/index.d.ts#limitOnModel
 limitVerdict: build/index.d.ts#limitVerdict
@@ -649,6 +654,39 @@ interface JobVerdict {
   readonly job: string;
   readonly verdict: TimeVerdict;
 }
+
+### build/index.d.ts#JointClaim
+interface JointClaim {
+  readonly entry: string;
+  readonly stratum: string | undefined;
+  readonly verdict: JointVerdict;
+  readonly dominatedBy: readonly string[];
+  readonly equalledBy: readonly string[];
+  readonly notAhead: readonly string[];
+  readonly controls: readonly JointControl[];
+  readonly measures: readonly JointMeasure[];
+}
+
+### build/index.d.ts#JointControl
+interface JointControl {
+  readonly control: string;
+  readonly beaten: readonly string[];
+  readonly lostTo: readonly string[];
+  readonly unread: readonly string[];
+  readonly dominates: boolean;
+}
+
+### build/index.d.ts#JointMeasure
+interface JointMeasure {
+  readonly measure: string;
+  readonly beats: readonly string[];
+  readonly clears: readonly string[];
+  readonly tied: readonly string[];
+  readonly unread: readonly string[];
+}
+
+### build/index.d.ts#JointVerdict
+type JointVerdict = "survives" | "dominated" | "not-ahead" | "no-read";
 
 ### build/index.d.ts#LADDER_FORMAT
 export declare const LADDER_FORMAT = "rigor-ladder/1";
@@ -1217,6 +1255,9 @@ export declare function controlFactor(rows: readonly ControlRow[], options?: Con
 
 ### build/index.d.ts#gateOf
 export declare function gateOf(cases: readonly GateCaseOutcome[]): Gate;
+
+### build/index.d.ts#jointClaim
+export declare function jointClaim(check: MeasureChecks, measures: readonly string[], entry: string, stratum?: string): JointClaim;
 
 ### build/index.d.ts#ladderVerdict
 export declare function ladderVerdict(ladder: Ladder, records: readonly RungRecord[], options: LadderOptions): LadderVerdict;
