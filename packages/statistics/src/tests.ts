@@ -3,7 +3,7 @@
  * the Holm correction for several tests.
  */
 import { random } from "@mark1russell7/rigor-generators";
-import { mean } from "./describe.ts";
+import { mean, median } from "./describe.ts";
 
 function whole(name: string, value: number): void {
   if (!Number.isSafeInteger(value) || value < 0) throw new RangeError(`${name}: ${value} is not a whole number of 0 or more.`);
@@ -159,4 +159,82 @@ export function pairedPermutation(candidate: readonly number[], baseline: readon
     if (Math.abs(statistic(flipped)) >= Math.abs(observed) * (1 - 1e-12)) extreme++;
   }
   return { observed, p: (1 + extreme) / (1 + runs), runs };
+}
+
+/** The options of `twoSamplePermutation`. */
+export interface TwoSamplePermutationOptions {
+  /** The largest number of splits that the test reads. The default is 10 000. */
+  readonly runs?: number;
+  /** The default is 1. */
+  readonly seed?: number | string;
+  /** The statistic of the two groups. The default is the median of `a` minus the median of `b`. */
+  readonly statistic?: (a: readonly number[], b: readonly number[]) => number;
+}
+
+/** The result of `twoSamplePermutation`. */
+export interface TwoSamplePermutationResult extends PermutationResult {
+  /** This field is true when the test read each split, so the p has no noise from the draws. */
+  readonly exact: boolean;
+}
+
+/** This function gives the count of the ways to choose `k` of `n`, or Infinity when the count is over `limit`. */
+function choices(n: number, k: number, limit: number): number {
+  const small = Math.min(k, n - k);
+  let count = 1;
+  for (let i = 1; i <= small; i++) {
+    // The product of i consecutive whole numbers divides by i!, so each step gives a whole number.
+    count = (count * (n - small + i)) / i;
+    if (count > limit) return Number.POSITIVE_INFINITY;
+  }
+  return count;
+}
+
+/** This function counts the splits of `pool` into a first group of `size` values that pass the test `extreme`, over each split. */
+function countEachSplit(pool: readonly number[], size: number, extreme: (a: readonly number[], b: readonly number[]) => boolean): number {
+  const chosen = Array.from({ length: size }, (_, i) => i);
+  let count = 0;
+  for (;;) {
+    const a: number[] = [];
+    const b: number[] = [];
+    for (const [i, value] of pool.entries()) (chosen[a.length] === i ? a : b).push(value);
+    if (extreme(a, b)) count++;
+    let place = size - 1;
+    while (place >= 0 && chosen[place] === pool.length - size + place) place--;
+    if (place < 0) return count;
+    let index = (chosen[place] as number) + 1;
+    for (let j = place; j < size; j++) chosen[j] = index++;
+  }
+}
+
+/**
+ * The two-sample permutation test (a split of the pooled values). It needs no normal distribution and no pairs, so it
+ * compares groups of different sizes. The p holds only if the values of the two groups can change places under the null.
+ *
+ * When the count of the splits is `runs` or less, the test reads each split, and the p is exact. Otherwise it draws `runs`
+ * random splits. A drawn p has noise: a level of 0.001 is 10 counts at 10 000 runs. So give enough runs for a small level.
+ */
+export function twoSamplePermutation(a: readonly number[], b: readonly number[], options: TwoSamplePermutationOptions = {}): TwoSamplePermutationResult {
+  if (a.length === 0 || b.length === 0) throw new RangeError(`twoSamplePermutation: the groups have ${a.length} and ${b.length} values, and each group needs one or more.`);
+  const statistic = options.statistic ?? ((x: readonly number[], y: readonly number[]): number => median(x) - median(y));
+  const runs = options.runs ?? 10_000;
+  if (!Number.isSafeInteger(runs) || runs < 1) throw new RangeError(`twoSamplePermutation: runs is a whole number of 1 or more, not ${runs}.`);
+  const observed = statistic(a, b);
+  const pool = [...a, ...b];
+  // The same tolerance as `pairedPermutation`: a split with the same statistic up to rounding counts as extreme.
+  const isExtreme = (x: readonly number[], y: readonly number[]): boolean => Math.abs(statistic(x, y)) >= Math.abs(observed) * (1 - 1e-12);
+  const splits = choices(pool.length, a.length, runs);
+  if (Number.isFinite(splits)) return { observed, p: countEachSplit(pool, a.length, isExtreme) / splits, runs: splits, exact: true };
+  const r = random(options.seed ?? 1);
+  let extreme = 0;
+  for (let run = 0; run < runs; run++) {
+    // The first a.length places of a partial Fisher-Yates shuffle are a uniform choice of the first group.
+    for (let i = 0; i < a.length; i++) {
+      const j = i + Math.floor(r.next() * (pool.length - i));
+      const held = pool[i] as number;
+      pool[i] = pool[j] as number;
+      pool[j] = held;
+    }
+    if (isExtreme(pool.slice(0, a.length), pool.slice(a.length))) extreme++;
+  }
+  return { observed, p: (1 + extreme) / (1 + runs), runs, exact: false };
 }
