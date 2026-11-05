@@ -71,6 +71,7 @@ export {
   Z95,
   holm,
   pairedPermutation,
+  partialConjunction,
   signTest,
   signTestPower,
   wilson,

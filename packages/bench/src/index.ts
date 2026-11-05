@@ -13,6 +13,19 @@ export {
   budgetLooksVerdict,
   budgetVerdict,
 } from "./budget.ts";
+export {
+  type CaseGate,
+  GATE_LOOKS,
+  type Gate,
+  type GateCaseOutcome,
+  type GateJobRead,
+  type GateOutcome,
+  type NotSlowerOptions,
+  type NotSlowerRead,
+  type NotSlowerVerdict,
+  gateOf,
+  notSlowerVerdict,
+} from "./gate.ts";
 export { type ControlFactors, type ControlOptions, type ControlRow, type GroupCounts, type GroupFactor, type MeasuredFactor, type NoFactor, controlFactor } from "./control.ts";
 export {
   type BudgetResult,
