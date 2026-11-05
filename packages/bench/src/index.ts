@@ -48,6 +48,7 @@ export {
   rungVerdict,
 } from "./ladder.ts";
 export { type CaseInterval, type CaseLimit, type LimitOptions, type LimitOutcome, type LimitVerdict, caseIntervals, limitVerdict } from "./limit.ts";
+export { type CaseTail, type CaseTailLimit, type TailLimit, type TailLimitOptions, type TailFalseFails, type TailGainCase, type TailLimitVerdict, type TailRuleOptions, caseTails, tailFalseFails, tailLimitVerdict } from "./tail.ts";
 export {
   type Balanced,
   type JobLimitVerdict,
