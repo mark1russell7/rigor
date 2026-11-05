@@ -2,6 +2,7 @@ export { type QuantileMethod, type Summary, mean, median, quantile, quantileSort
 export {
   type BootstrapOptions,
   type Interval,
+  type SideP,
   bootstrap,
   bootstrapClusters,
   bootstrapLeastSquares,

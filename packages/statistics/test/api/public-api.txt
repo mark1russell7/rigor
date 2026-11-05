@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 125 names
+## . (build/index.d.ts): 126 names
 
 type BootstrapOptions: build/index.d.ts#BootstrapOptions
 type CalibrationLevel: build/index.d.ts#CalibrationLevel
@@ -75,6 +75,7 @@ type RidgeOptions: build/index.d.ts#RidgeOptions
 type RidgeRankInput: build/index.d.ts#RidgeRankInput
 type RidgeResponseModel: build/index.d.ts#RidgeResponseModel
 type RidgeTerm: build/index.d.ts#RidgeTerm
+type SideP: build/index.d.ts#SideP
 type SmoothLaw: build/index.d.ts#SmoothLaw
 type SmoothLawScore: build/index.d.ts#SmoothLawScore
 type Summary: build/index.d.ts#Summary
@@ -141,6 +142,7 @@ interface BootstrapOptions {
   readonly seed?: number | string;
   readonly method?: QuantileMethod;
   readonly ends?: readonly [number, number];
+  readonly against?: number;
 }
 
 ### build/index.d.ts#CalibrationLevel
@@ -217,7 +219,7 @@ interface Forecast {
 }
 
 ### build/index.d.ts#Interval
-interface Interval {
+interface Interval extends Partial<SideP> {
   readonly estimate: number;
   readonly low: number;
   readonly high: number;
@@ -621,6 +623,13 @@ interface RidgeResponseModel extends ResponseModelBase {
 interface RidgeTerm {
   readonly factors: readonly ResponseFactor[];
   readonly weight: number;
+}
+
+### build/index.d.ts#SideP
+interface SideP {
+  readonly against: number;
+  readonly pAbove: number;
+  readonly pBelow: number;
 }
 
 ### build/index.d.ts#SmoothLaw
