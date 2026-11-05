@@ -444,7 +444,7 @@ A workspace package is not an engine: `lockClosure` refuses it, because its code
 
 - A rename of an identifier moves the stamp, and so does the rename of an entry file. This gives a false rerun, not a false keep.
 - A top-level statement with an effect stays in the bundle when its module has no `"sideEffects": false`. A change of that statement moves the stamp, also when no result depends on it.
-- A new version of the bundler that gives an equal bundle keeps the stamp and the records. A new version that gives another bundle moves `code`, so it keeps no record, also when no result can change. This gives a false rerun, not a false keep. The field `bundler` of `parts` tells the cause. So a caller merges an update of the bundler when its next full run starts.
+- A new version of the bundler that gives an equal bundle keeps the stamp and the records. A new version that gives another bundle moves `code`, so it keeps no record, also when no result can change. This gives a false rerun, not a false keep. The field `bundler` of `parts` tells the cause. A caller with long runs holds automatic updates of the bundler in its own update settings. It merges an update when its next full run starts. The read of 2026-11-05 stamped 2 real entries (17 inputs) with 8 versions of the bundler, 0.27.2 to 0.28.2. Each of the 7 steps gave an equal bundle, so 0 of 7 steps gave a false rerun. The true rate is at most approximately 35 % at 95 %, and this read is of one tree only.
 
 ## Run cases with a time budget
 

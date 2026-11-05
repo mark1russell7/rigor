@@ -130,7 +130,7 @@ export function stampOsFindings(a: StampOsRead, b: StampOsRead): readonly string
     else found.push(...rowFindings(name, left, right));
   }
   for (const read of [a, b]) {
-    const plain = read.rows.tree;
+    const plain = read.rows["tree"];
     if (plain === undefined) continue;
     for (const [name, part] of FLIPS) {
       const flipped = read.rows[name];
@@ -144,7 +144,7 @@ export function stampOsFindings(a: StampOsRead, b: StampOsRead): readonly string
 
 /** This function gives a copy of a read with one injected fault: another `code` part in the row `tree`. The compare in CI must read it as a fault. */
 export function withInjectedFault(read: StampOsRead): StampOsRead {
-  const plain = read.rows.tree;
+  const plain = read.rows["tree"];
   if (plain === undefined) throw new Error("The read has no row tree.");
   return { ...read, rows: { ...read.rows, tree: { ...plain, parts: { ...plain.parts, code: "injected" } } } };
 }
