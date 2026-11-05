@@ -565,6 +565,7 @@ interface JointClaim {
   readonly stratum: string | undefined;
   readonly verdict: JointVerdict;
   readonly dominatedBy: readonly string[];
+  readonly equalledBy: readonly string[];
   readonly notAhead: readonly string[];
   readonly controls: readonly JointControl[];
   readonly measures: readonly JointMeasure[];
@@ -583,6 +584,7 @@ interface JointControl {
 interface JointMeasure {
   readonly measure: string;
   readonly beats: readonly string[];
+  readonly clears: readonly string[];
   readonly tied: readonly string[];
   readonly unread: readonly string[];
 }

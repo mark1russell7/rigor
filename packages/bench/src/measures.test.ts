@@ -561,6 +561,7 @@ describe("jointClaim", () => {
     const claim = jointClaim(check, SET, "real");
     expect(claim.verdict).toBe("no-read");
     expect(claim.controls.every((c) => c.unread.length === 2 && !c.dominates)).toBe(true);
+    expect(claim.measures.map((m) => m.unread)).toEqual([["a-trick", "b-trick"], ["a-trick", "b-trick"]]);
   });
 
   it("does not call a control dominant while a test against it is unread", () => {
@@ -574,6 +575,64 @@ describe("jointClaim", () => {
     expect(claim.verdict).toBe("no-read");
   });
 
+  describe("the level over the controls of a measure", () => {
+    /** The entry beats `a-trick` on `fill` on `wins` keys, and it ties on `ties` keys. `b-trick` wins `fill`, and the entry beats both on `order`. */
+    const narrow = (wins: number, ties: number): MeasureRow[] => {
+      const count = wins + ties;
+      return [
+        ...rows("fill", "real", count, (i) => 0.5 + i * 1e-4),
+        ...rows("fill", "a-trick", count, (i) => (i < wins ? 0.1 + i * 1e-4 : 0.5 + i * 1e-4)),
+        ...rows("fill", "b-trick", count, (i) => 0.9 + i * 1e-4),
+        ...rows("order", "real", 40, (i) => 50 + i * 1e-3),
+        ...rows("order", "a-trick", 40, (i) => 90 + i * 1e-3),
+        ...rows("order", "b-trick", 40, (i) => 90 + i * 1e-3),
+      ];
+    };
+
+    it("does not let a plain beat clear the level over 2 controls, with the power to clear it", () => {
+      const claim = jointClaim(read(narrow(5, 1)), SET, "real");
+      const fill = claim.measures[0]!;
+      expect(fill.beats).toEqual(["a-trick"]);
+      expect(fill.clears).toEqual([]);
+      expect(claim.notAhead).toEqual(["fill"]);
+      expect(claim.verdict).toBe("not-ahead");
+    });
+
+    it("reads no-read when the keys are too few for the level over 2 controls", () => {
+      const claim = jointClaim(read(narrow(5, 0)), SET, "real");
+      expect(claim.measures[0]!.beats).toEqual(["a-trick"]);
+      expect(claim.measures[0]!.clears).toEqual([]);
+      expect(claim.verdict).toBe("no-read");
+    });
+
+    it("lets a beat clear when it passes that level", () => {
+      const claim = jointClaim(read(narrow(6, 0)), SET, "real");
+      expect(claim.measures[0]!.clears).toEqual(["a-trick"]);
+      expect(claim.verdict).toBe("survives");
+    });
+
+    it("leaves a plain beat in the lists of the control, so that it does not dominate", () => {
+      const trick = jointClaim(read(narrow(5, 1)), SET, "real").controls.find((c) => c.control === "a-trick")!;
+      expect(trick.beaten).toEqual(["fill", "order"]);
+      expect(trick.dominates).toBe(false);
+    });
+  });
+
+  it("names a control that ties the entry on each measure, and keeps the verdict", () => {
+    const level = (name: string): MeasureRow[] => group(name, 0.5, 50);
+    const data = [...level("real"), ...level("a-trick"), ...group("b-trick", 0.1, 90)];
+    const claim = jointClaim(read(data), SET, "real");
+    expect(claim.equalledBy).toEqual(["a-trick"]);
+    expect(claim.verdict).toBe("survives");
+    expect(claim.measures.map((m) => m.tied)).toEqual([["a-trick"], ["a-trick"]]);
+  });
+
+  it("does not name a control as equal while a test against it is unread", () => {
+    const claim = jointClaim(read([...group("real", 0.5, 50, 3), ...group("a-trick", 0.5, 50, 3), ...group("b-trick", 0.1, 90, 3)]), SET, "real");
+    expect(claim.equalledBy).toEqual([]);
+    expect(claim.verdict).toBe("no-read");
+  });
+
   it("reads no-read for a measure with no control, because nothing was read on it", () => {
     const rules: readonly MeasureRule[] = [
       { measure: "fill", sense: "higher", controls: ["a-trick"], partners: ["order"] },
@@ -583,6 +642,8 @@ describe("jointClaim", () => {
     const claim = jointClaim(check, SET, "real");
     expect(claim.verdict).toBe("no-read");
     expect(claim.notAhead).toEqual(["order"]);
+    expect(claim.measures[1]!.beats).toEqual([]);
+    expect(claim.measures[1]!.unread).toEqual(["a-trick"]);
   });
 
   it("gives no credit for the win of another entry", () => {
