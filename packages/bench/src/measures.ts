@@ -133,7 +133,10 @@ export interface SpreadRead {
 /** The result of one control and one partner on one stratum. */
 export interface PartnerRead {
   readonly partner: string;
-  /** `lost`: a real entry beats the control. `not-lost`: no real entry does. `too-few`: no test has the power. `no-rows`: nothing to read. */
+  /**
+   * `lost`: a real entry beats the control at the level divided by the count of partners. Each partner is one more chance to clear the control.
+   * `not-lost`: no real entry does. `too-few`: no test has the power at that level. `no-rows`: nothing to read.
+   */
   readonly status: "lost" | "not-lost" | "too-few" | "no-rows";
 }
 
@@ -173,6 +176,8 @@ export interface MeasureFinding {
   readonly measure: string;
   readonly stratum?: string | undefined;
   readonly control?: string;
+  /** The count of the partners of the rule, for a finding about the partners of a control. */
+  readonly partners?: number;
   /** The finding in plain words, with its numbers. */
   readonly text: string;
   /** The tests behind the finding. */
@@ -181,6 +186,8 @@ export interface MeasureFinding {
 
 /** The result of `checkMeasures`. */
 export interface MeasureChecks {
+  /** The level of each family of tests. */
+  readonly alpha: number;
   readonly measures: readonly MeasureCheck[];
   /** Each read of a control, on its own measures and on their partners. */
   readonly reads: readonly ControlRead[];
@@ -189,13 +196,13 @@ export interface MeasureChecks {
 
 /** What a page says about the win of one entry on one measure. */
 export interface WinClaim {
-  /** This field is true only when a control was read on this measure and no control won. */
+  /** This field is true only when a control was read on this measure and this entry beats each control on it. A win by another entry does not count. */
   readonly alone: boolean;
-  /** The partners that a winning control loses. With no read of a control, all partners of the rule. */
+  /** The partners that a winning control loses. When this entry does not beat a control that does not win, or with no read of a control, all partners of the rule. */
   readonly show: readonly string[];
-  /** This field is true when a control wins and this entry beats it on no partner, so the win reads the same as the trick. */
+  /** This field is true when this entry does not beat a control on this measure and beats it on no partner. The win then reads the same as the trick. The status of the control does not change this. */
   readonly likeControl: boolean;
-  /** The censored keys of this entry and of each control that wins. A page shows them beside the win. */
+  /** The censored keys of this entry and of each control that it does not beat. A page shows them beside the win. */
   readonly censored: { readonly entry: number; readonly controls: readonly { readonly control: string; readonly censored: number }[] };
   /** The reason and the date, for a measure with no control. */
   readonly open: NoControl | undefined;
@@ -356,10 +363,15 @@ function methodsOf(data: StratumRows | undefined): readonly (string | undefined)
   return [...methods];
 }
 
-const partnerStatus = (read: ControlRead | undefined): PartnerRead["status"] => {
+/** This function tells that a test clears a control on one of `partners` partners. One passed partner is enough, so the level divides by their count. */
+const clearsPartner = (c: Comparison, partners: number, alpha: number): boolean => c.beats && c.adjusted * partners <= alpha;
+
+/** This function reads a control on one of `partners` partners. A test with too few shared keys for the divided level has no power, so a miss there is not a read. */
+const partnerStatus = (read: ControlRead | undefined, partners: number, alpha: number): PartnerRead["status"] => {
   if (read === undefined || read.status === "no-rows") return "no-rows";
-  if (read.status === "beaten") return "lost";
-  return read.status === "too-few" ? "too-few" : "not-lost";
+  if (read.comparisons.some((c) => clearsPartner(c, partners, alpha))) return "lost";
+  const needs = pairsNeeded(alpha / ((read.comparisons[0]?.family ?? 1) * partners), 1);
+  return read.comparisons.every((c) => c.shared < needs) ? "too-few" : "not-lost";
 };
 
 /** The inputs of the reads, with the reads that the check already made. */
@@ -403,11 +415,17 @@ function missingFindings(rule: MeasureRule, reading: Reading): MeasureFinding[] 
 function winFindings(rule: MeasureRule, read: ControlRead, guard: GuardRead, counts: readonly EntryCount[], partnerReads: readonly ControlRead[]): MeasureFinding[] {
   const findings: MeasureFinding[] = [];
   const where = stratumText(read.stratum);
-  const noPower = guard.partners.some((p) => p.status === "too-few" || p.status === "no-rows");
-  if (!guard.partners.some((p) => p.status === "lost") && !noPower) {
-    const behind = partnerReads.flatMap((r) => r.comparisons);
-    const list = guard.partners.length === 0 ? "It has no partner." : `It loses none of ${guard.partners.map((p) => p.partner).join(", ")}.`;
-    findings.push({ kind: "uncaught", measure: rule.measure, stratum: read.stratum, control: read.control, text: `The control ${read.control} wins ${rule.measure}${where}. ${list}`, comparisons: [...read.comparisons, ...behind] });
+  const count = guard.partners.length;
+  const thin = guard.partners.filter((p) => p.status === "too-few").map((p) => p.partner);
+  const noRows = guard.partners.some((p) => p.status === "no-rows");
+  const behind = partnerReads.flatMap((r) => r.comparisons);
+  if (!guard.partners.some((p) => p.status === "lost")) {
+    if (thin.length > 0) {
+      findings.push({ kind: "too-few", measure: rule.measure, stratum: read.stratum, control: read.control, partners: count, text: `The control ${read.control} wins ${rule.measure}${where} and loses no partner. Of its ${count} partners, ${thin.join(", ")} have too few keys for a read.`, comparisons: behind });
+    } else if (!noRows) {
+      const list = count === 0 ? "It has no partner." : `It loses none of its ${count} partners, ${guard.partners.map((p) => p.partner).join(", ")}.`;
+      findings.push({ kind: "uncaught", measure: rule.measure, stratum: read.stratum, control: read.control, partners: count, text: `The control ${read.control} wins ${rule.measure}${where}. ${list}`, comparisons: [...read.comparisons, ...behind] });
+    }
   }
   const own = counts.find((c) => c.group === read.control && c.stratum === read.stratum)?.censored ?? 0;
   const fewer = counts.filter((c) => c.group !== read.control && c.stratum === read.stratum && read.comparisons.some((t) => t.better === c.group) && c.censored < own);
@@ -439,7 +457,7 @@ function checkRule(rule: MeasureRule, reading: Reading, asOf: string): { check: 
   for (const control of rule.controls) {
     for (const read of readsOf(reading, rule.measure, control)) {
       const partnerReads = rule.partners.map((partner) => readsOf(reading, partner, control).find((r) => r.stratum === read.stratum));
-      const partners = rule.partners.map((partner, i) => ({ partner, status: partnerStatus(partnerReads[i]) }));
+      const partners = rule.partners.map((partner, i) => ({ partner, status: partnerStatus(partnerReads[i], rule.partners.length, reading.alpha) }));
       const guard = { control, stratum: read.stratum, status: read.status, partners };
       guards.push(guard);
       reads.push(read, ...partnerReads.filter((r) => r !== undefined));
@@ -494,6 +512,7 @@ function checkRule(rule: MeasureRule, reading: Reading, asOf: string): { check: 
  * - One Holm family holds the tests of the spread of one measure over all pairs of real entries and all strata.
  * - A test with fewer untied keys than `signTestPower` needs for that family reads `tooFew` and beats nothing.
  * - A test with enough shared keys and too few untied keys is `tied`. The two entries read as equal, so a constant measure is `no-spread` and not `too-few`.
+ * - A control loses a partner only at the level divided by the count of its partners. One passed partner clears `uncaught`, so each partner is one more chance.
  *
  * The function throws a `RangeError` for a value that is not finite, a repeat of measure, group and key, or a key in two strata.
  * It also throws one for rules that contradict each other.
@@ -522,12 +541,12 @@ export function checkMeasures(rows: readonly MeasureRow[], options: MeasureCheck
     findings.push(...result.findings);
     for (const read of result.reads) reads.set(JSON.stringify([read.measure, read.control, read.stratum ?? null]), read);
   }
-  return { measures, reads: [...reads.values()], findings };
+  return { alpha, measures, reads: [...reads.values()], findings };
 }
 
 /**
  * This function tells what a page says about the win of one real entry on one measure.
- * The claim is about this entry: only this entry beating the control on a partner clears the entry. A win by another entry clears nothing.
+ * The claim is about this entry: only this entry beating the control, on this measure or on a partner, clears the entry. A win by another entry clears nothing.
  * With a stratum, the function reads that stratum. Without one, it reads the rows with no stratum.
  * The function throws a `RangeError` for a measure with no read and for an entry that the rows do not hold.
  */
@@ -539,19 +558,18 @@ export function winClaim(check: MeasureChecks, measure: string, entry: string, s
   const guards = read.guards.filter((g) => g.stratum === stratum);
   const winning = guards.filter((g) => g.status === "wins");
   const lostByControl = (guard: GuardRead): readonly string[] => guard.partners.filter((p) => p.status === "lost").map((p) => p.partner);
-  const entryBeats = (guard: GuardRead): boolean =>
-    guard.partners.some((p) => {
-      const partnerRead = check.reads.find((r) => r.measure === p.partner && r.control === guard.control && r.stratum === stratum);
-      return partnerRead?.comparisons.some((c) => c.better === entry && c.beats) === true;
-    });
+  const testsOf = (of: string, control: string): readonly Comparison[] => check.reads.find((r) => r.measure === of && r.control === control && r.stratum === stratum)?.comparisons ?? [];
+  const notBeaten = guards.filter((g) => !testsOf(measure, g.control).some((c) => c.better === entry && c.beats));
+  const clearsOnPartner = (guard: GuardRead): boolean => guard.partners.some((p) => testsOf(p.partner, guard.control).some((c) => c.better === entry && clearsPartner(c, guard.partners.length, check.alpha)));
   const countOf = (control: string): number => read.entries.find((c) => c.group === control && c.stratum === stratum)?.censored ?? 0;
-  const alone = guards.length > 0 && guards.every((g) => g.status === "beaten");
-  const show = winning.length > 0 ? [...new Set(winning.flatMap(lostByControl))] : alone ? [] : read.partners;
+  const alone = guards.length > 0 && notBeaten.length === 0;
+  const onlyWinners = notBeaten.length > 0 && notBeaten.every((g) => g.status === "wins");
+  const show = onlyWinners ? [...new Set(winning.flatMap(lostByControl))] : alone ? [] : read.partners;
   return {
     alone,
     show,
-    likeControl: winning.some((guard) => !entryBeats(guard)),
-    censored: { entry: count.censored, controls: winning.map((g) => ({ control: g.control, censored: countOf(g.control) })) },
+    likeControl: notBeaten.some((guard) => !clearsOnPartner(guard)),
+    censored: { entry: count.censored, controls: notBeaten.map((g) => ({ control: g.control, censored: countOf(g.control) })) },
     open: read.open,
   };
 }

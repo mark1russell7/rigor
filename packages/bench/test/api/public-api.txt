@@ -551,6 +551,7 @@ interface MeasureCheckOptions {
 
 ### build/index.d.ts#MeasureChecks
 interface MeasureChecks {
+  readonly alpha: number;
   readonly measures: readonly MeasureCheck[];
   readonly reads: readonly ControlRead[];
   readonly findings: readonly MeasureFinding[];
@@ -562,6 +563,7 @@ interface MeasureFinding {
   readonly measure: string;
   readonly stratum?: string | undefined;
   readonly control?: string;
+  readonly partners?: number;
   readonly text: string;
   readonly comparisons: readonly Comparison[];
 }

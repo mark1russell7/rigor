@@ -229,10 +229,21 @@ Each row has a `measure`, a `group`, a `key` and a `value`. The optional fields 
 
 - **Beats:** the Holm-corrected sign test passes. With a `resolution`, the median paired difference is also over it. Without one, the output says `test only`.
 - **A control wins** when no real entry beats it. A tie counts for the control.
-- **A control loses a partner** when one real entry beats it on that partner.
+- **A control loses a partner** when one real entry beats it on that partner, at the level divided by the count of partners. One passed partner clears `uncaught`, so each partner is one more chance.
 - **Families:** one Holm family holds one control on one measure, over all real entries and all strata. One family holds the spread of one measure.
 - **Too few:** the need comes from `signTestPower` at the level of that family, over the untied keys. So 31 real entries need 10 untied keys at the level 0.05. A test under the need beats nothing. A pair with enough keys that ties reads as equal.
 - **Strata:** the keys of one stratum come from one family of inputs, so they are not independent draws. A result is about these keys.
+
+Strata make a family larger, so each stratum needs more keys:
+
+| The family | Tests | Sides | Untied keys for each test |
+| --- | --- | --- | --- |
+| 31 entries, no strata | 31 | 1 | 10 |
+| 14 entries, 15 strata | 210 | 1 | 13 |
+| 30 entries, 20 strata | 600 | 1 | 14 |
+| The spread of 31 entries, 20 strata | 9,300 | 2 | 19 |
+
+So a stratum of 10 keys reads `too-few` by construction. That result is true, and the check keeps it. A caller gets the pooled read when the rows have no `stratum`. A sign test needs independent signs and not equal distributions, so a read can pool the keys of different families. A bench reads pooled for its gate, and by stratum where the keys are sufficient.
 
 Each finding fails a gate, and each one carries its tests with `n`, `ties`, `p` and the Holm result.
 
@@ -242,14 +253,14 @@ Each finding fails a gate, and each one carries its tests with `n`, `ties`, `p` 
 | `weak-control` | No control wins its measure, so the controls attack nothing. |
 | `censored-win` | A control wins with more censored keys than an entry it is read against. |
 | `no-spread` | No pair of real entries separates on the measure. |
-| `too-few` | No read of the controls or of the spread has enough keys. A small stratum alone gives only a row. |
+| `too-few` | No read of the controls or of the spread has enough keys. A control that wins and has a partner with too few keys also gives it. A small stratum alone gives only a row. |
 | `mixed-method` | The rows mix methods, or a method and no method. The check has no read of the measure. |
 | `no-rule` | The rows hold a measure with no rule. |
 | `no-rows` | A rule names a measure or a control with no rows. This does not read as "not beaten". |
 | `no-control` | A rule has no control and no `noControl`. |
 | `control-late` | The date of `noControl` is before `asOf`. |
 
-`winClaim(check, measure, entry, stratum)` gives `alone`, `show`, `likeControl`, `censored` and `open`. The field `likeControl` is about this entry: it is true when a control wins and this entry beats that control on no partner. A win by another entry clears nothing. The field `alone` is true only when each read control lost, so a measure with no control is not `alone`.
+`winClaim(check, measure, entry, stratum)` gives `alone`, `show`, `likeControl`, `censored` and `open`. The fields are about this entry. The field `likeControl` is true when this entry does not beat a control on the measure and beats it on no partner. A win by another entry clears nothing. The field `alone` is true only when this entry itself beats each control on the measure, so a measure with no control is not `alone`.
 
 ## The fresh runner
 

@@ -55,6 +55,15 @@ describe("the power of a test", () => {
     expect(check.findings.find((f) => f.kind === "too-few")!.text).toContain("needs 6 untied pairs");
   });
 
+  it("needs the keys that the table of the README states", () => {
+    const needs = (tests: number, sides: 1 | 2): number => {
+      let n = 1;
+      while (signTestPower(n, 0.05 / tests, sides) === undefined) n += 1;
+      return n;
+    };
+    expect([needs(31, 1), needs(14 * 15, 1), needs(30 * 20, 1), needs(((31 * 30) / 2) * 20, 2)]).toEqual([10, 13, 14, 19]);
+  });
+
   it("counts only the untied keys in the test", () => {
     const data = [...rows("fill", "a", 40, (i) => (i < 30 ? 0.5 : 0.9)), ...rows("fill", "trick", 40, () => 0.5)];
     const read = checkMeasures(data, { rules: [{ ...FILL, partners: [] }], controls: ["trick"], asOf: AS_OF }).reads[0]!.comparisons[0]!;
@@ -112,6 +121,62 @@ describe("the finding uncaught", () => {
     expect(after.measures[1]!.basis).toBe("test and resolution");
     expect(after.measures[0]!.guards[0]!.partners[0]!.status).toBe("not-lost");
     expect(has(after, "uncaught")).toBe(true);
+  });
+});
+
+describe("the partners of a control", () => {
+  const partnerRule = (measure: string): MeasureRule => ({ measure, sense: "lower", controls: [], partners: [], noControl: { because: "The control has no code.", until: "2026-12-01" } });
+  /** One real entry and the control, with 40 keys on fill. On each partner, the entry beats the control on `wins` keys of `n`. */
+  const data = (partners: readonly string[], wins: number, n: number): MeasureRow[] => [
+    ...rows("fill", "a", 40, (i) => 0.5 + i * 1e-4),
+    ...rows("fill", "trick", 40, (i) => 0.9 + i * 1e-4),
+    ...partners.flatMap((partner) => [...rows(partner, "a", n, (i) => (i < wins ? 1 : 9)), ...rows(partner, "trick", n, () => 5)]),
+  ];
+  const check = (partners: readonly string[], wins: number, n: number): MeasureChecks =>
+    checkMeasures(data(partners, wins, n), options([{ ...FILL, partners }, ...partners.map(partnerRule)]));
+  const THREE = ["p", "q", "r"];
+
+  it("sets the example between the level over 3 and the level", () => {
+    const read = check(["p"], 7, 8).reads.find((r) => r.measure === "p")!;
+    expect(read.comparisons[0]!.adjusted).toBeGreaterThan(0.05 / 3);
+    expect(read.comparisons[0]!.adjusted).toBeLessThan(0.05);
+  });
+
+  it("trips uncaught with three partners between the level over 3 and the level, and states the count", () => {
+    const result = check(THREE, 7, 8);
+    expect(result.measures[0]!.guards[0]!.partners.map((p) => p.status)).toEqual(["not-lost", "not-lost", "not-lost"]);
+    const finding = result.findings.find((f) => f.kind === "uncaught")!;
+    expect(finding.partners).toBe(3);
+    expect(finding.text).toContain("its 3 partners");
+  });
+
+  it("does not trip uncaught on the same read with one partner", () => {
+    const result = check(["p"], 7, 8);
+    expect(result.measures[0]!.guards[0]!.partners).toEqual([{ partner: "p", status: "lost" }]);
+    expect(has(result, "uncaught")).toBe(false);
+  });
+
+  it("does not trip uncaught with three partners when a partner passes the divided level", () => {
+    const result = checkMeasures([...data(["q", "r"], 7, 8), ...rows("p", "a", 40, () => 1), ...rows("p", "trick", 40, () => 5)], options([{ ...FILL, partners: THREE }, ...THREE.map(partnerRule)]));
+    expect(result.measures[0]!.guards[0]!.partners.map((p) => p.status)).toEqual(["lost", "not-lost", "not-lost"]);
+    expect(has(result, "uncaught")).toBe(false);
+  });
+
+  it("reads too few keys for the divided level as too-few, and that is a finding", () => {
+    // Five keys pass at the level 0.05, and they have no power at the level over 3.
+    const three = check(THREE, 5, 5);
+    expect(three.measures[0]!.guards[0]!.partners.map((p) => p.status)).toEqual(["too-few", "too-few", "too-few"]);
+    expect(has(three, "uncaught")).toBe(false);
+    expect(three.findings.find((f) => f.kind === "too-few")).toMatchObject({ measure: "fill", control: "trick", partners: 3 });
+    const one = check(["p"], 5, 5);
+    expect(one.measures[0]!.guards[0]!.partners[0]!.status).toBe("lost");
+    expect(has(one, "too-few")).toBe(false);
+  });
+
+  it("does not clear an entry at a level that does not clear the control", () => {
+    const claim = (partners: readonly string[]) => winClaim(check(partners, 7, 8), "fill", "a");
+    expect(claim(THREE).likeControl).toBe(true);
+    expect(claim(["p"]).likeControl).toBe(false);
   });
 });
 
@@ -283,7 +348,31 @@ describe("winClaim", () => {
     const beaten = checkMeasures([...real(), ...rows("fill", "trick", 40, (i) => 0.1 + i * 1e-4), ...rows("order", "trick", 40, (i) => 90 + i * 1e-3)], options());
     expect(winClaim(beaten, "fill", "a")).toMatchObject({ alone: true, show: [], likeControl: false });
     const thin = checkMeasures([...real(3), ...caught(3)], options());
-    expect(winClaim(thin, "fill", "a")).toMatchObject({ alone: false, show: ["order"], likeControl: false });
+    expect(winClaim(thin, "fill", "a")).toMatchObject({ alone: false, show: ["order"], likeControl: true });
+  });
+
+  /** Entry x beats the control on fill and on order. Entry y has the values of the control on `fill`, and z is behind both. */
+  const copy = (y: (i: number) => number): MeasureRow[] => [
+    ...rows("fill", "x", 40, (i) => 0.9 + i * 1e-4),
+    ...rows("fill", "y", 40, y),
+    ...rows("fill", "z", 40, (i) => 0.5 + i * 1e-4),
+    ...rows("fill", "trick", 40, (i) => 0.8 + i * 1e-4),
+    ...rows("order", "x", 40, (i) => 1 + i * 1e-3),
+    ...rows("order", "y", 40, (i) => 50 + i * 1e-3),
+    ...rows("order", "z", 40, (i) => 60 + i * 1e-3),
+    ...rows("order", "trick", 40, (i) => 50 + i * 1e-3),
+  ];
+
+  it("does not call a copy of the trick alone when another entry beats the control", () => {
+    const check = checkMeasures(copy((i) => 0.8 + i * 1e-4), options());
+    expect(check.measures[0]!.guards[0]!.status).toBe("beaten");
+    expect(winClaim(check, "fill", "y")).toMatchObject({ alone: false, show: ["order"], likeControl: true, censored: { entry: 0, controls: [{ control: "trick", censored: 0 }] } });
+    expect(winClaim(check, "fill", "x")).toMatchObject({ alone: true, show: [], likeControl: false });
+  });
+
+  it("calls the same entry alone when it beats the control itself", () => {
+    const check = checkMeasures(copy((i) => 0.85 + i * 1e-4), options());
+    expect(winClaim(check, "fill", "y")).toMatchObject({ alone: true, show: [], likeControl: false, censored: { entry: 0, controls: [] } });
   });
 
   it("does not call a measure with no control alone, and gives its reason", () => {
