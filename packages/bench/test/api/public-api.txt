@@ -414,6 +414,9 @@ interface ControlRead {
   readonly status: "wins" | "beaten" | "too-few" | "no-rows";
   readonly aheadOf: number;
   readonly comparisons: readonly Comparison[];
+  readonly beatsEntries: number;
+  readonly of: number;
+  readonly against: readonly Comparison[];
 }
 
 ### build/index.d.ts#ControlRow

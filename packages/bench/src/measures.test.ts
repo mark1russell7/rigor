@@ -181,19 +181,85 @@ describe("the partners of a control", () => {
 });
 
 describe("the finding weak-control", () => {
-  it("trips when a real entry beats the control of the measure", () => {
+  /** The rule with no partner, so only the reads of the control on fill count. */
+  const ALONE = [{ ...FILL, partners: [] }];
+  const entries = (count: number): MeasureRow[] => Array.from({ length: count }, (_, e) => rows("fill", `e${e}`, 40, (i) => 0.1 * e + i * 1e-4)).flat();
+
+  it("trips when the control loses to each real entry", () => {
     const check = checkMeasures([...real(), ...rows("fill", "trick", 40, (i) => 0.1 + i * 1e-4), ...rows("order", "trick", 40, (i) => 90 + i * 1e-3)], options());
     const finding = check.findings.find((f) => f.kind === "weak-control")!;
-    expect(finding.measure).toBe("fill");
-    expect(finding.comparisons.every((c) => c.beats)).toBe(true);
+    expect(finding).toMatchObject({ measure: "fill", control: "trick" });
+    expect(finding.text).toContain("beats 0 of 3 real entries");
     expect(finding.comparisons.length).toBe(3);
+    expect(finding.comparisons.every((c) => c.better === "trick" && !c.beats)).toBe(true);
+    expect(finding.comparisons[0]).toMatchObject({ n: 40, ties: 0, family: 3 });
   });
 
-  it("does not trip when one of two controls wins", () => {
+  it("does not trip for a control in second place of 10, which still beats most entries", () => {
+    const check = checkMeasures([...entries(10), ...rows("fill", "trick", 40, (i) => 0.85 + i * 1e-4)], options(ALONE));
+    const read = check.reads[0]!;
+    expect(read.status).toBe("beaten");
+    expect(read).toMatchObject({ beatsEntries: 9, of: 10, aheadOf: 9 });
+    expect(has(check, "weak-control")).toBe(false);
+  });
+
+  it("does not trip for a control that beats 1 of 30, and the read shows that count", () => {
+    const check = checkMeasures([...entries(30), ...rows("fill", "trick", 40, (i) => 0.05 + i * 1e-4)], options(ALONE));
+    expect(check.reads[0]!).toMatchObject({ beatsEntries: 1, of: 30 });
+    expect(has(check, "weak-control")).toBe(false);
+  });
+
+  it("trips together with no-spread when the control and the entries all tie", () => {
+    const flat = ["a", "b", "trick"].flatMap((group) => rows("fill", group, 40, () => 0.5));
+    const check = checkMeasures(flat, options(ALONE));
+    expect(check.reads[0]!).toMatchObject({ status: "wins", beatsEntries: 0, of: 2 });
+    expect(has(check, "weak-control")).toBe(true);
+    expect(has(check, "no-spread")).toBe(true);
+  });
+
+  it("gives too-few and not weak-control when no read has power", () => {
+    const check = checkMeasures([...rows("fill", "a", 3, (i) => 0.5 + i), ...rows("fill", "trick", 3, (i) => 0.1 + i)], options(ALONE));
+    expect(check.reads[0]!).toMatchObject({ status: "too-few", beatsEntries: 0, of: 0 });
+    expect(has(check, "too-few")).toBe(true);
+    expect(has(check, "weak-control")).toBe(false);
+  });
+
+  it("keeps the status wins when no test separates, trips with power, and alone stays false", () => {
+    // The signs alternate, so no test passes in either direction on 40 keys.
+    const mixed = [...rows("fill", "a", 40, (i) => (i % 2 === 0 ? 0.4 : 0.6)), ...rows("fill", "trick", 40, () => 0.5)];
+    const check = checkMeasures(mixed, options(ALONE));
+    expect(check.reads[0]!).toMatchObject({ status: "wins", beatsEntries: 0, of: 1 });
+    expect(has(check, "weak-control")).toBe(true);
+    expect(winClaim(check, "fill", "a").alone).toBe(false);
+  });
+
+  it("keeps the status wins with no finding of weak-control when the control beats one entry and another separates from nothing", () => {
+    const data = [...rows("fill", "a", 40, (i) => (i % 2 === 0 ? 0.4 : 0.6)), ...rows("fill", "b", 40, (i) => 0.1 + i * 1e-4), ...rows("fill", "trick", 40, () => 0.5)];
+    const check = checkMeasures(data, options(ALONE));
+    expect(check.reads[0]!).toMatchObject({ status: "wins", beatsEntries: 1, of: 2 });
+    expect(has(check, "weak-control")).toBe(false);
+    expect(winClaim(check, "fill", "a").alone).toBe(false);
+  });
+
+  it("counts all strata, so a stratum with a beaten entry clears the control", () => {
+    const part = (stratum: string, group: string, value: number): MeasureRow[] => keys(40, stratum).map((key, i) => ({ measure: "fill", group, key, stratum, value: value + i * 1e-4 }));
+    const beatsInOne = [...part("s", "a", 0.5), ...part("t", "a", 0.5), ...part("s", "trick", 0.9), ...part("t", "trick", 0.1)];
+    expect(has(checkMeasures(beatsInOne, options(ALONE)), "weak-control")).toBe(false);
+    const beatsInNone = [...part("s", "a", 0.5), ...part("t", "a", 0.5), ...part("s", "trick", 0.2), ...part("t", "trick", 0.1)];
+    expect(has(checkMeasures(beatsInNone, options(ALONE)), "weak-control")).toBe(true);
+  });
+
+  it("reads each control apart, so only the broken one of two controls trips", () => {
     const rule = { ...FILL, controls: ["trick", "broken"] };
     const data = [...real(), ...caught(), ...rows("fill", "broken", 40, (i) => 0.1 + i * 1e-4), ...rows("order", "broken", 40, (i) => 90 + i * 1e-3)];
     const check = checkMeasures(data, { rules: [rule, ORDER], controls: ["trick", "broken"], asOf: AS_OF });
-    expect(has(check, "weak-control")).toBe(false);
+    expect(check.findings.filter((f) => f.kind === "weak-control").map((f) => f.control)).toEqual(["broken"]);
+  });
+
+  it("uses the resolution in the family of the control too", () => {
+    const close = [...rows("fill", "a", 40, (i) => 0.5 + i * 1e-4), ...rows("fill", "trick", 40, (i) => 0.5 + i * 1e-4 + 1e-9)];
+    expect(has(checkMeasures(close, options(ALONE)), "weak-control")).toBe(false);
+    expect(has(checkMeasures(close, options([{ ...FILL, partners: [], resolution: 1e-6 }])), "weak-control")).toBe(true);
   });
 });
 

@@ -107,6 +107,12 @@ export interface ControlRead {
   readonly aheadOf: number;
   /** One test for each real entry: `better` is the real entry, and `other` is the control. */
   readonly comparisons: readonly Comparison[];
+  /** The real entries that the control beats by test on this stratum. */
+  readonly beatsEntries: number;
+  /** The tests of the control against the real entries that have power on this stratum. */
+  readonly of: number;
+  /** One test for each real entry: `better` is the control, and `other` is the real entry. This family is apart from `comparisons`. */
+  readonly against: readonly Comparison[];
 }
 
 /** The counts of one entry on one measure and one stratum. */
@@ -326,10 +332,17 @@ function controlReads(measure: string, control: string, data: StratumRows | unde
   if (data === undefined) return [];
   const tests = [...data].flatMap(([stratum, groups]) => real.flatMap((entry) => rawTest(entry, control, stratum, groups, rule.sense) ?? []));
   const comparisons = corrected(tests, 1, alpha, rule.resolution);
+  const attacks = corrected(
+    [...data].flatMap(([stratum, groups]) => real.flatMap((entry) => rawTest(control, entry, stratum, groups, rule.sense) ?? [])),
+    1,
+    alpha,
+    rule.resolution,
+  );
   return [...data.keys()].map((stratum) => {
     const here = comparisons.filter((c) => c.stratum === stratum);
+    const against = attacks.filter((c) => c.stratum === stratum);
     const status: ControlRead["status"] = here.length === 0 ? "no-rows" : here.some((c) => c.beats) ? "beaten" : here.every(unread) ? "too-few" : "wins";
-    return { measure, control, stratum, status, aheadOf: here.filter((c) => c.losses > c.wins).length, comparisons: here };
+    return { measure, control, stratum, status, aheadOf: here.filter((c) => c.losses > c.wins).length, comparisons: here, beatsEntries: against.filter((c) => c.beats).length, of: against.filter((c) => !unread(c)).length, against };
   });
 }
 
@@ -469,8 +482,14 @@ function checkRule(rule: MeasureRule, reading: Reading, asOf: string): { check: 
     if (guards.every((g) => g.status === "too-few" || g.status === "no-rows")) {
       const needs = Math.max(0, ...controlComparisons.map((c) => c.needs));
       findings.push({ kind: "too-few", measure: rule.measure, text: `No control of ${rule.measure} has enough pairs for a read. A test needs ${needs} untied pairs.`, comparisons: controlComparisons });
-    } else if (!guards.some((g) => g.status === "wins")) {
-      findings.push({ kind: "weak-control", measure: rule.measure, text: `No control of ${rule.measure} wins it, so the controls attack nothing. No read shows a win.`, comparisons: controlComparisons.filter((c) => c.beats) });
+    } else {
+      for (const control of rule.controls) {
+        const own = reads.filter((r) => r.measure === rule.measure && r.control === control);
+        const of = own.reduce((sum, r) => sum + r.of, 0);
+        if (of > 0 && own.every((r) => r.beatsEntries === 0)) {
+          findings.push({ kind: "weak-control", measure: rule.measure, control, text: `The control ${control} beats 0 of ${of} real entries on ${rule.measure} by test, in all strata. The trick buys nothing.`, comparisons: own.flatMap((r) => r.against) });
+        }
+      }
     }
   }
 
@@ -509,6 +528,7 @@ function checkRule(rule: MeasureRule, reading: Reading, asOf: string): { check: 
  * - A control wins a measure when no real entry beats it on the keys that both finished. A tie counts for the control.
  * - A real entry beats a control when the Holm-corrected sign test passes and the median paired difference is over the resolution.
  * - One Holm family holds the tests of one control on one measure over all real entries and all strata.
+ * - One more Holm family holds the tests of one control against the real entries, with the same need and resolution. A control that beats none of them is weak.
  * - One Holm family holds the tests of the spread of one measure over all pairs of real entries and all strata.
  * - A test with fewer untied keys than `signTestPower` needs for that family reads `tooFew` and beats nothing.
  * - A test with enough shared keys and too few untied keys is `tied`. The two entries read as equal, so a constant measure is `no-spread` and not `too-few`.

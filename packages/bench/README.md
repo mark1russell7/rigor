@@ -230,7 +230,7 @@ Each row has a `measure`, a `group`, a `key` and a `value`. The optional fields 
 - **Beats:** the Holm-corrected sign test passes. With a `resolution`, the median paired difference is also over it. Without one, the output says `test only`.
 - **A control wins** when no real entry beats it. A tie counts for the control.
 - **A control loses a partner** when one real entry beats it on that partner, at the level divided by the count of partners. One passed partner clears `uncaught`, so each partner is one more chance.
-- **Families:** one Holm family holds one control on one measure, over all real entries and all strata. One family holds the spread of one measure.
+- **Families:** one Holm family holds one control on one measure, over all real entries and all strata. A second family holds the same tests in the other direction, and `beatsEntries` of `of` gives its count. One family holds the spread of one measure.
 - **Too few:** the need comes from `signTestPower` at the level of that family, over the untied keys. So 31 real entries need 10 untied keys at the level 0.05. A test under the need beats nothing. A pair with enough keys that ties reads as equal.
 - **Strata:** the keys of one stratum come from one family of inputs, so they are not independent draws. A result is about these keys.
 
@@ -250,7 +250,7 @@ Each finding fails a gate, and each one carries its tests with `n`, `ties`, `p` 
 | Finding | Meaning |
 | --- | --- |
 | `uncaught` | A control wins the measure and loses no partner. The trick pays. |
-| `weak-control` | No control wins its measure, so the controls attack nothing. |
+| `weak-control` | A control with power beats no real entry on its measure, in any stratum. The trick buys nothing. A control in second place that beats other entries is not weak. |
 | `censored-win` | A control wins with more censored keys than an entry it is read against. |
 | `no-spread` | No pair of real entries separates on the measure. |
 | `too-few` | No read of the controls or of the spread has enough keys. A control that wins and has a partner with too few keys also gives it. A small stratum alone gives only a row. |
