@@ -141,6 +141,11 @@ export interface FamilyPowerOptions {
   readonly jobs?: number;
   /** The standard deviation of the log time of one arm in one round. The default is 0.1. */
   readonly sigma?: number;
+  /**
+   * The standard deviation of a shift of the log time of the candidate in one job, a new draw for each case and job. A shift
+   * models a job whose machine changes the candidate more than the baseline. The default is 0, the best case for the read of each job.
+   */
+  readonly jobShift?: number;
   /** The count of the seeded families. The default is 200. */
   readonly trials?: number;
   /** The seed of the draws. The default is 1. */
@@ -170,7 +175,7 @@ export interface FamilyPower {
 
 /**
  * This function draws `trials` families of pooled verdicts and gives the share of each read. Each arm of each round adds a
- * normal noise of `sigma` to the log time. The jobs have no shift between them, so the read of each job has its best case here.
+ * normal noise of `sigma` to the log time. Without `jobShift`, the jobs have no shift between them, so the read of each job has its best case.
  */
 export function familyPower(options: FamilyPowerOptions): FamilyPower {
   const { family } = options;
@@ -179,17 +184,19 @@ export function familyPower(options: FamilyPowerOptions): FamilyPower {
   const jobs = options.jobs ?? 2;
   const sigma = options.sigma ?? 0.1;
   const trials = options.trials ?? 200;
+  const jobShift = options.jobShift ?? 0;
   for (const [name, n] of [["family", family], ["rounds", rounds], ["jobs", jobs], ["trials", trials]] as const) {
     if (!Number.isSafeInteger(n) || n < 1) throw new RangeError(`familyPower: ${name} is a whole number of 1 or more, not ${n}.`);
   }
   if (!(ratio > 0 && Number.isFinite(ratio))) throw new RangeError(`familyPower: the ratio is a finite number above 0, not ${ratio}.`);
+  if (!(jobShift >= 0 && Number.isFinite(jobShift))) throw new RangeError(`familyPower: jobShift is a finite number of 0 or more, not ${jobShift}.`);
   const r = random(options.seed ?? 1);
   const draw = (truth: number, job: string, c: number): PairedTime[] =>
     Array.from({ length: rounds }, (_, round) => ({ case: `${job}:${String(round)}`, round: 0, first: firstArm(round, c), a: 10 * Math.exp(r.normal(0, sigma)), b: 10 * truth * Math.exp(r.normal(0, sigma)) }));
   const hits = { false: { plain: 0, holm: 0, eachJob: 0, eachJobHolm: 0 }, first: { plain: 0, holm: 0, eachJob: 0, eachJobHolm: 0 } };
   for (let t = 0; t < trials; t++) {
     const items = Array.from({ length: family }, (_, c): FamilyItem => {
-      const records = Array.from({ length: jobs }, (_, j): JobRecords => ({ job: `job ${String(j)}`, candidate: draw(c === 0 ? ratio : 1, String(j), c), aa: draw(1, String(j), c) }));
+      const records = Array.from({ length: jobs }, (_, j): JobRecords => ({ job: `job ${String(j)}`, candidate: draw((c === 0 ? ratio : 1) * (jobShift > 0 ? Math.exp(r.normal(0, jobShift)) : 1), String(j), c), aa: draw(1, String(j), c) }));
       return { case: `case ${String(c)}`, verdict: pooledVerdict(records, options.verdict) };
     });
     const read = familyRead(items, options.level);

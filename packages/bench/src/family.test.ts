@@ -91,6 +91,12 @@ describe("familyPower, the flip at the settings of a 16-case bench", () => {
     expect(one.firstSlower.plain).toBeGreaterThan(one.firstSlower.holm);
   }, 120_000);
 
+  it("loses power of the read of each job when the jobs shift", () => {
+    const still = familyPower({ ...bench, ratio: 1.02, trials: 20 });
+    const shifted = familyPower({ ...bench, ratio: 1.02, trials: 20, jobShift: 0.02 });
+    expect(shifted.firstSlower.eachJob).toBeLessThan(still.firstSlower.eachJob);
+  }, 120_000);
+
   it("reads a real slowdown as slower with Holm at the default of 10 000 runs", () => {
     const real = familyPower({ ...bench, ratio: 1.05, trials: 1, verdict: { margin: Math.log(1.015) } });
     expect(real.firstSlower).toEqual({ plain: 1, holm: 1, eachJob: 1, eachJobHolm: 1 });
@@ -101,5 +107,6 @@ describe("familyPower, the flip at the settings of a 16-case bench", () => {
     expect(() => familyPower({ family: 0 })).toThrow(RangeError);
     expect(() => familyPower({ family: 2, trials: 1.5 })).toThrow(RangeError);
     expect(() => familyPower({ family: 2, ratio: 0 })).toThrow(RangeError);
+    expect(() => familyPower({ family: 2, jobShift: -0.01 })).toThrow(RangeError);
   });
 });

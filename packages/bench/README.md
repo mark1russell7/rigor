@@ -569,4 +569,22 @@ The smallest p of a bootstrap is 1 / (finite + 1). The first step of Holm is `le
 | 1.025 | each job | 0 | 0.87 |
 | 1.025 | each job and Holm | 0 | 0.87 |
 
-The smallest slowdown read in 80 % or more of the families is 1.5 % with no correction, and 2.5 % with each other read. At 2 %, the shares are 0.97, 0.77, 0.59 and 0.56. The model has no shift between the jobs, so the read of each job has its best case here. A real shift between two machines lowers its power.
+The smallest slowdown read in 80 % or more of the families is 1.5 % with no correction, and 2.5 % with each other read. At 2 %, the shares are 0.97, 0.77, 0.59 and 0.56.
+
+This model has no shift between the jobs, so the read of each job has its best case. The option `jobShift` adds a shift to the candidate of each job. The rows below use the shift 0.0066 for each job, with the other settings of the table above.
+
+| Ratio of the first case | Read | Families with a false `slower` | First case read `slower` |
+| --- | --- | --- | --- |
+| 1 | no correction | 0.48 | 0.04 |
+| 1 | Holm | 0.1 | 0.01 |
+| 1 | each job | 0.04 | 0 |
+| 1 | each job and Holm | 0.02 | 0 |
+| 1.025 | no correction | 0.46 | 0.98 |
+| 1.025 | Holm | 0.09 | 0.93 |
+| 1.025 | each job | 0.04 | 0.74 |
+| 1.025 | each job and Holm | 0.02 | 0.74 |
+| 1.03 | each job | 0.04 | 0.9 |
+
+With this shift, the smallest slowdown read at 80 % is 2 % with no correction, 2.5 % with Holm, and 3 % with each job. A shift also adds false `slower` cases, because the candidate of a job is then not equal to its baseline.
+
+A slowdown below the smallest slowdown at 80 % often reads `same` or `cannot decide`. Give this number beside the margin of a bench, because together they set what the bench can find.

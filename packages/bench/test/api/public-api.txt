@@ -570,6 +570,7 @@ interface FamilyPowerOptions {
   readonly rounds?: number;
   readonly jobs?: number;
   readonly sigma?: number;
+  readonly jobShift?: number;
   readonly trials?: number;
   readonly seed?: number | string;
   readonly level?: number;
