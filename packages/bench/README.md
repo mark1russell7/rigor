@@ -37,6 +37,7 @@ v.comparison;                                     // the cases that gain and dro
 | `armOrder(arms, round)` | The order of any count of arms in a round. Each pair of arms has each order within 1 after each count of rounds. |
 | `checkPairedTime(record)` | The record, or a `RangeError` for a time that is not a finite number above 0. |
 | `caseRatios(records)` | The ratio of each case. It refuses 2 records of one round, and an order that did not turn. |
+| `orderSize(records)` | The count of records per first arm, the order effect, and the amount that unequal counts can move a mean. This size is a guide, because a verdict reads a median. |
 | `aaBand(aa, options)` | The band of the A/A arm, symmetric on a log scale. The kind `median` (the default) holds the A/A median, and the kind `case` holds one A/A case. It needs 5 cases or more. |
 | `timeVerdict(candidate, aa, options)` | The outcome of the rule `difference` (the default) or `band`. |
 | `verdictMargin(options)` | The margin of the rule `difference` on a log scale: the larger of `margin` and the noise of the pooled band. An interval in `[exp(-margin), exp(margin)]` is `same`. |

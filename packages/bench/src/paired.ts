@@ -91,3 +91,46 @@ export function caseRatios(records: readonly PairedTime[]): CaseRatio[] {
     return { case: name, ratio: Math.exp(median(list.map((r) => Math.log(r.b / r.a)))), rounds: list.length };
   });
 }
+
+/** The size of the order effect in paired records. It is a guide: this size holds for a mean, and a verdict reads a median. */
+export interface OrderSize {
+  /** The count of records with arm `a` first. */
+  readonly aFirst: number;
+  /** The count of records with arm `b` first. */
+  readonly bFirst: number;
+  /** The count of cases with records in both orders. The effect reads only these cases. */
+  readonly cases: number;
+  /** The median over those cases of the mean `log(b / a)` with `b` first, less the mean with `a` first. With no such case, it is `null`. */
+  readonly effect: number | null;
+  /** The largest `|n1 - n2| / (n1 + n2)` of a case, where `n1` and `n2` are its counts in each order. */
+  readonly split: number;
+  /** The value `split * |effect| / 2`: the amount that the unequal counts can move the mean of a case on a log scale. With no effect, it is `null`. */
+  readonly size: number | null;
+}
+
+/**
+ * This function gives the order effect of paired records, and the amount that unequal counts of the two orders can move a ratio.
+ * With `n1` and `n2` rounds in each order, the mean of `log(b / a)` moves by `(n1 - n2) / (n1 + n2) * effect / 2`.
+ * It examines each record, and it refuses no record for its order.
+ */
+export function orderSize(records: readonly PairedTime[]): OrderSize {
+  const cases = new Map<string, PairedTime[]>();
+  for (const record of records) {
+    checkPairedTime(record);
+    const list = cases.get(record.case) ?? [];
+    list.push(record);
+    cases.set(record.case, list);
+  }
+  const mean = (list: readonly PairedTime[]): number => list.reduce((sum, r) => sum + Math.log(r.b / r.a), 0) / list.length;
+  const effects: number[] = [];
+  let split = 0;
+  for (const list of cases.values()) {
+    const bFirst = list.filter((r) => r.first === "b");
+    const aFirst = list.filter((r) => r.first === "a");
+    split = Math.max(split, Math.abs(bFirst.length - aFirst.length) / list.length);
+    if (bFirst.length > 0 && aFirst.length > 0) effects.push(mean(bFirst) - mean(aFirst));
+  }
+  const effect = effects.length === 0 ? null : median(effects);
+  const bFirst = records.filter((r) => r.first === "b").length;
+  return { aFirst: records.length - bFirst, bFirst, cases: effects.length, effect, split, size: effect === null ? null : (split * Math.abs(effect)) / 2 };
+}

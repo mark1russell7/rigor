@@ -1,6 +1,6 @@
 import { random } from "@mark1russell7/rigor-generators";
 import { describe, expect, it } from "vitest";
-import { type PairedTime, aaBand, armOrder, caseRatios, checkPairedTime, firstArm, timeVerdict, verdictPower } from "./index.ts";
+import { type PairedTime, aaBand, armOrder, caseRatios, checkPairedTime, firstArm, orderSize, timeVerdict, verdictPower } from "./index.ts";
 
 /** The records of `cases` cases and `rounds` rounds. Arm b takes `factor` times arm a, with a seeded noise of about `spread`. */
 function records(cases: number, rounds: number, factor: number, spread: number, seed: number, prefix = "c"): PairedTime[] {
@@ -123,6 +123,50 @@ describe("caseRatios", () => {
     const one: PairedTime = { case: "x", round: 0, first: "a", a: 1, b: 1 };
     expect(() => caseRatios([one, one])).toThrow(/2 records of one round/);
     expect(() => caseRatios([one, { ...one, round: 1 }, { ...one, round: 2 }])).toThrow(/order turns/);
+  });
+});
+
+describe("orderSize", () => {
+  /** The records of 5 cases: the first arm comes from `firstArm`, and `log(b / a)` is `level` plus or minus half of `effect`. */
+  const ordered = (rounds: number, effect: number, level = 0.1): PairedTime[] =>
+    [0, 1, 2, 3, 4].flatMap((c) =>
+      Array.from({ length: rounds }, (_, round) => {
+        const first = firstArm(round);
+        return { case: `c${c}`, round, first, a: 100, b: 100 * Math.exp(level + (first === "b" ? effect / 2 : -effect / 2)) };
+      }),
+    );
+
+  it("reads a size of 0 at even counts, with a large effect", () => {
+    const read = orderSize(ordered(4, 0.5));
+    expect(read).toMatchObject({ aFirst: 10, bFirst: 10, cases: 5, split: 0, size: 0 });
+    expect(read.effect).toBeCloseTo(0.5, 12);
+  });
+
+  it("reads one sixth of the effect at 1:2, and one tenth at 2:3", () => {
+    const three = orderSize(ordered(3, 0.06));
+    expect(three).toMatchObject({ aFirst: 10, bFirst: 5, cases: 5 });
+    expect(three.split).toBeCloseTo(1 / 3, 12);
+    expect(three.size).toBeCloseTo(0.01, 12);
+    expect(orderSize(ordered(5, 0.1)).size).toBeCloseTo(0.01, 12);
+  });
+
+  it("gives the sign in the effect, and a size above 0 for each sign", () => {
+    const read = orderSize(ordered(3, -0.06));
+    expect(read.effect).toBeCloseTo(-0.06, 12);
+    expect(read.size).toBeCloseTo(0.01, 12);
+  });
+
+  it("does not take the common level as an order effect", () => {
+    expect(orderSize(ordered(3, 0, 0.7)).effect).toBeCloseTo(0, 12);
+  });
+
+  it("reads no effect from cases with one order, and keeps their split", () => {
+    expect(orderSize(ordered(1, 0.5))).toEqual({ aFirst: 5, bFirst: 0, cases: 0, effect: null, split: 1, size: null });
+    expect(orderSize([])).toEqual({ aFirst: 0, bFirst: 0, cases: 0, effect: null, split: 0, size: null });
+  });
+
+  it("refuses a record with a bad time", () => {
+    expect(() => orderSize([{ case: "c", round: 0, first: "a", a: 0, b: 1 }])).toThrow(RangeError);
   });
 });
 
