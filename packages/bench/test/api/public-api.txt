@@ -541,6 +541,7 @@ interface Comparison {
   readonly needs: number;
   readonly tooFew: boolean;
   readonly tied: boolean;
+  readonly floor?: number;
   readonly beats: boolean;
 }
 
@@ -813,6 +814,7 @@ interface MeasureRule {
   readonly controls: readonly string[];
   readonly partners: readonly string[];
   readonly resolution?: number;
+  readonly floors?: Readonly<Record<string, number>>;
   readonly noControl?: NoControl;
 }
 

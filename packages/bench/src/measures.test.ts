@@ -30,6 +30,46 @@ const has = (check: MeasureChecks, kind: MeasureFindingKind): boolean => check.f
 /** The trick wins fill and loses order on each key. */
 const caught = (count = 40): MeasureRow[] => [...rows("fill", "trick", count, (i) => 0.95 + i * 1e-4), ...rows("order", "trick", count, (i) => 90 + i * 1e-3)];
 
+describe("the floors of the groups", () => {
+  /** The entry `near` beats the control by 1 on each key, and the entry `far` beats it by 5 on each key. */
+  const data = [...rows("fill", "near", 40, (i) => i + 1), ...rows("fill", "far", 40, (i) => i + 5), ...rows("fill", "trick", 40, (i) => i)];
+  const rule = (extra: Partial<MeasureRule>): MeasureRule => ({ measure: "fill", sense: "higher", controls: ["trick"], partners: [], ...extra });
+  const comparison = (extra: Partial<MeasureRule>, entry: string) => checkMeasures(data, { rules: [rule(extra)], controls: ["trick"], asOf: AS_OF }).reads[0]!.comparisons.find((c) => c.better === entry)!;
+
+  it("needs a size over the floor of the entry and over the floor of the control", () => {
+    expect(comparison({ floors: { near: 0.5, far: 0, trick: 0 } }, "near")).toMatchObject({ floor: 0.5, beats: true });
+    expect(comparison({ floors: { near: 2, far: 0, trick: 0 } }, "near")).toMatchObject({ floor: 2, beats: false });
+    expect(comparison({ floors: { near: 0, far: 0, trick: 2 } }, "near")).toMatchObject({ floor: 2, beats: false });
+  });
+
+  it("keeps a comparison that one number for all groups removes", () => {
+    expect(comparison({ resolution: 2 }, "near").beats).toBe(false);
+    expect(comparison({ floors: { near: 0.5, far: 2, trick: 0.5 } }, "near").beats).toBe(true);
+    expect(comparison({ floors: { near: 0.5, far: 6, trick: 0.5 } }, "far").beats).toBe(false);
+  });
+
+  it("reads the resolution for a group with no floor, and throws for a group with neither", () => {
+    expect(comparison({ floors: { near: 0 }, resolution: 2 }, "near")).toMatchObject({ floor: 2, beats: false });
+    expect(() => comparison({ floors: { near: 0, far: 0 } }, "near")).toThrow(/"trick" of "fill" has no floor/);
+    expect(() => comparison({ floors: { near: 0, trick: 0 } }, "near")).toThrow(/"far" of "fill" has no floor/);
+  });
+
+  it("states the basis, and leaves a rule with no floors as it was", () => {
+    const basis = (extra: Partial<MeasureRule>) => checkMeasures(data, { rules: [rule(extra)], controls: ["trick"], asOf: AS_OF }).measures[0]!.basis;
+    expect(basis({ floors: { near: 0, far: 0, trick: 0 } })).toBe("test and resolution");
+    expect(basis({})).toBe("test only");
+    expect(comparison({}, "near")).not.toHaveProperty("floor");
+    expect(comparison({}, "near").beats).toBe(true);
+    expect(comparison({}, "far").beats).toBe(true);
+    expect(comparison({ resolution: 2 }, "near")).toMatchObject({ floor: 2, beats: false });
+  });
+
+  it("reads the larger floor in the spread of the real entries, and the finding says floors", () => {
+    const spread = checkMeasures(data, { rules: [rule({ floors: { near: 5, far: 0, trick: 0 } })], controls: ["trick"], asOf: AS_OF });
+    expect(spread.findings.find((f) => f.kind === "no-spread")!.text).toContain("the floors of the groups");
+  });
+});
+
 describe("the power of a test", () => {
   it("needs 10 untied keys for a family of 31 entries, and the test passes at that count", () => {
     const entries = Array.from({ length: 31 }, (_, e) => `e${e}`);
@@ -390,6 +430,11 @@ describe("the refusals", () => {
     expect(() => checkMeasures([], options([{ ...ORDER, partners: ["order"] }]))).toThrow(/names itself/);
     expect(() => checkMeasures([], options([{ ...FILL, partners: [], noControl: ORDER.noControl! }]))).toThrow(/also noControl/);
     expect(() => checkMeasures([], options([{ ...ORDER, resolution: -1 }]))).toThrow(/resolution/);
+  });
+
+  it("refuses a floor that is negative or not finite", () => {
+    expect(() => checkMeasures([], options([{ ...ORDER, floors: { c: -1 } }]))).toThrow(/floor of "c"/);
+    expect(() => checkMeasures([], options([{ ...ORDER, floors: { c: Number.NaN } }]))).toThrow(/floor of "c"/);
   });
 
   it("refuses a date that is not a real date, and an alpha out of range", () => {

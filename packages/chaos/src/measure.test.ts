@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { latencyQuantile, measureLoad, scheduleHeld, type Completion } from "./measure.ts";
+import { latencyQuantile, measureLoad, scheduleHeld, type Completion, type SecondSample } from "./measure.ts";
 import { constant, schedule } from "./schedule.ts";
 
 // one arrival each 10 ms for 2 s: the first at 5 ms
@@ -63,6 +63,28 @@ describe("the measure of a run", () => {
     expect(() => measureLoad(PLAN, [{ index: 0, sent: 5, done: 2001 }], 2000)).toThrow("stops at 2000");
     expect(() => measureLoad(PLAN, [{ index: 0, sent: 2001, done: null }], 2000)).toThrow("stops at 2000");
     expect(() => measureLoad(PLAN, [{ index: 0, sent: 5, done: 4 }], 2000)).toThrow("a reply at 4");
+  });
+
+  it("keeps the seconds that a driver read, and has no such field with no list", () => {
+    const completions = stalled(500, 1500);
+    const seconds = [{ at: 0, cpu: 0.4, loopP99: 2, loopMax: 9 }, { at: 1000, cpu: 1.2 }, { at: 1500 }];
+    expect(measureLoad(PLAN, completions, 2000, seconds).seconds).toEqual(seconds);
+    expect(measureLoad(PLAN, completions, 2000, []).seconds).toEqual([]);
+    expect(measureLoad(PLAN, completions, 2000)).not.toHaveProperty("seconds");
+  });
+
+  it("refuses a sample out of order or out of the run, a bad reading, and a largest delay under its p99", () => {
+    const refused = (seconds: readonly SecondSample[]) => () => measureLoad(PLAN, [], 2000, seconds);
+    expect(refused([{ at: 1000 }, { at: 1000 }])).toThrow("not in order");
+    expect(refused([{ at: 1000 }, { at: 0 }])).toThrow("not in order");
+    expect(refused([{ at: -1 }])).toThrow("not in order");
+    expect(refused([{ at: 2001 }])).toThrow("stops at 2000");
+    expect(refused([{ at: Number.NaN }])).toThrow(RangeError);
+    expect(refused([{ at: 0, cpu: -0.1 }])).toThrow("has the reading -0.1");
+    expect(refused([{ at: 0, cpu: Number.POSITIVE_INFINITY }])).toThrow("has the reading Infinity");
+    expect(refused([{ at: 0, loopP99: Number.NaN }])).toThrow("has the reading NaN");
+    expect(refused([{ at: 0, loopMax: -1 }])).toThrow("has the reading -1");
+    expect(refused([{ at: 0, loopP99: 5, loopMax: 4 }])).toThrow("under its p99");
   });
 
   it("refuses a quantile of a run with no arrivals", () => {
