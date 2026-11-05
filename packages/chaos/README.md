@@ -27,7 +27,8 @@ A schedule is data. A driver reads `times`, and it sends each arrival at its tim
 - `service` is the reply less the send. This is what a closed-loop driver measures.
 - `lag` is the send less the planned time.
 - `censored` holds the age at the end of each arrival with no reply. Each value is a lower bound of a latency.
+- `seconds` is optional. It holds the samples that the driver read of itself: the processor share, and the p99 and the largest delay of its event loop.
 
 `latencyQuantile` reads the latency and the censored values together, by the nearest rank. Thus an arrival with no reply does not leave the measure.
 
-`scheduleHeld` tells if the driver kept the schedule. A run that fails this check measures its driver, not its target. An A/A run with no fault examines this first.
+`scheduleHeld` tells if the driver kept the schedule. A run that fails this check measures its driver, not its target. An A/A run with no fault examines this first. When a run fails this check, `seconds` tells if a full processor or a held event loop made the sends late.

@@ -19,6 +19,21 @@ export interface Completion {
   readonly done: number | null;
 }
 
+/**
+ * A second sample is what a driver process read of itself over one second of a run. It tells if a late
+ * send came from a full processor or from a held event loop. Each reading is optional.
+ */
+export interface SecondSample {
+  /** This time is the start of the second, in ms from the start of the schedule. */
+  readonly at: number;
+  /** This share is the processor time of the process over the time of the sample. One full core reads 1. */
+  readonly cpu?: number;
+  /** This time is the p99 of the delay of the event loop in this second, in ms. */
+  readonly loopP99?: number;
+  /** This time is the largest delay of the event loop in this second, in ms. */
+  readonly loopMax?: number;
+}
+
 /** This is the measure of one run of a schedule. Each list is in the order of the schedule. */
 export interface LoadMeasure {
   readonly planned: number;
@@ -34,14 +49,33 @@ export interface LoadMeasure {
   readonly lag: readonly number[];
   /** These times are the age at the end of each arrival with no reply. Each one is a lower bound of a latency. */
   readonly censored: readonly number[];
+  /** These samples are the seconds that the driver read, in order of time. A run with no list of samples has no such field. */
+  readonly seconds?: readonly SecondSample[];
+}
+
+/** This function throws a `RangeError` for a sample that a measure of this run cannot hold. */
+function checkSeconds(seconds: readonly SecondSample[], end: number): void {
+  let last = Number.NEGATIVE_INFINITY;
+  for (const { at, cpu, loopP99, loopMax } of seconds) {
+    if (!(at >= 0 && at <= end && at > last)) throw new RangeError(`measureLoad: the sample at ${at} is not in order, in a run that stops at ${end}.`);
+    last = at;
+    for (const value of [cpu, loopP99, loopMax])
+      if (value !== undefined && !(value >= 0 && Number.isFinite(value))) throw new RangeError(`measureLoad: the sample at ${at} has the reading ${value}.`);
+    if (loopP99 !== undefined && loopMax !== undefined && loopMax < loopP99)
+      throw new RangeError(`measureLoad: the sample at ${at} has a largest delay of ${loopMax} under its p99 of ${loopP99}.`);
+  }
 }
 
 /**
  * This function gives the measure of a run. `end` is the end of the run, in ms from the start of the
  * schedule. It throws a `RangeError` for an index outside the schedule and for two completions of
  * one index. It throws the same error for a reply before its send and for a time past `end`.
+ *
+ * `seconds` is optional, and the measure holds it as given. A sample must be in order and inside the
+ * run, and each reading must be finite and not negative. Otherwise the function throws the same error.
  */
-export function measureLoad(plan: Schedule, completions: readonly Completion[], end: number): LoadMeasure {
+export function measureLoad(plan: Schedule, completions: readonly Completion[], end: number, seconds?: readonly SecondSample[]): LoadMeasure {
+  if (seconds !== undefined) checkSeconds(seconds, end);
   const byIndex = new Map<number, Completion>();
   for (const completion of completions) {
     if (!Number.isInteger(completion.index) || completion.index < 0 || completion.index >= plan.times.length)
@@ -68,7 +102,7 @@ export function measureLoad(plan: Schedule, completions: readonly Completion[], 
     latency.push(completion.done - planned);
     service.push(completion.done - completion.sent);
   });
-  return { planned: plan.times.length, unsent: plan.times.length - byIndex.size, unfinished, latency, service, lag, censored };
+  return { planned: plan.times.length, unsent: plan.times.length - byIndex.size, unfinished, latency, service, lag, censored, ...(seconds === undefined ? {} : { seconds }) };
 }
 
 /**

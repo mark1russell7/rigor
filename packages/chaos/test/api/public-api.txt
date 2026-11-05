@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 19 names
+## . (build/index.d.ts): 20 names
 
 type Arrivals: build/schedule.d.ts#Arrivals
 type Completion: build/measure.d.ts#Completion
@@ -15,6 +15,7 @@ SCHEDULE_FORMAT: build/schedule.d.ts#SCHEDULE_FORMAT
 type Schedule: build/schedule.d.ts#Schedule
 type ScheduleCheck: build/measure.d.ts#ScheduleCheck
 type ScheduleOptions: build/schedule.d.ts#ScheduleOptions
+type SecondSample: build/measure.d.ts#SecondSample
 checkProfile: build/schedule.d.ts#checkProfile
 constant: build/schedule.d.ts#constant
 expectedArrivals: build/schedule.d.ts#expectedArrivals
@@ -44,6 +45,7 @@ export interface LoadMeasure {
   readonly service: readonly number[];
   readonly lag: readonly number[];
   readonly censored: readonly number[];
+  readonly seconds?: readonly SecondSample[];
 }
 
 ### build/measure.d.ts#ScheduleCheck
@@ -54,11 +56,19 @@ export interface ScheduleCheck {
   readonly reason: string;
 }
 
+### build/measure.d.ts#SecondSample
+export interface SecondSample {
+  readonly at: number;
+  readonly cpu?: number;
+  readonly loopP99?: number;
+  readonly loopMax?: number;
+}
+
 ### build/measure.d.ts#latencyQuantile
 export declare function latencyQuantile(measure: LoadMeasure, p: number): number;
 
 ### build/measure.d.ts#measureLoad
-export declare function measureLoad(plan: Schedule, completions: readonly Completion[], end: number): LoadMeasure;
+export declare function measureLoad(plan: Schedule, completions: readonly Completion[], end: number, seconds?: readonly SecondSample[]): LoadMeasure;
 
 ### build/measure.d.ts#scheduleHeld
 export declare function scheduleHeld(measure: LoadMeasure, limit: number): ScheduleCheck;
