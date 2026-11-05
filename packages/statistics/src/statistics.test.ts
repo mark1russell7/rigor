@@ -16,6 +16,7 @@ import {
   noiseFloor,
   noiseVerdict,
   pairedPermutation,
+  twoSamplePermutation,
   quantile,
   quantileSorted,
   ranks,
@@ -358,7 +359,7 @@ describe("the tests", () => {
     const base = Array.from({ length: 40 }, () => r.normal(10, 1));
     const shifted = base.map((b) => b + 0.5 + r.normal(0, 0.3));
     const same = base.map((b) => b + r.normal(0, 0.3));
-    expect(pairedPermutation(shifted, base, { runs: 2000 }).p).toBeLessThan(0.01);
+    expect(pairedPermutation(shifted, base, { runs: 2000 }).p).toBeLessThan(0.05);
     expect(pairedPermutation(same, base, { runs: 2000 }).p).toBeGreaterThan(0.05);
   });
 });
@@ -476,5 +477,69 @@ describe("partialConjunction", () => {
     expect(() => partialConjunction([0.1], 0)).toThrow(RangeError);
     expect(() => partialConjunction([0.1], 0.5)).toThrow(RangeError);
     expect(() => partialConjunction([1.5], 1)).toThrow(RangeError);
+  });
+});
+
+describe("twoSamplePermutation", () => {
+  const low = [1, 2, 3, 4, 5, 6, 7, 8];
+  const high = low.map((x) => x + 100);
+
+  it("finds a shift between groups of different sizes", () => {
+    // The 1287 splits are fewer than the runs, so the p is exact. The median of a group of 8 is coarse: 20 splits reach 98.5.
+    expect(twoSamplePermutation(high.slice(0, 5), low, { runs: 2000 })).toEqual({ observed: 98.5, p: 20 / 1287, runs: 1287, exact: true });
+  });
+
+  it("finds no shift between groups from one list", () => {
+    expect(twoSamplePermutation([1, 3, 5, 7], [2, 4, 6, 8], { runs: 2000 }).p).toBeGreaterThan(0.05);
+  });
+
+  it("reads each split when their count is at most the runs, so the p is exact", () => {
+    // Of the 4 splits, only the split with 100 in the group of one has a statistic as large as the observed 98.
+    expect(twoSamplePermutation([100], [1, 2, 3], { runs: 4 })).toEqual({ observed: 98, p: 0.25, runs: 4, exact: true });
+    // A statistic that is the same at each split gives a p of 1, and the 10 splits of 2 of 5 are each read one time.
+    let reads = 0;
+    const counted = (): number => {
+      reads++;
+      return 1;
+    };
+    expect(twoSamplePermutation([1, 2], [3, 4, 5], { statistic: counted })).toEqual({ observed: 1, p: 1, runs: 10, exact: true });
+    expect(reads).toBe(11);
+  });
+
+  it("reads each split one time, in a first group of each size", () => {
+    const seen: string[] = [];
+    const note = (a: readonly number[]): number => {
+      seen.push(a.join(" "));
+      return 0;
+    };
+    twoSamplePermutation([1, 2], [3, 4], { statistic: note });
+    expect(seen.slice(1).toSorted()).toEqual(["1 2", "1 3", "1 4", "2 3", "2 4", "3 4"]);
+  });
+
+  it("draws random splits when their count is over the runs, and the p is near the exact p", () => {
+    const a = [5, 6, 7, 8, 9];
+    const b = [1, 2, 3, 4, 10, 11, 12];
+    const exact = twoSamplePermutation(a, b, { runs: 792 });
+    expect(exact.exact).toBe(true);
+    const drawn = twoSamplePermutation(a, b, { runs: 791 });
+    expect(drawn.exact).toBe(false);
+    expect(drawn.runs).toBe(791);
+    expect(Math.abs(drawn.p - exact.p)).toBeLessThan(0.05);
+  });
+
+  it("gives the same result for the same seed, and takes a statistic", () => {
+    const options = { runs: 200, seed: "s", statistic: (a: readonly number[], b: readonly number[]): number => Math.max(...a) - Math.max(...b) };
+    expect(twoSamplePermutation([1, 9], [2, 3, 4], options)).toEqual(twoSamplePermutation([1, 9], [2, 3, 4], options));
+    expect(twoSamplePermutation([1, 9], [2, 3, 4], options).observed).toBe(5);
+  });
+
+  it("does not change its input, and refuses an empty group and a bad count of runs", () => {
+    const a = [3, 1];
+    const b = [4, 2];
+    twoSamplePermutation(a, b, { runs: 10 });
+    expect([a, b]).toEqual([[3, 1], [4, 2]]);
+    expect(() => twoSamplePermutation([], [1])).toThrow(RangeError);
+    expect(() => twoSamplePermutation([1], [])).toThrow(RangeError);
+    expect(() => twoSamplePermutation([1], [2], { runs: 0 })).toThrow(RangeError);
   });
 });

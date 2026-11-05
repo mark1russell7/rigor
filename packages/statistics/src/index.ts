@@ -68,12 +68,15 @@ export {
   type PermutationOptions,
   type PermutationResult,
   type Proportion,
+  type TwoSamplePermutationOptions,
+  type TwoSamplePermutationResult,
   Z95,
   holm,
   pairedPermutation,
   partialConjunction,
   signTest,
   signTestPower,
+  twoSamplePermutation,
   wilson,
 } from "./tests.ts";
 export { KENDALL_EXACT, kendallTau, ranks, spearman } from "./rank.ts";
