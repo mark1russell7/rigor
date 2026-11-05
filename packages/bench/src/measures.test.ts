@@ -133,7 +133,7 @@ describe("the finding uncaught", () => {
   it("does not trip when the control loses a partner", () => {
     const check = checkMeasures([...real(), ...caught()], options());
     expect(check.measures[0]!.guards[0]!.status).toBe("wins");
-    expect(check.measures[0]!.guards[0]!.partners).toEqual([{ partner: "order", status: "lost", beatenBy: 3, of: 3, caught: true }]);
+    expect(check.measures[0]!.guards[0]!.partners).toEqual([{ partner: "order", status: "lost", beatenBy: 3, of: 3, excluded: 0, caught: true }]);
     expect(has(check, "uncaught")).toBe(false);
     expect(check.findings).toEqual([]);
   });
@@ -192,7 +192,7 @@ describe("the partners of a control", () => {
 
   it("does not trip uncaught on the same read with one partner", () => {
     const result = check(["p"], 7, 8);
-    expect(result.measures[0]!.guards[0]!.partners).toEqual([{ partner: "p", status: "lost", beatenBy: 1, of: 1, caught: true }]);
+    expect(result.measures[0]!.guards[0]!.partners).toEqual([{ partner: "p", status: "lost", beatenBy: 1, of: 1, excluded: 0, caught: true }]);
     expect(has(result, "uncaught")).toBe(false);
   });
 
@@ -240,12 +240,12 @@ describe("the median of a partner", () => {
   it("reads not caught when 2 of 40 entries beat the control, and the status stays lost", () => {
     const check = guard(field(40, 2));
     expect(check.measures[0]!.guards[0]!.status).toBe("wins");
-    expect(partner(check)).toEqual({ partner: "p", status: "lost", beatenBy: 2, of: 40, caught: false });
+    expect(partner(check)).toEqual({ partner: "p", status: "lost", beatenBy: 2, of: 40, excluded: 0, caught: false });
     expect(has(check, "uncaught")).toBe(false);
   });
 
   it("reads caught when 30 of 40 entries beat the control", () => {
-    expect(partner(guard(field(40, 30)))).toEqual({ partner: "p", status: "lost", beatenBy: 30, of: 40, caught: true });
+    expect(partner(guard(field(40, 30)))).toEqual({ partner: "p", status: "lost", beatenBy: 30, of: 40, excluded: 0, caught: true });
   });
 
   it("puts the line at the median: 20 of 40 is not caught, and 21 of 40 is caught", () => {
@@ -254,7 +254,11 @@ describe("the median of a partner", () => {
   });
 
   it("does not count an entry with too few keys in of", () => {
-    expect(partner(guard(field(40, 2, 5)))).toMatchObject({ beatenBy: 2, of: 40, caught: false });
+    expect(partner(guard(field(40, 2, 5)))).toMatchObject({ beatenBy: 2, of: 40, excluded: 5, caught: false });
+  });
+
+  it("shows the entries left out when 3 of 5 read entries beat the control and 35 of 40 have too few keys", () => {
+    expect(partner(guard(field(5, 3, 35)))).toEqual({ partner: "p", status: "lost", beatenBy: 3, of: 5, excluded: 35, caught: true });
   });
 
   it("gives the same findings as the status alone", () => {

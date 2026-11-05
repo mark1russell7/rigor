@@ -155,6 +155,8 @@ export interface PartnerRead {
   readonly beatenBy: number;
   /** The real entries with a read of the partner. An entry with too few untied keys is not one of them. */
   readonly of: number;
+  /** The real entries with too few untied keys for a read of the partner. A small `of` with a large `excluded` reads few entries. */
+  readonly excluded: number;
   /**
    * This field is true when `beatenBy` is over half of `of`: the median real entry beats the control on the partner.
    * One outlier entry can make the status `lost`, but it cannot make `caught` true. It is a report, and no finding reads it.
@@ -465,11 +467,11 @@ const partnerStatus = (read: ControlRead | undefined, partners: number, alpha: n
 };
 
 /** This function counts the real entries that beat a control on one of `partners` partners, of the real entries with a read. */
-const partnerCount = (read: ControlRead | undefined, partners: number, alpha: number): Pick<PartnerRead, "beatenBy" | "of" | "caught"> => {
+const partnerCount = (read: ControlRead | undefined, partners: number, alpha: number): Pick<PartnerRead, "beatenBy" | "of" | "excluded" | "caught"> => {
   const tests = read?.comparisons ?? [];
   const of = tests.filter((c) => !unread(c)).length;
   const beatenBy = tests.filter((c) => clearsPartner(c, partners, alpha)).length;
-  return { beatenBy, of, caught: beatenBy * 2 > of };
+  return { beatenBy, of, excluded: tests.length - of, caught: beatenBy * 2 > of };
 };
 
 /** The inputs of the reads, with the reads that the check already made. */

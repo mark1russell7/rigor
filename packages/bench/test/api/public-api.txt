@@ -876,6 +876,7 @@ interface PartnerRead {
   readonly status: "lost" | "not-lost" | "too-few" | "no-rows";
   readonly beatenBy: number;
   readonly of: number;
+  readonly excluded: number;
   readonly caught: boolean;
 }
 
