@@ -46,6 +46,11 @@ export interface MeasureRule {
   readonly partners: readonly string[];
   /** The smallest median paired difference that counts. Without it, only the test decides, and the output says so. It has no default. */
   readonly resolution?: number;
+  /**
+   * The smallest median paired difference that counts for each group. A comparison needs a size over the larger floor of its two groups.
+   * A group with no floor reads `resolution`. A group with neither makes the check throw, so a comparison does not fall back to the test alone.
+   */
+  readonly floors?: Readonly<Record<string, number>>;
   /** The reason and the date, for a rule with no controls. */
   readonly noControl?: NoControl;
 }
@@ -89,7 +94,9 @@ export interface Comparison {
   readonly tooFew: boolean;
   /** This field is true when the shared keys reach `needs` and ties took them under it. So the two read as equal, not as unread. */
   readonly tied: boolean;
-  /** The test passes, and the median difference is over the resolution when the measure has one. */
+  /** The size that this comparison needs: the larger floor of its two groups, else the resolution. It is absent for a measure with neither. */
+  readonly floor?: number;
+  /** The test passes, and the median difference is over `floor` when the comparison has one. */
   readonly beats: boolean;
 }
 
@@ -158,7 +165,7 @@ export interface GuardRead {
 export interface MeasureCheck {
   readonly measure: string;
   readonly sense: "higher" | "lower";
-  /** `test only`: a measure with no resolution. `test and resolution`: a measure with one. */
+  /** `test only`: a measure with no resolution and no floors. `test and resolution`: a measure with one of these. */
   readonly basis: "test only" | "test and resolution";
   /** The only method of the rows. It is undefined when the rows give none. */
   readonly method: string | undefined;
@@ -289,6 +296,7 @@ function checkedRules(options: MeasureCheckOptions): Map<string, MeasureRule> {
       if (!rules.has(partner)) throw new RangeError(`checkMeasures: the partner ${JSON.stringify(partner)} of ${name} has no rule.`);
     }
     if (rule.resolution !== undefined && !(Number.isFinite(rule.resolution) && rule.resolution >= 0)) throw new RangeError(`checkMeasures: the resolution of ${name} is finite and 0 or more, not ${rule.resolution}.`);
+    for (const [group, floor] of Object.entries(rule.floors ?? {})) if (!(Number.isFinite(floor) && floor >= 0)) throw new RangeError(`checkMeasures: the floor of ${JSON.stringify(group)} on ${name} is finite and 0 or more, not ${floor}.`);
     if (rule.noControl !== undefined) {
       if (rule.controls.length > 0) throw new RangeError(`checkMeasures: ${name} has controls and also noControl.`);
       checkedDate(`the date of ${name}`, rule.noControl.until);
@@ -353,8 +361,20 @@ function rawTest(better: string, other: string, stratum: string | undefined, gro
   return { better, other, stratum, shared: differences.length, wins, losses, medianDifference: median(differences) };
 }
 
+/** This function gives the size that a comparison of two groups needs. The value is undefined only for a rule with no floors and no resolution. */
+function floorOf(rule: MeasureRule, a: string, b: string): number | undefined {
+  const floors = rule.floors;
+  if (floors === undefined) return rule.resolution;
+  const ofGroup = (group: string): number => {
+    const floor = Object.hasOwn(floors, group) ? floors[group] : rule.resolution;
+    if (floor === undefined) throw new RangeError(`checkMeasures: the group ${JSON.stringify(group)} of ${JSON.stringify(rule.measure)} has no floor, and the rule has no resolution.`);
+    return floor;
+  };
+  return Math.max(ofGroup(a), ofGroup(b));
+}
+
 /** This function corrects one family of tests, over all strata. A test with too few keys beats nothing, even when a step of Holm passes it. */
-function corrected(tests: readonly RawTest[], sides: 1 | 2, alpha: number, resolution: number | undefined): Comparison[] {
+function corrected(tests: readonly RawTest[], sides: 1 | 2, alpha: number, rule: MeasureRule): Comparison[] {
   if (tests.length === 0) return [];
   const family = tests.length;
   const needs = pairsNeeded(alpha / family, sides);
@@ -364,8 +384,9 @@ function corrected(tests: readonly RawTest[], sides: 1 | 2, alpha: number, resol
     const n = t.wins + t.losses;
     const tooFew = n < needs;
     const size = sides === 1 ? t.medianDifference : Math.abs(t.medianDifference);
-    const clears = resolution === undefined || size > resolution;
-    return { ...t, n, ties: t.shared - n, p: ps[i] as number, adjusted: steps[i]?.adjusted as number, family, needs, tooFew, tied: tooFew && t.shared >= needs, beats: !tooFew && steps[i]?.reject === true && clears };
+    const floor = floorOf(rule, t.better, t.other);
+    const clears = floor === undefined || size > floor;
+    return { ...t, n, ties: t.shared - n, p: ps[i] as number, adjusted: steps[i]?.adjusted as number, family, needs, tooFew, tied: tooFew && t.shared >= needs, ...(floor === undefined ? {} : { floor }), beats: !tooFew && steps[i]?.reject === true && clears };
   });
 }
 
@@ -378,12 +399,12 @@ const unread = (c: Comparison): boolean => c.tooFew && !c.tied;
 function controlReads(measure: string, control: string, data: StratumRows | undefined, rule: MeasureRule, real: readonly string[], alpha: number): ControlRead[] {
   if (data === undefined) return [];
   const tests = [...data].flatMap(([stratum, groups]) => real.flatMap((entry) => rawTest(entry, control, stratum, groups, rule.sense) ?? []));
-  const comparisons = corrected(tests, 1, alpha, rule.resolution);
+  const comparisons = corrected(tests, 1, alpha, rule);
   const attacks = corrected(
     [...data].flatMap(([stratum, groups]) => real.flatMap((entry) => rawTest(control, entry, stratum, groups, rule.sense) ?? [])),
     1,
     alpha,
-    rule.resolution,
+    rule,
   );
   return [...data.keys()].map((stratum) => {
     const here = comparisons.filter((c) => c.stratum === stratum);
@@ -396,7 +417,7 @@ function controlReads(measure: string, control: string, data: StratumRows | unde
 /** The read of the spread of one measure: one family over all pairs of real entries and all strata. */
 function spreadReads(data: StratumRows, rule: MeasureRule, real: readonly string[], alpha: number): { reads: SpreadRead[]; comparisons: Comparison[] } {
   const tests = [...data].flatMap(([stratum, groups]) => real.flatMap((entry, i) => real.slice(i + 1).flatMap((other) => rawTest(entry, other, stratum, groups, rule.sense) ?? [])));
-  const comparisons = corrected(tests, 2, alpha, rule.resolution);
+  const comparisons = corrected(tests, 2, alpha, rule);
   const reads = [...data.keys()].map((stratum) => {
     const here = comparisons.filter((c) => c.stratum === stratum);
     const widest = here.length === 0 ? undefined : Math.max(...here.map((c) => Math.abs(c.medianDifference)));
@@ -549,7 +570,7 @@ function checkRule(rule: MeasureRule, reading: Reading, asOf: string): { check: 
       findings.push({ kind: "too-few", measure: rule.measure, text: `No pair of real entries has enough keys for a read of the spread of ${rule.measure}. A test needs ${comparisons[0]?.needs} untied pairs.`, comparisons: [] });
     } else if (testable.length > 0 && !comparisons.some((c) => c.beats)) {
       const widest = Math.max(...comparisons.map((c) => Math.abs(c.medianDifference)));
-      const basis = rule.resolution === undefined ? "by the test only" : `by the test and the resolution ${rule.resolution}`;
+      const basis = rule.floors !== undefined ? "by the test and the floors of the groups" : rule.resolution === undefined ? "by the test only" : `by the test and the resolution ${rule.resolution}`;
       findings.push({ kind: "no-spread", measure: rule.measure, text: `No pair of the ${comparisons.length} pairs of real entries separates on ${rule.measure}, ${basis}. The widest median difference is ${widest}.`, comparisons: [...comparisons].sort((a, b) => a.adjusted - b.adjusted).slice(0, 1) });
     }
   }
@@ -557,7 +578,7 @@ function checkRule(rule: MeasureRule, reading: Reading, asOf: string): { check: 
   const check: MeasureCheck = {
     measure: rule.measure,
     sense: rule.sense,
-    basis: rule.resolution === undefined ? "test only" : "test and resolution",
+    basis: rule.resolution === undefined && rule.floors === undefined ? "test only" : "test and resolution",
     method: mixed ? undefined : methods[0],
     mixed,
     guards,
@@ -573,7 +594,7 @@ function checkRule(rule: MeasureRule, reading: Reading, asOf: string): { check: 
  * This function reads the controls and the spread of each measure of a bench.
  *
  * - A control wins a measure when no real entry beats it on the keys that both finished. A tie counts for the control.
- * - A real entry beats a control when the Holm-corrected sign test passes and the median paired difference is over the resolution.
+ * - A real entry beats a control when the Holm-corrected sign test passes and the median paired difference clears the bar. The bar is the larger floor of the two, else the resolution.
  * - One Holm family holds the tests of one control on one measure over all real entries and all strata.
  * - One more Holm family holds the tests of one control against the real entries, with the same need and resolution. A control that beats none of them is weak.
  * - One Holm family holds the tests of the spread of one measure over all pairs of real entries and all strata.
