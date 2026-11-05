@@ -214,6 +214,49 @@ export interface WinClaim {
   readonly open: NoControl | undefined;
 }
 
+/** The read of one control over the set of measures of a joint claim. */
+export interface JointControl {
+  readonly control: string;
+  /** The measures where the entry beats this control. */
+  readonly beaten: readonly string[];
+  /** The measures where this control beats the entry. */
+  readonly lostTo: readonly string[];
+  /** The measures with no read of the entry and this control: no test, or too few keys. A tie on enough keys is a read and does not count here. */
+  readonly unread: readonly string[];
+  /** This field is true when the entry beats this control on no measure, this control beats it on at least one, and no measure is unread. */
+  readonly dominates: boolean;
+}
+
+/** The read of one measure of a joint claim. */
+export interface JointMeasure {
+  readonly measure: string;
+  /** The controls that the entry beats on this measure. */
+  readonly beats: readonly string[];
+  /** The controls that tie the entry on this measure: enough shared keys, and too few keys that differ. */
+  readonly tied: readonly string[];
+  /** The controls with no read on this measure. A measure with no control has an empty list here and an empty list in `beats`. */
+  readonly unread: readonly string[];
+}
+
+/**
+ * The verdict of a joint claim. `dominated`: a control dominates the entry. `not-ahead`: on a measure with each read made, the entry beats no control.
+ * `no-read`: a read that is not there decides the claim, and that is not a pass. `survives`: no control dominates the entry, and the entry beats a control on each measure.
+ */
+export type JointVerdict = "survives" | "dominated" | "not-ahead" | "no-read";
+
+/** What one real entry earned on a set of measures taken together. */
+export interface JointClaim {
+  readonly entry: string;
+  readonly stratum: string | undefined;
+  readonly verdict: JointVerdict;
+  /** The controls that dominate the entry. */
+  readonly dominatedBy: readonly string[];
+  /** The measures where the entry beats no control. */
+  readonly notAhead: readonly string[];
+  readonly controls: readonly JointControl[];
+  readonly measures: readonly JointMeasure[];
+}
+
 const DEFAULT_ALPHA = 0.05;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -592,4 +635,48 @@ export function winClaim(check: MeasureChecks, measure: string, entry: string, s
     censored: { entry: count.censored, controls: notBeaten.map((g) => ({ control: g.control, censored: countOf(g.control) })) },
     open: read.open,
   };
+}
+
+/**
+ * This function tells what one real entry earned on a set of measures taken together. Each win of a control loses a partner, so one measure cannot call a win.
+ * A control dominates the entry when the entry beats it on no measure of the set, and it beats the entry on at least one. A tie does not clear a control.
+ * The entry survives when no control dominates it and it beats at least one control on each measure. The function adds no test: it reads the tests of `check`.
+ * With a stratum, the function reads that stratum. Without one, it reads the rows with no stratum.
+ * The function throws a `RangeError` for an empty set, for a repeat, for a measure with no rule and for an entry that the rows do not hold.
+ */
+export function jointClaim(check: MeasureChecks, measures: readonly string[], entry: string, stratum?: string): JointClaim {
+  if (measures.length === 0) throw new RangeError("jointClaim: the set of measures is empty.");
+  if (new Set(measures).size !== measures.length) throw new RangeError("jointClaim: the set of measures has a repeat.");
+  for (const measure of measures) {
+    const read = check.measures.find((m) => m.measure === measure);
+    if (read === undefined) throw new RangeError(`jointClaim: the measure ${JSON.stringify(measure)} has no rule.`);
+    if (!read.mixed && !read.entries.some((c) => c.group === entry && c.stratum === stratum)) throw new RangeError(`jointClaim: the entry ${JSON.stringify(entry)} has no rows on ${JSON.stringify(measure)}${stratumText(stratum)}.`);
+  }
+  const reads = check.reads.filter((r) => r.stratum === stratum && measures.includes(r.measure));
+  const names = [...new Set(reads.map((r) => r.control))];
+  const testOf = (measure: string, control: string): { readonly mine: Comparison | undefined; readonly theirs: Comparison | undefined } => {
+    const read = reads.find((r) => r.measure === measure && r.control === control);
+    return { mine: read?.comparisons.find((c) => c.better === entry), theirs: read?.against.find((c) => c.other === entry) };
+  };
+  const noRead = (test: Comparison | undefined): boolean => test === undefined || unread(test);
+  const controls = names.map((control): JointControl => {
+    const beaten = measures.filter((m) => testOf(m, control).mine?.beats === true);
+    const lostTo = measures.filter((m) => testOf(m, control).theirs?.beats === true);
+    const missing = measures.filter((m) => noRead(testOf(m, control).mine));
+    return { control, beaten, lostTo, unread: missing, dominates: beaten.length === 0 && lostTo.length > 0 && missing.length === 0 };
+  });
+  const measureReads = measures.map((measure): JointMeasure => ({
+    measure,
+    beats: names.filter((c) => testOf(measure, c).mine?.beats === true),
+    tied: names.filter((c) => testOf(measure, c).mine?.tied === true),
+    unread: names.filter((c) => noRead(testOf(measure, c).mine)),
+  }));
+  const dominatedBy = controls.filter((c) => c.dominates).map((c) => c.control);
+  const notAhead = measureReads.filter((m) => m.beats.length === 0).map((m) => m.measure);
+  // A measure with no control at all has nothing to read, so it cannot close the claim as `not-ahead`.
+  const closed = measureReads.some((m) => m.beats.length === 0 && m.unread.length === 0 && names.some((c) => testOf(m.measure, c).mine !== undefined));
+  // An unread test can hide a win of the entry, so a control that leads on another measure stays open.
+  const undecided = controls.some((c) => c.beaten.length === 0 && c.lostTo.length > 0 && c.unread.length > 0);
+  const verdict: JointVerdict = dominatedBy.length > 0 ? "dominated" : closed ? "not-ahead" : notAhead.length > 0 || undecided ? "no-read" : "survives";
+  return { entry, stratum, verdict, dominatedBy, notAhead, controls, measures: measureReads };
 }

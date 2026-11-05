@@ -1,6 +1,6 @@
 import { signTestPower } from "@mark1russell7/rigor-statistics";
 import { describe, expect, it } from "vitest";
-import { type MeasureCheckOptions, type MeasureChecks, type MeasureFindingKind, type MeasureRow, type MeasureRule, checkMeasures, winClaim } from "./measures.ts";
+import { type MeasureCheckOptions, type MeasureChecks, type MeasureFindingKind, type MeasureRow, type MeasureRule, checkMeasures, jointClaim, winClaim } from "./measures.ts";
 
 const keys = (count: number, prefix = "k"): string[] => Array.from({ length: count }, (_, i) => `${prefix}${i}`);
 
@@ -504,5 +504,107 @@ describe("the size of a read", () => {
     const check = checkMeasures(data, { rules: [{ ...FILL, partners: [] }], controls: ["trick"], asOf: AS_OF });
     expect(check.measures[0]!.spread[0]!.pairs).toBe(2016);
     expect(has(check, "uncaught")).toBe(true);
+  });
+});
+
+describe("jointClaim", () => {
+  const SET = ["fill", "order"];
+  const RULES_2: readonly MeasureRule[] = [
+    { measure: "fill", sense: "higher", controls: ["a-trick", "b-trick"], partners: ["order"] },
+    { measure: "order", sense: "lower", controls: ["a-trick", "b-trick"], partners: ["fill"] },
+  ];
+  const read = (data: readonly MeasureRow[]): MeasureChecks => checkMeasures(data, { rules: RULES_2, controls: ["a-trick", "b-trick"], asOf: AS_OF });
+  /** One group with one level on each measure, with a small change for each key. */
+  const group = (name: string, fill: number, order: number, count = 40, extra: Partial<MeasureRow> = {}): MeasureRow[] => [
+    ...rows("fill", name, count, (i) => fill + i * 1e-4, extra),
+    ...rows("order", name, count, (i) => order + i * 1e-3, extra),
+  ];
+
+  it("lets an entry survive that beats a control on each measure, when each control beats it on another", () => {
+    const check = read([...group("real", 0.5, 50), ...group("a-trick", 0.9, 90), ...group("b-trick", 0.1, 10)]);
+    const claim = jointClaim(check, SET, "real");
+    expect(claim.verdict).toBe("survives");
+    expect(claim.dominatedBy).toEqual([]);
+    expect(claim.measures.map((m) => m.beats)).toEqual([["b-trick"], ["a-trick"]]);
+    expect(claim.controls.map((c) => [c.control, c.beaten, c.lostTo])).toEqual([
+      ["a-trick", ["order"], ["fill"]],
+      ["b-trick", ["fill"], ["order"]],
+    ]);
+  });
+
+  it("calls an entry dominated when one control beats it on each measure, and names only that control", () => {
+    const check = read([...group("real", 0.5, 50), ...group("a-trick", 0.9, 10), ...group("b-trick", 0.1, 90)]);
+    const claim = jointClaim(check, SET, "real");
+    expect(claim.verdict).toBe("dominated");
+    expect(claim.dominatedBy).toEqual(["a-trick"]);
+    expect(claim.controls.find((c) => c.control === "b-trick")!.dominates).toBe(false);
+  });
+
+  it("does not let a tie clear a control", () => {
+    const tied = [...rows("fill", "real", 40, () => 0.5), ...rows("order", "real", 40, (i) => 50 + i * 1e-3), ...rows("fill", "a-trick", 40, () => 0.5), ...rows("order", "a-trick", 40, (i) => 10 + i * 1e-3), ...group("b-trick", 0.1, 90)];
+    const claim = jointClaim(read(tied), SET, "real");
+    expect(claim.measures[0]!.tied).toEqual(["a-trick"]);
+    expect(claim.dominatedBy).toEqual(["a-trick"]);
+    expect(claim.verdict).toBe("dominated");
+  });
+
+  it("reads not-ahead when the entry beats no control on a measure, and no control dominates", () => {
+    const check = read([...group("real", 0.5, 50), ...group("a-trick", 0.9, 90), ...group("b-trick", 0.8, 95)]);
+    const claim = jointClaim(check, SET, "real");
+    expect(claim.verdict).toBe("not-ahead");
+    expect(claim.notAhead).toEqual(["fill"]);
+    expect(claim.dominatedBy).toEqual([]);
+  });
+
+  it("reads no-read at 3 keys, where no test has the power, and not a pass", () => {
+    const check = read([...group("real", 0.5, 50, 3), ...group("a-trick", 0.9, 90, 3), ...group("b-trick", 0.1, 10, 3)]);
+    const claim = jointClaim(check, SET, "real");
+    expect(claim.verdict).toBe("no-read");
+    expect(claim.controls.every((c) => c.unread.length === 2 && !c.dominates)).toBe(true);
+  });
+
+  it("does not call a control dominant while a test against it is unread", () => {
+    const few = (name: string, value: number): MeasureRow[] => rows("order", name, 3, (i) => value + i * 1e-3);
+    const data = [...rows("fill", "real", 40, (i) => 0.5 + i * 1e-4), ...few("real", 50), ...rows("fill", "a-trick", 40, (i) => 0.9 + i * 1e-4), ...few("a-trick", 90), ...rows("fill", "b-trick", 40, (i) => 0.1 + i * 1e-4), ...few("b-trick", 90)];
+    const claim = jointClaim(read(data), SET, "real");
+    const trick = claim.controls.find((c) => c.control === "a-trick")!;
+    expect(trick.lostTo).toEqual(["fill"]);
+    expect(trick.unread).toEqual(["order"]);
+    expect(trick.dominates).toBe(false);
+    expect(claim.verdict).toBe("no-read");
+  });
+
+  it("reads no-read for a measure with no control, because nothing was read on it", () => {
+    const rules: readonly MeasureRule[] = [
+      { measure: "fill", sense: "higher", controls: ["a-trick"], partners: ["order"] },
+      { measure: "order", sense: "lower", controls: [], partners: [], noControl: { because: "The control has no code.", until: "2026-12-01" } },
+    ];
+    const check = checkMeasures([...group("real", 0.5, 50), ...rows("fill", "a-trick", 40, (i) => 0.1 + i * 1e-4)], { rules, controls: ["a-trick"], asOf: AS_OF });
+    const claim = jointClaim(check, SET, "real");
+    expect(claim.verdict).toBe("no-read");
+    expect(claim.notAhead).toEqual(["order"]);
+  });
+
+  it("gives no credit for the win of another entry", () => {
+    const check = read([...group("real", 0.5, 50), ...group("other", 0.95, 5), ...group("a-trick", 0.9, 10), ...group("b-trick", 0.1, 90)]);
+    expect(jointClaim(check, SET, "real").dominatedBy).toEqual(["a-trick"]);
+    expect(jointClaim(check, SET, "other").verdict).toBe("survives");
+  });
+
+  it("reads each stratum on its own", () => {
+    const at = (stratum: string, name: string, fill: number, order: number): MeasureRow[] =>
+      (["fill", "order"] as const).flatMap((measure) => keys(40, stratum).map((key, i): MeasureRow => ({ measure, group: name, key, stratum, value: (measure === "fill" ? fill + i * 1e-4 : order + i * 1e-3) })));
+    const data = [...at("s1", "real", 0.5, 50), ...at("s1", "a-trick", 0.9, 90), ...at("s1", "b-trick", 0.1, 10), ...at("s2", "real", 0.5, 50), ...at("s2", "a-trick", 0.9, 10), ...at("s2", "b-trick", 0.1, 90)];
+    const check = read(data);
+    expect(jointClaim(check, SET, "real", "s1").verdict).toBe("survives");
+    expect(jointClaim(check, SET, "real", "s2").verdict).toBe("dominated");
+  });
+
+  it("refuses an empty set, a repeat, a measure with no rule and an entry with no rows", () => {
+    const check = read([...group("real", 0.5, 50), ...group("a-trick", 0.9, 90), ...group("b-trick", 0.1, 10)]);
+    expect(() => jointClaim(check, [], "real")).toThrow(RangeError);
+    expect(() => jointClaim(check, ["fill", "fill"], "real")).toThrow(RangeError);
+    expect(() => jointClaim(check, ["nothing"], "real")).toThrow(RangeError);
+    expect(() => jointClaim(check, SET, "nobody")).toThrow(RangeError);
   });
 });

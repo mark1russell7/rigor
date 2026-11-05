@@ -321,6 +321,22 @@ Each finding fails a gate, and each one carries its tests with `n`, `ties`, `p` 
 
 `winClaim(check, measure, entry, stratum)` gives `alone`, `show`, `likeControl`, `censored` and `open`. The fields are about this entry. The field `likeControl` is true when this entry does not beat a control on the measure and beats it on no partner. A win by another entry clears nothing. The field `alone` is true only when this entry itself beats each control on the measure, so a measure with no control is not `alone`.
 
+`jointClaim(check, measures, entry, stratum)` reads a set of measures together, because one measure cannot call a win when each control wins a measure and loses a partner:
+
+```ts
+const joint = jointClaim(check, ["fill", "order"], "my-entry");
+joint.verdict; // "survives", "dominated", "not-ahead" or "no-read"
+```
+
+| Verdict | Meaning |
+| --- | --- |
+| `survives` | No control dominates the entry, and the entry beats at least one control on each measure. |
+| `dominated` | A control beats the entry on at least one measure, and the entry beats that control on none. The field `dominatedBy` names it. |
+| `not-ahead` | The entry beats no control on a measure with each read made. The field `notAhead` names it. |
+| `no-read` | A test with too few keys, or a measure with no control, decides the claim. This verdict is not a pass. |
+
+A tie does not clear a control, and the win of another entry gives this entry no credit. The function adds no test: it reads the tests of `checkMeasures`, with their Holm families.
+
 ## The fresh runner
 
 The entry `@mark1russell7/rigor-bench/fresh` starts child processes, so it is for Node only. The root entry stays free of `node:child_process`.

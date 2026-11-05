@@ -70,6 +70,10 @@ export {
   type ControlRead,
   type EntryCount,
   type GuardRead,
+  type JointClaim,
+  type JointControl,
+  type JointMeasure,
+  type JointVerdict,
   type MeasureCheck,
   type MeasureCheckOptions,
   type MeasureChecks,
@@ -82,6 +86,7 @@ export {
   type SpreadRead,
   type WinClaim,
   checkMeasures,
+  jointClaim,
   winClaim,
 } from "./measures.ts";
 export { type Arm, type CaseRatio, type PairedTime, caseRatios, checkPairedTime, firstArm } from "./paired.ts";
