@@ -46,6 +46,9 @@ describe("rigor-mutation", () => {
     expect(run("list")).toBe(0);
     expect(out).toBe("lib\nlib.core\napp\n");
     out = "";
+    expect(run("list", "--runs")).toBe(0);
+    expect(out).toBe("lib.core\napp\n");
+    out = "";
     expect(run("dir", "lib.core")).toBe(0);
     expect(out).toBe("packages/lib\n");
   });

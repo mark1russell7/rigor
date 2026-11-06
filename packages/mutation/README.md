@@ -38,7 +38,7 @@ The lane file `mutation.json` is at the root of the repository:
 - `vitestConfig` names the Vitest config of the package, from `dir`. Without it, Vitest finds its config.
 - `disables` (at the root of the lane) names the list of the disabled mutants. The default is `mutation-disables.json`.
 
-A selection is one Stryker run: a package (`collections`) or a part (`collections.impl`).
+A selection is one Stryker run: a package (`collections`) or a part (`collections.impl`). `rigor-mutation list --runs` gives the selections of a full run: the parts of each package with parts, else the package.
 
 ## A run
 
@@ -78,4 +78,4 @@ const score = scoreReport(parseReport(JSON.parse(reportText)), selection);
 console.log(formatScore(score)); // collections.impl: 91.20 % (456 of 500, 44 survived), gate 80 %: pass
 ```
 
-The package also exports `selectionNames`, `summaryMarkdown`, `findDisables`, `compareDisables` and `runCli`.
+The package also exports `selectionNames`, `runSelections`, `summaryMarkdown`, `findDisables`, `compareDisables` and `runCli`.

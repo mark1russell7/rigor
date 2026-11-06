@@ -6,7 +6,7 @@ import { dirname, relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { REPORT_DIR, strykerConfig } from "./config.ts";
 import { compareDisables, findDisables, type Disable } from "./disables.ts";
-import { parseLane, select, selectionNames, type Lane } from "./lane.ts";
+import { parseLane, runSelections, select, selectionNames, type Lane } from "./lane.ts";
 import { formatScore, parseReport, scoreReport, summaryMarkdown, type Score } from "./score.ts";
 
 /** The input and the output of the CLI. */
@@ -19,7 +19,8 @@ export interface CliIo {
 /** The help text of the CLI. */
 export const HELP: string = `rigor-mutation: the mutation tests of a repository, with Stryker and a gate for each package.
 
-  rigor-mutation list                          the packages and the parts of the lane
+  rigor-mutation list [--runs]                 the packages and the parts of the lane. With --runs, the
+                                               selections of a full run: the parts of a package with parts.
   rigor-mutation dir <selection>               the folder of the package of a selection
   rigor-mutation config <selection> [--out <file>] [--concurrency <n>]
                                                the Stryker config of a selection, as JSON
@@ -92,6 +93,7 @@ export function runCli(argv: readonly string[], io: CliIo): number {
       report: { type: "string" },
       summary: { type: "string" },
       write: { type: "boolean", default: false },
+      runs: { type: "boolean", default: false },
       help: { type: "boolean", default: false },
     },
   });
@@ -109,7 +111,7 @@ export function runCli(argv: readonly string[], io: CliIo): number {
   };
   switch (command) {
     case "list":
-      io.stdout(`${selectionNames(lane).join("\n")}\n`);
+      io.stdout(`${(values.runs ? runSelections(lane) : selectionNames(lane)).join("\n")}\n`);
       return 0;
     case "dir":
       io.stdout(`${relative(io.cwd, resolve(laneDir, select(lane, one()).dir)).replaceAll("\\", "/") || "."}\n`);

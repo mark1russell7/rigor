@@ -83,6 +83,11 @@ export function selectionNames(lane: Lane): string[] {
   return Object.entries(lane.packages).flatMap(([name, p]) => [name, ...Object.keys(p.parts ?? {}).map((part) => `${name}.${part}`)]);
 }
 
+/** This function gives the selections of a full run: the parts of each package with parts, else the package. Each file is in one run. */
+export function runSelections(lane: Lane): string[] {
+  return Object.entries(lane.packages).flatMap(([name, p]) => (p.parts === undefined ? [name] : Object.keys(p.parts).map((part) => `${name}.${part}`)));
+}
+
 /**
  * This function gives the selection of a name: a package, or a part of a package.
  *

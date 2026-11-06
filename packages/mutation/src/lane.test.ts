@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { strykerConfig } from "./config.ts";
-import { parseLane, select, selectionNames } from "./lane.ts";
+import { parseLane, runSelections, select, selectionNames } from "./lane.ts";
 
 const LANE = {
   packages: {
@@ -36,6 +36,10 @@ describe("select", () => {
 
   it("names each package and each part", () => {
     expect(selectionNames(lane)).toEqual(["collections", "collections.impl", "collections.core", "small"]);
+  });
+
+  it("gives the parts of a package with parts for a full run, so no file is in two runs", () => {
+    expect(runSelections(lane)).toEqual(["collections.impl", "collections.core", "small"]);
   });
 
   it("gives the globs of a package", () => {

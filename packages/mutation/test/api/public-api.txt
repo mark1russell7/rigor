@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 24 names
+## . (build/index.d.ts): 25 names
 
 type CliIo: build/index.d.ts#CliIo
 type ConfigOptions: build/index.d.ts#ConfigOptions
@@ -25,6 +25,7 @@ formatScore: build/index.d.ts#formatScore
 parseLane: build/index.d.ts#parseLane
 parseReport: build/index.d.ts#parseReport
 runCli: build/index.d.ts#runCli
+runSelections: build/index.d.ts#runSelections
 scoreReport: build/index.d.ts#scoreReport
 select: build/index.d.ts#select
 selectionNames: build/index.d.ts#selectionNames
@@ -169,6 +170,9 @@ export declare function parseReport(json: unknown): MutationReport;
 
 ### build/index.d.ts#runCli
 export declare function runCli(argv: readonly string[], io: CliIo): number;
+
+### build/index.d.ts#runSelections
+export declare function runSelections(lane: Lane): string[];
 
 ### build/index.d.ts#scoreReport
 export declare function scoreReport(report: MutationReport, selection: {
