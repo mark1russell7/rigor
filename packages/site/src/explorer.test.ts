@@ -170,7 +170,7 @@ describe("the text and the axis of the explorer", () => {
 
 describe("the page of the explorer", () => {
   it("has the section, its link and the controls at the start values", () => {
-    const html = pageHtml(packageRows({ generators: "0.1.0", statistics: "0.1.0", bench: "0.2.2", chaos: "0.1.0" }), "2026-11-02");
+    const html = pageHtml(packageRows({ generators: "0.1.0", statistics: "0.1.0", bench: "0.2.2", chaos: "0.1.0", mutation: "0.1.0" }), "2026-11-02");
     expect(html).toContain('href="#verdict"');
     expect(html).toContain('<section id="verdict">');
     expect(html.indexOf('id="try"')).toBeLessThan(html.indexOf('id="verdict"'));
