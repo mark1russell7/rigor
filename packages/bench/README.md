@@ -402,6 +402,32 @@ A run of many jobs sets `roundOffset` to `job * rounds`. Then the merged records
 
 A rotation of N arms turns the order of two arms only when they are N/2 apart in the rotation. For 4 arms, two arms 1 apart come in the order 3:1 over 4 rounds. Thus each pair of `freshRun` has its own two children, and the order of each pair turns each round.
 
+## A result that changes on purpose
+
+A bench compares two arms, and two arms with different results do not do the same work. So a difference stops the merge. A pull request can change a result on purpose. Without a stated path, its author edits the case, and no gate reads that edit. A row in the diff gives that path, and it names the exact change.
+
+```ts
+import { resultRows, resultVerdict } from "@mark1russell7/rigor-bench";
+
+const verdict = resultVerdict(
+  [{ case: "facts of a tree", base: "9f3a", head: "c81e" }],            // the hash of the result of each case in the two arms
+  { base: resultRows(rowsOfTheBase), head: resultRows(rowsOfTheHead) }, // the parsed file of rows in each arm
+);
+
+verdict.outcome;                                  // "pass" or "fail"
+verdict.lines;                                    // the lines that the check prints
+```
+
+A row has four fields: `case`, `base`, `head` and `reason`. The fields `base` and `head` are hashes that the caller makes, so a large result stays out of the file. A reviewer can read a row against the run. A refused line prints the row to add. These rules stop the reuse of a row:
+
+- **The hashes bind the row to one change.** The same row against one other result reads `refused`, and the line says which side moved: the base, the head or both. The fields have an order, so a row of a change does not accept its revert.
+- **A row counts only if it is new.** A row that the base also has is spent and accepts nothing, even on the same change. The verdict keeps the array `spent`, and it prints one line with the count.
+- **A new row that accepts nothing fails the verdict.** A row of a case with one result reads `unused`. Otherwise it merges and is spent, and a later true change is refused.
+- **A row of a case with no result fails the verdict.** It reads `absent`, because a missing read is no pass. The case can be skipped or filtered out, so the line does not tell the author to delete the row.
+- **A change that comes again needs two pull requests.** The first one deletes the spent row, and the second one adds it. A revert can delete the row in the same pull request.
+
+**Time.** The verdict reads results only. An accepted result buys no time reading. Keep the accepted case in `freshRun`, so it gets its head and A/A pairs and its normal time verdict. The time of the new result counts. The hash rule of `freshRun` is per arm, so two arms with different hashes run. The test "refuses two hashes of one arm on one case, and permits other hashes for other arms" pins this rule.
+
 ## The stamp of the code of a run
 
 The entry `@mark1russell7/rigor-bench/code-stamp` is for Node only. It uses the optional peer `esbuild`. Add `esbuild` to the dependencies of the caller, so that its lock file pins the version.
