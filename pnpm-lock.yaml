@@ -336,6 +336,24 @@ importers:
         specifier: ^5.0.3
         version: 5.0.5(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(tsx@4.23.15))
 
+  packages/testkit:
+    devDependencies:
+      '@mark1russell7/cue':
+        specifier: ^2.0.0
+        version: 2.1.1
+      '@types/node':
+        specifier: ^26.6.5
+        version: 26.6.6
+      tsdown:
+        specifier: ^0.23.1
+        version: 0.23.4(publint@0.3.25)(tsx@4.23.15)(typescript@7.0.2)
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.5(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(tsx@4.23.15))
+
 packages:
 
   '@clack/core@1.5.1':
