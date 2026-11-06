@@ -58,6 +58,15 @@ assert.equal(double(2), 4);
 - Each call of `run` writes a new module file, so a block runs again on each call. The file goes away after the run.
 - A block runs as a module, so it can use `await` at the top level.
 - The loader of the test runner compiles the block. Vitest compiles TypeScript. `node:test` runs TypeScript only with the type stripping of Node.
+- Vitest does not compile the packages in `node_modules`. Thus, when this package comes from npm, Vitest does not compile the blocks that it imports. Then a mapped source with `.js` imports of `.ts` files fails. Add this package to `server.deps.inline`:
+
+  ```ts no-run
+  // vitest.config.ts
+  export default defineConfig({
+    test: { server: { deps: { inline: ["@mark1russell7/rigor-testkit"] } } },
+  });
+  ```
+
 - The default cache folder is `.cache/rigor-testkit` under the option `root`. The default root is the current folder. When the function makes the folder, it writes a `.gitignore` there, so git ignores the files.
 - Do not put the cache folder under `node_modules`. Node does not strip the types of a file there, so a TypeScript block fails under `node:test`.
 - Under `node:test`, Node runs the mapped source files with no transform. A relative import of a `.ts` file with the extension `.js` fails there. Use `vitest` for that source, or map to the build.
