@@ -70,6 +70,14 @@ describe("strykerConfig", () => {
     expect(config).not.toHaveProperty("vitest");
   });
 
+  // Under pnpm the runner is not next to @stryker-mutator/core, so the default plugin glob of Stryker does not find it.
+  // A config with no plugins starts no test (ireko nightly of 2026-11-06), so each config names the runner.
+  it("names the Vitest runner plugin, so Stryker finds it under pnpm", () => {
+    for (const name of selectionNames(lane)) {
+      expect(strykerConfig(select(lane, name)).plugins).toEqual(["@stryker-mutator/vitest-runner"]);
+    }
+  });
+
   it("names the Vitest config of a package that has one", () => {
     expect(strykerConfig(select(lane, "small"))).toMatchObject({ vitest: { configFile: "vitest.unit.ts" }, thresholds: { low: 60, high: 90 }, concurrency: 2 });
   });
