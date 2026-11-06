@@ -15,6 +15,7 @@ Many engines make their own copies of these tools. The duplication atlas ([codea
 | statistics | planned | Bootstrap intervals, paired permutation tests, Holm, Wilson, Sobol, Brier and the noise rule of 5 seeds. |
 | gates | planned | The determinism gate, the promotion test and the performance evidence of a release. |
 | testgen | planned | Property tests on fast-check, pairwise and covering arrays, metamorphic relations. |
+| [`@mark1russell7/rigor-testkit`](packages/testkit) | new | Test helpers: the code blocks of Markdown files as test cases. Property, pairwise and metamorphic helpers come here too. |
 | [`@mark1russell7/rigor-chaos`](packages/chaos) | 0.1.0 | Open-loop load schedules from a rate profile, and a measure of latency from the planned time. Fault injection is planned. |
 
 The roadmap is in [docs/ROADMAP.md](docs/ROADMAP.md). The win test that layout-contract, packing and highways share is in [docs/WIN-TEST.md](docs/WIN-TEST.md).
