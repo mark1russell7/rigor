@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/rigor-testkit",
-  "version": "0.1.0",
-  "description": "Test helpers: the code blocks of Markdown files as test cases, so each example of a doc runs in a test.",
+  "version": "0.1.1",
+  "description": "Test helpers: the code blocks of Markdown files as test cases, and model-based tests on fast-check.",
   "keywords": [
     "testing",
     "markdown",
@@ -10,7 +10,10 @@
     "examples",
     "documentation",
     "vitest",
-    "node-test"
+    "node-test",
+    "model-based",
+    "property-based",
+    "fast-check"
   ],
   "homepage": "https://github.com/mark1russell7/rigor/tree/main/packages/testkit#readme",
   "bugs": {
@@ -26,6 +29,11 @@
   "type": "module",
   "sideEffects": false,
   "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./model": "./src/model.ts",
+    "./package.json": "./package.json"
+  },
   "files": [
     "build"
   ],
@@ -37,6 +45,10 @@
       ".": {
         "types": "./build/index.d.ts",
         "import": "./build/index.js"
+      },
+      "./model": {
+        "types": "./build/model.d.ts",
+        "import": "./build/model.js"
       },
       "./package.json": "./package.json"
     }
@@ -53,8 +65,17 @@
   "devDependencies": {
     "@mark1russell7/cue": "^2.0.0",
     "@types/node": "^26.6.5",
+    "fast-check": "^4.10.2",
+    "tsdown": "^0.23.1",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.3",
-    "tsdown": "^0.23.1"
+    "vitest": "^5.0.3"
+  },
+  "peerDependencies": {
+    "fast-check": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "fast-check": {
+      "optional": true
+    }
   }
 }
