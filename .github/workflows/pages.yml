@@ -6,9 +6,17 @@ name: Pages
 on:
   push:
     branches: [main]
+  # After a release, so that the Releases page has the new version
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+    branches: [main]
   # A pull request builds the site and runs the site check, with no deploy.
   pull_request:
   workflow_dispatch:
+  # Each day, in case a release fails after it publishes
+  schedule:
+    - cron: "15 5 * * *"
 
 permissions: {}
 
