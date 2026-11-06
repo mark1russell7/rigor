@@ -40,9 +40,21 @@ const counts = (xs: readonly Disable[]): Map<string, number> => {
   return m;
 };
 
+/**
+ * This function tells if a comment has a reason: a mutator name, a colon, a space and a text. It reads the text by
+ * index, so its time is linear in the length of the comment (a regular expression here was quadratic).
+ */
+function hasReason(comment: string): boolean {
+  const start = comment.indexOf("Stryker disable ");
+  if (start < 0) return false;
+  const rest = comment.slice(start + "Stryker disable ".length);
+  const colon = rest.indexOf(":");
+  return colon > 0 && rest[colon + 1] === " " && /\S/.test(rest[colon + 2] ?? "");
+}
+
 /** This function compares the comments of the sources with the list. A file with the same comment two times needs it two times in the list. */
 export function compareDisables(found: readonly Disable[], listed: readonly Disable[]): DisableCheck {
-  const noReason = found.filter((d) => !/Stryker disable [^:]+: \S/.test(d.comment));
+  const noReason = found.filter((d) => !hasReason(d.comment));
   const a = counts(found);
   const b = counts(listed);
   const added = [...a].filter(([k, n]) => n > (b.get(k) ?? 0)).map(([k]) => k);
