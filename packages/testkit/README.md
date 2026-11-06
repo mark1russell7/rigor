@@ -55,7 +55,8 @@ assert.equal(double(2), 4);
 - Each call of `run` writes a new module file, so a block runs again on each call. The file goes away after the run.
 - A block runs as a module, so it can use `await` at the top level.
 - The loader of the test runner compiles the block. Vitest compiles TypeScript. `node:test` runs TypeScript only with the type stripping of Node.
-- The default cache folder is `node_modules/.cache/rigor-testkit` under the option `root`. The default root is the current folder.
+- The default cache folder is `.cache/rigor-testkit` under the option `root`. The default root is the current folder. When the function makes the folder, it writes a `.gitignore` there, so git ignores the files.
+- Do not put the cache folder under `node_modules`. Node does not strip the types of a file there, so a TypeScript block fails under `node:test`.
 
 `fencedBlocks(text)` gives each fenced block of a Markdown text with its language, its flags and its line. `mapImports(code, imports, root)` changes the mapped import specifiers of a code text to file URLs.
 

@@ -1,5 +1,8 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 import { fencedBlocks, mapImports, markdownExamples } from "./index.ts";
 
@@ -131,5 +134,55 @@ describe("markdownExamples", () => {
 
   it("refuses a language that it cannot run", () => {
     expect(() => markdownExamples([doc], { root, lang: ["sh"] })).toThrow(RangeError);
+  });
+
+  it("writes a .gitignore in a cache folder that it makes, and not in a folder that exists", async () => {
+    const made = join(root, "made-cache");
+    await markdownExamples([doc], { root, imports: { "my-lib": lib }, cacheDir: made })[0]!.run();
+    expect(readFileSync(join(made, ".gitignore"), "utf8")).toBe("*\n");
+    const own = join(root, "own-cache");
+    mkdirSync(own);
+    await markdownExamples([doc], { root, imports: { "my-lib": lib }, cacheDir: own })[0]!.run();
+    expect(existsSync(join(own, ".gitignore"))).toBe(false);
+  });
+});
+
+describe("markdownExamples under node:test, with no transform of the test runner", () => {
+  // Node strips the types of a .ts file, but not of a file under node_modules. So this root is outside each node_modules.
+  const plain = mkdtempSync(join(tmpdir(), "rigor-testkit-"));
+  afterAll(() => rmSync(plain, { recursive: true, force: true }));
+  const entry = pathToFileURL(join(import.meta.dirname, "index.ts")).href;
+  writeFileSync(join(plain, "lib.ts"), "export const double = (value: number): number => value * 2;\n");
+  writeFileSync(
+    join(plain, "guide.md"),
+    [`${fence}ts`, `import assert from "node:assert/strict";`, `import { double } from "my-lib";`, "const n: number = double(2);", "assert.equal(n, 4);", fence].join("\n")
+  );
+
+  /** This function runs one test file with `node --test` in a child process, and gives its exit code and output. */
+  function nodeTest(cacheDir: string | undefined): { status: number | null; output: string } {
+    const runner = join(plain, `runner-${cacheDir === undefined ? "default" : "node-modules"}.test.ts`);
+    writeFileSync(
+      runner,
+      [
+        `import { test } from "node:test";`,
+        `import { markdownExamples } from ${JSON.stringify(entry)};`,
+        `const options = { root: ${JSON.stringify(plain)}, imports: { "my-lib": "lib.ts" }, cacheDir: ${JSON.stringify(cacheDir)} };`,
+        `for (const example of markdownExamples(["guide.md"], options)) test(example.name, example.run);`,
+      ].join("\n")
+    );
+    const child = spawnSync(process.execPath, ["--test", runner], { cwd: plain, encoding: "utf8" });
+    return { status: child.status, output: `${child.stdout}${child.stderr}` };
+  }
+
+  it("runs a TypeScript block with the default cache folder", () => {
+    const result = nodeTest(undefined);
+    expect(result.output).toContain("guide.md:1");
+    expect(result.status, result.output).toBe(0);
+  });
+
+  it("fails a TypeScript block with a cache folder under node_modules (flip)", () => {
+    const result = nodeTest("node_modules/.cache/rigor-testkit");
+    expect(result.status).not.toBe(0);
+    expect(result.output).toContain("ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING");
   });
 });

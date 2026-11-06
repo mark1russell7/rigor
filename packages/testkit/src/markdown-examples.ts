@@ -20,7 +20,9 @@ export interface MarkdownExampleOptions {
   readonly root?: string | undefined;
   /**
    * The folder for the module files of the blocks. A block resolves the packages that it does not
-   * map from this folder. The default is `node_modules/.cache/rigor-testkit` under `root`.
+   * map from this folder. The default is `.cache/rigor-testkit` under `root`. Node does not strip
+   * the types of a file under `node_modules`, so a TypeScript block in a folder there fails under
+   * `node:test`.
    */
   readonly cacheDir?: string | undefined;
 }
@@ -131,7 +133,7 @@ export function markdownExamples(files: readonly string[], options: MarkdownExam
     if (EXTENSION[lang] === undefined) throw new RangeError(`markdownExamples: the language ${lang} is not one of ${Object.keys(EXTENSION).join(", ")}`);
   }
   const imports = options.imports ?? {};
-  const cacheDir = resolve(root, options.cacheDir ?? "node_modules/.cache/rigor-testkit");
+  const cacheDir = resolve(root, options.cacheDir ?? ".cache/rigor-testkit");
   const cases: MarkdownExample[] = [];
   for (const given of files) {
     const file = resolve(root, given);
@@ -148,7 +150,8 @@ export function markdownExamples(files: readonly string[], options: MarkdownExam
         lang: block.lang,
         code: block.code,
         run: async () => {
-          mkdirSync(cacheDir, { recursive: true });
+          // A folder that this function makes gets a .gitignore, so its files stay out of git
+          if (mkdirSync(cacheDir, { recursive: true }) !== undefined) writeFileSync(resolve(cacheDir, ".gitignore"), "*\n");
           // A new file for each run: a module loader keeps a module of the same path, and then the block does not run again
           runs += 1;
           const module = resolve(cacheDir, `${shown.replace(/[^\w.-]+/g, "_")}-${block.line}-${process.pid}-${runs}${extension}`);
