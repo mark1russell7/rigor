@@ -105,3 +105,4 @@ export {
   noiseFloor,
   noiseVerdict,
 } from "./compare.ts";
+export { type OptionFloorOptions, optionFloor, tQuantile } from "./power.ts";

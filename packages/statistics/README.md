@@ -125,6 +125,7 @@ The default expansion has one product for each pair of levels of two dimensions.
 | `partialConjunction(pValues, need)` | The p of the claim that at least `need` of these tests have a real effect. |
 | `spearman`, `kendallTau`, `ranks` | The rank correlations, with mean ranks for ties. |
 | `compareRatios`, `noiseFloor`, `noiseVerdict` | The comparison with a baseline, the noise floor of the 5-seed rule with a margin of practical effect, and the state of a difference over the seeds. |
+| `optionFloor({ sigma, delta, tests, alpha, power })`, `tQuantile(p, df)` | The fewest values for each of two options, so that one test of a Bonferroni family finds a difference of `delta` with the stated power, from the Student t law. It assumes unpaired groups of equal size and equal `sigma`. The quantile of the Student t law. |
 | `modeCount(values, { minShare, valleyRatio })` | The count of the modes of a sample, from a kernel density estimate. |
 | `smoothLawScores(values)`, `bestSmoothLaw(values)` | The mean log density of the uniform, normal, exponential, log-normal and Pareto laws at their fits, and the best of them. |
 | `brier`, `calibration` | The Brier score of predictions, and the hit rate of each stated level. |

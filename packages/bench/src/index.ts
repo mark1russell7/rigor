@@ -93,6 +93,7 @@ export {
 } from "./measures.ts";
 export { type Arm, type CaseRatio, type OrderSize, type PairedTime, armOrder, caseRatios, checkPairedTime, firstArm, orderSize } from "./paired.ts";
 export { type Power, type PowerOptions, verdictPower } from "./power.ts";
+export { type CaseResults, type ResultRead, type ResultRow, type ResultRows, type ResultVerdict, type RowRead, resultRows, resultVerdict } from "./results.ts";
 export { type Rounds, type RoundsOptions, timeRounds } from "./rounds.ts";
 export {
   type Band,
