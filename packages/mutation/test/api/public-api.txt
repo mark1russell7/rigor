@@ -13,8 +13,10 @@ type Disable: build/index.d.ts#Disable
 type DisableCheck: build/index.d.ts#DisableCheck
 HELP: build/index.d.ts#HELP
 type Lane: build/index.d.ts#Lane
+type LeavingPath: build/index.d.ts#LeavingPath
 type Mutant: build/index.d.ts#Mutant
 type MutationReport: build/index.d.ts#MutationReport
+type PackageFile: build/index.d.ts#PackageFile
 type PackageLane: build/index.d.ts#PackageLane
 REPORT_DIR: build/index.d.ts#REPORT_DIR
 STRYKER_OWNED: build/index.d.ts#STRYKER_OWNED
@@ -26,7 +28,9 @@ changedFiles: build/index.d.ts#changedFiles
 compareDisables: build/index.d.ts#compareDisables
 findDisables: build/index.d.ts#findDisables
 formatScore: build/index.d.ts#formatScore
+isConfigFile: build/index.d.ts#isConfigFile
 isHitLimit: build/index.d.ts#isHitLimit
+leavingPaths: build/index.d.ts#leavingPaths
 parseLane: build/index.d.ts#parseLane
 parseReport: build/index.d.ts#parseReport
 partErrors: build/index.d.ts#partErrors
@@ -84,6 +88,13 @@ interface Lane {
   readonly disables?: string;
 }
 
+### build/index.d.ts#LeavingPath
+interface LeavingPath {
+  readonly file: string;
+  readonly line: number;
+  readonly path: string;
+}
+
 ### build/index.d.ts#Mutant
 interface Mutant {
   readonly status: string;
@@ -101,6 +112,12 @@ interface MutationReport {
   readonly files: Readonly<Record<string, {
     readonly mutants: readonly Mutant[];
   }>>;
+}
+
+### build/index.d.ts#PackageFile
+interface PackageFile {
+  readonly file: string;
+  readonly text: string;
 }
 
 ### build/index.d.ts#PackageLane
@@ -196,8 +213,14 @@ export declare function findDisables(files: readonly {
 ### build/index.d.ts#formatScore
 export declare function formatScore(s: Score): string;
 
+### build/index.d.ts#isConfigFile
+export declare function isConfigFile(file: string, vitestConfig?: string): boolean;
+
 ### build/index.d.ts#isHitLimit
 export declare const isHitLimit: (m: Mutant) => boolean;
+
+### build/index.d.ts#leavingPaths
+export declare function leavingPaths(files: readonly PackageFile[], vitestConfig?: string): LeavingPath[];
 
 ### build/index.d.ts#parseLane
 export declare function parseLane(json: unknown): Lane;
