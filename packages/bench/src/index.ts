@@ -13,6 +13,7 @@ export {
   budgetLooksVerdict,
   budgetVerdict,
 } from "./budget.ts";
+export { type GrowthOptions, type GrowthOutcome, type GrowthRound, type GrowthStep, type GrowthVerdict, growthVerdict } from "./growth.ts";
 export {
   type CaseGate,
   GATE_LOOKS,
