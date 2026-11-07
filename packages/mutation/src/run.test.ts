@@ -30,10 +30,11 @@ beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "rigor-mutation-"));
   out = "";
   err = "";
-  const lib = { dir: "packages/lib", mutate: ["src/**/*.ts", "!src/**/*.test.ts"], gate: 80, parts: { core: ["src/core/**/*.ts"] } };
+  const lib = { dir: "packages/lib", mutate: ["src/**/*.ts", "!src/**/*.test.ts"], gate: 80, parts: { core: ["src/core/**/*.ts"], rest: ["src/*.ts"] } };
   put("mutation.json", JSON.stringify({ packages: { lib, app: { dir: "packages/app", mutate: ["src/**/*.ts"] } } }));
   put("packages/lib/src/a.ts", "// Stryker disable next-line all: an equivalent mutant\nexport const a = 1;\n");
   put("packages/lib/src/a.test.ts", "// Stryker disable next-line all\n");
+  put("packages/lib/src/core/c.ts", "export const c = 3;\n");
   put("packages/lib/node_modules/x/index.ts", "// Stryker disable next-line all\n");
   put("packages/app/src/b.ts", "export const b = 2;\n");
 });
@@ -44,10 +45,10 @@ afterEach(() => {
 describe("rigor-mutation", () => {
   it("lists the selections and gives the folder of one", () => {
     expect(run("list")).toBe(0);
-    expect(out).toBe("lib\nlib.core\napp\n");
+    expect(out).toBe("lib\nlib.core\nlib.rest\napp\n");
     out = "";
     expect(run("list", "--runs")).toBe(0);
-    expect(out).toBe("lib.core\napp\n");
+    expect(out).toBe("lib.core\nlib.rest\napp\n");
     out = "";
     expect(run("dir", "lib.core")).toBe(0);
     expect(out).toBe("packages/lib\n");
@@ -69,7 +70,7 @@ describe("rigor-mutation", () => {
     expect(out).toContain("  survived: src/a.ts:8 BooleanLiteral");
     expect(out).toContain("app: 10.00 % (1 of 10, 9 survived), no gate: pass");
     expect(err).toBe("The gate failed for lib.\n");
-    expect(readFileSync(join(root, "summary.md"), "utf8")).toContain("| lib | 70.00 % | 7 | 10 | 3 | 80 % | fail:");
+    expect(readFileSync(join(root, "summary.md"), "utf8")).toContain("| lib | 70.00 % | 7 | 10 | 3 | 0 | 70.00 % | 80 % | fail:");
   });
 
   it("passes a package at its gate, and fails a selection with no report", () => {
@@ -90,6 +91,16 @@ describe("rigor-mutation", () => {
     put("packages/app/src/b.ts", "// Stryker disable next-line all: a new one\n");
     expect(run("disables")).toBe(1);
     expect(err).toContain("not in the list: packages/app/src/b.ts");
+  });
+
+  // rigor#110: a file in no part is not mutated by a full run, so the commands of a full run refuse the lane.
+  it("refuses the runs and the parts of a package when a file is in no part, and names the file", () => {
+    put("packages/lib/src/util/u.ts", "export const u = 4;\n");
+    expect(() => run("list", "--runs")).toThrow(/lib: the file src\/util\/u\.ts is in no part/);
+    expect(() => run("config", "lib.core")).toThrow(/src\/util\/u\.ts is in no part/);
+    expect(() => run("scores", "lib.rest")).toThrow(/src\/util\/u\.ts is in no part/);
+    expect(run("config", "lib")).toBe(0);
+    expect(run("list")).toBe(0);
   });
 
   it("gives the help, and refuses an unknown command", () => {
