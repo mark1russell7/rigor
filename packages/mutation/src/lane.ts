@@ -32,6 +32,11 @@ export interface PackageLane {
    * owns the keys of `STRYKER_OWNED`, so the field cannot have them.
    */
   readonly stryker?: Readonly<Record<string, unknown>>;
+  /**
+   * Each test file of this field is on the disk, and no report reads it. The value gives the reason. `scores
+   * --test-files` fails for each other test file on the disk that the report does not read. The file is from `dir`.
+   */
+  readonly notRead?: Readonly<Record<string, string>>;
 }
 
 /** The keys of the Stryker config that the lane owns. The field `stryker` of a package cannot have them. */
@@ -42,7 +47,17 @@ export interface Lane {
   readonly packages: Readonly<Record<string, PackageLane>>;
   /** This field gives the list of the disabled mutants, from the folder of the lane file. The default is `mutation-disables.json`. */
   readonly disables?: string;
+  /**
+   * This field gives the highest fall of the test count in percent against the last good count. The default is 20.
+   * `scores --last` fails a selection with a higher fall: the report did not read all the tests.
+   */
+  readonly maxTestFall?: number;
+  /** Each selection of this field can have a higher fall of its test count. The value gives the reason. */
+  readonly plannedFalls?: Readonly<Record<string, string>>;
 }
+
+/** The default of `maxTestFall` of the lane, in percent. */
+export const MAX_TEST_FALL = 20;
 
 /** A selection is one Stryker run: a package (`collections`) or a part of a package (`collections.impl`). */
 export interface Selection {
@@ -60,6 +75,9 @@ export interface Selection {
 const NAME = /^[\w-]+$/;
 
 const isRecord = (x: unknown): x is Record<string, unknown> => typeof x === "object" && x !== null && !Array.isArray(x);
+
+/** This function tells if a value is an object of names, each with a reason that is not empty. */
+const isReasons = (x: unknown): x is Record<string, string> => isRecord(x) && Object.values(x).every((r) => typeof r === "string" && r.trim() !== "");
 
 const isGlobs = (x: unknown): x is string[] => Array.isArray(x) && x.length > 0 && x.every((g) => typeof g === "string" && g !== "");
 
@@ -86,6 +104,7 @@ function packageErrors(name: string, p: unknown): string[] {
       if (owned.length > 0) errors.push(`${name}: "stryker" has ${owned.map((k) => `"${k}"`).join(", ")}, but the lane owns these keys`);
     }
   }
+  if (p["notRead"] !== undefined && !isReasons(p["notRead"])) errors.push(`${name}: "notRead" is not an object of files, each with a reason`);
   const parts = p["parts"];
   if (parts !== undefined) {
     if (!isRecord(parts) || Object.keys(parts).length === 0) errors.push(`${name}: "parts" is not an object with parts`);
@@ -109,8 +128,16 @@ export function parseLane(json: unknown): Lane {
   const errors = Object.entries(json["packages"]).flatMap(([name, p]) => packageErrors(name, p));
   if (Object.keys(json["packages"]).length === 0) errors.push(`the lane has no packages`);
   if (json["disables"] !== undefined && typeof json["disables"] !== "string") errors.push(`"disables" is not a file name`);
+  const fall = json["maxTestFall"];
+  if (fall !== undefined && (typeof fall !== "number" || !(fall >= 0 && fall <= 100))) errors.push(`"maxTestFall" is not a percent from 0 to 100`);
+  const planned = json["plannedFalls"];
+  if (planned !== undefined && !isReasons(planned)) errors.push(`"plannedFalls" is not an object of selections, each with a reason`);
   if (errors.length > 0) throw new Error(`the lane is not valid:\n  ${errors.join("\n  ")}`);
-  return json as unknown as Lane;
+  const lane = json as unknown as Lane;
+  const names = new Set(selectionNames(lane));
+  const unknown = Object.keys(lane.plannedFalls ?? {}).filter((n) => !names.has(n));
+  if (unknown.length > 0) throw new Error(`the lane is not valid:\n  "plannedFalls" names no selection of the lane: ${unknown.join(", ")}`);
+  return lane;
 }
 
 /** This function gives the names of all the selections of a lane: each package, then each part of the package. */

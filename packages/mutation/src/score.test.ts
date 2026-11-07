@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatScore, parseReport, scoreReport, summaryMarkdown, type MutationReport } from "./score.ts";
+import { failScore, formatScore, parseReport, scoreReport, summaryMarkdown, testCount, testFall, unreadTestFiles, type MutationReport } from "./score.ts";
 
 const mutant = (status: string, line: number) =>
   status === "HitLimit"
@@ -77,5 +77,44 @@ describe("parseReport", () => {
   it("accepts a report", () => {
     const r = report("Killed");
     expect(parseReport(r)).toBe(r);
+  });
+});
+
+/** This function gives the `testFiles` of a report: each file with its count of tests. */
+const tests = (counts: Record<string, number>): MutationReport["testFiles"] =>
+  Object.fromEntries(Object.entries(counts).map(([file, n]) => [file, { tests: Array.from({ length: n }, (_, i) => ({ name: `t${String(i)}` })) }]));
+
+describe("the tests of a report (LANE.TESTS and LANE.FILES of Vex)", () => {
+  it("counts the tests of testFiles, and prints the count", () => {
+    const r = { ...report("Killed", "Survived"), testFiles: tests({ "src/a.test.ts": 3, "src/b.test.ts": 2 }) };
+    expect(testCount(parseReport(r))).toBe(5);
+    expect(testCount(report("Killed"))).toBeUndefined();
+    const s = scoreReport(r, { name: "lib", gate: undefined });
+    expect(s.tests).toBe(5);
+    expect(formatScore(s)).toBe("lib: 50.00 % (1 of 2, 1 survived, 5 tests), no gate: pass");
+    expect(summaryMarkdown([s])).toContain("| no gate | pass | 5 |".replace("no gate", "none"));
+    expect(() => parseReport({ ...report("Killed"), testFiles: { "a.test.ts": {} } })).toThrow(/no list "tests" for the test file a\.test\.ts/);
+  });
+
+  // The flip of V-090: compiler.rest read 1029 of 1990 tests, and the printer read 69.13 %. That is no read.
+  it("fails a fall of more than the limit against the last good count, and passes a fall at the limit", () => {
+    expect(testFall(1029, 1990, 20)).toBe("the run read 1029 tests, 48.3 % fewer than the last good count 1990 (the limit is 20 %), so the score is no read");
+    expect(testFall(1592, 1990, 20)).toBeUndefined();
+    expect(testFall(1591, 1990, 20)).toMatch(/20\.1 % fewer/);
+    expect(testFall(2500, 1990, 20)).toBeUndefined();
+    expect(testFall(0, 0, 20)).toBeUndefined();
+  });
+
+  it("gives each test file on the disk that the report does not read, except the files of notRead", () => {
+    const r = { ...report("Killed"), testFiles: tests({ "src/a.test.ts": 1, "D:/repo/pkg/src/b.test.ts": 1, "./src/c.test.ts": 1 }) };
+    const onDisk = ["src/a.test.ts", "src/b.test.ts", "src/c.test.ts", "src/d.test.ts", "bench/e.test.ts"];
+    expect(unreadTestFiles(r, onDisk, {}, String.raw`D:\repo\pkg`)).toEqual(["src/d.test.ts", "bench/e.test.ts"]);
+    expect(unreadTestFiles(r, onDisk, { "bench/e.test.ts": "a bench, CI starts it in its own job" }, "D:/repo/pkg/")).toEqual(["src/d.test.ts"]);
+  });
+
+  it("keeps the first reason of a score that failed already", () => {
+    const failed = scoreReport(report("Survived", "Killed"), { name: "lib", gate: 80 });
+    expect(failScore(failed, "the run read no test").reason).toBe("the score 50.00 % is under the gate 80 %. Also the run read no test");
+    expect(failScore(scoreReport(report("Killed"), { name: "lib", gate: 80 }), "x")).toMatchObject({ pass: false, reason: "x" });
   });
 });

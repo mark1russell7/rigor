@@ -86,6 +86,8 @@ export declare const HELP: string;
 interface Lane {
   readonly packages: Readonly<Record<string, PackageLane>>;
   readonly disables?: string;
+  readonly maxTestFall?: number;
+  readonly plannedFalls?: Readonly<Record<string, string>>;
 }
 
 ### build/index.d.ts#LeavingPath
@@ -112,6 +114,11 @@ interface MutationReport {
   readonly files: Readonly<Record<string, {
     readonly mutants: readonly Mutant[];
   }>>;
+  readonly testFiles?: Readonly<Record<string, {
+    readonly tests: readonly {
+      readonly name: string;
+    }[];
+  }>> | undefined;
 }
 
 ### build/index.d.ts#PackageFile
@@ -130,6 +137,7 @@ interface PackageLane {
   readonly timeoutMS?: number;
   readonly dryRunTimeoutMinutes?: number;
   readonly stryker?: Readonly<Record<string, unknown>>;
+  readonly notRead?: Readonly<Record<string, string>>;
 }
 
 ### build/index.d.ts#REPORT_DIR
@@ -149,6 +157,7 @@ interface Score {
   readonly survived: readonly string[];
   readonly percent: number;
   readonly percentWithClock: number;
+  readonly tests: number | undefined;
   readonly pass: boolean;
   readonly reason: string | undefined;
 }

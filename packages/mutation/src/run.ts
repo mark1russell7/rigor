@@ -7,8 +7,8 @@ import { parseArgs } from "node:util";
 import { REPORT_DIR, strykerConfig } from "./config.ts";
 import { compareDisables, findDisables, type Disable } from "./disables.ts";
 import { leavingPaths } from "./load.ts";
-import { changedFiles, parseLane, partErrors, runSelections, select, selectionNames, type Lane } from "./lane.ts";
-import { formatScore, parseReport, scoreReport, summaryMarkdown, type Score } from "./score.ts";
+import { changedFiles, MAX_TEST_FALL, parseLane, partErrors, runSelections, select, selectionNames, type Lane } from "./lane.ts";
+import { failScore, formatScore, parseReport, scoreReport, summaryMarkdown, testFall, unreadTestFiles, type MutationReport, type Score } from "./score.ts";
 
 /** The input and the output of the CLI. */
 export interface CliIo {
@@ -29,8 +29,14 @@ export const HELP: string = `rigor-mutation: the mutation tests of a repository,
                                                the Stryker config of a selection, as JSON. With --dry-run,
                                                Stryker starts only the tests. With --changed, it mutates only
                                                the changed files of the selection.
-  rigor-mutation scores <selection>... [--report <file>] [--summary <file>]
-                                               the score of each selection, with its gate
+  rigor-mutation scores <selection>... [--report <file>] [--summary <file>] [--last <file>]
+                       [--write-last <file>] [--test-files]
+                                               the score of each selection, with its gate and its count
+                                               of tests. With --last, a fall of the count of more than
+                                               maxTestFall % (default 20) against the file fails. With
+                                               --write-last, the counts of the passed selections go in
+                                               the file. With --test-files, a test file on the disk that
+                                               the report does not read fails.
   rigor-mutation disables [--write]            compare the disable comments with their list
   rigor-mutation load-check [<selection>...]   refuse each relative path of a package that leaves its folder.
                                                Stryker starts the tests in a copy of the folder, so such a
@@ -141,6 +147,98 @@ function disables(lane: Lane, laneDir: string, write: boolean, io: CliIo): numbe
   return check.ok ? 0 : 1;
 }
 
+/** The options of `scores`. */
+interface ScoresOptions {
+  readonly report: string | undefined;
+  readonly summary: string | undefined;
+  readonly last: string | undefined;
+  readonly writeLast: string | undefined;
+  readonly testFiles: boolean;
+}
+
+/**
+ * This function gives the score of each selection (`scores`). With `last`, it compares the test count with the last
+ * good count (LANE.TESTS of Vex). With `testFiles`, it compares the test files on the disk with the report (LANE.FILES).
+ */
+function scores(lane: Lane, laneDir: string, names: readonly string[], o: ScoresOptions, io: CliIo): number {
+  if (names.length === 0) throw new Error(`"scores" takes one or more selections`);
+  if (o.report !== undefined && names.length > 1) throw new Error(`--report takes one selection`);
+  checkPartsOf(lane, laneDir, names);
+  const lastFile = o.last === undefined ? undefined : resolve(io.cwd, o.last);
+  const last = lastFile === undefined || !existsSync(lastFile) ? {} : readCounts(lastFile);
+  if (lastFile !== undefined && !existsSync(lastFile)) io.stdout(`scores: the file ${o.last ?? ""} does not exist, so no count is compared
+`);
+  const notes = new Map<string, string[]>(names.map((n) => [n, []]));
+  const note = (name: string, line: string): void => void notes.get(name)?.push(line);
+  const results: Score[] = names.map((name) => {
+    const s = select(lane, name);
+    const file = o.report === undefined ? resolve(laneDir, s.dir, REPORT_DIR, "mutation.json") : resolve(io.cwd, o.report);
+    if (!existsSync(file)) {
+      const reason = `the report ${relative(io.cwd, file)} does not exist`;
+      return { name, gate: s.gate, detected: 0, hitLimit: 0, clockTimeouts: 0, valid: 0, survived: [], percent: 0, percentWithClock: 0, tests: undefined, pass: false, reason };
+    }
+    const report = parseReport(readJson(file));
+    let score = scoreReport(report, s);
+    const before = last[name];
+    if (lastFile !== undefined && before !== undefined) {
+      if (score.tests === undefined) score = failScore(score, `the report has no "testFiles", so the count of the tests is not known`);
+      else {
+        const fall = testFall(score.tests, before, lane.maxTestFall ?? MAX_TEST_FALL);
+        const planned = lane.plannedFalls?.[name];
+        if (fall !== undefined && planned === undefined) score = failScore(score, fall);
+        else if (fall !== undefined) note(name, `  a planned fall: ${fall.replace(/, so the score is no read$/, "")}. The reason: ${planned ?? ""}`);
+      }
+    }
+    if (o.testFiles) score = checkTestFiles(lane, laneDir, s.pkg, report, score, (line) => note(name, line));
+    return score;
+  });
+  for (const s of results) {
+    io.stdout(`${formatScore(s)}
+`);
+    for (const line of notes.get(s.name) ?? []) io.stdout(`${line}
+`);
+    if (!s.pass) for (const m of s.survived) io.stdout(`  survived: ${m}
+`);
+  }
+  if (o.summary !== undefined) appendFileSync(resolve(io.cwd, o.summary), `### Mutation scores
+
+${summaryMarkdown(results)}
+`);
+  if (o.writeLast !== undefined) {
+    const out = resolve(io.cwd, o.writeLast);
+    const counts = { ...(existsSync(out) ? readCounts(out) : {}) };
+    for (const s of results) if (s.pass && s.tests !== undefined) counts[s.name] = s.tests;
+    mkdirSync(dirname(out), { recursive: true });
+    writeFileSync(out, `${JSON.stringify(Object.fromEntries(Object.entries(counts).toSorted(([a], [b]) => (a < b ? -1 : 1))), null, 2)}
+`);
+  }
+  const failed = results.filter((s) => !s.pass).map((s) => s.name);
+  if (failed.length > 0) io.stderr(`The gate failed for ${failed.join(", ")}.
+`);
+  return failed.length > 0 ? 1 : 0;
+}
+
+/** This function reads a file of test counts: an object from each selection to its count. */
+function readCounts(file: string): Record<string, number> {
+  const json = readJson(file);
+  const ok = typeof json === "object" && json !== null && !Array.isArray(json) && Object.values(json).every((n) => Number.isInteger(n) && (n as number) >= 0);
+  if (!ok) throw new Error(`the file ${file} is not an object of test counts`);
+  return json as Record<string, number>;
+}
+
+/** This function fails a score when a test file of its package is on the disk and the report does not read it. */
+function checkTestFiles(lane: Lane, laneDir: string, pkg: string, report: MutationReport, score: Score, note: (line: string) => void): Score {
+  const p = lane.packages[pkg];
+  if (p === undefined) return score;
+  const dir = resolve(laneDir, p.dir);
+  if (report.testFiles === undefined) return failScore(score, `the report has no "testFiles", so the test files that it read are not known`);
+  const onDisk = sourcesOf(dir, dir, true).filter((f) => TEST.test(f) && !f.endsWith(".d.ts"));
+  const unread = unreadTestFiles(report, onDisk, p.notRead, dir);
+  for (const f of unread) note(`  not read: ${p.dir}/${f}`);
+  if (unread.length === 0) return score;
+  return failScore(score, `the report does not read ${String(unread.length)} test files on the disk. Each one is no read, unless "notRead" of the package gives its reason`);
+}
+
 /** This function starts the CLI with its arguments and gives the exit code. */
 export function runCli(argv: readonly string[], io: CliIo): number {
   const { values, positionals } = parseArgs({
@@ -156,6 +254,9 @@ export function runCli(argv: readonly string[], io: CliIo): number {
       runs: { type: "boolean", default: false },
       "dry-run": { type: "boolean", default: false },
       changed: { type: "string" },
+      last: { type: "string" },
+      "write-last": { type: "string" },
+      "test-files": { type: "boolean", default: false },
       help: { type: "boolean", default: false },
     },
   });
@@ -207,28 +308,8 @@ export function runCli(argv: readonly string[], io: CliIo): number {
       }
       return 0;
     }
-    case "scores": {
-      if (names.length === 0) throw new Error(`"scores" takes one or more selections`);
-      if (values.report !== undefined && names.length > 1) throw new Error(`--report takes one selection`);
-      checkPartsOf(lane, laneDir, names);
-      const scores: Score[] = names.map((name) => {
-        const s = select(lane, name);
-        const file = values.report === undefined ? resolve(laneDir, s.dir, REPORT_DIR, "mutation.json") : resolve(io.cwd, values.report);
-        if (!existsSync(file)) {
-          const reason = `the report ${relative(io.cwd, file)} does not exist`;
-          return { name, gate: s.gate, detected: 0, hitLimit: 0, clockTimeouts: 0, valid: 0, survived: [], percent: 0, percentWithClock: 0, pass: false, reason };
-        }
-        return scoreReport(parseReport(readJson(file)), s);
-      });
-      for (const s of scores) {
-        io.stdout(`${formatScore(s)}\n`);
-        if (!s.pass) for (const m of s.survived) io.stdout(`  survived: ${m}\n`);
-      }
-      if (values.summary !== undefined) appendFileSync(resolve(io.cwd, values.summary), `### Mutation scores\n\n${summaryMarkdown(scores)}\n`);
-      const failed = scores.filter((s) => !s.pass).map((s) => s.name);
-      if (failed.length > 0) io.stderr(`The gate failed for ${failed.join(", ")}.\n`);
-      return failed.length > 0 ? 1 : 0;
-    }
+    case "scores":
+      return scores(lane, laneDir, names, { report: values.report, summary: values.summary, last: values.last, writeLast: values["write-last"], testFiles: values["test-files"] }, io);
     case "disables":
       return disables(lane, laneDir, values.write, io);
     case "load-check":

@@ -16,9 +16,11 @@ export interface Mutant {
   readonly location: { readonly start: { readonly line: number } };
 }
 
-/** The JSON report of Stryker: the mutants of each mutated file. */
+/** The JSON report of Stryker: the mutants of each mutated file, and the tests of each test file that the run read. */
 export interface MutationReport {
   readonly files: Readonly<Record<string, { readonly mutants: readonly Mutant[] }>>;
+  /** Stryker gives this field when the test runner tells the tests, as the Vitest runner does. */
+  readonly testFiles?: Readonly<Record<string, { readonly tests: readonly { readonly name: string }[] }>> | undefined;
 }
 
 /** The score of one selection. */
@@ -39,6 +41,8 @@ export interface Score {
   readonly percent: number;
   /** The score in percent with the clock time-outs counted as detected, as Stryker counts them. The gate does not read it. */
   readonly percentWithClock: number;
+  /** The count of the tests that the run read, from `testFiles` of the report. It is undefined when the report has no `testFiles`. */
+  readonly tests: number | undefined;
   readonly pass: boolean;
   /** The reason of a failure. */
   readonly reason: string | undefined;
@@ -60,7 +64,56 @@ export function parseReport(json: unknown): MutationReport {
   for (const [file, data] of Object.entries(files)) {
     if (!Array.isArray((data as { mutants?: unknown } | null)?.mutants)) throw new Error(`the report has no list "mutants" for ${file}`);
   }
+  const testFiles = (json as { testFiles?: unknown }).testFiles;
+  if (testFiles !== undefined) {
+    if (typeof testFiles !== "object" || testFiles === null) throw new Error(`the field "testFiles" of the report is not an object`);
+    for (const [file, data] of Object.entries(testFiles)) {
+      if (!Array.isArray((data as { tests?: unknown } | null)?.tests)) throw new Error(`the report has no list "tests" for the test file ${file}`);
+    }
+  }
   return json as MutationReport;
+}
+
+/** This function gives the count of the tests of a report, or undefined when the report has no `testFiles`. */
+export function testCount(report: MutationReport): number | undefined {
+  if (report.testFiles === undefined) return undefined;
+  return Object.values(report.testFiles).reduce((sum, f) => sum + f.tests.length, 0);
+}
+
+/**
+ * This function compares a test count with the last good count. It gives the reason of a failure when the count fell
+ * by more than `maxFall` percent, else undefined. A report that reads fewer tests is no read of the score.
+ *
+ * @param maxFall - the highest fall in percent that passes
+ */
+export function testFall(tests: number, last: number, maxFall: number): string | undefined {
+  if (last <= 0 || tests >= last) return undefined;
+  const fall = (100 * (last - tests)) / last;
+  if (fall <= maxFall) return undefined;
+  return `the run read ${String(tests)} tests, ${fall.toFixed(1)} % fewer than the last good count ${String(last)} (the limit is ${String(maxFall)} %), so the score is no read`;
+}
+
+/**
+ * This function gives each test file on the disk that the report does not read, and that `notRead` does not name.
+ * The files of the report and of the disk are from the folder of the package.
+ *
+ * @param onDisk - the test files of the package, from its folder, with `/`
+ * @param dir - the folder of the package, to make a full path of the report relative
+ */
+export function unreadTestFiles(report: MutationReport, onDisk: readonly string[], notRead: Readonly<Record<string, string>> = {}, dir = ""): string[] {
+  const root = dir.replaceAll("\\", "/").replace(/\/?$/, "/");
+  const read = new Set(
+    Object.keys(report.testFiles ?? {}).map((f) => {
+      const file = f.replaceAll("\\", "/");
+      return dir !== "" && file.startsWith(root) ? file.slice(root.length) : file.replace(/^\.\//, "");
+    }),
+  );
+  return onDisk.filter((f) => !read.has(f) && notRead[f] === undefined);
+}
+
+/** This function gives a score that fails for a reason. A score that failed already keeps its first reason, and gets the new one after it. */
+export function failScore(score: Score, reason: string): Score {
+  return { ...score, pass: false, reason: score.reason === undefined ? reason : `${score.reason}. Also ${reason}` };
 }
 
 /**
@@ -102,7 +155,7 @@ export function scoreReport(report: MutationReport, selection: { readonly name: 
         : gate !== undefined && percent < gate
           ? `the score ${percent.toFixed(2)} % is under the gate ${String(gate)} %`
           : undefined;
-  return { name, gate, detected, hitLimit, clockTimeouts, valid, survived, percent, percentWithClock, pass: reason === undefined, reason };
+  return { name, gate, detected, hitLimit, clockTimeouts, valid, survived, percent, percentWithClock, tests: testCount(report), pass: reason === undefined, reason };
 }
 
 /** This function gives the time-outs of a score as text: the count of each kind, and the score that counts the clock time-outs as detected. */
@@ -114,18 +167,19 @@ export function formatScore(s: Score): string {
   const gate = s.gate === undefined ? "no gate" : `gate ${String(s.gate)} %`;
   const result = s.pass ? "pass" : `FAIL: ${s.reason ?? ""}`;
   const time = s.hitLimit + s.clockTimeouts === 0 ? "" : `, ${timeouts(s)}`;
-  return `${s.name}: ${s.percent.toFixed(2)} % (${String(s.detected)} of ${String(s.valid)}, ${String(s.survived.length)} survived${time}), ${gate}: ${result}`;
+  const tests = s.tests === undefined ? "" : `, ${String(s.tests)} tests`;
+  return `${s.name}: ${s.percent.toFixed(2)} % (${String(s.detected)} of ${String(s.valid)}, ${String(s.survived.length)} survived${time}${tests}), ${gate}: ${result}`;
 }
 
 /** This function gives a Markdown table of scores, for the summary of a CI job. */
 export function summaryMarkdown(scores: readonly Score[]): string {
   const rows = scores.map(
     (s) =>
-      `| ${s.name} | ${s.percent.toFixed(2)} % | ${String(s.detected)} | ${String(s.valid)} | ${String(s.survived.length)} | ${String(s.clockTimeouts)} | ${s.percentWithClock.toFixed(2)} % | ${s.gate === undefined ? "none" : `${String(s.gate)} %`} | ${s.pass ? "pass" : `fail: ${s.reason ?? ""}`} |`,
+      `| ${s.name} | ${s.percent.toFixed(2)} % | ${String(s.detected)} | ${String(s.valid)} | ${String(s.survived.length)} | ${String(s.clockTimeouts)} | ${s.percentWithClock.toFixed(2)} % | ${s.gate === undefined ? "none" : `${String(s.gate)} %`} | ${s.pass ? "pass" : `fail: ${s.reason ?? ""}`} | ${s.tests === undefined ? "?" : String(s.tests)} |`,
   );
   return [
-    "| Selection | Score | Detected | Valid | Survived | Clock time-outs | Score with them | Gate | Result |",
-    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+    "| Selection | Score | Detected | Valid | Survived | Clock time-outs | Score with them | Gate | Result | Tests |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: |",
     ...rows,
     "",
   ].join("\n");
