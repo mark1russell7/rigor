@@ -4,6 +4,7 @@ Test helpers:
 
 - `markdownExamples` makes each code block of a Markdown file into a test case. Then the doc and the code cannot drift.
 - `runModel` runs model-based tests on `fast-check`, from the entry `@mark1russell7/rigor-testkit/model`.
+- `rejects` examines an asynchronous operation that must fail, and gives its error.
 
 ```sh
 npm install --save-dev @mark1russell7/rigor-testkit
@@ -72,6 +73,25 @@ assert.equal(double(2), 4);
 - Under `node:test`, Node runs the mapped source files with no transform. A relative import of a `.ts` file with the extension `.js` fails there. Use `vitest` for that source, or map to the build.
 
 `fencedBlocks(text)` gives each fenced block of a Markdown text with its language, its flags and its line. `mapImports(code, imports, root)` changes the mapped import specifiers of a code text to file URLs.
+
+## An operation that must fail
+
+`rejects(start, what)` starts an operation that must give a rejected promise, and gives the reason of the rejection. It fails, and the message starts with `what`, in these conditions:
+
+- `start` throws at once, before it gives a promise.
+- `start` gives a value that is not a promise.
+- The promise resolves.
+
+`assert.rejects` of `node:assert` passes when the operation throws at once, and it gives no error. Thus it does not find an API method that throws at once when it must give a rejected promise. For the other checks of a test, use `node:assert`: `assert.ok`, and `assert.deepStrictEqual` for JSON values and maps.
+
+```ts
+import assert from "node:assert/strict";
+import { rejects } from "@mark1russell7/rigor-testkit";
+
+const store = { get: async (id: string): Promise<string> => Promise.reject(new Error(`no item ${id}`)) };
+const error = await rejects(() => store.get("a"), "get of a missing id");
+assert.equal((error as Error).message, "no item a");
+```
 
 ## Model-based tests
 

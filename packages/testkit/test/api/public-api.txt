@@ -12,6 +12,7 @@ type MarkdownExampleOptions: build/markdown-examples.d.ts#MarkdownExampleOptions
 fencedBlocks: build/markdown-examples.d.ts#fencedBlocks
 mapImports: build/markdown-examples.d.ts#mapImports
 markdownExamples: build/markdown-examples.d.ts#markdownExamples
+rejects: build/rejects.d.ts#rejects
 
 ## ./model (build/model.d.ts): names
 
@@ -83,3 +84,6 @@ export declare function runModel<S, M>(options: RunModelOptions<S, M>): void;
 
 ### build/model.d.ts#step
 export declare function step<S, M>(label: string, run: (sut: S, model: M) => void): Step<S, M>;
+
+### build/rejects.d.ts#rejects
+export declare function rejects(start: () => PromiseLike<unknown>, what: string): Promise<unknown>;
