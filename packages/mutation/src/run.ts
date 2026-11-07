@@ -6,7 +6,7 @@ import { dirname, relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { REPORT_DIR, strykerConfig } from "./config.ts";
 import { compareDisables, findDisables, type Disable } from "./disables.ts";
-import { parseLane, runSelections, select, selectionNames, type Lane } from "./lane.ts";
+import { parseLane, partErrors, runSelections, select, selectionNames, type Lane } from "./lane.ts";
 import { formatScore, parseReport, scoreReport, summaryMarkdown, type Score } from "./score.ts";
 
 /** The input and the output of the CLI. */
@@ -31,6 +31,8 @@ export const HELP: string = `rigor-mutation: the mutation tests of a repository,
   --lane <file>   the lane file. The default is mutation.json.
 
 A selection is a package ("collections") or a part of a package ("collections.impl").
+Each file of a package with parts must be in exactly one part. list --runs, and config and scores
+of a part, fail when it is not.
 The score of a selection reads <dir>/${REPORT_DIR}/mutation.json, or the file of --report.
 `;
 
@@ -50,6 +52,26 @@ function sourcesOf(root: string, dir: string): string[] {
 }
 
 const readJson = (file: string): unknown => JSON.parse(readFileSync(file, "utf8"));
+
+/**
+ * This function examines the parts of the packages against their source files.
+ *
+ * @throws Error with each file that is in no part, in more than one part, or in a part and not in `mutate`
+ */
+function checkParts(lane: Lane, laneDir: string, pkgs: readonly string[]): void {
+  const errors = pkgs.flatMap((pkg) => {
+    const p = lane.packages[pkg];
+    if (p?.parts === undefined) return [];
+    const dir = resolve(laneDir, p.dir);
+    if (!existsSync(dir)) return [`${pkg}: the folder ${p.dir} does not exist`];
+    return partErrors(lane, pkg, sourcesOf(dir, dir));
+  });
+  if (errors.length > 0) throw new Error(`the parts do not cover each file exactly one time:\n  ${errors.join("\n  ")}`);
+}
+
+/** This function examines the parts of the package of each selection that is a part. */
+const checkPartsOf = (lane: Lane, laneDir: string, names: readonly string[]): void =>
+  checkParts(lane, laneDir, [...new Set(names.map((n) => select(lane, n)).filter((s) => s.name !== s.pkg).map((s) => s.pkg))]);
 
 function disables(lane: Lane, laneDir: string, write: boolean, io: CliIo): number {
   const files = new Set<string>();
@@ -111,6 +133,7 @@ export function runCli(argv: readonly string[], io: CliIo): number {
   };
   switch (command) {
     case "list":
+      if (values.runs) checkParts(lane, laneDir, Object.keys(lane.packages));
       io.stdout(`${(values.runs ? runSelections(lane) : selectionNames(lane)).join("\n")}\n`);
       return 0;
     case "dir":
@@ -119,6 +142,7 @@ export function runCli(argv: readonly string[], io: CliIo): number {
     case "config": {
       const concurrency = values.concurrency === undefined ? undefined : Number(values.concurrency);
       if (concurrency !== undefined && !(Number.isInteger(concurrency) && concurrency > 0)) throw new Error(`--concurrency is not a positive integer`);
+      checkPartsOf(lane, laneDir, [one()]);
       const text = `${JSON.stringify(strykerConfig(select(lane, one()), concurrency === undefined ? {} : { concurrency }), null, 2)}\n`;
       if (values.out === undefined) io.stdout(text);
       else {
@@ -130,10 +154,14 @@ export function runCli(argv: readonly string[], io: CliIo): number {
     case "scores": {
       if (names.length === 0) throw new Error(`"scores" takes one or more selections`);
       if (values.report !== undefined && names.length > 1) throw new Error(`--report takes one selection`);
+      checkPartsOf(lane, laneDir, names);
       const scores: Score[] = names.map((name) => {
         const s = select(lane, name);
         const file = values.report === undefined ? resolve(laneDir, s.dir, REPORT_DIR, "mutation.json") : resolve(io.cwd, values.report);
-        if (!existsSync(file)) return { name, gate: s.gate, detected: 0, valid: 0, survived: [], percent: 0, pass: false, reason: `the report ${relative(io.cwd, file)} does not exist` };
+        if (!existsSync(file)) {
+          const reason = `the report ${relative(io.cwd, file)} does not exist`;
+          return { name, gate: s.gate, detected: 0, hitLimit: 0, clockTimeouts: 0, valid: 0, survived: [], percent: 0, percentWithClock: 0, pass: false, reason };
+        }
         return scoreReport(parseReport(readJson(file)), s);
       });
       for (const s of scores) {

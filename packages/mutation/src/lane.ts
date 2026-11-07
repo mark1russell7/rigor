@@ -1,3 +1,5 @@
+import { matchesGlob } from "node:path";
+
 /**
  * The lane file of a repository (`mutation.json`) names the packages that the mutation tests mutate. A package has
  * its folder, its globs and an optional gate. A big package has parts, so that each part has its own runner.
@@ -9,12 +11,22 @@ export interface PackageLane {
   readonly dir: string;
   /** These globs give the files to mutate, from `dir`. A glob with `!` removes the files of the globs before it. */
   readonly mutate: readonly string[];
-  /** Each part has its own globs. The `!` globs of `mutate` also apply to each part. */
+  /**
+   * Each part has its own globs. The `!` globs of `mutate` also apply to each part. Each file of `mutate` must be in
+   * exactly one part, so that a full run mutates each file one time. `partErrors` examines this.
+   */
   readonly parts?: Readonly<Record<string, readonly string[]>>;
   /** This field gives the lowest mutation score in percent that passes. Without a gate, the lane only reports the score. */
   readonly gate?: number;
   /** This field gives the Vitest config file, from `dir`. Without it, Vitest finds its config in `dir`. */
   readonly vitestConfig?: string;
+  /**
+   * This field gives the time in milliseconds that the clock adds to the time of the tests for each mutant. The
+   * default is 120000. A short time on a loaded runner stops mutants that the tests detect later.
+   */
+  readonly timeoutMS?: number;
+  /** This field gives the time in minutes for the run of the tests without mutants. The default is 15. */
+  readonly dryRunTimeoutMinutes?: number;
 }
 
 /** The lane file: the packages of the mutation tests, and the list of the disabled mutants. */
@@ -32,6 +44,8 @@ export interface Selection {
   readonly mutate: readonly string[];
   readonly gate: number | undefined;
   readonly vitestConfig: string | undefined;
+  readonly timeoutMS: number | undefined;
+  readonly dryRunTimeoutMinutes: number | undefined;
 }
 
 const NAME = /^[\w-]+$/;
@@ -51,6 +65,10 @@ function packageErrors(name: string, p: unknown): string[] {
   const gate = p["gate"];
   if (gate !== undefined && (typeof gate !== "number" || !(gate >= 0 && gate <= 100))) errors.push(`${name}: "gate" is not a percent from 0 to 100`);
   if (p["vitestConfig"] !== undefined && typeof p["vitestConfig"] !== "string") errors.push(`${name}: "vitestConfig" is not a file name`);
+  for (const field of ["timeoutMS", "dryRunTimeoutMinutes"]) {
+    const v = p[field];
+    if (v !== undefined && !(typeof v === "number" && Number.isInteger(v) && v > 0)) errors.push(`${name}: "${field}" is not a positive integer`);
+  }
   const parts = p["parts"];
   if (parts !== undefined) {
     if (!isRecord(parts) || Object.keys(parts).length === 0) errors.push(`${name}: "parts" is not an object with parts`);
@@ -102,5 +120,41 @@ export function select(lane: Lane, name: string): Selection {
   }
   // Stryker applies a "!" glob to the globs before it, so the "!" globs of the package go after the globs of the part.
   const mutate = globs === undefined ? p.mutate : [...globs, ...p.mutate.filter((g) => g.startsWith("!"))];
-  return { name, pkg, dir: p.dir, mutate, gate: p.gate, vitestConfig: p.vitestConfig };
+  return { name, pkg, dir: p.dir, mutate, gate: p.gate, vitestConfig: p.vitestConfig, timeoutMS: p.timeoutMS, dryRunTimeoutMinutes: p.dryRunTimeoutMinutes };
+}
+
+/**
+ * This function tells if globs select a file. It reads the globs as Stryker does. A glob adds its files. A glob with
+ * `!` removes its files from the files of the globs before it.
+ */
+export function globsSelect(globs: readonly string[], file: string): boolean {
+  let selected = false;
+  for (const g of globs) {
+    if (g.startsWith("!")) {
+      if (selected && matchesGlob(file, g.slice(1))) selected = false;
+    } else if (!selected && matchesGlob(file, g)) selected = true;
+  }
+  return selected;
+}
+
+/**
+ * This function examines the parts of a package against its files. It gives an error for each file of `mutate` in no
+ * part. It also gives an error for each file in two parts, and for each file of a part that is not in `mutate`. A
+ * package with no parts has no errors.
+ *
+ * @param files - the source files of the package, from its folder, with `/`
+ */
+export function partErrors(lane: Lane, pkg: string, files: readonly string[]): string[] {
+  const p = lane.packages[pkg];
+  if (p?.parts === undefined) return [];
+  const parts = Object.keys(p.parts).map((part) => ({ part, mutate: select(lane, `${pkg}.${part}`).mutate }));
+  const errors: string[] = [];
+  for (const file of files) {
+    const inMutate = globsSelect(p.mutate, file);
+    const inParts = parts.filter((x) => globsSelect(x.mutate, file)).map((x) => x.part);
+    if (inMutate && inParts.length === 0) errors.push(`${pkg}: the file ${file} is in no part, so a full run does not mutate it`);
+    else if (inParts.length > 1) errors.push(`${pkg}: the file ${file} is in more than one part: ${inParts.join(", ")}`);
+    else if (!inMutate && inParts.length === 1) errors.push(`${pkg}: the file ${file} is in the part ${inParts.join("")}, but not in "mutate"`);
+  }
+  return errors;
 }
