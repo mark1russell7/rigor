@@ -24,9 +24,24 @@ export interface BootstrapOptions {
    * not 0.025, so a copy that writes 0.025 needs this option to give the same numbers.
    */
   readonly ends?: readonly [number, number];
+  /**
+   * The value of a claim to test, for example 0 for "no difference". With this option, the interval also gives `pAbove`
+   * and `pBelow` from the same draws, so the ends do not change. The default is no value and no p.
+   */
+  readonly against?: number;
 }
 
-export interface Interval {
+/** The two bootstrap p of the option `against`. The smallest p is 1 / (finite + 1), so a family correction needs enough runs. */
+export interface SideP {
+  /** The value of the option `against`. */
+  readonly against: number;
+  /** The p of the claim "the statistic is above `against`": (1 + the finite runs at or below `against`) / (finite + 1). */
+  readonly pAbove: number;
+  /** The p of the claim "the statistic is below `against`": (1 + the finite runs at or above `against`) / (finite + 1). */
+  readonly pBelow: number;
+}
+
+export interface Interval extends Partial<SideP> {
   /** The statistic of all the data. */
   readonly estimate: number;
   readonly low: number;
@@ -136,6 +151,7 @@ interface Settings {
   readonly highEnd: number;
   readonly level: number;
   readonly method: QuantileMethod;
+  readonly against: number | undefined;
 }
 
 /** This function examines the options of a bootstrap, and gives the defaults. It throws a RangeError for each fault. */
@@ -147,15 +163,31 @@ function settings(name: string, options: BootstrapOptions): Settings {
   if (!(lowEnd >= 0 && lowEnd < highEnd && highEnd <= 1)) throw new RangeError(`${name}: the ends are 0 <= low < high <= 1, not ${lowEnd} and ${highEnd}.`);
   const level = options.ends ? highEnd - lowEnd : (options.level ?? 0.95);
   if (!(level > 0 && level < 1)) throw new RangeError(`${name}: level is more than 0 and less than 1, not ${level}.`);
-  return { runs, lowEnd, highEnd, level, method: options.method ?? "linear" };
+  const against = options.against;
+  if (against !== undefined && !Number.isFinite(against)) throw new RangeError(`${name}: against is a finite number, not ${against}.`);
+  return { runs, lowEnd, highEnd, level, method: options.method ?? "linear", against };
+}
+
+/** This function gives the two p of the option `against`, or nothing without the option. With no finite run, each p is 1. */
+function sides(values: readonly number[], against: number | undefined): SideP | Record<string, never> {
+  if (against === undefined) return {};
+  let atOrBelow = 0;
+  let atOrAbove = 0;
+  for (const v of values) {
+    if (v <= against) atOrBelow++;
+    if (v >= against) atOrAbove++;
+  }
+  const n = values.length + 1;
+  return { against, pAbove: (1 + atOrBelow) / n, pBelow: (1 + atOrAbove) / n };
 }
 
 /** The interval of the finite statistics of the runs. When no run is finite, low and high are equal to the estimate. */
 function ends(values: number[], estimate: number, s: Settings, seed: number): Interval {
   const { runs, level } = s;
-  if (values.length === 0) return { estimate, low: estimate, high: estimate, level, runs, finite: 0, seed };
+  const p = sides(values, s.against);
+  if (values.length === 0) return { estimate, low: estimate, high: estimate, level, runs, finite: 0, seed, ...p };
   const v = sorted(values);
-  return { estimate, low: quantileSorted(v, s.lowEnd, s.method), high: quantileSorted(v, s.highEnd, s.method), level, runs, finite: v.length, seed };
+  return { estimate, low: quantileSorted(v, s.lowEnd, s.method), high: quantileSorted(v, s.highEnd, s.method), level, runs, finite: v.length, seed, ...p };
 }
 
 /**
