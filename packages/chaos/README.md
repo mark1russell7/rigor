@@ -49,6 +49,7 @@ const p99 = latencyQuantile(measureLoad(plan, completions, end), 0.99);
 - A pause of the driver itself also hides sends. The driver expects its next send at the later of `sent + interval` and the reply.
 - A send later than that time by more than `tolerance` is a driver gap. Each planned send in the gap is hidden, and it gets the real send and its reply.
 - `driverGaps` and `driverGapTotal` count these gaps and their delay in ms. A pause of the driver thus does not make the estimate better than the open loop.
+- A driver that waits after each reply gives that wait as `pause`, and `interval` the same value. Its send at `done + pause` is then not a driver gap.
 - The plan starts again at each real send. The driver does not send faster after a stall, thus a later send is not late.
 - After a request with no reply, each hidden send is not sent, and its age at the end is a lower bound.
 

@@ -132,5 +132,44 @@ describe("the hidden sends of a closed loop", () => {
     ).toThrow("not the last request");
     expect(() => closedLoopPlan([{ sent: 0, done: 101 }], options(10, 100))).toThrow("stops at 100");
     expect(() => closedLoopPlan([{ sent: 5, done: 4 }], options(10, 100))).toThrow("a reply at 4");
+    expect(() => closedLoopPlan([], { ...options(10, 100), pause: -1 })).toThrow("the pause is 0 or more");
+    expect(() => closedLoopPlan([], { ...options(10, 100), pause: Number.NaN })).toThrow("the pause is 0 or more");
+  });
+});
+
+/** This function gives the requests of a driver that waits 10 ms after each reply, with a stall of the requests sent at 500 to 1500. */
+const thinking = (): LoopRequest[] => {
+  const out: LoopRequest[] = [];
+  for (let sent = 5; sent < 1990; ) {
+    const done = sent >= 500 && sent < 1500 ? 1500 : sent + 3;
+    out.push({ sent, done });
+    sent = done + 10;
+  }
+  return out;
+};
+
+describe("a driver with a pause after each reply", () => {
+  it("does not count the pause after a stall as a driver gap", () => {
+    const requests = thinking();
+    const blind = closedLoopPlan(requests, { interval: 10, end: 2000, tolerance: 4 });
+    const run = closedLoopPlan(requests, { interval: 10, end: 2000, tolerance: 4, pause: 10 });
+    // with no pause, each send waits 3 ms past its expected time, and the send after the stall waits 10 ms
+    expect(blind).toMatchObject({ driverGaps: 1, driverGapTotal: 10 });
+    expect(run).toMatchObject({ driverGaps: 0, driverGapTotal: 0 });
+  });
+
+  it("hides the sends of the stall at the interval, each with the reply of the stall", () => {
+    const run = closedLoopPlan(thinking(), { interval: 10, end: 2000, tolerance: 4, pause: 10 });
+    // the sends are 13 ms apart: the request at 512 holds to 1500, and it hides the sends at 522 to 1492
+    expect(run.hidden).toBe(98);
+    const stalled = run.completions.filter((completion) => completion.sent === 1500);
+    expect(stalled).toHaveLength(98);
+    const measure = measureLoad(run.plan, run.completions, 2000);
+    expect(latencyQuantile(measure, 0.5)).toBeGreaterThan(100);
+  });
+
+  it("gives the result of no pause for a pause of 0", () => {
+    const requests = thinking();
+    expect(closedLoopPlan(requests, { interval: 10, end: 2000, tolerance: 4, pause: 0 })).toEqual(closedLoopPlan(requests, { interval: 10, end: 2000, tolerance: 4 }));
   });
 });
