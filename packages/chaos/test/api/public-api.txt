@@ -7,6 +7,7 @@
 ## . (build/index.d.ts): names
 
 type Arrivals: build/schedule.d.ts#Arrivals
+type ClosedLoopOptions: build/closed.d.ts#ClosedLoopOptions
 type ClosedLoopRun: build/closed.d.ts#ClosedLoopRun
 type Completion: build/measure.d.ts#Completion
 type LoadMeasure: build/measure.d.ts#LoadMeasure
@@ -32,11 +33,20 @@ steps: build/schedule.d.ts#steps
 
 ## Declarations
 
+### build/closed.d.ts#ClosedLoopOptions
+export interface ClosedLoopOptions {
+  readonly interval: number;
+  readonly end: number;
+  readonly tolerance: number;
+}
+
 ### build/closed.d.ts#ClosedLoopRun
 export interface ClosedLoopRun {
   readonly plan: Schedule;
   readonly completions: readonly Completion[];
   readonly hidden: number;
+  readonly driverGaps: number;
+  readonly driverGapTotal: number;
 }
 
 ### build/closed.d.ts#LoopRequest
@@ -46,7 +56,7 @@ export interface LoopRequest {
 }
 
 ### build/closed.d.ts#closedLoopPlan
-export declare function closedLoopPlan(requests: readonly LoopRequest[], interval: number, end: number): ClosedLoopRun;
+export declare function closedLoopPlan(requests: readonly LoopRequest[], options: ClosedLoopOptions): ClosedLoopRun;
 
 ### build/measure.d.ts#Completion
 export interface Completion {
