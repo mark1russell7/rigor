@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 160 names
+## . (build/index.d.ts): names
 
 type Arm: build/paired.d.ts#Arm
 type ArmModels: build/index.d.ts#ArmModels
@@ -167,7 +167,7 @@ verdictPower: build/index.d.ts#verdictPower
 visibleShift: build/index.d.ts#visibleShift
 winClaim: build/index.d.ts#winClaim
 
-## ./code-stamp (build/code-stamp.d.ts): 8 names
+## ./code-stamp (build/code-stamp.d.ts): names
 
 CODE_STAMP_READ_WORDS: build/code-stamp.d.ts#CODE_STAMP_READ_WORDS
 CodeStamp: build/code-stamp.d.ts#CodeStamp
@@ -178,7 +178,7 @@ EngineClosure: build/code-stamp.d.ts#EngineClosure
 codeStamp: build/code-stamp.d.ts#codeStamp
 lockClosure: build/code-stamp.d.ts#lockClosure
 
-## ./fresh (build/fresh.d.ts): 17 names
+## ./fresh (build/fresh.d.ts): names
 
 BenchEnv: build/fresh.d.ts#BenchEnv
 ChildExit: build/fresh.d.ts#ChildExit
@@ -198,7 +198,7 @@ childLine: build/fresh.d.ts#childLine
 freshRun: build/fresh.d.ts#freshRun
 pairOrder: build/fresh.d.ts#pairOrder
 
-## ./supervise (build/supervise.d.ts): 11 names
+## ./supervise (build/supervise.d.ts): names
 
 CaseProgress: build/supervise.d.ts#CaseProgress
 DEFAULT_OVERRUNS: build/supervise.d.ts#DEFAULT_OVERRUNS
