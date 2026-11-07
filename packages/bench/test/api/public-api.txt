@@ -999,6 +999,10 @@ interface NotSlowerVerdict extends Gate {
 interface PartnerRead {
   readonly partner: string;
   readonly status: "lost" | "not-lost" | "too-few" | "no-rows";
+  readonly beatenBy: number;
+  readonly of: number;
+  readonly excluded: number;
+  readonly caught: boolean;
 }
 
 ### build/index.d.ts#PoolFacts
