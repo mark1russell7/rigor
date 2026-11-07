@@ -6,6 +6,7 @@ import { dirname, relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { REPORT_DIR, strykerConfig } from "./config.ts";
 import { compareDisables, findDisables, type Disable } from "./disables.ts";
+import { leavingPaths } from "./load.ts";
 import { changedFiles, parseLane, partErrors, runSelections, select, selectionNames, type Lane } from "./lane.ts";
 import { formatScore, parseReport, scoreReport, summaryMarkdown, type Score } from "./score.ts";
 
@@ -31,6 +32,9 @@ export const HELP: string = `rigor-mutation: the mutation tests of a repository,
   rigor-mutation scores <selection>... [--report <file>] [--summary <file>]
                                                the score of each selection, with its gate
   rigor-mutation disables [--write]            compare the disable comments with their list
+  rigor-mutation load-check [<selection>...]   refuse each relative path of a package that leaves its folder.
+                                               Stryker starts the tests in a copy of the folder, so such a
+                                               path finds no file. No selection checks each package.
 
   --lane <file>      the lane file. The default is mutation.json.
   --changed <file>   a file with one changed path on each line, from the folder of the lane file,
@@ -46,15 +50,43 @@ const SOURCE = /\.(?:[cm]?[jt]s|tsx)$/;
 const TEST = /\.(?:test|spec)\.[^.]+$/;
 const SKIP = new Set(["node_modules", "build", "dist", "reports", "coverage"]);
 
-/** This function gives each source file of a folder, from `root`, with `/`. It skips the tests, the outputs and the dot folders. */
-function sourcesOf(root: string, dir: string): string[] {
+/**
+ * This function gives each source file of a folder, from `root`, with `/`. It skips the outputs and the dot folders,
+ * and the tests when `tests` is false.
+ */
+function sourcesOf(root: string, dir: string, tests = false): string[] {
   return readdirSync(dir, { withFileTypes: true })
     .toSorted((x, y) => x.name.localeCompare(y.name))
     .flatMap((e) => {
       const path = resolve(dir, e.name);
-      if (e.isDirectory()) return e.name.startsWith(".") || SKIP.has(e.name) ? [] : sourcesOf(root, path);
-      return e.isFile() && SOURCE.test(e.name) && !TEST.test(e.name) ? [relative(root, path).replaceAll("\\", "/")] : [];
+      if (e.isDirectory()) return e.name.startsWith(".") || SKIP.has(e.name) ? [] : sourcesOf(root, path, tests);
+      return e.isFile() && SOURCE.test(e.name) && (tests || !TEST.test(e.name)) ? [relative(root, path).replaceAll("\\", "/")] : [];
     });
+}
+
+/** This function checks the relative paths of the package of each selection (`load-check`). */
+function loadCheck(lane: Lane, laneDir: string, names: readonly string[], io: CliIo): number {
+  const pkgs = [...new Set((names.length === 0 ? Object.keys(lane.packages) : names.map((n) => select(lane, n).pkg)))];
+  let failed = 0;
+  for (const pkg of pkgs) {
+    const s = select(lane, pkg);
+    const dir = resolve(laneDir, s.dir);
+    if (!existsSync(dir)) throw new Error(`${pkg}: the folder ${s.dir} does not exist`);
+    const files = sourcesOf(dir, dir, true)
+      .filter((f) => !f.endsWith(".d.ts"))
+      .map((file) => ({ file, text: readFileSync(resolve(dir, file), "utf8") }));
+    const found = leavingPaths(files, s.vitestConfig);
+    for (const p of found) {
+      io.stderr(`${s.dir}/${p.file}:${String(p.line)}: "${p.path}" leaves the folder ${s.dir}. In the copy of Stryker it finds no file.
+`);
+    }
+    if (found.length === 0) io.stdout(`load-check ${pkg}: ${String(files.length)} files, no relative path leaves ${s.dir}
+`);
+    else failed += 1;
+  }
+  if (failed > 0) io.stderr(`load-check: ${String(failed)} packages have a relative path that leaves their folder. Import the file from its package, or move it into the folder.
+`);
+  return failed > 0 ? 1 : 0;
 }
 
 const readJson = (file: string): unknown => JSON.parse(readFileSync(file, "utf8"));
@@ -199,6 +231,8 @@ export function runCli(argv: readonly string[], io: CliIo): number {
     }
     case "disables":
       return disables(lane, laneDir, values.write, io);
+    case "load-check":
+      return loadCheck(lane, laneDir, names, io);
     default:
       io.stderr(`unknown command "${command}"\n\n${HELP}`);
       return 1;

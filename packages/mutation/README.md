@@ -85,6 +85,18 @@ A selection fails in these conditions:
 
 The gate of a package with parts applies to each part. Each part must have a score at the gate or above it. A part under the gate fails, also when the score of all the parts together is above the gate.
 
+## The load check
+
+Stryker copies the folder of the package and starts the tests in the copy. A relative path that leaves the folder then finds no file. A test file that does not load gives no failed test. Thus each mutant that only that file detects survives, with no error.
+
+`rigor-mutation load-check` examines the files that the run loads. These are the test files, the config files of Vitest and Vite, and each file that they load. It fails and names the file, the line and the path of each relative path that leaves the folder. In a config file, it examines each relative path string, for example a setup file. Start it before Stryker. To correct a path, import the file from its package, or move it into the folder.
+
+```text
+packages/compiler/src/module-sheet.test.ts:12: "../../testkit/src/fc-timeout.ts" leaves the folder packages/compiler.
+```
+
+The check does not read comments, type imports and paths with a template expression.
+
 ## The disabled mutants
 
 A comment `// Stryker disable next-line <Mutator>: <reason>` disables a mutant that is equivalent. The disable raises the score, so each one is also in the list, with its reason. `rigor-mutation disables` compares the comments of the sources of each package with the list. It fails when they are not the same, or when a comment has no reason. After you add or remove a disable, start `rigor-mutation disables --write` and examine the diff of the list.
@@ -101,4 +113,4 @@ const score = scoreReport(parseReport(JSON.parse(reportText)), selection);
 console.log(formatScore(score)); // collections.impl: 91.20 % (456 of 500, 44 survived), gate 80 %: pass
 ```
 
-The package also exports `selectionNames`, `runSelections`, `summaryMarkdown`, `findDisables`, `compareDisables` and `runCli`.
+The package also exports `selectionNames`, `runSelections`, `summaryMarkdown`, `findDisables`, `compareDisables`, `leavingPaths`, `isConfigFile` and `runCli`.

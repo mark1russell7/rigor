@@ -122,6 +122,19 @@ describe("rigor-mutation", () => {
     expect(JSON.parse(out)).toMatchObject({ dryRunOnly: true, disableBail: true, mutate: ["src/**/*.ts"] });
   });
 
+  it("refuses a relative path that leaves the folder of a package, and passes a package with none", () => {
+    expect(run("load-check")).toBe(0);
+    expect(out).toBe("load-check lib: 3 files, no relative path leaves packages/lib\nload-check app: 1 files, no relative path leaves packages/app\n");
+    put("packages/lib/src/core/c.test.ts", 'import { c } from "./c.ts";\nimport { fc } from "../../../testkit/src/fc.ts";\n');
+    put("packages/lib/src/types.d.ts", 'import "../../outside.ts";\n');
+    out = "";
+    expect(run("load-check", "lib.core")).toBe(1);
+    expect(out).toBe("");
+    expect(err).toContain('packages/lib/src/core/c.test.ts:2: "../../../testkit/src/fc.ts" leaves the folder packages/lib.');
+    expect(err).not.toContain("types.d.ts");
+    expect(err).toContain("load-check: 1 packages have a relative path");
+  });
+
   it("gives the help, and refuses an unknown command", () => {
     expect(run("--help")).toBe(0);
     expect(out).toContain("rigor-mutation list");
