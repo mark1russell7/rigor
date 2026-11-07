@@ -103,6 +103,25 @@ describe("rigor-mutation", () => {
     expect(run("list")).toBe(0);
   });
 
+  it("gives only the runs with a changed file, and a config that mutates only the changed files", () => {
+    put("changed.txt", "packages/lib/src/core/c.ts\nREADME.md\n\n");
+    expect(run("list", "--runs", "--changed", "changed.txt")).toBe(0);
+    expect(out).toBe("lib.core\n");
+    expect(run("config", "lib.core", "--changed", "changed.txt", "--out", "tmp/s.json")).toBe(0);
+    expect(JSON.parse(readFileSync(join(root, "tmp/s.json"), "utf8"))).toMatchObject({ mutate: ["src/core/c.ts"] });
+    expect(() => run("config", "lib.rest", "--changed", "changed.txt")).toThrow(/lib\.rest has no changed file/);
+    expect(() => run("list", "--changed", "changed.txt")).toThrow(/takes --runs/);
+    out = "";
+    put("none.txt", "docs/a.md\n");
+    expect(run("list", "--runs", "--changed", "none.txt")).toBe(0);
+    expect(out).toBe("");
+  });
+
+  it("writes a config for a dry run", () => {
+    expect(run("config", "app", "--dry-run")).toBe(0);
+    expect(JSON.parse(out)).toMatchObject({ dryRunOnly: true, disableBail: true, mutate: ["src/**/*.ts"] });
+  });
+
   it("gives the help, and refuses an unknown command", () => {
     expect(run("--help")).toBe(0);
     expect(out).toContain("rigor-mutation list");

@@ -6,10 +6,16 @@ export interface ConfigOptions {
   readonly concurrency?: number;
   /** This option gives the folder of the reports, from the folder of the package. The default is `reports/mutation`. */
   readonly reportDir?: string;
+  /**
+   * When this option is true, Stryker starts only the tests without mutants, and it does not stop at the first failed
+   * test. Use it to see if the tests pass under Stryker before a long run.
+   */
+  readonly dryRun?: boolean;
 }
 
-/** The Stryker config of one selection, as JSON. Stryker starts in the folder of the package. */
+/** The Stryker config of one selection, as JSON. Stryker starts in the folder of the package. The field `stryker` of the lane adds keys. */
 export interface StrykerConfig {
+  readonly [key: string]: unknown;
   readonly testRunner: "vitest";
   readonly plugins: readonly string[];
   readonly vitest?: { readonly configFile: string };
@@ -22,6 +28,8 @@ export interface StrykerConfig {
   readonly concurrency: number;
   readonly timeoutMS: number;
   readonly dryRunTimeoutMinutes: number;
+  readonly dryRunOnly?: true;
+  readonly disableBail?: true;
 }
 
 /** The default folder of the reports, from the folder of the package. */
@@ -57,5 +65,9 @@ export function strykerConfig(selection: Selection, options: ConfigOptions = {})
     concurrency: options.concurrency ?? 2,
     timeoutMS: selection.timeoutMS ?? TIMEOUT_MS,
     dryRunTimeoutMinutes: selection.dryRunTimeoutMinutes ?? DRY_RUN_TIMEOUT_MINUTES,
+    // The keys of the lane field "stryker" replace the keys above, but "--concurrency" replaces its "concurrency".
+    ...selection.stryker,
+    ...(options.concurrency === undefined ? {} : { concurrency: options.concurrency }),
+    ...(options.dryRun === true ? { dryRunOnly: true, disableBail: true } : {}),
   };
 }
