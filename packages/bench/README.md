@@ -33,6 +33,7 @@ v.comparison;                                     // the cases that gain and dro
 
 | Function | What it gives |
 | --- | --- |
+| `growthVerdict(rounds, options)` | The growth of a cost for each step of size, from a ratio inside each job, against a limit, for example 15 times for each 10 times. |
 | `firstArm(round, offset)` | The arm that runs first. The order turns each round, and an odd offset starts with arm `b`. |
 | `armOrder(arms, round)` | The order of any count of arms in a round. Each pair of arms has each order within 1 after each count of rounds. A report that keeps no `first` for each pair states the order that it used, so that a reader can make `first` again. |
 | `checkPairedTime(record)` | The record, or a `RangeError` for a time that is not a finite number above 0. |
@@ -257,6 +258,32 @@ There are four kinds of budget:
 - A record states what was real and what was synthetic. A record with no entry in `real` gives `cannot decide`.
 - `checkLadder` gives each problem of a ladder as data. `ladderVerdict` throws a `RangeError` for a ladder with problems.
 
+## A claim on the growth of a cost
+
+A ladder holds each size to a limit. A growth claim holds the step between sizes, for example "the time of one publish grows less than 15 times for each 10 times more subscribers". A cost that grows as n x n grows 100 times for each 10 times. A linear cost grows 10 times.
+
+```ts
+const v = growthVerdict(
+  [
+    { job: "job-1", size: 1_000, value: 9.0 },
+    { job: "job-1", size: 10_000, value: 51.8 },
+    { job: "job-1", size: 100_000, value: 590 },
+    // ... the same sizes for each other job
+  ],
+  { maxGrowth: 15 },
+);
+
+v.outcome;                  // "within", "beyond" or "cannot decide"
+v.steps[0].median;          // the median growth of the jobs from 1,000 to 10,000, for a step of 10 times
+v.steps[0].exponent;        // the cost grows as the size to this power
+```
+
+- The verdict reads a ratio inside each job: the cost at the larger size over the cost at the smaller size. Each job runs on one runner, so a slow runner changes both values and the ratio keeps its value. The verdict needs no A/A arm.
+- A step that is not `per` times in size is scaled to `per` times, with the exponent of the step. The default of `per` is 10.
+- The interval of each step is the distribution-free interval of the median of the jobs. With 5 jobs it is the full range, with the coverage 0.94. A step is `within` when the high end is less than `maxGrowth`.
+- A job that gives more than one value at a size gives their median.
+- The flip test of a growth gate is the old code: it must give `beyond`.
+
 ## Time the rounds
 
 `timeRounds` times one case in one process. Start a fresh process for each case and each pair, and give the index of the case as `offset`:
@@ -344,6 +371,21 @@ Each finding fails a gate, and each one carries its tests with `n`, `ties`, `p` 
 | `no-rows` | A rule names a measure or a control with no rows. This does not read as "not beaten". |
 | `no-control` | A rule has no control and no `noControl`. |
 | `control-late` | The date of `noControl` is before `asOf`. |
+
+### A narrow spread
+
+The finding `no-spread` reads "no pair separates". One entry far from the others stops that finding, but the measure does not separate the others. Each row of `spread` in a `MeasureCheck` thus has a report of how many entries carry the separated pairs.
+
+| Field | Meaning |
+| --- | --- |
+| `entries` | The real entries with at least one pair that has a read. |
+| `share` | The median, over these entries, of the share of the other entries that a test separates from the entry. A pair with no read does not count. |
+| `apart` | The entries that a test separates from more than half of the others that they have a read with. |
+| `narrow` | Some pair separates and `share` is under `NARROW_SPREAD_SHARE`. |
+
+- `narrow` is a report. It gives no finding, and it fails no gate.
+- `NARROW_SPREAD_SHARE` is 0.1. This value is a fitted default from a gap in the rows of one project, and it is not a gate limit.
+- One Holm family holds all pairs of all strata. Thus more strata in one call give fewer separated pairs and a lower `share`. Compare a `share` only with a `share` from the same strata.
 
 `winClaim(check, measure, entry, stratum)` gives `alone`, `show`, `likeControl`, `censored` and `open`. The fields are about this entry. The field `likeControl` is true when this entry does not beat a control on the measure and beats it on no partner. A win by another entry clears nothing. The field `alone` is true only when this entry itself beats each control on the measure, so a measure with no control is not `alone`.
 
