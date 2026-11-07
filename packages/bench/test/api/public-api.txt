@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 151 names
+## . (build/index.d.ts): names
 
 type Arm: build/paired.d.ts#Arm
 type ArmModels: build/index.d.ts#ArmModels
@@ -29,6 +29,7 @@ type CaseGate: build/index.d.ts#CaseGate
 type CaseInterval: build/index.d.ts#CaseInterval
 type CaseLimit: build/index.d.ts#CaseLimit
 type CaseRatio: build/paired.d.ts#CaseRatio
+type CaseResults: build/index.d.ts#CaseResults
 type CaseTail: build/index.d.ts#CaseTail
 type CaseTailLimit: build/index.d.ts#CaseTailLimit
 type Comparison: build/index.d.ts#Comparison
@@ -95,8 +96,13 @@ type Power: build/index.d.ts#Power
 type PowerOptions: build/index.d.ts#PowerOptions
 type QuantileBudget: build/index.d.ts#QuantileBudget
 type RateBudget: build/index.d.ts#RateBudget
+type ResultRead: build/index.d.ts#ResultRead
+type ResultRow: build/index.d.ts#ResultRow
+type ResultRows: build/index.d.ts#ResultRows
+type ResultVerdict: build/index.d.ts#ResultVerdict
 type Rounds: build/index.d.ts#Rounds
 type RoundsOptions: build/index.d.ts#RoundsOptions
+type RowRead: build/index.d.ts#RowRead
 type RunPairs: build/index.d.ts#RunPairs
 type Rung: build/index.d.ts#Rung
 type RungBudget: build/index.d.ts#RungBudget
@@ -148,6 +154,8 @@ poolRecords: build/index.d.ts#poolRecords
 pooledBand: build/index.d.ts#pooledBand
 pooledLimitVerdict: build/index.d.ts#pooledLimitVerdict
 pooledVerdict: build/index.d.ts#pooledVerdict
+resultRows: build/index.d.ts#resultRows
+resultVerdict: build/index.d.ts#resultVerdict
 rungVerdict: build/index.d.ts#rungVerdict
 tailFalseFails: build/index.d.ts#tailFalseFails
 tailLimitVerdict: build/index.d.ts#tailLimitVerdict
@@ -158,7 +166,18 @@ verdictPower: build/index.d.ts#verdictPower
 visibleShift: build/index.d.ts#visibleShift
 winClaim: build/index.d.ts#winClaim
 
-## ./fresh (build/fresh.d.ts): 17 names
+## ./code-stamp (build/code-stamp.d.ts): names
+
+CODE_STAMP_READ_WORDS: build/code-stamp.d.ts#CODE_STAMP_READ_WORDS
+CodeStamp: build/code-stamp.d.ts#CodeStamp
+CodeStampEngines: build/code-stamp.d.ts#CodeStampEngines
+CodeStampOptions: build/code-stamp.d.ts#CodeStampOptions
+CodeStampParts: build/code-stamp.d.ts#CodeStampParts
+EngineClosure: build/code-stamp.d.ts#EngineClosure
+codeStamp: build/code-stamp.d.ts#codeStamp
+lockClosure: build/code-stamp.d.ts#lockClosure
+
+## ./fresh (build/fresh.d.ts): names
 
 BenchEnv: build/fresh.d.ts#BenchEnv
 ChildExit: build/fresh.d.ts#ChildExit
@@ -178,7 +197,7 @@ childLine: build/fresh.d.ts#childLine
 freshRun: build/fresh.d.ts#freshRun
 pairOrder: build/fresh.d.ts#pairOrder
 
-## ./supervise (build/supervise.d.ts): 11 names
+## ./supervise (build/supervise.d.ts): names
 
 CaseProgress: build/supervise.d.ts#CaseProgress
 DEFAULT_OVERRUNS: build/supervise.d.ts#DEFAULT_OVERRUNS
@@ -193,6 +212,57 @@ startSupervisedProcess: build/supervise.d.ts#startSupervisedProcess
 superviseCases: build/supervise.d.ts#superviseCases
 
 ## Declarations
+
+### build/code-stamp.d.ts#CODE_STAMP_READ_WORDS
+export declare const CODE_STAMP_READ_WORDS: readonly string[];
+
+### build/code-stamp.d.ts#CodeStamp
+export interface CodeStamp {
+  readonly hash: string;
+  readonly parts: CodeStampParts;
+  readonly inputs: readonly string[];
+  readonly reads: readonly string[];
+  readonly engines: readonly EngineClosure[];
+}
+
+### build/code-stamp.d.ts#CodeStampEngines
+export interface CodeStampEngines {
+  readonly names: readonly string[];
+  readonly lockFile: string;
+  readonly importer: string;
+}
+
+### build/code-stamp.d.ts#CodeStampOptions
+export interface CodeStampOptions {
+  readonly cwd: string;
+  readonly entries: readonly string[];
+  readonly engines?: CodeStampEngines;
+  readonly dataFiles?: readonly string[];
+  readonly reads?: readonly string[];
+  readonly node?: string;
+}
+
+### build/code-stamp.d.ts#CodeStampParts
+export interface CodeStampParts {
+  readonly code: string;
+  readonly engines: string;
+  readonly data: string;
+  readonly bundler: string;
+  readonly node: string;
+}
+
+### build/code-stamp.d.ts#EngineClosure
+export interface EngineClosure {
+  readonly name: string;
+  readonly version: string;
+  readonly closure: readonly string[];
+}
+
+### build/code-stamp.d.ts#codeStamp
+export declare function codeStamp(options: CodeStampOptions): Promise<CodeStamp>;
+
+### build/code-stamp.d.ts#lockClosure
+export declare function lockClosure(lockText: string, importer: string, names: readonly string[]): readonly EngineClosure[];
 
 ### build/fresh.d.ts#BenchEnv
 export interface BenchEnv {
@@ -444,6 +514,13 @@ interface CaseLimit extends CaseInterval {
   readonly bound: number;
   readonly floor: number;
   readonly outcome: LimitOutcome;
+}
+
+### build/index.d.ts#CaseResults
+interface CaseResults {
+  readonly case: string;
+  readonly base: string;
+  readonly head: string;
 }
 
 ### build/index.d.ts#CaseTail
@@ -966,6 +1043,36 @@ interface RateBudget {
   readonly limit: number;
 }
 
+### build/index.d.ts#ResultRead
+interface ResultRead extends CaseResults {
+  readonly outcome: "accepted" | "refused";
+  readonly line: string;
+}
+
+### build/index.d.ts#ResultRow
+interface ResultRow {
+  readonly case: string;
+  readonly base: string;
+  readonly head: string;
+  readonly reason: string;
+}
+
+### build/index.d.ts#ResultRows
+interface ResultRows {
+  readonly base: readonly ResultRow[];
+  readonly head: readonly ResultRow[];
+}
+
+### build/index.d.ts#ResultVerdict
+interface ResultVerdict {
+  readonly outcome: "pass" | "fail";
+  readonly cases: readonly ResultRead[];
+  readonly unused: readonly RowRead[];
+  readonly absent: readonly RowRead[];
+  readonly spent: readonly ResultRow[];
+  readonly lines: readonly string[];
+}
+
 ### build/index.d.ts#Rounds
 interface Rounds {
   readonly records: PairedTime[];
@@ -981,6 +1088,12 @@ interface RoundsOptions {
   readonly targetMs?: number;
   readonly warmMs?: number;
   readonly now?: () => number;
+}
+
+### build/index.d.ts#RowRead
+interface RowRead {
+  readonly row: ResultRow;
+  readonly line: string;
 }
 
 ### build/index.d.ts#RunPairs
@@ -1230,6 +1343,12 @@ export declare function pooledLimitVerdict(jobs: readonly JobRecords[], options:
 
 ### build/index.d.ts#pooledVerdict
 export declare function pooledVerdict(jobs: readonly JobRecords[], options?: VerdictOptions): PooledVerdict;
+
+### build/index.d.ts#resultRows
+export declare function resultRows(content: unknown): ResultRow[];
+
+### build/index.d.ts#resultVerdict
+export declare function resultVerdict(results: readonly CaseResults[], rows: ResultRows): ResultVerdict;
 
 ### build/index.d.ts#rungVerdict
 export declare function rungVerdict(rung: Rung, record: RungRecord | undefined, options: LadderOptions): RungVerdict;

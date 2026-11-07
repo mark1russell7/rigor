@@ -5,9 +5,12 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
   # release.yml starts these gates before a release
   workflow_call:
+  # A person starts a run on a branch with no pull request: gh workflow run ci.yml --ref <branch>
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -16,9 +19,13 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   ci:
-    uses: mark1russell7/template/.github/workflows/reusable-ci.yml@f48f29fe5b00772951e0910a90fbbe312343338c # main
+    uses: mark1russell7/template/.github/workflows/reusable-ci.yml@e077054e0f2ebb8441e4bc525b56cf2acc2afb6f # main
 
   # Each preset of `pnpm package add` makes a package, and that package passes its typecheck and its tests.
   # The tests of the preset service hold its entry to describe() and lint() of @mark1russell7/service (OTH-5).
@@ -54,14 +61,20 @@ jobs:
       - run: pnpm --filter "@template/$PACKAGE" typecheck
       - run: pnpm --filter "@template/$PACKAGE" test
 
+  # A code stamp must be the same on each operating system. The reads run when the stamp code, the lock file or their workflow changes.
+  stamp-check:
+    uses: ./.github/workflows/stamp-check.yml
+    permissions:
+      contents: read
+
   # The one check of the ruleset of main (CI.md of mark1russell7/template, "The check of the ruleset").
   # It passes only when each job of needs passed, or was skipped by its own if and ALLOW_SKIP names it.
   # A new job of this file goes in needs, so the ruleset never has to change, and gh pr merge --auto
   # waits for the whole gate.
   ci-ok:
     name: CI OK
-    if: always()
-    needs: [ci, presets]
+    if: ${{ !cancelled() }}
+    needs: [ci, presets, stamp-check]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     permissions: {}

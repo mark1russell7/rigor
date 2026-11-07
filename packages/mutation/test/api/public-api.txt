@@ -1,0 +1,193 @@
+# The public API of @mark1russell7/rigor-mutation
+#
+# The names of each entry of the exports field, and the declaration of each name, without comments
+# and private members. The command `api-report check` compares this file with the built .d.ts files.
+# To accept a change of the API, start the build, then `api-report update`, and review the diff.
+
+## . (build/index.d.ts): names
+
+type CliIo: build/index.d.ts#CliIo
+type ConfigOptions: build/index.d.ts#ConfigOptions
+type Disable: build/index.d.ts#Disable
+type DisableCheck: build/index.d.ts#DisableCheck
+HELP: build/index.d.ts#HELP
+type Lane: build/index.d.ts#Lane
+type Mutant: build/index.d.ts#Mutant
+type MutationReport: build/index.d.ts#MutationReport
+type PackageLane: build/index.d.ts#PackageLane
+REPORT_DIR: build/index.d.ts#REPORT_DIR
+type Score: build/index.d.ts#Score
+type Selection: build/index.d.ts#Selection
+type StrykerConfig: build/index.d.ts#StrykerConfig
+compareDisables: build/index.d.ts#compareDisables
+findDisables: build/index.d.ts#findDisables
+formatScore: build/index.d.ts#formatScore
+parseLane: build/index.d.ts#parseLane
+parseReport: build/index.d.ts#parseReport
+runCli: build/index.d.ts#runCli
+runSelections: build/index.d.ts#runSelections
+scoreReport: build/index.d.ts#scoreReport
+select: build/index.d.ts#select
+selectionNames: build/index.d.ts#selectionNames
+strykerConfig: build/index.d.ts#strykerConfig
+summaryMarkdown: build/index.d.ts#summaryMarkdown
+
+## bin: 1 commands
+
+rigor-mutation: ./build/cli.js
+
+## Declarations
+
+### build/index.d.ts#CliIo
+interface CliIo {
+  readonly cwd: string;
+  readonly stdout: (text: string) => void;
+  readonly stderr: (text: string) => void;
+}
+
+### build/index.d.ts#ConfigOptions
+interface ConfigOptions {
+  readonly concurrency?: number;
+  readonly reportDir?: string;
+}
+
+### build/index.d.ts#Disable
+interface Disable {
+  readonly file: string;
+  readonly comment: string;
+}
+
+### build/index.d.ts#DisableCheck
+interface DisableCheck {
+  readonly added: readonly string[];
+  readonly removed: readonly string[];
+  readonly noReason: readonly Disable[];
+  readonly ok: boolean;
+}
+
+### build/index.d.ts#HELP
+export declare const HELP: string;
+
+### build/index.d.ts#Lane
+interface Lane {
+  readonly packages: Readonly<Record<string, PackageLane>>;
+  readonly disables?: string;
+}
+
+### build/index.d.ts#Mutant
+interface Mutant {
+  readonly status: string;
+  readonly mutatorName: string;
+  readonly location: {
+    readonly start: {
+      readonly line: number;
+    };
+  };
+}
+
+### build/index.d.ts#MutationReport
+interface MutationReport {
+  readonly files: Readonly<Record<string, {
+    readonly mutants: readonly Mutant[];
+  }>>;
+}
+
+### build/index.d.ts#PackageLane
+interface PackageLane {
+  readonly dir: string;
+  readonly mutate: readonly string[];
+  readonly parts?: Readonly<Record<string, readonly string[]>>;
+  readonly gate?: number;
+  readonly vitestConfig?: string;
+}
+
+### build/index.d.ts#REPORT_DIR
+export declare const REPORT_DIR = "reports/mutation";
+
+### build/index.d.ts#Score
+interface Score {
+  readonly name: string;
+  readonly gate: number | undefined;
+  readonly detected: number;
+  readonly valid: number;
+  readonly survived: readonly string[];
+  readonly percent: number;
+  readonly pass: boolean;
+  readonly reason: string | undefined;
+}
+
+### build/index.d.ts#Selection
+interface Selection {
+  readonly name: string;
+  readonly pkg: string;
+  readonly dir: string;
+  readonly mutate: readonly string[];
+  readonly gate: number | undefined;
+  readonly vitestConfig: string | undefined;
+}
+
+### build/index.d.ts#StrykerConfig
+interface StrykerConfig {
+  readonly testRunner: "vitest";
+  readonly plugins: readonly string[];
+  readonly vitest?: {
+    readonly configFile: string;
+  };
+  readonly mutate: readonly string[];
+  readonly coverageAnalysis: "perTest";
+  readonly reporters: readonly string[];
+  readonly htmlReporter: {
+    readonly fileName: string;
+  };
+  readonly jsonReporter: {
+    readonly fileName: string;
+  };
+  readonly thresholds: {
+    readonly high: number;
+    readonly low: number;
+    readonly break: null;
+  };
+  readonly concurrency: number;
+}
+
+### build/index.d.ts#compareDisables
+export declare function compareDisables(found: readonly Disable[], listed: readonly Disable[]): DisableCheck;
+
+### build/index.d.ts#findDisables
+export declare function findDisables(files: readonly {
+  readonly file: string;
+  readonly text: string;
+}[]): Disable[];
+
+### build/index.d.ts#formatScore
+export declare function formatScore(s: Score): string;
+
+### build/index.d.ts#parseLane
+export declare function parseLane(json: unknown): Lane;
+
+### build/index.d.ts#parseReport
+export declare function parseReport(json: unknown): MutationReport;
+
+### build/index.d.ts#runCli
+export declare function runCli(argv: readonly string[], io: CliIo): number;
+
+### build/index.d.ts#runSelections
+export declare function runSelections(lane: Lane): string[];
+
+### build/index.d.ts#scoreReport
+export declare function scoreReport(report: MutationReport, selection: {
+  readonly name: string;
+  readonly gate: number | undefined;
+}): Score;
+
+### build/index.d.ts#select
+export declare function select(lane: Lane, name: string): Selection;
+
+### build/index.d.ts#selectionNames
+export declare function selectionNames(lane: Lane): string[];
+
+### build/index.d.ts#strykerConfig
+export declare function strykerConfig(selection: Selection, options?: ConfigOptions): StrykerConfig;
+
+### build/index.d.ts#summaryMarkdown
+export declare function summaryMarkdown(scores: readonly Score[]): string;

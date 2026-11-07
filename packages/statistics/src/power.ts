@@ -91,6 +91,9 @@ export interface OptionFloorOptions {
  * with `df = 2 n - 2`. The count is on both sides of that form, so the function takes the first count that meets it.
  *
  * The function assumes independent values, unpaired groups of equal size, equal `sigma`, and a Bonferroni family.
+ * Holm gives each test a level of `alpha / tests` or more. Thus for a Holm family the count is an upper bound, not the exact count.
+ * The tests read the power by simulation: 2,000 draws at the floor for 1, 5 and 67 tests, from the fixed seeds `rigor-statistics/optionFloor/at/<tests>`.
+ * Each read gives 0.78 or more, and one count below the floor gives less.
  * A value of `sigma` from an older run gives a count for that run. Read `sigma` again on the new values.
  *
  * @param options - The spread, the difference, the family and the targets.
