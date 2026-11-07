@@ -8,7 +8,7 @@ import { SCHEDULE_FORMAT, constant, type Schedule } from "./schedule.ts";
  * `sent + j × interval` before that reply. Each hidden send gets the reply that ended the stall.
  *
  * A pause of the driver itself also hides sends. The driver expects its next send at the later of
- * `sent + interval` and the reply. A send past that time and the tolerance is a driver gap. Each
+ * `sent + interval` and the reply plus `pause`. A send past that time and the tolerance is a driver gap. Each
  * planned send in the gap is hidden too, and it gets the reply of the real send that ended the gap.
  *
  * The plan starts again at each real send. A global plan of `first + n × interval` is not correct for
@@ -30,6 +30,12 @@ export interface ClosedLoopOptions {
   readonly end: number;
   /** A send later than its expected time by more than this tolerance is a driver gap. */
   readonly tolerance: number;
+  /**
+   * This time is the wait of the driver after each reply, before its next send. The default is 0. A
+   * driver with a think time sends at `done + pause`, thus that send is not a driver gap. Such a driver
+   * gives `interval` and `pause` the same value: a stall then hides the sends at `sent + j × interval`.
+   */
+  readonly pause?: number;
 }
 
 /** This is a closed-loop run in the terms of `measureLoad`. */
@@ -52,10 +58,11 @@ export interface ClosedLoopRun {
 }
 
 /** This function throws a `RangeError` for options or a request list that one closed loop cannot give. */
-function check(requests: readonly LoopRequest[], { interval, end, tolerance }: ClosedLoopOptions): void {
+function check(requests: readonly LoopRequest[], { interval, end, tolerance, pause = 0 }: ClosedLoopOptions): void {
   if (!(interval > 0 && Number.isFinite(interval))) throw new RangeError(`closedLoopPlan: the interval is more than 0, not ${interval}.`);
   if (!(end > 0 && Number.isFinite(end))) throw new RangeError(`closedLoopPlan: the end is more than 0, not ${end}.`);
   if (!(tolerance >= 0 && Number.isFinite(tolerance))) throw new RangeError(`closedLoopPlan: the tolerance is 0 or more, not ${tolerance}.`);
+  if (!(pause >= 0 && Number.isFinite(pause))) throw new RangeError(`closedLoopPlan: the pause is 0 or more, not ${pause}.`);
   let free = 0;
   requests.forEach(({ sent, done }, index) => {
     if (!(sent >= free && Number.isFinite(sent))) throw new RangeError(`closedLoopPlan: the request ${index} has a send at ${sent}, before the reply at ${free}.`);
@@ -74,7 +81,7 @@ function check(requests: readonly LoopRequest[], { interval, end, tolerance }: C
  */
 export function closedLoopPlan(requests: readonly LoopRequest[], options: ClosedLoopOptions): ClosedLoopRun {
   check(requests, options);
-  const { interval, end, tolerance } = options;
+  const { interval, end, tolerance, pause = 0 } = options;
   const times: number[] = [];
   const completions: Completion[] = [];
   let hidden = 0;
@@ -97,7 +104,7 @@ export function closedLoopPlan(requests: readonly LoopRequest[], options: Closed
     times.push(sent);
     const stop = done ?? end;
     for (let step = 1; sent + step * interval < stop; step += 1) hide(sent + step * interval, done ?? sent, done);
-    expected = done === null ? null : Math.max(sent + interval, done);
+    expected = done === null ? null : Math.max(sent + interval, done + pause);
   }
   const plan: Schedule = { format: SCHEDULE_FORMAT, arrivals: "uniform", seed: null, profile: constant(1000 / interval, end), times };
   return { plan, completions, hidden, driverGaps, driverGapTotal };

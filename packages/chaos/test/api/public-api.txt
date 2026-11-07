@@ -38,6 +38,7 @@ export interface ClosedLoopOptions {
   readonly interval: number;
   readonly end: number;
   readonly tolerance: number;
+  readonly pause?: number;
 }
 
 ### build/closed.d.ts#ClosedLoopRun
