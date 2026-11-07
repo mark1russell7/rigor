@@ -33,6 +33,7 @@ v.comparison;                                     // the cases that gain and dro
 
 | Function | What it gives |
 | --- | --- |
+| `growthVerdict(rounds, options)` | The growth of a cost for each step of size, from a ratio inside each job, against a limit, for example 15 times for each 10 times. |
 | `firstArm(round, offset)` | The arm that runs first. The order turns each round, and an odd offset starts with arm `b`. |
 | `armOrder(arms, round)` | The order of any count of arms in a round. Each pair of arms has each order within 1 after each count of rounds. A report that keeps no `first` for each pair states the order that it used, so that a reader can make `first` again. |
 | `checkPairedTime(record)` | The record, or a `RangeError` for a time that is not a finite number above 0. |
@@ -256,6 +257,32 @@ There are four kinds of budget:
 - A high rung does not count over a gap: `held` stops at the first rung that is not `within`.
 - A record states what was real and what was synthetic. A record with no entry in `real` gives `cannot decide`.
 - `checkLadder` gives each problem of a ladder as data. `ladderVerdict` throws a `RangeError` for a ladder with problems.
+
+## A claim on the growth of a cost
+
+A ladder holds each size to a limit. A growth claim holds the step between sizes, for example "the time of one publish grows less than 15 times for each 10 times more subscribers". A cost that grows as n x n grows 100 times for each 10 times. A linear cost grows 10 times.
+
+```ts
+const v = growthVerdict(
+  [
+    { job: "job-1", size: 1_000, value: 9.0 },
+    { job: "job-1", size: 10_000, value: 51.8 },
+    { job: "job-1", size: 100_000, value: 590 },
+    // ... the same sizes for each other job
+  ],
+  { maxGrowth: 15 },
+);
+
+v.outcome;                  // "within", "beyond" or "cannot decide"
+v.steps[0].median;          // the median growth of the jobs from 1,000 to 10,000, for a step of 10 times
+v.steps[0].exponent;        // the cost grows as the size to this power
+```
+
+- The verdict reads a ratio inside each job: the cost at the larger size over the cost at the smaller size. Each job runs on one runner, so a slow runner changes both values and the ratio keeps its value. The verdict needs no A/A arm.
+- A step that is not `per` times in size is scaled to `per` times, with the exponent of the step. The default of `per` is 10.
+- The interval of each step is the distribution-free interval of the median of the jobs. With 5 jobs it is the full range, with the coverage 0.94. A step is `within` when the high end is less than `maxGrowth`.
+- A job that gives more than one value at a size gives their median.
+- The flip test of a growth gate is the old code: it must give `beyond`.
 
 ## Time the rounds
 
