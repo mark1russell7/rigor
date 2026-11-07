@@ -372,6 +372,21 @@ Each finding fails a gate, and each one carries its tests with `n`, `ties`, `p` 
 | `no-control` | A rule has no control and no `noControl`. |
 | `control-late` | The date of `noControl` is before `asOf`. |
 
+### A narrow spread
+
+The finding `no-spread` reads "no pair separates". One entry far from the others stops that finding, but the measure does not separate the others. Each row of `spread` in a `MeasureCheck` thus has a report of how many entries carry the separated pairs.
+
+| Field | Meaning |
+| --- | --- |
+| `entries` | The real entries with at least one pair that has a read. |
+| `share` | The median, over these entries, of the share of the other entries that a test separates from the entry. A pair with no read does not count. |
+| `apart` | The entries that a test separates from more than half of the others that they have a read with. |
+| `narrow` | Some pair separates and `share` is under `NARROW_SPREAD_SHARE`. |
+
+- `narrow` is a report. It gives no finding, and it fails no gate.
+- `NARROW_SPREAD_SHARE` is 0.1. This value is a fitted default from a gap in the rows of one project, and it is not a gate limit.
+- One Holm family holds all pairs of all strata. Thus more strata in one call give fewer separated pairs and a lower `share`. Compare a `share` only with a `share` from the same strata.
+
 `winClaim(check, measure, entry, stratum)` gives `alone`, `show`, `likeControl`, `censored` and `open`. The fields are about this entry. The field `likeControl` is true when this entry does not beat a control on the measure and beats it on no partner. A win by another entry clears nothing. The field `alone` is true only when this entry itself beats each control on the measure, so a measure with no control is not `alone`.
 
 `jointClaim(check, measures, entry, stratum)` reads a set of measures together, because one measure cannot call a win when each control wins a measure and loses a partner:

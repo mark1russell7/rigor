@@ -87,6 +87,7 @@ export {
   type PartnerRead,
   type SpreadRead,
   type WinClaim,
+  NARROW_SPREAD_SHARE,
   checkMeasures,
   jointClaim,
   winClaim,
