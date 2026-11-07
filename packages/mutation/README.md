@@ -34,11 +34,16 @@ The lane file `mutation.json` is at the root of the repository:
 - `dir` is the folder of the package. Stryker starts in this folder.
 - `mutate` has the globs of the files to mutate, from `dir`. A glob with `!` removes the files of the globs before it.
 - `gate` is the lowest score in percent that passes. Without a gate, the lane only reports the score.
-- `parts` divides a big package. A part has its own globs, and the `!` globs of `mutate` also apply to it.
+- `parts` divides a big package. A part has its own globs, and the `!` globs of `mutate` also apply to it. Each file of `mutate` must be in exactly one part.
 - `vitestConfig` names the Vitest config of the package, from `dir`. Without it, Vitest finds its config.
+- `timeoutMS` is the time in milliseconds that the clock adds to the time of the tests for each mutant. The default is 120000. The default of Stryker (5000) is too short on a loaded CI runner.
+- `dryRunTimeoutMinutes` is the time in minutes for the run of the tests without mutants. The default is 15.
+- `stryker` has more options for the Stryker config of each selection of the package, for example `{ "ignoreStatic": true }`. Its keys replace the keys of the config, but `--concurrency` replaces its `concurrency`. The lane owns `mutate`, `thresholds`, `jsonReporter`, `htmlReporter`, `timeoutMS` and `dryRunTimeoutMinutes`, so `stryker` cannot have them.
 - `disables` (at the root of the lane) names the list of the disabled mutants. The default is `mutation-disables.json`.
 
 A selection is one Stryker run: a package (`collections`) or a part (`collections.impl`). `rigor-mutation list --runs` gives the selections of a full run: the parts of each package with parts, else the package.
+
+A full run mutates only the files of the parts. Thus a file in no part has no score, and a file in two parts has two scores. `list --runs`, and `config` and `scores` of a part, examine the source files of the package. They fail and name each file that is in no part, in two parts, or in a part but not in `mutate`. In the example, a file `src/util.ts` is in no part, so the lane fails.
 
 ## A run
 
@@ -50,17 +55,47 @@ cd -
 pnpm exec rigor-mutation scores collections
 ```
 
+Each run starts the tests of `dir` only. A test in another folder, for example a test of the repository root, does not detect a mutant of the package.
+
 `rigor-mutation scores` reads `<dir>/reports/mutation/mutation.json` and applies the gate. It exits with 1 when a selection fails. With `--summary "$GITHUB_STEP_SUMMARY"`, it adds a table of the scores to the summary of the job. The shared workflow `reusable-mutation.yml` of the template starts these steps on one runner for each selection.
 
 A run of mutation tests is long and it uses much memory. Start it in CI, and on a local computer start one part with `--concurrency 2`.
 
+Two options make a run shorter:
+
+- `config --dry-run` gives a config that starts only the tests without mutants. Stryker does not stop at the first failed test. Use it to see if the tests pass under Stryker before a long run.
+- `--changed <file>` reads a file with one changed path on each line, from the folder of the lane file. Make the file with `git diff --name-only`. Then `list --runs` gives only the runs with a changed file, and `config` mutates only the changed files of the selection. `config` fails for a selection with no changed file.
+
 ## The score
 
-The score counts the mutants with the status `Killed` or `Timeout`, out of the mutants that a test covers or that survive. Compile errors, runtime errors and ignored mutants do not count. A selection fails in these conditions:
+The score counts the detected mutants, out of the mutants that a test covers or that survive. Compile errors, runtime errors and ignored mutants do not count.
+
+A detected mutant has the status `Killed`, or a `Timeout` of the hit limit. Stryker gives the status `Timeout` for two events:
+
+- The hit limit stopped the mutant. The mutant has an endless loop, and its `statusReason` starts with `Hit limit`. The mutant is detected.
+- The clock stopped the mutant. The load of the runner can cause this, so the mutant is not detected for certain. It counts as not detected.
+
+The score line gives the count of each kind of time-out. It also gives the score with the clock time-outs counted as detected, as Stryker counts them. The gate does not use that second score.
+
+A selection fails in these conditions:
 
 - The report has no mutants that count. Stryker found no files, or it did not start.
 - The report has mutants that count, but the tests detect none. The test runner started no test on the mutants.
 - The selection has a gate, and the score is under it.
+
+The gate of a package with parts applies to each part. Each part must have a score at the gate or above it. A part under the gate fails, also when the score of all the parts together is above the gate.
+
+## The load check
+
+Stryker copies the folder of the package and starts the tests in the copy. A relative path that leaves the folder then finds no file. A test file that does not load gives no failed test. Thus each mutant that only that file detects survives, with no error.
+
+`rigor-mutation load-check` examines the files that the run loads. These are the test files, the config files of Vitest and Vite, and each file that they load. It fails and names the file, the line and the path of each relative path that leaves the folder. In a config file, it examines each relative path string, for example a setup file. Start it before Stryker. To correct a path, import the file from its package, or move it into the folder.
+
+```text
+packages/compiler/src/module-sheet.test.ts:12: "../../testkit/src/fc-timeout.ts" leaves the folder packages/compiler.
+```
+
+The check does not read comments, type imports and paths with a template expression.
 
 ## The disabled mutants
 
@@ -78,4 +113,4 @@ const score = scoreReport(parseReport(JSON.parse(reportText)), selection);
 console.log(formatScore(score)); // collections.impl: 91.20 % (456 of 500, 44 survived), gate 80 %: pass
 ```
 
-The package also exports `selectionNames`, `runSelections`, `summaryMarkdown`, `findDisables`, `compareDisables` and `runCli`.
+The package also exports `selectionNames`, `runSelections`, `summaryMarkdown`, `findDisables`, `compareDisables`, `leavingPaths`, `isConfigFile` and `runCli`.

@@ -7,8 +7,11 @@
 ## . (build/index.d.ts): names
 
 type Arrivals: build/schedule.d.ts#Arrivals
+type ClosedLoopOptions: build/closed.d.ts#ClosedLoopOptions
+type ClosedLoopRun: build/closed.d.ts#ClosedLoopRun
 type Completion: build/measure.d.ts#Completion
 type LoadMeasure: build/measure.d.ts#LoadMeasure
+type LoopRequest: build/closed.d.ts#LoopRequest
 type Phase: build/schedule.d.ts#Phase
 type Profile: build/schedule.d.ts#Profile
 SCHEDULE_FORMAT: build/schedule.d.ts#SCHEDULE_FORMAT
@@ -17,6 +20,7 @@ type ScheduleCheck: build/measure.d.ts#ScheduleCheck
 type ScheduleOptions: build/schedule.d.ts#ScheduleOptions
 type SecondSample: build/measure.d.ts#SecondSample
 checkProfile: build/schedule.d.ts#checkProfile
+closedLoopPlan: build/closed.d.ts#closedLoopPlan
 constant: build/schedule.d.ts#constant
 expectedArrivals: build/schedule.d.ts#expectedArrivals
 latencyQuantile: build/measure.d.ts#latencyQuantile
@@ -28,6 +32,31 @@ spike: build/schedule.d.ts#spike
 steps: build/schedule.d.ts#steps
 
 ## Declarations
+
+### build/closed.d.ts#ClosedLoopOptions
+export interface ClosedLoopOptions {
+  readonly interval: number;
+  readonly end: number;
+  readonly tolerance: number;
+}
+
+### build/closed.d.ts#ClosedLoopRun
+export interface ClosedLoopRun {
+  readonly plan: Schedule;
+  readonly completions: readonly Completion[];
+  readonly hidden: number;
+  readonly driverGaps: number;
+  readonly driverGapTotal: number;
+}
+
+### build/closed.d.ts#LoopRequest
+export interface LoopRequest {
+  readonly sent: number;
+  readonly done: number | null;
+}
+
+### build/closed.d.ts#closedLoopPlan
+export declare function closedLoopPlan(requests: readonly LoopRequest[], options: ClosedLoopOptions): ClosedLoopRun;
 
 ### build/measure.d.ts#Completion
 export interface Completion {

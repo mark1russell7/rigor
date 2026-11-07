@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { strykerConfig } from "./config.ts";
-import { parseLane, runSelections, select, selectionNames } from "./lane.ts";
+import { changedFiles, globsSelect, parseLane, partErrors, runSelections, select, selectionNames } from "./lane.ts";
 
 const LANE = {
   packages: {
@@ -26,6 +26,11 @@ describe("parseLane", () => {
     [{ packages: { a: { dir: "a", mutate: ["x"], parts: { p: ["!y"] } } } }, /a\.p: the part is not a list of globs without "!"/],
     [{ packages: { "a.b": { dir: "a", mutate: ["x"] } } }, /the package name "a\.b"/],
     [{ packages: { a: { dir: "a", mutate: ["x"] } }, disables: 3 }, /"disables" is not a file name/],
+    [{ packages: { a: { dir: "a", mutate: ["x"], timeoutMS: 0 } } }, /a: "timeoutMS" is not a positive integer/],
+    [{ packages: { a: { dir: "a", mutate: ["x"], dryRunTimeoutMinutes: 1.5 } } }, /a: "dryRunTimeoutMinutes" is not a positive integer/],
+    [{ packages: { a: { dir: "a", mutate: ["x"], stryker: [] } } }, /a: "stryker" is not an object/],
+    [{ packages: { a: { dir: "a", mutate: ["x"], stryker: { mutate: ["y"] } } } }, /a: "stryker" has "mutate", but the lane owns these keys/],
+    [{ packages: { a: { dir: "a", mutate: ["x"], stryker: { thresholds: {}, jsonReporter: {} } } } }, /a: "stryker" has "thresholds", "jsonReporter"/],
   ])("refuses %j", (json, message) => {
     expect(() => parseLane(json)).toThrow(message);
   });
@@ -55,6 +60,50 @@ describe("select", () => {
   });
 });
 
+describe("globsSelect", () => {
+  it("reads the globs in order, as Stryker does", () => {
+    expect(globsSelect(["src/**/*.ts", "!src/**/*.test.ts"], "src/a/b.ts")).toBe(true);
+    expect(globsSelect(["src/**/*.ts", "!src/**/*.test.ts"], "src/a/b.test.ts")).toBe(false);
+    expect(globsSelect(["src/**/*.ts", "!src/gen/**", "src/gen/keep.ts"], "src/gen/keep.ts")).toBe(true);
+    expect(globsSelect(["src/**/*.ts"], "scripts/x.ts")).toBe(false);
+  });
+});
+
+// rigor#110: the parts of a package must cover each file of "mutate" exactly one time.
+describe("partErrors", () => {
+  const lane = parseLane(LANE);
+  const files = ["src/impl/a.ts", "src/core/b.ts", "src/index.ts", "src/impl/a.test.ts"];
+
+  it("gives no errors when each file of mutate is in exactly one part", () => {
+    expect(partErrors(lane, "collections", files)).toEqual([]);
+    expect(partErrors(lane, "small", ["src/x.ts"])).toEqual([]);
+  });
+
+  it("names a file that is in no part", () => {
+    expect(partErrors(lane, "collections", [...files, "src/util.ts"])).toEqual(["collections: the file src/util.ts is in no part, so a full run does not mutate it"]);
+  });
+
+  it("names a file that is in two parts, and a file of a part that is not in mutate", () => {
+    const two = parseLane({ packages: { p: { dir: "p", mutate: ["src/**/*.ts"], parts: { a: ["src/**/*.ts"], b: ["src/b/**/*.ts", "scripts/*.ts"] } } } });
+    expect(partErrors(two, "p", ["src/b/x.ts", "scripts/y.ts"])).toEqual([
+      "p: the file src/b/x.ts is in more than one part: a, b",
+      'p: the file scripts/y.ts is in the part b, but not in "mutate"',
+    ]);
+  });
+});
+
+describe("changedFiles", () => {
+  const lane = parseLane(LANE);
+
+  it("gives the changed files of a selection, from the folder of its package", () => {
+    const changed = ["packages/collections/src/impl/a.ts", "packages/collections/src/core/b.ts", "packages/collections/src/impl/a.test.ts", "packages/small/src/x.ts", "README.md"];
+    expect(changedFiles(select(lane, "collections.impl"), changed)).toEqual(["src/impl/a.ts"]);
+    expect(changedFiles(select(lane, "collections"), changed)).toEqual(["src/impl/a.ts", "src/core/b.ts"]);
+    expect(changedFiles(select(lane, "small"), ["packages\\small\\src\\x.ts"])).toEqual(["src/x.ts"]);
+    expect(changedFiles(select(lane, "small"), ["packages/smaller/src/x.ts", "packages/small"])).toEqual([]);
+  });
+});
+
 describe("strykerConfig", () => {
   const lane = parseLane(LANE);
 
@@ -80,5 +129,23 @@ describe("strykerConfig", () => {
 
   it("names the Vitest config of a package that has one", () => {
     expect(strykerConfig(select(lane, "small"))).toMatchObject({ vitest: { configFile: "vitest.unit.ts" }, thresholds: { low: 60, high: 90 }, concurrency: 2 });
+  });
+
+  it("adds the keys of the lane field stryker, and --concurrency replaces its concurrency", () => {
+    const opts = parseLane({ packages: { s: { dir: "s", mutate: ["x"], stryker: { ignoreStatic: true, concurrency: 1, plugins: ["a", "b"] } } } });
+    expect(strykerConfig(select(opts, "s"))).toMatchObject({ ignoreStatic: true, concurrency: 1, plugins: ["a", "b"], mutate: ["x"] });
+    expect(strykerConfig(select(opts, "s"), { concurrency: 3 })).toMatchObject({ ignoreStatic: true, concurrency: 3 });
+  });
+
+  it("starts only the tests with dryRun, and does not stop at the first failed test", () => {
+    expect(strykerConfig(select(lane, "small"), { dryRun: true })).toMatchObject({ dryRunOnly: true, disableBail: true });
+    expect(strykerConfig(select(lane, "small"))).not.toHaveProperty("dryRunOnly");
+  });
+
+  // rigor#109: the clock of Stryker (5000 ms) stopped mutants on a loaded runner, so the default is longer.
+  it("gives the clock times of 120000 ms and 15 minutes, and the times of the lane when it has them", () => {
+    expect(strykerConfig(select(lane, "small"))).toMatchObject({ timeoutMS: 120_000, dryRunTimeoutMinutes: 15 });
+    const slow = parseLane({ packages: { s: { dir: "s", mutate: ["x"], timeoutMS: 300_000, dryRunTimeoutMinutes: 40 } } });
+    expect(strykerConfig(select(slow, "s"))).toMatchObject({ timeoutMS: 300_000, dryRunTimeoutMinutes: 40 });
   });
 });

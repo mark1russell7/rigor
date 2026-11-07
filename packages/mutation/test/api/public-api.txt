@@ -8,22 +8,32 @@
 
 type CliIo: build/index.d.ts#CliIo
 type ConfigOptions: build/index.d.ts#ConfigOptions
+DRY_RUN_TIMEOUT_MINUTES: build/index.d.ts#DRY_RUN_TIMEOUT_MINUTES
 type Disable: build/index.d.ts#Disable
 type DisableCheck: build/index.d.ts#DisableCheck
 HELP: build/index.d.ts#HELP
 type Lane: build/index.d.ts#Lane
+type LeavingPath: build/index.d.ts#LeavingPath
 type Mutant: build/index.d.ts#Mutant
 type MutationReport: build/index.d.ts#MutationReport
+type PackageFile: build/index.d.ts#PackageFile
 type PackageLane: build/index.d.ts#PackageLane
 REPORT_DIR: build/index.d.ts#REPORT_DIR
+STRYKER_OWNED: build/index.d.ts#STRYKER_OWNED
 type Score: build/index.d.ts#Score
 type Selection: build/index.d.ts#Selection
 type StrykerConfig: build/index.d.ts#StrykerConfig
+TIMEOUT_MS: build/index.d.ts#TIMEOUT_MS
+changedFiles: build/index.d.ts#changedFiles
 compareDisables: build/index.d.ts#compareDisables
 findDisables: build/index.d.ts#findDisables
 formatScore: build/index.d.ts#formatScore
+isConfigFile: build/index.d.ts#isConfigFile
+isHitLimit: build/index.d.ts#isHitLimit
+leavingPaths: build/index.d.ts#leavingPaths
 parseLane: build/index.d.ts#parseLane
 parseReport: build/index.d.ts#parseReport
+partErrors: build/index.d.ts#partErrors
 runCli: build/index.d.ts#runCli
 runSelections: build/index.d.ts#runSelections
 scoreReport: build/index.d.ts#scoreReport
@@ -49,7 +59,11 @@ interface CliIo {
 interface ConfigOptions {
   readonly concurrency?: number;
   readonly reportDir?: string;
+  readonly dryRun?: boolean;
 }
+
+### build/index.d.ts#DRY_RUN_TIMEOUT_MINUTES
+export declare const DRY_RUN_TIMEOUT_MINUTES = 15;
 
 ### build/index.d.ts#Disable
 interface Disable {
@@ -74,10 +88,18 @@ interface Lane {
   readonly disables?: string;
 }
 
+### build/index.d.ts#LeavingPath
+interface LeavingPath {
+  readonly file: string;
+  readonly line: number;
+  readonly path: string;
+}
+
 ### build/index.d.ts#Mutant
 interface Mutant {
   readonly status: string;
   readonly mutatorName: string;
+  readonly statusReason?: string | undefined;
   readonly location: {
     readonly start: {
       readonly line: number;
@@ -92,6 +114,12 @@ interface MutationReport {
   }>>;
 }
 
+### build/index.d.ts#PackageFile
+interface PackageFile {
+  readonly file: string;
+  readonly text: string;
+}
+
 ### build/index.d.ts#PackageLane
 interface PackageLane {
   readonly dir: string;
@@ -99,19 +127,28 @@ interface PackageLane {
   readonly parts?: Readonly<Record<string, readonly string[]>>;
   readonly gate?: number;
   readonly vitestConfig?: string;
+  readonly timeoutMS?: number;
+  readonly dryRunTimeoutMinutes?: number;
+  readonly stryker?: Readonly<Record<string, unknown>>;
 }
 
 ### build/index.d.ts#REPORT_DIR
 export declare const REPORT_DIR = "reports/mutation";
+
+### build/index.d.ts#STRYKER_OWNED
+export declare const STRYKER_OWNED: readonly string[];
 
 ### build/index.d.ts#Score
 interface Score {
   readonly name: string;
   readonly gate: number | undefined;
   readonly detected: number;
+  readonly hitLimit: number;
+  readonly clockTimeouts: number;
   readonly valid: number;
   readonly survived: readonly string[];
   readonly percent: number;
+  readonly percentWithClock: number;
   readonly pass: boolean;
   readonly reason: string | undefined;
 }
@@ -124,10 +161,14 @@ interface Selection {
   readonly mutate: readonly string[];
   readonly gate: number | undefined;
   readonly vitestConfig: string | undefined;
+  readonly timeoutMS: number | undefined;
+  readonly dryRunTimeoutMinutes: number | undefined;
+  readonly stryker: Readonly<Record<string, unknown>> | undefined;
 }
 
 ### build/index.d.ts#StrykerConfig
 interface StrykerConfig {
+  readonly [key: string]: unknown;
   readonly testRunner: "vitest";
   readonly plugins: readonly string[];
   readonly vitest?: {
@@ -148,7 +189,17 @@ interface StrykerConfig {
     readonly break: null;
   };
   readonly concurrency: number;
+  readonly timeoutMS: number;
+  readonly dryRunTimeoutMinutes: number;
+  readonly dryRunOnly?: true;
+  readonly disableBail?: true;
 }
+
+### build/index.d.ts#TIMEOUT_MS
+export declare const TIMEOUT_MS = 12e4;
+
+### build/index.d.ts#changedFiles
+export declare function changedFiles(selection: Selection, changed: readonly string[]): string[];
 
 ### build/index.d.ts#compareDisables
 export declare function compareDisables(found: readonly Disable[], listed: readonly Disable[]): DisableCheck;
@@ -162,11 +213,23 @@ export declare function findDisables(files: readonly {
 ### build/index.d.ts#formatScore
 export declare function formatScore(s: Score): string;
 
+### build/index.d.ts#isConfigFile
+export declare function isConfigFile(file: string, vitestConfig?: string): boolean;
+
+### build/index.d.ts#isHitLimit
+export declare const isHitLimit: (m: Mutant) => boolean;
+
+### build/index.d.ts#leavingPaths
+export declare function leavingPaths(files: readonly PackageFile[], vitestConfig?: string): LeavingPath[];
+
 ### build/index.d.ts#parseLane
 export declare function parseLane(json: unknown): Lane;
 
 ### build/index.d.ts#parseReport
 export declare function parseReport(json: unknown): MutationReport;
+
+### build/index.d.ts#partErrors
+export declare function partErrors(lane: Lane, pkg: string, files: readonly string[]): string[];
 
 ### build/index.d.ts#runCli
 export declare function runCli(argv: readonly string[], io: CliIo): number;

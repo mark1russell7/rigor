@@ -52,6 +52,11 @@ type GateJobRead: build/index.d.ts#GateJobRead
 type GateOutcome: build/index.d.ts#GateOutcome
 type GroupCounts: build/index.d.ts#GroupCounts
 type GroupFactor: build/index.d.ts#GroupFactor
+type GrowthOptions: build/index.d.ts#GrowthOptions
+type GrowthOutcome: build/index.d.ts#GrowthOutcome
+type GrowthRound: build/index.d.ts#GrowthRound
+type GrowthStep: build/index.d.ts#GrowthStep
+type GrowthVerdict: build/index.d.ts#GrowthVerdict
 type GuardRead: build/index.d.ts#GuardRead
 type JobLimitVerdict: build/index.d.ts#JobLimitVerdict
 type JobRecords: build/index.d.ts#JobRecords
@@ -84,6 +89,7 @@ type ModelRow: build/index.d.ts#ModelRow
 type ModelStatus: build/index.d.ts#ModelStatus
 type ModelTest: build/index.d.ts#ModelTest
 type ModelTestOptions: build/index.d.ts#ModelTestOptions
+NARROW_SPREAD_SHARE: build/index.d.ts#NARROW_SPREAD_SHARE
 type NoControl: build/index.d.ts#NoControl
 type NoFactor: build/index.d.ts#NoFactor
 type NoiseCheck: build/index.d.ts#NoiseCheck
@@ -151,6 +157,7 @@ familyPower: build/index.d.ts#familyPower
 familyRead: build/index.d.ts#familyRead
 firstArm: build/paired.d.ts#firstArm
 gateOf: build/index.d.ts#gateOf
+growthVerdict: build/index.d.ts#growthVerdict
 jointClaim: build/index.d.ts#jointClaim
 ladderVerdict: build/index.d.ts#ladderVerdict
 limitOnModel: build/index.d.ts#limitOnModel
@@ -717,6 +724,44 @@ interface GroupCounts {
 ### build/index.d.ts#GroupFactor
 type GroupFactor = MeasuredFactor | NoFactor;
 
+### build/index.d.ts#GrowthOptions
+interface GrowthOptions {
+  readonly maxGrowth: number;
+  readonly per?: number;
+  readonly level?: number;
+}
+
+### build/index.d.ts#GrowthOutcome
+type GrowthOutcome = "within" | "beyond" | "cannot decide";
+
+### build/index.d.ts#GrowthRound
+interface GrowthRound {
+  readonly job: string;
+  readonly size: number;
+  readonly value: number;
+}
+
+### build/index.d.ts#GrowthStep
+interface GrowthStep {
+  readonly from: number;
+  readonly to: number;
+  readonly growths: readonly number[];
+  readonly median: number;
+  readonly low: number;
+  readonly high: number;
+  readonly coverage: number;
+  readonly exponent: number;
+  readonly outcome: GrowthOutcome;
+}
+
+### build/index.d.ts#GrowthVerdict
+interface GrowthVerdict {
+  readonly outcome: GrowthOutcome;
+  readonly maxGrowth: number;
+  readonly per: number;
+  readonly steps: readonly GrowthStep[];
+}
+
 ### build/index.d.ts#GuardRead
 interface GuardRead {
   readonly control: string;
@@ -980,6 +1025,9 @@ interface ModelTestOptions {
   readonly searchVisible?: boolean;
 }
 
+### build/index.d.ts#NARROW_SPREAD_SHARE
+export declare const NARROW_SPREAD_SHARE = .1;
+
 ### build/index.d.ts#NoControl
 interface NoControl {
   readonly because: string;
@@ -1239,6 +1287,10 @@ interface SpreadRead {
   readonly separated: number;
   readonly tooFew: number;
   readonly widest: number | undefined;
+  readonly entries: number;
+  readonly share: number | undefined;
+  readonly apart: readonly string[];
+  readonly narrow: boolean;
 }
 
 ### build/index.d.ts#TailFalseFails
@@ -1393,6 +1445,9 @@ export declare function familyRead(items: readonly FamilyItem[], level?: number)
 
 ### build/index.d.ts#gateOf
 export declare function gateOf(cases: readonly GateCaseOutcome[]): Gate;
+
+### build/index.d.ts#growthVerdict
+export declare function growthVerdict(rounds: readonly GrowthRound[], options: GrowthOptions): GrowthVerdict;
 
 ### build/index.d.ts#jointClaim
 export declare function jointClaim(check: MeasureChecks, measures: readonly string[], entry: string, stratum?: string): JointClaim;

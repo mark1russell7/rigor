@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/rigor-chaos",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Open-loop load schedules with planned arrival times from a rate profile, and a measure of latency from the planned time with no coordinated omission.",
   "keywords": [
     "load",
