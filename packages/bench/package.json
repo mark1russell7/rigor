@@ -28,6 +28,7 @@
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./code-stamp": "./src/code-stamp.ts",
     "./fresh": "./src/fresh.ts",
     "./supervise": "./src/supervise.ts",
     "./package.json": "./package.json"
@@ -43,6 +44,10 @@
       ".": {
         "types": "./build/index.d.ts",
         "import": "./build/index.js"
+      },
+      "./code-stamp": {
+        "types": "./build/code-stamp.d.ts",
+        "import": "./build/code-stamp.js"
       },
       "./fresh": {
         "types": "./build/fresh.d.ts",
@@ -68,9 +73,18 @@
     "@mark1russell7/rigor-generators": "workspace:^",
     "@mark1russell7/rigor-statistics": "workspace:^"
   },
+  "peerDependencies": {
+    "esbuild": "^0.28.2"
+  },
+  "peerDependenciesMeta": {
+    "esbuild": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@mark1russell7/cue": "^2.0.0",
     "@types/node": "^26.6.5",
+    "esbuild": "^0.28.2",
     "tsdown": "^0.23.1",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3"

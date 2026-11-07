@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json.schemastore.org/package",
+  "name": "@mark1russell7/rigor-testkit",
+  "version": "0.1.0",
+  "description": "Test helpers: the code blocks of Markdown files as test cases, so each example of a doc runs in a test.",
+  "keywords": [
+    "testing",
+    "markdown",
+    "doctest",
+    "examples",
+    "documentation",
+    "vitest",
+    "node-test"
+  ],
+  "homepage": "https://github.com/mark1russell7/rigor/tree/main/packages/testkit#readme",
+  "bugs": {
+    "url": "https://github.com/mark1russell7/rigor/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mark1russell7/rigor.git",
+    "directory": "packages/testkit"
+  },
+  "license": "MIT",
+  "author": "Mark Russell (https://github.com/mark1russell7)",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./src/index.ts",
+  "files": [
+    "build"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "main": "./build/index.js",
+    "types": "./build/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./build/index.d.ts",
+        "import": "./build/index.js"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
+  },
+  "devDependencies": {
+    "@mark1russell7/cue": "^2.0.0",
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3",
+    "tsdown": "^0.23.1"
+  }
+}

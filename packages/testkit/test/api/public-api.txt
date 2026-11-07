@@ -1,0 +1,51 @@
+# The public API of @mark1russell7/rigor-testkit
+#
+# The names of each entry of the exports field, and the declaration of each name, without comments
+# and private members. The command `api-report check` compares this file with the built .d.ts files.
+# To accept a change of the API, start the build, then `api-report update`, and review the diff.
+
+## . (build/index.d.ts): names
+
+type FencedBlock: build/markdown-examples.d.ts#FencedBlock
+type MarkdownExample: build/markdown-examples.d.ts#MarkdownExample
+type MarkdownExampleOptions: build/markdown-examples.d.ts#MarkdownExampleOptions
+fencedBlocks: build/markdown-examples.d.ts#fencedBlocks
+mapImports: build/markdown-examples.d.ts#mapImports
+markdownExamples: build/markdown-examples.d.ts#markdownExamples
+
+## Declarations
+
+### build/markdown-examples.d.ts#FencedBlock
+export interface FencedBlock {
+  readonly lang: string;
+  readonly flags: readonly string[];
+  readonly line: number;
+  readonly code: string;
+}
+
+### build/markdown-examples.d.ts#MarkdownExample
+export interface MarkdownExample {
+  readonly name: string;
+  readonly file: string;
+  readonly line: number;
+  readonly lang: string;
+  readonly code: string;
+  readonly run: () => Promise<void>;
+}
+
+### build/markdown-examples.d.ts#MarkdownExampleOptions
+export interface MarkdownExampleOptions {
+  readonly imports?: Readonly<Record<string, string>> | undefined;
+  readonly lang?: readonly string[] | undefined;
+  readonly root?: string | undefined;
+  readonly cacheDir?: string | undefined;
+}
+
+### build/markdown-examples.d.ts#fencedBlocks
+export declare function fencedBlocks(text: string): FencedBlock[];
+
+### build/markdown-examples.d.ts#mapImports
+export declare function mapImports(code: string, imports: Readonly<Record<string, string>>, root: string): string;
+
+### build/markdown-examples.d.ts#markdownExamples
+export declare function markdownExamples(files: readonly string[], options?: MarkdownExampleOptions): MarkdownExample[];
