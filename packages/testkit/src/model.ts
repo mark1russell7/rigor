@@ -21,7 +21,10 @@ export interface RunModelOptions<S, M> {
   check: (sut: S, model: M) => void;
   /** The maximum number of steps in a sequence. The default is 120. */
   maxSteps?: number;
-  /** The number of runs. The default is 200. A value in `parameters` replaces it. */
+  /**
+   * The number of runs. The default is the `numRuns` of `fc.configureGlobal`, or 200 when it has none.
+   * A value in `parameters` replaces it.
+   */
   numRuns?: number;
   /** This function releases the implementation after each run, for example its timers. It runs also when a check throws. */
   dispose?: (sut: S) => void;
@@ -56,7 +59,7 @@ export function runModel<S, M>(options: RunModelOptions<S, M>): void {
         options.dispose?.(sut);
       }
     }),
-    { numRuns: options.numRuns ?? 200, ...options.parameters },
+    { numRuns: options.numRuns ?? fc.readConfigureGlobal().numRuns ?? 200, ...options.parameters },
   );
 }
 

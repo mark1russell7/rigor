@@ -111,7 +111,7 @@ The options:
 | `steps` | | An arbitrary that gives one step. Make each step with `step(label, run)`. |
 | `check` | | It compares the implementation with the model, and throws when they do not agree. |
 | `maxSteps` | 120 | The maximum length of a sequence. The sequences use the size `medium` of `fast-check`, so some reach this length. |
-| `numRuns` | 200 | The number of runs. |
+| `numRuns` | the `numRuns` of `fc.configureGlobal`, or 200 | The number of runs. A long-run lane sets `fc.configureGlobal({ numRuns })`, and each model test uses it. |
 | `dispose` | | It releases the implementation after each run, also when a check throws. Use it for timers. |
 | `clear` | | It runs before each run, the runs of a shrink included. Use it to clear a spy, so that the spy keeps only the calls of one run. |
 | `parameters` | | More parameters of `fc.assert`, for example `seed`. A `numRuns` here replaces the option `numRuns`. |
