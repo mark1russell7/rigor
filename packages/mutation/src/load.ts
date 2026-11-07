@@ -25,7 +25,8 @@ export interface PackageFile {
 
 // The paths that a module loads: import and export from, import(), require(), vi.mock() and the other vi functions,
 // and new URL(path, import.meta.url).
-const LOADED = /(?:\bfrom|\bimport|\brequire|\bvi\.\w+|\bnew\s+URL)\s*\(?\s*(["'`])([^"'`\r\n]*)\1/g;
+// The optional "(" and its spaces are one group, so that each space has one match (no slow backtracking).
+const LOADED = /(?:\bfrom|\bimport|\brequire|\bvi\.\w+|\bnew\s+URL)\s*(?:\(\s*)?(["'`])([^"'`\r\n]*)\1/g;
 // Each relative path string of a config file, for example setupFiles: ["../testkit/setup.ts"].
 const CONFIG_PATH = /(["'`])(\.\.?\/[^"'`\r\n]*)\1/g;
 // A type import or export: the test runner removes it, so it loads no file.

@@ -46,6 +46,12 @@ describe("leavingPaths", () => {
     expect(leavingPaths([{ file: "src/deep/x.test.ts", text: 'import { y } from "../../src/y.ts";' }])).toEqual([]);
   });
 
+  it("reads a line with many spaces before a path in one pass, and still finds the path", () => {
+    const spaces = " ".repeat(20000);
+    expect(leavingPaths([{ file: "a.test.ts", text: `import${spaces}x` }])).toEqual([]);
+    expect(leavingPaths([{ file: "a.test.ts", text: `await import(${spaces}"../b.ts")` }]).map((p) => p.path)).toEqual(["../b.ts"]);
+  });
+
   it("refuses a path to the folder above, also from the top of the folder", () => {
     expect(leavingPaths([{ file: "a.test.ts", text: 'import x from "..";\nimport y from "../b.ts";' }]).map((p) => p.path)).toEqual(["..", "../b.ts"]);
   });
