@@ -232,8 +232,19 @@ export function checkLadder(ladder: Ladder): readonly string[] {
   return out;
 }
 
+/** This function gives the reason that a list has a NaN, with the index of the first one, or undefined. */
+function nanAt(name: string, values: readonly number[]): string | undefined {
+  const index = values.findIndex((value) => Number.isNaN(value));
+  return index < 0 ? undefined : `${name} ${index} is NaN`;
+}
+
 /** This function gives the verdict of a rate: the Wilson interval at 95 % against the limit. */
 function rateResult(budget: RateBudget, failures: number, trials: number): BudgetResult {
+  const whole = (value: number): boolean => Number.isSafeInteger(value) && value >= 0;
+  if (!(whole(failures) && whole(trials) && failures <= trials)) {
+    const why = `the counts are whole numbers of 0 or more with failures not above trials, not ${failures} failures of ${trials} trials`;
+    return { measure: budget.measure, outcome: "cannot decide", reason: `The measure ${JSON.stringify(budget.measure)} is "cannot decide": ${why}.` };
+  }
   const interval = wilson(failures, trials);
   const facts = `${failures} failures of ${trials} trials, interval ${interval.low} to ${interval.high}, limit ${budget.limit}`;
   const outcome: BudgetOutcome = trials === 0 ? "cannot decide" : interval.high <= budget.limit ? "within" : interval.low > budget.limit ? "beyond" : "cannot decide";
@@ -242,6 +253,9 @@ function rateResult(budget: RateBudget, failures: number, trials: number): Budge
 
 /** This function gives the verdict of a set of drills: the largest value against the limit. */
 function worstResult(budget: WorstBudget, values: readonly number[]): BudgetResult {
+  // A NaN is above no limit, thus Math.max would give NaN and the budget would read "within".
+  const nan = nanAt("the drill", values);
+  if (nan !== undefined) return { measure: budget.measure, outcome: "cannot decide", reason: `The measure ${JSON.stringify(budget.measure)} is "cannot decide": ${nan}.` };
   const largest = values.length === 0 ? undefined : Math.max(...values);
   const facts = `${values.length} drills, the largest ${largest ?? "none"} ${budget.unit}, limit ${budget.limit}`;
   const outcome: BudgetOutcome = largest !== undefined && largest > budget.limit ? "beyond" : values.length < budget.minDrills ? "cannot decide" : "within";
@@ -259,7 +273,8 @@ function quantileResult(budget: QuantileBudget, values: readonly number[], censo
   const open = censored.length > 0;
   const bounds = [...values, ...censored];
   if (bounds.length === 0) return say("cannot decide", `0 values, limit ${budget.limit} ${budget.unit}`);
-  if (values.some((value) => Number.isNaN(value))) return say("cannot decide", "the values have a NaN");
+  const nan = nanAt("the value", values);
+  if (nan !== undefined) return say("cannot decide", nan);
   if (!censored.every((value) => Number.isFinite(value))) return say("cannot decide", "a censored value is not a finite number");
   const lowest = quantileInterval(bounds, budget.quantile, level);
   const highest = open ? quantileInterval([...values, ...censored.map(() => Infinity)], budget.quantile, level) : lowest;
