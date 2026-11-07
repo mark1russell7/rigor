@@ -38,6 +38,7 @@ The lane file `mutation.json` is at the root of the repository:
 - `vitestConfig` names the Vitest config of the package, from `dir`. Without it, Vitest finds its config.
 - `timeoutMS` is the time in milliseconds that the clock adds to the time of the tests for each mutant. The default is 120000. The default of Stryker (5000) is too short on a loaded CI runner.
 - `dryRunTimeoutMinutes` is the time in minutes for the run of the tests without mutants. The default is 15.
+- `stryker` has more options for the Stryker config of each selection of the package, for example `{ "ignoreStatic": true }`. Its keys replace the keys of the config, but `--concurrency` replaces its `concurrency`. The lane owns `mutate`, `thresholds`, `jsonReporter`, `htmlReporter`, `timeoutMS` and `dryRunTimeoutMinutes`, so `stryker` cannot have them.
 - `disables` (at the root of the lane) names the list of the disabled mutants. The default is `mutation-disables.json`.
 
 A selection is one Stryker run: a package (`collections`) or a part (`collections.impl`). `rigor-mutation list --runs` gives the selections of a full run: the parts of each package with parts, else the package.
@@ -54,9 +55,16 @@ cd -
 pnpm exec rigor-mutation scores collections
 ```
 
+Each run starts the tests of `dir` only. A test in another folder, for example a test of the repository root, does not detect a mutant of the package.
+
 `rigor-mutation scores` reads `<dir>/reports/mutation/mutation.json` and applies the gate. It exits with 1 when a selection fails. With `--summary "$GITHUB_STEP_SUMMARY"`, it adds a table of the scores to the summary of the job. The shared workflow `reusable-mutation.yml` of the template starts these steps on one runner for each selection.
 
 A run of mutation tests is long and it uses much memory. Start it in CI, and on a local computer start one part with `--concurrency 2`.
+
+Two options make a run shorter:
+
+- `config --dry-run` gives a config that starts only the tests without mutants. Stryker does not stop at the first failed test. Use it to see if the tests pass under Stryker before a long run.
+- `--changed <file>` reads a file with one changed path on each line, from the folder of the lane file. Make the file with `git diff --name-only`. Then `list --runs` gives only the runs with a changed file, and `config` mutates only the changed files of the selection. `config` fails for a selection with no changed file.
 
 ## The score
 
@@ -74,6 +82,8 @@ A selection fails in these conditions:
 - The report has no mutants that count. Stryker found no files, or it did not start.
 - The report has mutants that count, but the tests detect none. The test runner started no test on the mutants.
 - The selection has a gate, and the score is under it.
+
+The gate of a package with parts applies to each part. Each part must have a score at the gate or above it. A part under the gate fails, also when the score of all the parts together is above the gate.
 
 ## The disabled mutants
 

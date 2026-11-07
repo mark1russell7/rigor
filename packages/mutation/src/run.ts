@@ -6,7 +6,7 @@ import { dirname, relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { REPORT_DIR, strykerConfig } from "./config.ts";
 import { compareDisables, findDisables, type Disable } from "./disables.ts";
-import { parseLane, partErrors, runSelections, select, selectionNames, type Lane } from "./lane.ts";
+import { changedFiles, parseLane, partErrors, runSelections, select, selectionNames, type Lane } from "./lane.ts";
 import { formatScore, parseReport, scoreReport, summaryMarkdown, type Score } from "./score.ts";
 
 /** The input and the output of the CLI. */
@@ -19,16 +19,22 @@ export interface CliIo {
 /** The help text of the CLI. */
 export const HELP: string = `rigor-mutation: the mutation tests of a repository, with Stryker and a gate for each package.
 
-  rigor-mutation list [--runs]                 the packages and the parts of the lane. With --runs, the
+  rigor-mutation list [--runs] [--changed <file>]
+                                               the packages and the parts of the lane. With --runs, the
                                                selections of a full run: the parts of a package with parts.
+                                               With --changed, only the runs with a changed file.
   rigor-mutation dir <selection>               the folder of the package of a selection
-  rigor-mutation config <selection> [--out <file>] [--concurrency <n>]
-                                               the Stryker config of a selection, as JSON
+  rigor-mutation config <selection> [--out <file>] [--concurrency <n>] [--dry-run] [--changed <file>]
+                                               the Stryker config of a selection, as JSON. With --dry-run,
+                                               Stryker starts only the tests. With --changed, it mutates only
+                                               the changed files of the selection.
   rigor-mutation scores <selection>... [--report <file>] [--summary <file>]
                                                the score of each selection, with its gate
   rigor-mutation disables [--write]            compare the disable comments with their list
 
-  --lane <file>   the lane file. The default is mutation.json.
+  --lane <file>      the lane file. The default is mutation.json.
+  --changed <file>   a file with one changed path on each line, from the folder of the lane file,
+                     for example the output of git diff --name-only.
 
 A selection is a package ("collections") or a part of a package ("collections.impl").
 Each file of a package with parts must be in exactly one part. list --runs, and config and scores
@@ -116,6 +122,8 @@ export function runCli(argv: readonly string[], io: CliIo): number {
       summary: { type: "string" },
       write: { type: "boolean", default: false },
       runs: { type: "boolean", default: false },
+      "dry-run": { type: "boolean", default: false },
+      changed: { type: "string" },
       help: { type: "boolean", default: false },
     },
   });
@@ -127,15 +135,26 @@ export function runCli(argv: readonly string[], io: CliIo): number {
   const laneFile = resolve(io.cwd, values.lane);
   const laneDir = dirname(laneFile);
   const lane = parseLane(readJson(laneFile));
+  const changed =
+    values.changed === undefined
+      ? undefined
+      : readFileSync(resolve(io.cwd, values.changed), "utf8")
+          .split("\n")
+          .map((line) => line.trim())
+          .filter((line) => line !== "");
   const one = (): string => {
     if (names.length !== 1 || names[0] === undefined) throw new Error(`"${command}" takes one selection`);
     return names[0];
   };
   switch (command) {
-    case "list":
+    case "list": {
       if (values.runs) checkParts(lane, laneDir, Object.keys(lane.packages));
-      io.stdout(`${(values.runs ? runSelections(lane) : selectionNames(lane)).join("\n")}\n`);
+      if (changed !== undefined && !values.runs) throw new Error(`--changed of "list" takes --runs`);
+      const runs = values.runs ? runSelections(lane) : selectionNames(lane);
+      const shown = changed === undefined ? runs : runs.filter((n) => changedFiles(select(lane, n), changed).length > 0);
+      io.stdout(shown.length === 0 ? "" : `${shown.join("\n")}\n`);
       return 0;
+    }
     case "dir":
       io.stdout(`${relative(io.cwd, resolve(laneDir, select(lane, one()).dir)).replaceAll("\\", "/") || "."}\n`);
       return 0;
@@ -143,7 +162,12 @@ export function runCli(argv: readonly string[], io: CliIo): number {
       const concurrency = values.concurrency === undefined ? undefined : Number(values.concurrency);
       if (concurrency !== undefined && !(Number.isInteger(concurrency) && concurrency > 0)) throw new Error(`--concurrency is not a positive integer`);
       checkPartsOf(lane, laneDir, [one()]);
-      const text = `${JSON.stringify(strykerConfig(select(lane, one()), concurrency === undefined ? {} : { concurrency }), null, 2)}\n`;
+      const all = select(lane, one());
+      const files = changed === undefined ? undefined : changedFiles(all, changed);
+      if (files?.length === 0) throw new Error(`the selection ${all.name} has no changed file`);
+      const selection = files === undefined ? all : { ...all, mutate: files };
+      const options = { ...(concurrency === undefined ? {} : { concurrency }), dryRun: values["dry-run"] };
+      const text = `${JSON.stringify(strykerConfig(selection, options), null, 2)}\n`;
       if (values.out === undefined) io.stdout(text);
       else {
         mkdirSync(dirname(resolve(io.cwd, values.out)), { recursive: true });

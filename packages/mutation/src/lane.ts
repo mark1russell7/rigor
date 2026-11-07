@@ -1,4 +1,4 @@
-import { matchesGlob } from "node:path";
+import { matchesGlob, posix } from "node:path";
 
 /**
  * The lane file of a repository (`mutation.json`) names the packages that the mutation tests mutate. A package has
@@ -27,7 +27,15 @@ export interface PackageLane {
   readonly timeoutMS?: number;
   /** This field gives the time in minutes for the run of the tests without mutants. The default is 15. */
   readonly dryRunTimeoutMinutes?: number;
+  /**
+   * These options go into the Stryker config of each selection of the package, for example `ignoreStatic`. The lane
+   * owns the keys of `STRYKER_OWNED`, so the field cannot have them.
+   */
+  readonly stryker?: Readonly<Record<string, unknown>>;
 }
+
+/** The keys of the Stryker config that the lane owns. The field `stryker` of a package cannot have them. */
+export const STRYKER_OWNED: readonly string[] = ["mutate", "thresholds", "jsonReporter", "htmlReporter", "timeoutMS", "dryRunTimeoutMinutes"];
 
 /** The lane file: the packages of the mutation tests, and the list of the disabled mutants. */
 export interface Lane {
@@ -46,6 +54,7 @@ export interface Selection {
   readonly vitestConfig: string | undefined;
   readonly timeoutMS: number | undefined;
   readonly dryRunTimeoutMinutes: number | undefined;
+  readonly stryker: Readonly<Record<string, unknown>> | undefined;
 }
 
 const NAME = /^[\w-]+$/;
@@ -68,6 +77,14 @@ function packageErrors(name: string, p: unknown): string[] {
   for (const field of ["timeoutMS", "dryRunTimeoutMinutes"]) {
     const v = p[field];
     if (v !== undefined && !(typeof v === "number" && Number.isInteger(v) && v > 0)) errors.push(`${name}: "${field}" is not a positive integer`);
+  }
+  const stryker = p["stryker"];
+  if (stryker !== undefined) {
+    if (!isRecord(stryker)) errors.push(`${name}: "stryker" is not an object`);
+    else {
+      const owned = Object.keys(stryker).filter((k) => STRYKER_OWNED.includes(k));
+      if (owned.length > 0) errors.push(`${name}: "stryker" has ${owned.map((k) => `"${k}"`).join(", ")}, but the lane owns these keys`);
+    }
   }
   const parts = p["parts"];
   if (parts !== undefined) {
@@ -120,7 +137,7 @@ export function select(lane: Lane, name: string): Selection {
   }
   // Stryker applies a "!" glob to the globs before it, so the "!" globs of the package go after the globs of the part.
   const mutate = globs === undefined ? p.mutate : [...globs, ...p.mutate.filter((g) => g.startsWith("!"))];
-  return { name, pkg, dir: p.dir, mutate, gate: p.gate, vitestConfig: p.vitestConfig, timeoutMS: p.timeoutMS, dryRunTimeoutMinutes: p.dryRunTimeoutMinutes };
+  return { name, pkg, dir: p.dir, mutate, gate: p.gate, vitestConfig: p.vitestConfig, timeoutMS: p.timeoutMS, dryRunTimeoutMinutes: p.dryRunTimeoutMinutes, stryker: p.stryker };
 }
 
 /**
@@ -135,6 +152,19 @@ export function globsSelect(globs: readonly string[], file: string): boolean {
     } else if (!selected && matchesGlob(file, g)) selected = true;
   }
   return selected;
+}
+
+/**
+ * This function gives the changed files of a selection, from the folder of its package. The globs of the selection
+ * select the files.
+ *
+ * @param changed - the changed paths, from the folder of the lane file, with `/`
+ */
+export function changedFiles(selection: Selection, changed: readonly string[]): string[] {
+  const dir = posix.normalize(selection.dir.replaceAll("\\", "/"));
+  return changed
+    .map((f) => posix.relative(dir, posix.normalize(f.replaceAll("\\", "/"))))
+    .filter((f) => f !== "" && !f.startsWith("../") && !posix.isAbsolute(f) && globsSelect(selection.mutate, f));
 }
 
 /**
