@@ -61,6 +61,8 @@ v.comparison;                                     // the cases that gain and dro
 | `budgetLookSpend(looks)` | The chance of error that a list of looks spends. |
 | `timeRounds(arms, options)` | The timed rounds of one case in one process: a warm-up, a batch of at least the target time, and the order of `firstArm`. |
 | `verdictPower(options)` | The share of each outcome over seeded benches with a known ratio: the power test of a rule. |
+| `familyRead(items, level)` | The reads of a family of cases as a report: Holm over the cases, each job alone, and both. Each read changes only `slower` and `faster`. |
+| `familyPower(options)` | The false-slower share of a family and the share of a slow case read, for each read, over seeded families. |
 | `balanceOrders(records)` | The records of each case with a turned order. It removes the extra records of the larger order, with the highest rounds first. |
 | `poolRecords(jobs)` | The pool of the jobs: the merged and balanced records, the records of each job, and the skipped cases. |
 | `pooledVerdict(jobs, options)` | The verdict of the merged records of all jobs, with the verdict of each job alone as a guard. |
@@ -655,3 +657,50 @@ Since 0.2.0, the rule `difference` examines the margin before 1. An interval in 
 The rule `band` compares an interval with a band of the same noise, so it needs a change of approximately twice that noise. With the kind `case`, it also calls a real speedup `same`. Thus `difference` is the default. Its false rate is near the 5% of a two-sided interval of level 0.95. A change of 7% needs approximately 20 cases for a power of 0.7.
 
 Since 0.2.0, `verdictPower` takes `same` as the true outcome of a ratio in the margin of the rule `difference`. The cells of the table stay, because the ratio 0.93 is out of the margin 0.05.
+
+## A family of cases
+
+A run reads many cases, and each case has its own interval. With no correction, the chance of one false `slower` case grows with the count of cases. At 16 cases and 0.025 for each side, this chance can be 1 - 0.975^16, approximately 0.33. With the option `pValues`, a time verdict of the rule `difference` gives `pSlower` and `pFaster` from the draws of its interval. Its outcome does not change, and the option is off by default. `familyRead` reads a family as a report:
+
+- **Holm** (Holm, 1979) keeps a `slower` case only when the Holm correction over the cases rejects its side at `level` (default 0.025).
+- **Each job** keeps a `slower` case of a pooled verdict only when each job gives `slower` alone.
+- **Each job and Holm** keeps a case only when both reads keep it.
+
+The smallest p of a bootstrap is 1 / (finite + 1). The first step of Holm is `level` over the count of cases. With too few runs, no case can pass that step, and `familyRead` prints a line that says so. At 16 cases, the first step is approximately 0.0016, so give the bootstrap more than 640 runs. The default is 10 000.
+
+`familyPower` drew 100 seeded families for each row. Each family had 16 cases, with 12 rounds in each of 2 jobs. The log time of each arm had a normal noise of 0.01. The margin was log(1.015), and the bootstrap had 2000 runs. The first case had the ratio of the row, and the other cases had the ratio 1.
+
+| Ratio of the first case | Read | Families with a false `slower` | First case read `slower` |
+| --- | --- | --- | --- |
+| 1 | no correction | 0.28 | 0.02 |
+| 1 | Holm | 0.01 | 0 |
+| 1 | each job | 0 | 0 |
+| 1 | each job and Holm | 0 | 0 |
+| 1.015 | no correction | 0.26 | 0.8 |
+| 1.015 | Holm | 0.01 | 0.34 |
+| 1.015 | each job | 0 | 0.28 |
+| 1.015 | each job and Holm | 0 | 0.23 |
+| 1.025 | no correction | 0.26 | 1 |
+| 1.025 | Holm | 0.01 | 0.95 |
+| 1.025 | each job | 0 | 0.87 |
+| 1.025 | each job and Holm | 0 | 0.87 |
+
+The smallest slowdown read in 80 % or more of the families is 1.5 % with no correction, and 2.5 % with each other read. At 2 %, the shares are 0.97, 0.77, 0.59 and 0.56.
+
+This model has no shift between the jobs, so the read of each job has its best case. The option `jobShift` adds a shift to the candidate of each job. The rows below use the shift 0.0066 for each job, with the other settings of the table above.
+
+| Ratio of the first case | Read | Families with a false `slower` | First case read `slower` |
+| --- | --- | --- | --- |
+| 1 | no correction | 0.48 | 0.04 |
+| 1 | Holm | 0.1 | 0.01 |
+| 1 | each job | 0.04 | 0 |
+| 1 | each job and Holm | 0.02 | 0 |
+| 1.025 | no correction | 0.46 | 0.98 |
+| 1.025 | Holm | 0.09 | 0.93 |
+| 1.025 | each job | 0.04 | 0.74 |
+| 1.025 | each job and Holm | 0.02 | 0.74 |
+| 1.03 | each job | 0.04 | 0.9 |
+
+With this shift, the smallest slowdown read at 80 % is 2 % with no correction, 2.5 % with Holm, and 3 % with each job. A shift also adds false `slower` cases, because the candidate of a job is then not equal to its baseline.
+
+A slowdown below the smallest slowdown at 80 % often reads `same` or `cannot decide`. Give this number beside the margin of a bench, because together they set what the bench can find.

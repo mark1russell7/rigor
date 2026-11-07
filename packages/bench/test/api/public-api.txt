@@ -38,6 +38,13 @@ type ControlOptions: build/index.d.ts#ControlOptions
 type ControlRead: build/index.d.ts#ControlRead
 type ControlRow: build/index.d.ts#ControlRow
 type EntryCount: build/index.d.ts#EntryCount
+type FamilyCase: build/index.d.ts#FamilyCase
+type FamilyCount: build/index.d.ts#FamilyCount
+type FamilyItem: build/index.d.ts#FamilyItem
+type FamilyPower: build/index.d.ts#FamilyPower
+type FamilyPowerOptions: build/index.d.ts#FamilyPowerOptions
+type FamilyRead: build/index.d.ts#FamilyRead
+type FamilyShares: build/index.d.ts#FamilyShares
 GATE_LOOKS: build/index.d.ts#GATE_LOOKS
 type Gate: build/index.d.ts#Gate
 type GateCaseOutcome: build/index.d.ts#GateCaseOutcome
@@ -146,6 +153,8 @@ checkLadder: build/index.d.ts#checkLadder
 checkMeasures: build/index.d.ts#checkMeasures
 checkPairedTime: build/paired.d.ts#checkPairedTime
 controlFactor: build/index.d.ts#controlFactor
+familyPower: build/index.d.ts#familyPower
+familyRead: build/index.d.ts#familyRead
 firstArm: build/paired.d.ts#firstArm
 gateOf: build/index.d.ts#gateOf
 growthVerdict: build/index.d.ts#growthVerdict
@@ -606,6 +615,71 @@ interface EntryCount {
   readonly stratum: string | undefined;
   readonly finished: number;
   readonly censored: number;
+}
+
+### build/index.d.ts#FamilyCase
+interface FamilyCase {
+  readonly case: string;
+  readonly outcome: TimeOutcome;
+  readonly holm: TimeOutcome;
+  readonly eachJob: TimeOutcome;
+  readonly eachJobHolm: TimeOutcome;
+  readonly adjustedSlower: number | undefined;
+  readonly adjustedFaster: number | undefined;
+}
+
+### build/index.d.ts#FamilyCount
+interface FamilyCount {
+  readonly slower: number;
+  readonly faster: number;
+}
+
+### build/index.d.ts#FamilyItem
+interface FamilyItem {
+  readonly case: string;
+  readonly verdict: TimeVerdict | PooledVerdict;
+}
+
+### build/index.d.ts#FamilyPower
+interface FamilyPower {
+  readonly trials: number;
+  readonly falseSlower: FamilyShares;
+  readonly firstSlower: FamilyShares;
+}
+
+### build/index.d.ts#FamilyPowerOptions
+interface FamilyPowerOptions {
+  readonly family: number;
+  readonly ratio?: number;
+  readonly rounds?: number;
+  readonly jobs?: number;
+  readonly sigma?: number;
+  readonly jobShift?: number;
+  readonly trials?: number;
+  readonly seed?: number | string;
+  readonly level?: number;
+  readonly verdict?: VerdictOptions;
+}
+
+### build/index.d.ts#FamilyRead
+interface FamilyRead {
+  readonly level: number;
+  readonly cases: readonly FamilyCase[];
+  readonly plain: FamilyCount;
+  readonly holm: FamilyCount;
+  readonly eachJob: FamilyCount;
+  readonly eachJobHolm: FamilyCount;
+  readonly floor: number | undefined;
+  readonly firstStep: number | undefined;
+  readonly lines: readonly string[];
+}
+
+### build/index.d.ts#FamilyShares
+interface FamilyShares {
+  readonly plain: number;
+  readonly holm: number;
+  readonly eachJob: number;
+  readonly eachJobHolm: number;
 }
 
 ### build/index.d.ts#GATE_LOOKS
@@ -1274,6 +1348,8 @@ interface TimeVerdict {
   readonly comparison: Comparison$1 | undefined;
   readonly pool?: PoolFacts;
   readonly noise?: NoiseCheck;
+  readonly pSlower?: number;
+  readonly pFaster?: number;
 }
 
 ### build/index.d.ts#UNKNOWN_MODEL
@@ -1286,6 +1362,7 @@ interface VerdictOptions extends BandOptions {
   readonly noiseCap?: number;
   readonly spreadLevel?: number;
   readonly pool?: PoolOptions;
+  readonly pValues?: boolean;
 }
 
 ### build/index.d.ts#VerdictRule
@@ -1359,6 +1436,12 @@ export declare function checkMeasures(rows: readonly MeasureRow[], options: Meas
 
 ### build/index.d.ts#controlFactor
 export declare function controlFactor(rows: readonly ControlRow[], options?: ControlOptions): ControlFactors;
+
+### build/index.d.ts#familyPower
+export declare function familyPower(options: FamilyPowerOptions): FamilyPower;
+
+### build/index.d.ts#familyRead
+export declare function familyRead(items: readonly FamilyItem[], level?: number): FamilyRead;
 
 ### build/index.d.ts#gateOf
 export declare function gateOf(cases: readonly GateCaseOutcome[]): Gate;
