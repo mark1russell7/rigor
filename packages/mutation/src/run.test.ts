@@ -135,6 +135,50 @@ describe("rigor-mutation", () => {
     expect(err).toContain("load-check: 1 packages have a relative path");
   });
 
+  // The flip of LANE.TESTS (V-090 of Vex): a run that read 1029 of 1990 tests is no read, also above the gate.
+  it("fails a fall of the test count against the last good count, unless the lane plans it, and writes the counts", () => {
+    const withTests = (n: number) => ({ ...mutants(9, 1), testFiles: { "src/a.test.ts": { tests: Array.from({ length: n }, (_, i) => ({ name: `t${String(i)}` })) } } });
+    put("packages/app/reports/mutation/mutation.json", JSON.stringify(withTests(1029)));
+    put("last.json", JSON.stringify({ app: 1990, lib: 7 }));
+    expect(run("scores", "app", "--last", "last.json")).toBe(1);
+    expect(out).toContain("app: 90.00 % (9 of 10, 1 survived, 1029 tests), no gate: FAIL: the run read 1029 tests, 48.3 % fewer than the last good count 1990");
+    expect(err).toBe("The gate failed for app.\n");
+
+    const lane = JSON.parse(readFileSync(join(root, "mutation.json"), "utf8")) as Record<string, unknown>;
+    put("mutation.json", JSON.stringify({ ...lane, plannedFalls: { app: "half of the tests moved to the package lib" } }));
+    out = "";
+    expect(run("scores", "app", "--last", "last.json", "--write-last", "last.json")).toBe(0);
+    expect(out).toContain("app: 90.00 % (9 of 10, 1 survived, 1029 tests), no gate: pass\n  a planned fall: the run read 1029 tests, 48.3 % fewer");
+    expect(out).toContain("The reason: half of the tests moved to the package lib");
+    expect(JSON.parse(readFileSync(join(root, "last.json"), "utf8"))).toEqual({ app: 1029, lib: 7 });
+
+    out = "";
+    expect(run("scores", "app", "--last", "none.json")).toBe(0);
+    expect(out).toContain("the file none.json does not exist, so no count is compared");
+  });
+
+  // The flip of LANE.FILES: a test file on the disk that the report does not read fails, unless notRead names it.
+  it("fails a test file on the disk that the report does not read, unless notRead gives its reason", () => {
+    put("packages/app/src/b.test.ts", "");
+    put("packages/app/bench/e.test.ts", "");
+    put("packages/app/src/types.d.ts", "");
+    put("packages/app/reports/mutation/mutation.json", JSON.stringify({ ...mutants(9, 1), testFiles: { "src/b.test.ts": { tests: [{ name: "b" }] } } }));
+    expect(run("scores", "app", "--test-files")).toBe(1);
+    expect(out).toContain("app: 90.00 % (9 of 10, 1 survived, 1 tests), no gate: FAIL: the report does not read 1 test files on the disk");
+    expect(out).toContain("  not read: packages/app/bench/e.test.ts\n");
+    expect(out).not.toContain("types.d.ts");
+    expect(run("scores", "app")).toBe(0);
+
+    const lane = JSON.parse(readFileSync(join(root, "mutation.json"), "utf8")) as { packages: Record<string, Record<string, unknown>> };
+    lane.packages["app"] = { ...lane.packages["app"], notRead: { "bench/e.test.ts": "a bench, CI starts it in its own job" } };
+    put("mutation.json", JSON.stringify(lane));
+    out = "";
+    expect(run("scores", "app", "--test-files")).toBe(0);
+    put("packages/app/reports/mutation/mutation.json", JSON.stringify(mutants(9, 1)));
+    expect(run("scores", "app", "--test-files")).toBe(1);
+    expect(out).toContain(`FAIL: the report has no "testFiles", so the test files that it read are not known`);
+  });
+
   it("gives the help, and refuses an unknown command", () => {
     expect(run("--help")).toBe(0);
     expect(out).toContain("rigor-mutation list");

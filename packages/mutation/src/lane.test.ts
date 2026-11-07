@@ -149,3 +149,16 @@ describe("strykerConfig", () => {
     expect(strykerConfig(select(slow, "s"))).toMatchObject({ timeoutMS: 300_000, dryRunTimeoutMinutes: 40 });
   });
 });
+
+describe("the lane fields of the test checks", () => {
+  it("accepts notRead, maxTestFall and plannedFalls, and refuses bad values", () => {
+    const lane = { ...LANE, maxTestFall: 10, plannedFalls: { "collections.impl": "the old tests moved to rigor" } };
+    expect(parseLane(lane)).toBe(lane);
+    const notRead = { packages: { a: { dir: "a", mutate: ["src/*.ts"], notRead: { "bench/x.test.ts": "a bench" } } } };
+    expect(parseLane(notRead)).toBe(notRead);
+    expect(() => parseLane({ packages: { a: { dir: "a", mutate: ["src/*.ts"], notRead: { "x.test.ts": " " } } } })).toThrow(/a: "notRead" is not an object of files, each with a reason/);
+    expect(() => parseLane({ ...LANE, maxTestFall: 120 })).toThrow(/"maxTestFall" is not a percent/);
+    expect(() => parseLane({ ...LANE, plannedFalls: { collections: "" } })).toThrow(/"plannedFalls" is not an object/);
+    expect(() => parseLane({ ...LANE, plannedFalls: { "collections.nope": "a reason" } })).toThrow(/"plannedFalls" names no selection of the lane: collections\.nope/);
+  });
+});
