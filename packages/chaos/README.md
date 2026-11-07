@@ -32,3 +32,21 @@ A schedule is data. A driver reads `times`, and it sends each arrival at its tim
 `latencyQuantile` reads the latency and the censored values together, by the nearest rank. Thus an arrival with no reply does not leave the measure.
 
 `scheduleHeld` tells if the driver kept the schedule. A run that fails this check measures its driver, not its target. An A/A run with no fault examines this first. When a run fails this check, `seconds` tells if a full processor or a held event loop made the sends late.
+
+## A closed-loop record
+
+`closedLoopPlan` reads a run of a closed-loop driver that sends each `interval` ms. It puts back the sends that each stall hid, by the rule of `recordValueWithExpectedInterval` of HdrHistogram.
+
+```ts
+import { closedLoopPlan, latencyQuantile, measureLoad } from "@mark1russell7/rigor-chaos";
+
+const { plan, completions } = closedLoopPlan(requests, 10, end);
+const p99 = latencyQuantile(measureLoad(plan, completions, end), 0.99);
+```
+
+- A request with a reply later than one interval hides the planned sends at `sent + j × interval` before that reply.
+- Each hidden send gets the reply that ended the stall. Its lag is its wait, and its service is 0.
+- The plan starts again at each real send. The driver does not send faster after a stall, thus a later send is not late.
+- After a request with no reply, each hidden send is not sent, and its age at the end is a lower bound.
+
+The result is an estimate of the open loop, not a measure of it. A record of an open-loop driver stays the better measure.
