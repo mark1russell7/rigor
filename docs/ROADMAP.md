@@ -25,3 +25,4 @@ This file lists the items of the roadmap of this repository. The status page of 
 | R7 | later | P2 | testgen: property tests on fast-check, pairwise and covering arrays, metamorphic relations |
 | R8 | later | P2 | chaos: fault injection and schedules of latency and failure, with their measures. Open-loop load profiles are in the package |
 | R9 | later | P2 | Sobol indices and shrinking, from the engines that have them now |
+| R10 | later | P2 | statistics: an optional sum of the squared kernel for `uStatisticInterval`, for an empirical Bernstein bound. Parked until a consumer works at `k > 500`. `docs/CALIBRATION.md` has the read |

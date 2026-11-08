@@ -1,6 +1,7 @@
 /**
  * The calibration study of the method `"tight"` of `uStatisticInterval`. It has 3 made-up kernels over pairs and 17
  * cells of a population `n` and a sample `m`. The bar of the study gives `U_STATISTIC_TIGHT_MIN_SAMPLE`.
+ * The file `docs/CALIBRATION.md` records the methods that a read ruled out, with the empirical Bernstein bound.
  */
 import { random } from "@mark1russell7/rigor-generators";
 import { type CoverageBar, coverageMinSample } from "../coverage.ts";
