@@ -47,6 +47,7 @@ The lane file `mutation.json` is at the root of the repository:
 - `disables` (at the root of the lane) names the list of the disabled mutants. The default is `mutation-disables.json`.
 - `staticLimits` gives the most static runs of each file of the package, from the folder where Stryker starts. The key `*` gives the limit of the other files. `plan-check` reads it.
 - `targetMinutes` (at the root of the lane) is the target of the estimate of each selection, in minutes. The default is 100.
+- `stopMinutes` (at the root of the lane) is the stop of the estimate of each selection, in minutes. The default is 140. It is not less than `targetMinutes`.
 - `planPerClock` (at the root of the lane) is the planned net time of one minute of the clock. The default is 9.8, from a nightly run of Vex.
 
 A selection is one Stryker run: a package (`collections`) or a part (`collections.impl`). `rigor-mutation list --runs` gives the selections of a full run: the parts of each package with parts, else the package.
@@ -107,15 +108,15 @@ Each line of a mutant in `partial.jsonl` also gives its planned net time and its
 
 `rigor-mutation config <selection> --plan` gives a config that stops Stryker after the plan. Stryker starts no mutant, so the plan costs only the run of the tests.
 
-`rigor-mutation plan-check <selection>...` reads the plan of each selection. It gives the estimate of the clock, and it fails a selection when:
+`rigor-mutation plan-check <selection>...` reads the plan of each selection. It gives the estimate of the clock. It gives a warning when the estimate is over `targetMinutes`, and in GitHub Actions also a warning annotation. The estimate has an error of 28 minutes in the mean, so the target does not fail. It fails a selection when:
 
-- the estimate is over `targetMinutes`;
+- the estimate is over `stopMinutes`. Stryker cannot end the selection before the stop, so it cannot give a full score;
 - a file has more static runs than its limit in `staticLimits`.
 
 A static run starts each test, so it costs the time of all the tests. Code outside a function gives a static mutant.
 
 ```text
-vex.kernel: 812 runs, 3 of them static, with a planned net time of 12.4 h. The estimate is 76 minutes of the clock, and the target is 100.
+vex.kernel: 812 runs, 3 of them static, with a planned net time of 12.4 h. The estimate is 76 minutes of the clock, the target is 100 and the stop is 140.
 plan-check: each plan of 1 selections is in its limits
 ```
 

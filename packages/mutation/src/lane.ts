@@ -1,4 +1,5 @@
 import { matchesGlob, posix } from "node:path";
+import { STOP_MINUTES, TARGET_MINUTES } from "./plan.ts";
 
 /**
  * The lane file of a repository (`mutation.json`) names the packages that the mutation tests mutate. A package has
@@ -75,8 +76,10 @@ export interface Lane {
   readonly plannedFalls?: Readonly<Record<string, string>>;
   /** This field gives the planned net time of one minute of the clock, for the estimate of `plan-check`. The default is 9.8. */
   readonly planPerClock?: number;
-  /** This field gives the most minutes of the estimate of a selection. `plan-check` fails a selection over it. The default is 100. */
+  /** This field gives the target of the estimate of a selection, in minutes. `plan-check` warns of a selection over it. The default is 100. */
   readonly targetMinutes?: number;
+  /** This field gives the stop of the estimate of a selection, in minutes. `plan-check` fails a selection over it. The default is 140. */
+  readonly stopMinutes?: number;
 }
 
 /** The default of `maxTestFall` of the lane, in percent. */
@@ -163,10 +166,13 @@ export function parseLane(json: unknown): Lane {
   if (fall !== undefined && (typeof fall !== "number" || !(fall >= 0 && fall <= 100))) errors.push(`"maxTestFall" is not a percent from 0 to 100`);
   const planned = json["plannedFalls"];
   if (planned !== undefined && !isReasons(planned)) errors.push(`"plannedFalls" is not an object of selections, each with a reason`);
-  for (const field of ["planPerClock", "targetMinutes"]) {
-    const v = json[field];
-    if (v !== undefined && !(typeof v === "number" && v > 0 && Number.isFinite(v))) errors.push(`"${field}" is not a positive number`);
+  const positive = (v: unknown): v is number => typeof v === "number" && v > 0 && Number.isFinite(v);
+  for (const field of ["planPerClock", "targetMinutes", "stopMinutes"]) {
+    if (json[field] !== undefined && !positive(json[field])) errors.push(`"${field}" is not a positive number`);
   }
+  const target = json["targetMinutes"] ?? TARGET_MINUTES;
+  const stop = json["stopMinutes"] ?? STOP_MINUTES;
+  if (positive(target) && positive(stop) && stop < target) errors.push(`"stopMinutes" (${String(stop)}) is less than "targetMinutes" (${String(target)})`);
   if (errors.length > 0) throw new Error(`the lane is not valid:\n  ${errors.join("\n  ")}`);
   const lane = json as unknown as Lane;
   const names = new Set(selectionNames(lane));

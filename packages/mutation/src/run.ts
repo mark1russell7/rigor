@@ -56,9 +56,10 @@ export const HELP: string = `rigor-mutation: the mutation tests of a repository,
                                                entry of "notRead" that is not true.
   rigor-mutation plan-check <selection>... [--report <file> | --reports <dir>]
                                                the estimate of the clock of each selection from its plan.json,
-                                               against "targetMinutes" (default 100) at "planPerClock" (default
-                                               9.8). A selection over the target fails, and so does a file
-                                               over its count of "staticLimits". --reports reads
+                                               against "targetMinutes" (default 100) and "stopMinutes" (default
+                                               140) at "planPerClock" (default 9.8). A selection over the
+                                               target gives a warning. A selection over the stop fails, and so
+                                               does a file over its count of "staticLimits". --reports reads
                                                <dir>/mutation-<selection>/plan.json.
   rigor-mutation disables [--write]            compare the disable comments with their list
   rigor-mutation load-check [<selection>...] [--collect] [--runner <file>]
@@ -486,6 +487,8 @@ function planCheck(lane: Lane, laneDir: string, names: readonly string[], o: Pla
   if (o.report !== undefined && names.length > 1) throw new Error(`--report takes one selection`);
   if (o.report !== undefined && o.reports !== undefined) throw new Error(`"plan-check" takes --report or --reports, not both`);
   let failed = 0;
+  let warned = 0;
+  const actions = io.env?.["GITHUB_ACTIONS"] === "true";
   for (const name of names) {
     const s = select(lane, name);
     const file =
@@ -500,11 +503,20 @@ function planCheck(lane: Lane, laneDir: string, names: readonly string[], o: Pla
       continue;
     }
     const limits = lane.packages[s.pkg]?.staticLimits;
-    const read = readPlan(name, parsePlan(readJson(file)), { planPerClock: lane.planPerClock, targetMinutes: lane.targetMinutes, ...(limits === undefined ? {} : { staticLimits: limits }) });
-    io.stdout(`${read.line}\n${read.faults.map((f) => `  FAIL: ${f}\n`).join("")}`);
+    const read = readPlan(name, parsePlan(readJson(file)), {
+      planPerClock: lane.planPerClock,
+      targetMinutes: lane.targetMinutes,
+      stopMinutes: lane.stopMinutes,
+      ...(limits === undefined ? {} : { staticLimits: limits }),
+    });
+    io.stdout(`${read.line}\n${read.warnings.map((w) => `  WARN: ${w}\n`).join("")}${read.faults.map((f) => `  FAIL: ${f}\n`).join("")}`);
+    // The estimate has an error of 28 minutes in the mean, so a selection over its target gives a warning with a mark.
+    if (actions) for (const w of read.warnings) io.stdout(`::warning title=${escapeCommand("Mutation plan: over the target", true)}::${escapeCommand(w)}\n`);
+    if (read.warnings.length > 0) warned += 1;
     if (read.faults.length > 0) failed += 1;
   }
-  io.stdout(failed === 0 ? `plan-check: each plan of ${String(names.length)} selections is in its limits\n` : `plan-check: ${String(failed)} of ${String(names.length)} selections fail\n`);
+  const over = warned === 0 ? "" : `, and ${String(warned)} of them are over the target`;
+  io.stdout(failed === 0 ? `plan-check: each plan of ${String(names.length)} selections is in its limits${over}\n` : `plan-check: ${String(failed)} of ${String(names.length)} selections fail${over}\n`);
   return failed === 0 ? 0 : 1;
 }
 

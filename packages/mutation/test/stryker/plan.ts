@@ -45,11 +45,18 @@ const pass = spawnSync(process.execPath, [cli, "plan-check", "slow", "--lane", l
 console.log(pass.stdout, pass.stderr);
 if (pass.status !== 0 || !/^plan-check: each plan of 1 selections is in its limits$/mu.test(pass.stdout)) fail(`plan-check exited with ${String(pass.status)}, not 0, on the plan.`);
 
-// A lane with a target of almost 0 minutes: plan-check must fail the same plan.
-const tight = join(out, "mutation.json");
-writeFileSync(tight, JSON.stringify({ packages: { slow: { dir: "pkg", mutate: ["src/count.ts"] } }, targetMinutes: 1e-9 }));
-const over = spawnSync(process.execPath, [cli, "plan-check", "slow", "--lane", tight, "--report", planFile], { cwd: here, encoding: "utf8" });
-console.log(over.stdout, over.stderr);
-if (over.status !== 1 || !/FAIL: slow: the estimate of .* is over the target/u.test(over.stdout)) fail(`plan-check exited with ${String(over.status)}, not 1, on a plan over its target.`);
+/** This function starts plan-check on the plan with a lane of the limits `limits`, in minutes. */
+const checkWith = (limits: object) => {
+  const tight = join(out, "mutation.json");
+  writeFileSync(tight, JSON.stringify({ packages: { slow: { dir: "pkg", mutate: ["src/count.ts"] } }, ...limits }));
+  const result = spawnSync(process.execPath, [cli, "plan-check", "slow", "--lane", tight, "--report", planFile], { cwd: here, encoding: "utf8" });
+  console.log(result.stdout, result.stderr);
+  return result;
+};
+// A target of almost 0 minutes gives a warning, and a stop of almost 0 minutes fails the same plan.
+const warned = checkWith({ targetMinutes: 1e-9 });
+if (warned.status !== 0 || !/WARN: slow: the estimate of .* is over the target/u.test(warned.stdout)) fail(`plan-check exited with ${String(warned.status)}, not 0 with a warning, on a plan over its target.`);
+const over = checkWith({ targetMinutes: 1e-9, stopMinutes: 1e-9 });
+if (over.status !== 1 || !/FAIL: slow: the estimate of .* is over the stop/u.test(over.stdout)) fail(`plan-check exited with ${String(over.status)}, not 1, on a plan over its stop.`);
 rmSync(out, { recursive: true, force: true });
 console.log("The plan run stopped after the plan, and plan-check read the plan.");

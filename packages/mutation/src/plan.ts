@@ -1,8 +1,8 @@
 /**
  * The cost plan of a selection. Stryker makes a plan of the mutants after the run of the tests without mutants. The
  * reporter `rigor-partial` writes the plan of each file and each line into `plan.json`. `plan-check` reads the file,
- * gives the estimate of the clock of the selection, and fails a selection over its target or a file over its limit of
- * static runs. The cut of the parts can then follow the cost of the lines, and not the size of the files.
+ * gives the estimate of the clock of the selection. It warns of a selection over its target, and fails a selection over
+ * its stop or a file over its limit of static runs. The cut of the parts can then follow the cost of the lines, and not the size of the files.
  */
 
 /** The name of the file of the plan, in the folder of the JSON report. */
@@ -16,6 +16,12 @@ export const PLAN_PER_CLOCK = 9.8;
 
 /** The default target of the estimate of a selection, in minutes. A slow runner then ends a job of 150 minutes. */
 export const TARGET_MINUTES = 100;
+
+/**
+ * The default stop of the estimate of a selection, in minutes. A selection over it does not end before the limit of the
+ * job, so it cannot give a full score. The estimate has an error of 28 minutes in the mean, so the target only warns.
+ */
+export const STOP_MINUTES = 140;
 
 /** The count of the tests of the largest cost that the plan keeps. */
 export const TOP_TESTS = 40;
@@ -145,8 +151,10 @@ export interface PlanRead {
   readonly netMs: number;
   /** The estimate of the clock of the selection, in minutes. */
   readonly minutes: number;
-  /** One line for the selection, and one for each file over its limit of static runs. */
+  /** One line for a selection over its stop, and one for each file over its limit of static runs. */
   readonly faults: readonly string[];
+  /** One line for a selection over its target and under its stop. */
+  readonly warnings: readonly string[];
   /** The line of the plan of the selection, with its estimate. */
   readonly line: string;
 }
@@ -155,6 +163,7 @@ export interface PlanRead {
 export interface PlanLimits {
   readonly planPerClock?: number;
   readonly targetMinutes?: number;
+  readonly stopMinutes?: number;
   /** The most static runs of each file. The key `*` gives the limit of each file that the field does not name. */
   readonly staticLimits?: Readonly<Record<string, number>>;
 }
@@ -171,16 +180,19 @@ export function staticFaults(files: Readonly<Record<string, FilePlan>>, limits: 
   });
 }
 
-/** This function reads the plan of a selection: its estimate of the clock, against the target, and its static runs. */
+/** This function reads the plan of a selection: its estimate of the clock, against the target and the stop, and its static runs. */
 export function readPlan(name: string, plan: SelectionPlan, limits: PlanLimits = {}): PlanRead {
   const rows = Object.values(plan.files);
   const sum = (key: "runs" | "static" | "netMs"): number => rows.reduce((n, row) => n + row[key], 0);
   const minutes = clockMinutes(sum("netMs"), limits.planPerClock);
   const target = limits.targetMinutes ?? TARGET_MINUTES;
+  const stop = limits.stopMinutes ?? STOP_MINUTES;
+  const estimate = `${name}: the estimate of ${minutes.toFixed(0)} minutes`;
   const head = `${name}: ${String(sum("runs"))} runs, ${String(sum("static"))} of them static, with a planned net time of ${(sum("netMs") / 3_600_000).toFixed(1)} h.`;
-  const line = `${head} The estimate is ${minutes.toFixed(0)} minutes of the clock, and the target is ${String(target)}.`;
-  const over = minutes > target ? [`${name}: the estimate of ${minutes.toFixed(0)} minutes is over the target of ${String(target)}. Cut the selection into more parts.`] : [];
-  return { runs: sum("runs"), static: sum("static"), netMs: sum("netMs"), minutes, faults: [...over, ...staticFaults(plan.files, limits.staticLimits)], line };
+  const line = `${head} The estimate is ${minutes.toFixed(0)} minutes of the clock, the target is ${String(target)} and the stop is ${String(stop)}.`;
+  const overStop = minutes > stop ? [`${estimate} is over the stop of ${String(stop)}. The run cannot end before the stop, so it cannot give a full score. Cut the selection into more parts.`] : [];
+  const warnings = minutes > target && minutes <= stop ? [`${estimate} is over the target of ${String(target)}. Cut the selection into more parts.`] : [];
+  return { runs: sum("runs"), static: sum("static"), netMs: sum("netMs"), minutes, faults: [...overStop, ...staticFaults(plan.files, limits.staticLimits)], warnings, line };
 }
 
 /**

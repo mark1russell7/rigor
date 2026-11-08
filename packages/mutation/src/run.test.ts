@@ -235,17 +235,23 @@ describe("rigor-mutation", () => {
     expect(() => run("config", "app", "--plan", "--dry-run")).toThrow(/takes --dry-run or --plan, not both/);
   });
 
-  // LANE.COST and LANE.STATIC of Vex: the estimate of each part against its target, and the static runs of each file.
-  it("reads the plan of each selection, and fails a selection over its target, a file over its static limit and a missing plan", () => {
+  // LANE.COST and LANE.STATIC of Vex: the estimate of each part against its target and its stop, and the static runs of each file.
+  it("reads the plan of each selection, warns over the target, and fails over the stop, over a static limit and with no plan", () => {
     const plan = (netMs: number, isStatic: number) => JSON.stringify({ files: { "src/a.ts": { mutants: 1, runs: 1, static: isStatic, netMs, limitMs: 0, lines: [] } }, tests: [] });
-    put("mutation.json", JSON.stringify({ packages: { lib: { dir: "packages/lib", mutate: ["src/*.ts"], parts: { core: ["src/a.ts"] }, staticLimits: { "*": 4 } } }, targetMinutes: 50 }));
+    put("mutation.json", JSON.stringify({ packages: { lib: { dir: "packages/lib", mutate: ["src/*.ts"], parts: { core: ["src/a.ts"] }, staticLimits: { "*": 4 } } }, targetMinutes: 50, stopMinutes: 80 }));
     put("packages/lib/reports/mutation/plan.json", plan(588_000 * 10, 4));
     expect(run("plan-check", "lib")).toBe(0);
-    expect(out).toBe("lib: 1 runs, 4 of them static, with a planned net time of 1.6 h. The estimate is 10 minutes of the clock, and the target is 50.\nplan-check: each plan of 1 selections is in its limits\n");
+    expect(out).toBe("lib: 1 runs, 4 of them static, with a planned net time of 1.6 h. The estimate is 10 minutes of the clock, the target is 50 and the stop is 80.\nplan-check: each plan of 1 selections is in its limits\n");
     out = "";
-    put("plans/mutation-lib.core/plan.json", plan(588_000 * 60, 5));
+    put("packages/lib/reports/mutation/plan.json", plan(588_000 * 60, 4));
+    expect(runInActions("plan-check", "lib")).toBe(0);
+    expect(out).toContain("  WARN: lib: the estimate of 60 minutes is over the target of 50. Cut the selection into more parts.\n");
+    expect(annotationsOf(out)).toEqual(["::warning title=Mutation plan%3A over the target::lib: the estimate of 60 minutes is over the target of 50. Cut the selection into more parts."]);
+    expect(out).toContain("plan-check: each plan of 1 selections is in its limits, and 1 of them are over the target\n");
+    out = "";
+    put("plans/mutation-lib.core/plan.json", plan(588_000 * 90, 5));
     expect(run("plan-check", "lib.core", "lib", "--reports", "plans")).toBe(1);
-    expect(out).toContain("  FAIL: lib.core: the estimate of 60 minutes is over the target of 50. Cut the selection into more parts.\n");
+    expect(out).toContain("  FAIL: lib.core: the estimate of 90 minutes is over the stop of 80. The run cannot end before the stop, so it cannot give a full score.");
     expect(out).toContain("  FAIL: src/a.ts: the plan has 5 static runs, and the limit is 4.");
     expect(out).toContain("lib: FAIL: there is no plan at plans/mutation-lib/plan.json.");
     expect(out).toContain("plan-check: 2 of 2 selections fail\n");

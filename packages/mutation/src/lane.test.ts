@@ -15,7 +15,7 @@ describe("parseLane", () => {
   });
 
   it("accepts the limits of the cost plan", () => {
-    const lane = { packages: { a: { dir: "a", mutate: ["x"], staticLimits: { "x.ts": 0, "*": 40 } } }, planPerClock: 7.2, targetMinutes: 90 };
+    const lane = { packages: { a: { dir: "a", mutate: ["x"], staticLimits: { "x.ts": 0, "*": 40 } } }, planPerClock: 7.2, targetMinutes: 90, stopMinutes: 120 };
     expect(parseLane(lane)).toBe(lane);
   });
 
@@ -40,6 +40,9 @@ describe("parseLane", () => {
     [{ packages: { a: { dir: "a", mutate: ["x"], staticLimits: [] } } }, /a: "staticLimits" is not an object of files/],
     [{ packages: { a: { dir: "a", mutate: ["x"] } }, planPerClock: 0 }, /"planPerClock" is not a positive number/],
     [{ packages: { a: { dir: "a", mutate: ["x"] } }, targetMinutes: "100" }, /"targetMinutes" is not a positive number/],
+    [{ packages: { a: { dir: "a", mutate: ["x"] } }, stopMinutes: -1 }, /"stopMinutes" is not a positive number/],
+    [{ packages: { a: { dir: "a", mutate: ["x"] } }, stopMinutes: 90 }, /"stopMinutes" \(90\) is less than "targetMinutes" \(100\)/],
+    [{ packages: { a: { dir: "a", mutate: ["x"] } }, targetMinutes: 150 }, /"stopMinutes" \(140\) is less than "targetMinutes" \(150\)/],
   ])("refuses %j", (json, message) => {
     expect(() => parseLane(json)).toThrow(message);
   });

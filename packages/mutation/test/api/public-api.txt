@@ -37,6 +37,7 @@ type PlanOfMutant: build/reporter.chunk.d.ts#PlanOfMutant
 type PlanRead: build/reporter.chunk.d.ts#PlanRead
 REPORT_DIR: build/index.d.ts#REPORT_DIR
 type ReporterOptions: build/reporter.chunk.d.ts#ReporterOptions
+STOP_MINUTES: build/reporter.chunk.d.ts#STOP_MINUTES
 STRYKER_OWNED: build/index.d.ts#STRYKER_OWNED
 type Score: build/index.d.ts#Score
 type ScoreOutcome: build/index.d.ts#ScoreOutcome
@@ -151,6 +152,7 @@ interface Lane {
   readonly plannedFalls?: Readonly<Record<string, string>>;
   readonly planPerClock?: number;
   readonly targetMinutes?: number;
+  readonly stopMinutes?: number;
 }
 
 ### build/index.d.ts#LeavingPath
@@ -452,6 +454,7 @@ declare class PartialReporter {
 interface PlanLimits {
   readonly planPerClock?: number;
   readonly targetMinutes?: number;
+  readonly stopMinutes?: number;
   readonly staticLimits?: Readonly<Record<string, number>>;
 }
 
@@ -482,6 +485,7 @@ interface PlanRead {
   readonly netMs: number;
   readonly minutes: number;
   readonly faults: readonly string[];
+  readonly warnings: readonly string[];
   readonly line: string;
 }
 
@@ -494,6 +498,9 @@ interface ReporterOptions {
     readonly stopAfterPlan?: boolean;
   };
 }
+
+### build/reporter.chunk.d.ts#STOP_MINUTES
+declare const STOP_MINUTES = 140;
 
 ### build/reporter.chunk.d.ts#SelectionPlan
 interface SelectionPlan {

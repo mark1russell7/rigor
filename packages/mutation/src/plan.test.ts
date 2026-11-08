@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clockMinutes, filePlans, parsePlan, PLAN_PER_CLOCK, readPlan, staticFaults, TARGET_MINUTES, testPlans, type FilePlan, type PlanOfMutant } from "./plan.ts";
+import { clockMinutes, filePlans, parsePlan, PLAN_PER_CLOCK, readPlan, staticFaults, STOP_MINUTES, TARGET_MINUTES, testPlans, type FilePlan, type PlanOfMutant } from "./plan.ts";
 
 /** This function gives a plan of Stryker for the mutant `id`. Stryker counts the lines of a plan from 0. */
 const run = (id: string, fileName: string, line: number | undefined, netTime: number, isStatic = false, testFilter?: readonly string[]): PlanOfMutant => ({
@@ -39,22 +39,30 @@ describe("testPlans", () => {
 });
 
 describe("readPlan", () => {
-  it("gives the estimate of the clock at 9.8 planned minutes for each minute, against the target of 100", () => {
+  it("gives the estimate of the clock at 9.8 planned minutes for each minute, and fails it over the stop of 140", () => {
     expect(PLAN_PER_CLOCK).toBe(9.8);
     expect(TARGET_MINUTES).toBe(100);
+    expect(STOP_MINUTES).toBe(140);
     expect(clockMinutes(9.8 * 60_000)).toBeCloseTo(1);
     expect(clockMinutes(120_000, 2)).toBe(1);
     const read = readPlan("lib.core", { files: { "a.ts": file(5_880_000 * 50, 3) }, tests: [] });
     expect(read.minutes).toBeCloseTo(500);
-    expect(read).toMatchObject({ runs: 1, static: 3, faults: ["lib.core: the estimate of 500 minutes is over the target of 100. Cut the selection into more parts."] });
-    expect(read.line).toBe("lib.core: 1 runs, 3 of them static, with a planned net time of 81.7 h. The estimate is 500 minutes of the clock, and the target is 100.");
+    expect(read).toMatchObject({
+      runs: 1,
+      static: 3,
+      faults: ["lib.core: the estimate of 500 minutes is over the stop of 140. The run cannot end before the stop, so it cannot give a full score. Cut the selection into more parts."],
+      warnings: [],
+    });
+    expect(read.line).toBe("lib.core: 1 runs, 3 of them static, with a planned net time of 81.7 h. The estimate is 500 minutes of the clock, the target is 100 and the stop is 140.");
   });
 
-  it("passes a plan in its target, and reads the target and the rate of the lane", () => {
+  // The review of vex: the estimate has an error of 28 minutes in the mean, so the target warns and only the stop fails.
+  it("passes a plan in its target, warns of a plan over its target, and reads the limits and the rate of the lane", () => {
     const plan = { files: { "a.ts": file(588_000), "b.ts": file(588_000) }, tests: [] };
     expect(readPlan("lib", plan).minutes).toBeCloseTo(2);
-    expect(readPlan("lib", plan).faults).toEqual([]);
-    expect(readPlan("lib", plan, { targetMinutes: 1 }).faults).toHaveLength(1);
+    expect(readPlan("lib", plan)).toMatchObject({ faults: [], warnings: [] });
+    expect(readPlan("lib", plan, { targetMinutes: 1 })).toMatchObject({ faults: [], warnings: ["lib: the estimate of 2 minutes is over the target of 1. Cut the selection into more parts."] });
+    expect(readPlan("lib", plan, { targetMinutes: 1, stopMinutes: 1.5 })).toMatchObject({ faults: [expect.stringMatching(/^lib: the estimate of 2 minutes is over the stop of 1\.5\./)], warnings: [] });
     expect(readPlan("lib", plan, { planPerClock: 0.98 }).minutes).toBeCloseTo(20);
   });
 
