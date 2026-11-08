@@ -1,8 +1,8 @@
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
-import { armModels, gateLine, gateOf, isBlock, isNoRead, jobModels, writeGateLine } from "./index.ts";
+import { describe, expect, it, vi } from "vitest";
+import { GATE_LINE_LIMIT, GATE_LINE_NAMES, armModels, gateLine, gateOf, isBlock, isNoRead, jobModels, writeGateLine } from "./index.ts";
 
 const ONE = armModels([{ a: "AMD EPYC 7763", b: "AMD EPYC 7763" }]);
 const MIXED = armModels([
@@ -152,6 +152,83 @@ describe("gateLine", () => {
     expect(count).toBe(12);
   });
 
+  it("names at most GATE_LINE_NAMES cases of each kind, keeps exact counts and each case in the data", () => {
+    const reads = [
+      ...Array.from({ length: 25 }, (_, i) => ({ case: `b${i}`, outcome: "beyond" })),
+      ...Array.from({ length: 11 }, (_, i) => ({ case: `n${i}`, outcome: "cannot decide" })),
+      ...Array.from({ length: 4 }, (_, i) => ({ case: `p${i}`, outcome: "within" })),
+    ];
+    const line = gateLine(reads, { title: "t" });
+    expect(GATE_LINE_NAMES).toBe(10);
+    expect(line?.blocks).toEqual({ count: 25, cases: reads.slice(0, 25).map((r) => r.case) });
+    expect(line?.noReads.cases).toHaveLength(11);
+    expect(line?.text).toBe(
+      "t: block for 25 of 40 cases: b0, b1, b2, b3, b4, b5, b6, b7, b8, b9 and 15 more. No read for 11 of 40 cases: n0, n1, n2, n3, n4, n5, n6, n7, n8, n9 and 1 more. A no read is not a pass.",
+    );
+    const ten = gateLine(reads.slice(0, 10), { title: "t" });
+    expect(ten?.text).toBe("t: block for 10 of 10 cases: b0, b1, b2, b3, b4, b5, b6, b7, b8, b9.");
+  });
+
+  it("keeps a line with many long case names under the limit of an annotation", () => {
+    // Each name has 300 characters, so the old text of 400 names had more than 120 000 characters.
+    const long = (k: string, i: number): string => `${k}-${String(i).padStart(3, "0")}-${"x".repeat(292)}`;
+    const reads = [
+      ...Array.from({ length: 200 }, (_, i) => ({ case: long("block", i), outcome: "slower" })),
+      ...Array.from({ length: 200 }, (_, i) => ({ case: long("noread", i), outcome: "no read" })),
+    ];
+    const line = gateLine(reads, { title: "x".repeat(300), enforced: true, reason: "r".repeat(5000), models: MIXED });
+    expect(line?.blocks.cases).toHaveLength(200);
+    expect(line?.noReads.cases).toEqual(reads.slice(200).map((r) => r.case));
+    expect(line?.text.length).toBeLessThanOrEqual(GATE_LINE_LIMIT);
+    expect(line?.text.endsWith(". A no read is not a pass.") || line?.text.endsWith("… A no read is not a pass.")).toBe(true);
+    const out = written(line).lines[0] ?? "";
+    const [, title = "", data = ""] = /^::error title=(.*?)::(.*)$/su.exec(out) ?? [];
+    expect(data.length).toBeLessThanOrEqual(GATE_LINE_LIMIT);
+    expect(decodeURIComponent(title).length).toBeLessThanOrEqual(255);
+    // The names, the reason and the title without a cut: the line names only 10 of each kind, and each name in the text has at most 120 characters.
+    const short = gateLine(reads, { title: "bench", models: MIXED });
+    expect(short?.text).toContain(" and 190 more. No read for 200 of 400 cases: ");
+    expect(short?.text).toContain(`${long("block", 0).slice(0, 119)}…, `);
+    expect(short?.text.length).toBeLessThan(GATE_LINE_LIMIT);
+  });
+
+  it("names the cores of the jobs with the option cores, and old callers get the same text", () => {
+    const envs = [
+      { cpu: "AMD EPYC 7763", cores: 4 },
+      { cpu: "AMD EPYC 7763", cores: 2 },
+      { cpu: "AMD EPYC 7763", cores: 4 },
+      { cpu: "Intel Xeon 8370C", cores: 1 },
+      { cpu: "Intel Xeon 8370C" },
+    ];
+    expect(jobModels(envs)).toEqual([
+      { model: "AMD EPYC 7763", jobs: 3 },
+      { model: "Intel Xeon 8370C", jobs: 2 },
+    ]);
+    const kept = jobModels(envs, { cores: true });
+    expect(kept).toEqual([
+      { model: "AMD EPYC 7763", cores: 2, jobs: 1 },
+      { model: "AMD EPYC 7763", cores: 4, jobs: 2 },
+      { model: "Intel Xeon 8370C", jobs: 1 },
+      { model: "Intel Xeon 8370C", cores: 1, jobs: 1 },
+    ]);
+    const reads = [{ case: "a", outcome: "cannot decide" }];
+    expect(gateLine(reads, { title: "t", models: jobModels(envs) })?.cpu).toBe("Jobs on 2 CPU models: AMD EPYC 7763 (3 jobs), Intel Xeon 8370C (2 jobs)");
+    const line = gateLine(reads, { title: "t", models: kept });
+    expect(line?.cpu).toBe("Jobs on 2 CPU models: AMD EPYC 7763 with 2 cores (1 job), AMD EPYC 7763 with 4 cores (2 jobs), Intel Xeon 8370C (1 job), Intel Xeon 8370C with 1 core (1 job)");
+    expect(line?.mixed).toBe(true);
+    const one = gateLine(reads, { title: "t", models: jobModels([{ cpu: "m", cores: 4 }, { cpu: "m", cores: 4 }], { cores: true }) });
+    expect(one).toMatchObject({ cpu: "Jobs on 1 CPU model: m with 4 cores (2 jobs)", mixed: false });
+    const split = gateLine(reads, { title: "t", models: jobModels([{ cpu: "m", cores: 4 }, { cpu: "m", cores: 2 }], { cores: true }) });
+    expect(split).toMatchObject({ cpu: "Jobs on 1 CPU model: m with 2 cores (1 job), m with 4 cores (1 job)", mixed: true });
+  });
+
+  it("gives a plain sentence for jobs with no CPU model", () => {
+    const line = gateLine([{ case: "a", outcome: "cannot decide" }], { title: "t", models: jobModels([]) });
+    expect(line).toMatchObject({ cpu: "The jobs have no CPU model", mixed: false });
+    expect(line?.text).toBe("t: no read for 1 of 1 cases: a. The jobs have no CPU model. A no read is not a pass.");
+    expect(line?.text).not.toContain("0 CPU models");
+  });
+
   it("knows the words of a no-read and of a block", () => {
     const words = ["cannot decide", "no read", "beyond", "slower", "same", "within", "not slower", "faster"];
     expect(words.map(isNoRead)).toEqual([true, true, false, false, false, false, false, false]);
@@ -178,6 +255,29 @@ describe("writeGateLine", () => {
       expect(readFileSync(file, "utf8")).toBe("\n> [!WARNING]\n> **No read.** bench: a, b: no read for 1 of 1 cases: 50% split. A no read is not a pass.\n");
     } finally {
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("writes the log to the standard output by default, and to the standard error with stream stderr", () => {
+    const line = gateLine([{ case: "a", outcome: "beyond" }], { title: "t" });
+    const out = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const err = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      const written = writeGateLine(line, { summary: undefined });
+      expect(out.mock.calls.map((c) => c[0])).toEqual([`${written?.annotation}\n`]);
+      expect(err).not.toHaveBeenCalled();
+      out.mockClear();
+      writeGateLine(line, { summary: undefined, stream: "stderr" });
+      expect(err.mock.calls.map((c) => c[0])).toEqual([`${written?.annotation}\n`]);
+      expect(out).not.toHaveBeenCalled();
+      err.mockClear();
+      const lines: string[] = [];
+      writeGateLine(line, { summary: undefined, stream: "stderr", log: (s) => lines.push(s) });
+      expect(lines).toEqual([written?.annotation]);
+      expect(err).not.toHaveBeenCalled();
+    } finally {
+      out.mockRestore();
+      err.mockRestore();
     }
   });
 
