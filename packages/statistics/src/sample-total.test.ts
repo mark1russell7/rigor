@@ -61,6 +61,24 @@ describe("sampleTotalInterval", () => {
     expect(share.high).toBeGreaterThanOrEqual(0.95);
   });
 
+  it("records the coverage of a small sample, which is below the 95% level", () => {
+    const items = population(40, "small");
+    const truth = total(items);
+    const r = random("small-samples-8");
+    const samples = 400;
+    let hits = 0;
+    for (let k = 0; k < samples; k++) {
+      const drawn = r.sample(items, 8);
+      const i = sampleTotalInterval(drawn, { population: items.length, runs: 1000, seed: k + 1 });
+      if (i.low <= truth && truth <= i.high) hits++;
+    }
+    const share = wilson(hits, samples);
+    // The measured count at these seeds: 346 of 400 (0.865), with the Wilson interval 0.828 to 0.895.
+    // The divisor m of the draws and the skew of the values make the interval too narrow. The TSDoc tells it.
+    expect(hits).toBe(346);
+    expect(share.high).toBeLessThan(0.95);
+  });
+
   it("gets narrower as the sample gets near the population", () => {
     const items = population(200, "narrow");
     const order = random("narrow-order").shuffle(items);
