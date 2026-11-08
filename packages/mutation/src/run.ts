@@ -13,7 +13,7 @@ import { compareDisables, findDisables, type Disable } from "./disables.ts";
 import { collectFaults, computedImports, leavingPaths, relatedTestFiles, type Collected, type CollectRequest, type PackageFile } from "./load.ts";
 import { costMapOf, cutByCost, parseCostMaps, plannedMs, weightedFiles, type CostMap, type CostMaps, type WeightedFile } from "./cut.ts";
 import { changedFiles, globsSelect, MAX_TEST_FALL, packageRuns, parseLane, partErrors, runSelections, select, selectionNames, type CutOf, type Lane, type Selection } from "./lane.ts";
-import { clockMinutes, parsePlan, PLAN_FILE, readPlan, STOP_MINUTES, TARGET_MINUTES, type LinePlan } from "./plan.ts";
+import { clockMinutes, parsePlan, PLAN_FILE, readPlan, speedFactors, STOP_MINUTES, TARGET_MINUTES, type LinePlan, type RunnerPlan } from "./plan.ts";
 import { PARTIAL_FILE } from "./reporter.ts";
 import { copyOfFolder, ignoreRules, minimatchOf, removeCopy, sandboxFiles, tempDirOf } from "./sandbox.ts";
 import { failScore, formatScore, packageScore, parsePartial, parseReport, readFaults, partialScore, scoreReport, summaryMarkdown, testFall, testFileFaults, unreadTestFiles, type MutationReport, type Score } from "./score.ts";
@@ -569,25 +569,34 @@ function planCheck(lane: Lane, laneDir: string, names: readonly string[], o: Pla
 /**
  * This function writes the cost maps of the lane from the plans of a run (`costs`). It adds the plan lines of each file
  * over the selections, so a file in two parts gets one map. A file that a selection mutates with no plan gets a map of
- * 0. The maps of the files of the other selections stay.
+ * 0. The maps of the files of the other selections stay. The function divides the net time of each part by the speed factor
+ * of its runner (`speedFactors`), so a slow runner does not make its files look slow.
  */
 function writeCosts(lane: Lane, laneDir: string, run: string, reports: string | undefined, io: CliIo): number {
   if (lane.costs === undefined) throw new Error(`the lane has no field "costs" for the file of the cost maps`);
   if (reports === undefined) throw new Error(`"costs" takes --reports <dir>`);
-  const lines = new Map<string, Map<string, LinePlan[]>>();
-  const read: string[] = [];
+  const read: RunnerPlan[] = [];
   for (const name of selectionNames(lane)) {
     const file = resolve(io.cwd, reports, `mutation-${name}`, PLAN_FILE);
     if (!existsSync(file)) continue;
-    read.push(name);
+    const s = selectIn(lane, laneDir, name);
+    read.push({ name, group: s.cut === undefined ? name : `${s.pkg}.${s.cut.group}`, plan: parsePlan(readJson(file)) });
+  }
+  if (read.length === 0) throw new Error(`there is no plan of a selection of the lane in ${reports}`);
+  const factors = speedFactors(read);
+  const lines = new Map<string, Map<string, LinePlan[]>>();
+  for (const { name, plan } of read) {
     const s = selectIn(lane, laneDir, name);
     const dir = resolve(laneDir, s.dir);
+    const factor = factors.get(name) ?? 1;
     const files = lines.get(s.pkg) ?? new Map<string, LinePlan[]>();
     lines.set(s.pkg, files);
     for (const source of sourcesOf(dir, dir).filter((f) => globsSelect(s.mutate, f))) files.set(source, files.get(source) ?? []);
-    for (const [source, plan] of Object.entries(parsePlan(readJson(file)).files)) files.set(source, [...(files.get(source) ?? []), ...plan.lines]);
+    for (const [source, row] of Object.entries(plan.files)) {
+      const scaled = row.lines.map(([line, runs, staticRuns, netMs]): LinePlan => [line, runs, staticRuns, Math.round(netMs / factor)]);
+      files.set(source, [...(files.get(source) ?? []), ...scaled]);
+    }
   }
-  if (read.length === 0) throw new Error(`there is no plan of a selection of the lane in ${reports}`);
   const maps: Record<string, Record<string, CostMap>> = Object.fromEntries(Object.entries(costMapsOf(lane, laneDir)).map(([pkg, files]) => [pkg, { ...files }]));
   let count = 0;
   for (const [pkg, files] of lines) {
@@ -605,6 +614,8 @@ function writeCosts(lane: Lane, laneDir: string, run: string, reports: string | 
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, `${JSON.stringify(sorted(Object.fromEntries(Object.entries(maps).map(([pkg, files]) => [pkg, sorted(files)]))), null, 2)}\n`);
   io.stdout(`costs: ${String(count)} files from the plans of ${String(read.length)} selections of the run ${run}, in ${relative(io.cwd, out).replaceAll("\\", "/")}\n`);
+  const grouped = read.filter((p) => read.filter((q) => q.group === p.group).length > 1);
+  if (grouped.length > 0) io.stdout(`costs: the speed factors of the runners: ${grouped.map((p) => `${p.name} ${(factors.get(p.name) ?? 1).toFixed(2)}`).join(", ")}\n`);
   return 0;
 }
 

@@ -105,6 +105,7 @@ After the run of the tests without mutants, Stryker makes a plan of the mutants.
 
 - `files` gives the plan of each file: its mutants, the runs, the static runs, the planned net time and the time limits in milliseconds. `lines` gives the runs, the static runs and the net time of each line.
 - `tests` gives the 40 tests of the largest cost. The cost of a test is its time, times the runs that start it.
+- `dryRun` gives the run of the tests without mutants: the count of its tests and the sum of their times. A plan before 0.2.5 has no `dryRun`.
 
 Each line of a mutant in `partial.jsonl` also gives its planned net time and its time limit.
 
@@ -147,6 +148,12 @@ The cut follows the cost maps of the lane:
 The cut reads only the files on the disk and the cost maps. Thus each job of a run gets the same parts.
 
 `rigor-mutation costs <run> --reports <dir>` writes the cost maps from the plans of the run `<run>`. It reads `<dir>/mutation-<selection>/plan.json` of each selection. It adds the plan lines of a file over the parts, and a file with no plan line gets a map of 0. The maps of the other files stay. Write the maps again after a large change of a file or of its tests, and commit them.
+
+Each part runs on its own runner, and the speed of the runners differs. In a run of Vex, the same 1191 tests took from 83 s to 149 s. Thus `costs` divides the net time of each part by the speed factor of its runner, and it prints the factors:
+
+- When each plan of a group has a `dryRun` with the same count of tests, the factor is the time of the dry run over the median of the group.
+- Otherwise the factor is the median ratio of the time of a shared test to its median time in the group. A shared test takes 200 ms or more (`SPEED_MIN_MS`), and half of the plans of the group or more name it, with 2 at least.
+- A selection alone in its group, or with no shared test, has the factor 1. A factor over 1 is a slow runner.
 
 `rigor-mutation cost-check [<selection>...]` gives the estimate of the clock of each numbered part under the committed maps. A part over `targetMinutes` fails, and so does a group with no map. The check reads no plan, so each commit gives one result. Thus a check of the pull request can hold each part under its target.
 

@@ -19,6 +19,7 @@ type CutPart: build/index.d.ts#CutPart
 DRY_RUN_TIMEOUT_MINUTES: build/index.d.ts#DRY_RUN_TIMEOUT_MINUTES
 type Disable: build/index.d.ts#Disable
 type DisableCheck: build/index.d.ts#DisableCheck
+type DryRun: build/reporter.chunk.d.ts#DryRun
 type FilePlan: build/reporter.chunk.d.ts#FilePlan
 HELP: build/index.d.ts#HELP
 type Lane: build/index.d.ts#Lane
@@ -42,6 +43,8 @@ type PlanOfMutant: build/reporter.chunk.d.ts#PlanOfMutant
 type PlanRead: build/reporter.chunk.d.ts#PlanRead
 REPORT_DIR: build/index.d.ts#REPORT_DIR
 type ReporterOptions: build/reporter.chunk.d.ts#ReporterOptions
+type RunnerPlan: build/reporter.chunk.d.ts#RunnerPlan
+SPEED_MIN_MS: build/reporter.chunk.d.ts#SPEED_MIN_MS
 STOP_MINUTES: build/reporter.chunk.d.ts#STOP_MINUTES
 STRYKER_OWNED: build/index.d.ts#STRYKER_OWNED
 type Score: build/index.d.ts#Score
@@ -62,6 +65,7 @@ compareDisables: build/index.d.ts#compareDisables
 computedImports: build/index.d.ts#computedImports
 costMapOf: build/index.d.ts#costMapOf
 cutByCost: build/index.d.ts#cutByCost
+dryRunOf: build/reporter.chunk.d.ts#dryRunOf
 filePlans: build/reporter.chunk.d.ts#filePlans
 findDisables: build/index.d.ts#findDisables
 formatScore: build/index.d.ts#formatScore
@@ -88,6 +92,7 @@ scoreReport: build/index.d.ts#scoreReport
 segmentsOf: build/index.d.ts#segmentsOf
 select: build/index.d.ts#select
 selectionNames: build/index.d.ts#selectionNames
+speedFactors: build/reporter.chunk.d.ts#speedFactors
 staticFaults: build/reporter.chunk.d.ts#staticFaults
 strykerConfig: build/index.d.ts#strykerConfig
 summaryMarkdown: build/index.d.ts#summaryMarkdown
@@ -469,6 +474,12 @@ export declare function weightedFiles(texts: readonly {
   readonly text: string;
 }[], maps?: Readonly<Record<string, CostMap>>): WeightedFile[];
 
+### build/reporter.chunk.d.ts#DryRun
+interface DryRun {
+  readonly tests: number;
+  readonly netMs: number;
+}
+
 ### build/reporter.chunk.d.ts#FilePlan
 interface FilePlan {
   readonly mutants: number;
@@ -583,6 +594,16 @@ interface ReporterOptions {
   };
 }
 
+### build/reporter.chunk.d.ts#RunnerPlan
+interface RunnerPlan {
+  readonly name: string;
+  readonly group: string;
+  readonly plan: SelectionPlan;
+}
+
+### build/reporter.chunk.d.ts#SPEED_MIN_MS
+declare const SPEED_MIN_MS = 200;
+
 ### build/reporter.chunk.d.ts#STOP_MINUTES
 declare const STOP_MINUTES = 140;
 
@@ -590,6 +611,7 @@ declare const STOP_MINUTES = 140;
 interface SelectionPlan {
   readonly files: Readonly<Record<string, FilePlan>>;
   readonly tests: readonly TestPlan[];
+  readonly dryRun?: DryRun;
 }
 
 ### build/reporter.chunk.d.ts#TARGET_MINUTES
@@ -609,6 +631,9 @@ type TestPlan = readonly [name: string, file: string, ms: number, runs: number, 
 ### build/reporter.chunk.d.ts#clockMinutes
 declare function clockMinutes(netMs: number, planPerClock?: number): number;
 
+### build/reporter.chunk.d.ts#dryRunOf
+declare function dryRunOf(tests: readonly TestOfDryRun[]): DryRun;
+
 ### build/reporter.chunk.d.ts#filePlans
 declare function filePlans(plans: readonly PlanOfMutant[], path?: (fileName: string) => string): Record<string, FilePlan>;
 
@@ -617,6 +642,9 @@ declare function parsePlan(json: unknown): SelectionPlan;
 
 ### build/reporter.chunk.d.ts#readPlan
 declare function readPlan(name: string, plan: SelectionPlan, limits?: PlanLimits): PlanRead;
+
+### build/reporter.chunk.d.ts#speedFactors
+declare function speedFactors(plans: readonly RunnerPlan[]): Map<string, number>;
 
 ### build/reporter.chunk.d.ts#staticFaults
 declare function staticFaults(files: Readonly<Record<string, FilePlan>>, limits?: Readonly<Record<string, number>>): string[];
