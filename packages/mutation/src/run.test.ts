@@ -150,6 +150,10 @@ describe("rigor-mutation", () => {
     out = "";
     expect(run("scores", "lib.core", "--reports", "reports")).toBe(1);
     expect(out).toContain("lib: 100.00 % (10 of 10, 0 survived), gate 80 %: FAIL: the read has no score of the parts lib.rest, so the sum does not count their mutants");
+    // The job of one part: --alone gives no line for the package, and the part has no gate of its own.
+    out = "";
+    expect(run("scores", "lib.rest", "--reports", "reports", "--alone")).toBe(0);
+    expect(out).toBe("lib.rest: 50.00 % (5 of 10, 5 survived), no gate: pass\n  the gate of lib reads all its parts together\n");
     expect(() => run("scores", "lib.core", "--reports", "reports", "--report", "r.json")).toThrow(/--report or --reports/);
     put("mutation.json", JSON.stringify({ packages: { lib: { ...lib, parts: undefined } } }));
     expect(() => run("list")).toThrow(/"gateOver" is "package", but the package has no parts/);

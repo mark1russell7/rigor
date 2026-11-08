@@ -33,11 +33,13 @@ export const HELP: string = `rigor-mutation: the mutation tests of a repository,
                                                Stryker starts only the tests. With --changed, it mutates only
                                                the changed files of the selection.
   rigor-mutation scores <selection>... [--report <file> | --reports <dir>] [--summary <file>]
-                       [--last <file>] [--write-last <file>] [--test-files]
+                       [--last <file>] [--write-last <file>] [--test-files] [--alone]
                                                the score of each selection, with its gate and its count
                                                of tests. --reports reads <dir>/mutation-<selection>/mutation.json.
                                                A package with "gateOver": "package" also gets
-                                               the score of its parts together, a no read without all its parts. With --last, a fall of the count of more than
+                                               the score of its parts together, a no read without all its parts.
+                                               --alone gives no line for the package: the job of one part
+                                               then fails only for a no read. With --last, a fall of the count of more than
                                                maxTestFall % (default 20) against the file fails. With
                                                --write-last, the counts of the passed selections go in
                                                the file. With --test-files, a test file that the run
@@ -186,6 +188,8 @@ interface ScoresOptions {
   readonly last: string | undefined;
   readonly writeLast: string | undefined;
   readonly testFiles: boolean;
+  /** This field tells if the command gives no score of a package from its parts, for the job of one part. */
+  readonly alone?: boolean;
 }
 
 /**
@@ -239,7 +243,8 @@ function scores(lane: Lane, laneDir: string, names: readonly string[], o: Scores
     if (o.testFiles) score = checkTestFiles(lane, laneDir, s, report, score, (line) => note(name, line));
     return score;
   });
-  const totals = [...new Set(names.map((n) => select(lane, n)).filter(byPackage).map((s) => s.pkg))].map((pkg) => {
+  const packages = o.alone === true ? [] : names.map((n) => select(lane, n)).filter(byPackage).map((s) => s.pkg);
+  const totals = [...new Set(packages)].map((pkg) => {
     const p = lane.packages[pkg];
     const parts = results.filter((r) => select(lane, r.name).pkg === pkg && r.name !== pkg);
     // A no read is never a pass: a part that the command does not name makes the package a no read.
@@ -361,6 +366,7 @@ export function runCli(argv: readonly string[], io: CliIo): number {
       last: { type: "string" },
       "write-last": { type: "string" },
       "test-files": { type: "boolean", default: false },
+      alone: { type: "boolean", default: false },
       help: { type: "boolean", default: false },
     },
   });
@@ -414,7 +420,7 @@ export function runCli(argv: readonly string[], io: CliIo): number {
       return 0;
     }
     case "scores":
-      return scores(lane, laneDir, names, { report: values.report, reports: values.reports, summary: values.summary, last: values.last, writeLast: values["write-last"], testFiles: values["test-files"] }, io);
+      return scores(lane, laneDir, names, { report: values.report, reports: values.reports, summary: values.summary, last: values.last, writeLast: values["write-last"], testFiles: values["test-files"], alone: values.alone }, io);
     case "disables":
       return disables(lane, laneDir, values.write, io);
     case "load-check":

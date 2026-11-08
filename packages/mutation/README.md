@@ -102,6 +102,7 @@ With `"gateOver": "package"`, the gate reads all the parts together. `scores` su
 
 - Give `scores` all the parts in one command, so that the sum reads each part. `--reports <dir>` reads `<dir>/mutation-<selection>/mutation.json` for each selection.
 - A read of some of the parts only makes the package a no read, and its line names the missing parts. A run of the changed files is usually report only, so this does not fail it.
+- `--alone` gives no line for the package. The job of one part uses it, and the part then fails only for a no read.
 
 ## The tests that a run read
 
