@@ -212,7 +212,7 @@ function percentile(name: string, options: BootstrapOptions, run: (r: Random) =>
  * The percentile bootstrap of `k` statistics from the same draws. Each run gives `k` statistics. Each statistic
  * has its own count of finite runs.
  */
-function percentiles(name: string, options: BootstrapOptions, k: number, run: (r: Random) => readonly number[], all: () => readonly number[]): Interval[] {
+export function percentiles(name: string, options: BootstrapOptions, k: number, run: (r: Random) => readonly number[], all: () => readonly number[]): Interval[] {
   const s = settings(name, options);
   const r = random(options.seed ?? 1);
   const values = Array.from({ length: k }, (): number[] => []);

@@ -97,6 +97,9 @@ type SampleTotalOptions: build/index.d.ts#SampleTotalOptions
 type SideP: build/index.d.ts#SideP
 type SmoothLaw: build/index.d.ts#SmoothLaw
 type SmoothLawScore: build/index.d.ts#SmoothLawScore
+type SobolIndex: build/index.d.ts#SobolIndex
+type SobolIndices: build/index.d.ts#SobolIndices
+type SobolOptions: build/index.d.ts#SobolOptions
 type Summary: build/index.d.ts#Summary
 type TableResponseModel: build/index.d.ts#TableResponseModel
 type TieModel: build/index.d.ts#TieModel
@@ -161,6 +164,7 @@ signTest: build/index.d.ts#signTest
 signTestPower: build/index.d.ts#signTestPower
 sliceResponse: build/index.d.ts#sliceResponse
 smoothLawScores: build/index.d.ts#smoothLawScores
+sobolIndices: build/index.d.ts#sobolIndices
 sorted: build/index.d.ts#sorted
 spearman: build/index.d.ts#spearman
 strengthToRating: build/index.d.ts#strengthToRating
@@ -814,6 +818,35 @@ interface SmoothLawScore {
   readonly meanLogDensity: number;
 }
 
+### build/index.d.ts#SobolIndex
+interface SobolIndex {
+  readonly dimension: string;
+  readonly first: number;
+  readonly total: number;
+  readonly firstInterval?: Interval;
+  readonly totalInterval?: Interval;
+}
+
+### build/index.d.ts#SobolIndices
+interface SobolIndices {
+  readonly measure: string;
+  readonly scale: "measure" | "model";
+  readonly n: number;
+  readonly evaluations: number;
+  readonly seed: number;
+  readonly mean: number;
+  readonly variance: number;
+  readonly indices: readonly SobolIndex[];
+}
+
+### build/index.d.ts#SobolOptions
+interface SobolOptions {
+  readonly n?: number;
+  readonly seed?: number | string;
+  readonly scale?: "measure" | "model";
+  readonly interval?: BootstrapOptions;
+}
+
 ### build/index.d.ts#Summary
 interface Summary {
   readonly n: number;
@@ -1050,6 +1083,9 @@ export declare function sliceResponse(record: ResponseRecord, measure: string, o
 
 ### build/index.d.ts#smoothLawScores
 export declare function smoothLawScores(values: readonly number[]): readonly SmoothLawScore[];
+
+### build/index.d.ts#sobolIndices
+export declare function sobolIndices(record: Pick<ResponseRecord, "dimensions" | "models">, measure: string, options?: SobolOptions): SobolIndices;
 
 ### build/index.d.ts#sorted
 export declare function sorted(values: readonly number[]): number[];

@@ -66,6 +66,7 @@ export {
 } from "./response.ts";
 export { type ParsedResponseRecord, type ResponseFault, RESPONSE_MAX_POWER, parseResponseRecord } from "./response-parse.ts";
 export { type ResponseFitOptions, RESPONSE_LAMBDAS, RESPONSE_MAX_TERMS, fitResponse } from "./response-fit.ts";
+export { type SobolIndex, type SobolIndices, type SobolOptions, sobolIndices } from "./response-sobol.ts";
 export {
   type Corrected,
   type PermutationOptions,
