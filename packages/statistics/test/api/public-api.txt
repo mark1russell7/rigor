@@ -93,8 +93,12 @@ type RidgeOptions: build/index.d.ts#RidgeOptions
 type RidgeRankInput: build/index.d.ts#RidgeRankInput
 type RidgeResponseModel: build/index.d.ts#RidgeResponseModel
 type RidgeTerm: build/index.d.ts#RidgeTerm
+SIGN_FLIP_EXACT_LIMIT: build/index.d.ts#SIGN_FLIP_EXACT_LIMIT
+SIGN_FLIP_EXACT_MAX: build/index.d.ts#SIGN_FLIP_EXACT_MAX
 type SampleTotalOptions: build/index.d.ts#SampleTotalOptions
 type SideP: build/index.d.ts#SideP
+type SignFlipOptions: build/index.d.ts#SignFlipOptions
+type SignFlipResult: build/index.d.ts#SignFlipResult
 type SmoothLaw: build/index.d.ts#SmoothLaw
 type SmoothLawScore: build/index.d.ts#SmoothLawScore
 type SobolIndex: build/index.d.ts#SobolIndex
@@ -119,6 +123,7 @@ bootstrapClusters: build/index.d.ts#bootstrapClusters
 bootstrapLeastSquares: build/index.d.ts#bootstrapLeastSquares
 bootstrapMedian: build/index.d.ts#bootstrapMedian
 bootstrapMedianRatio: build/index.d.ts#bootstrapMedianRatio
+bootstrapStrata: build/index.d.ts#bootstrapStrata
 bootstrapTwo: build/index.d.ts#bootstrapTwo
 bradleyTerry: build/index.d.ts#bradleyTerry
 brier: build/index.d.ts#brier
@@ -160,6 +165,7 @@ responseCells: build/index.d.ts#responseCells
 ridgeSolve: build/index.d.ts#ridgeSolve
 sampleTotalInterval: build/index.d.ts#sampleTotalInterval
 sd: build/index.d.ts#sd
+signFlipTest: build/index.d.ts#signFlipTest
 signTest: build/index.d.ts#signTest
 signTestPower: build/index.d.ts#signTestPower
 sliceResponse: build/index.d.ts#sliceResponse
@@ -796,6 +802,12 @@ interface RidgeTerm {
   readonly weight: number;
 }
 
+### build/index.d.ts#SIGN_FLIP_EXACT_LIMIT
+export declare const SIGN_FLIP_EXACT_LIMIT = 24;
+
+### build/index.d.ts#SIGN_FLIP_EXACT_MAX
+export declare const SIGN_FLIP_EXACT_MAX = 16;
+
 ### build/index.d.ts#SampleTotalOptions
 interface SampleTotalOptions extends BootstrapOptions {
   readonly population: number;
@@ -807,6 +819,21 @@ interface SideP {
   readonly against: number;
   readonly pAbove: number;
   readonly pBelow: number;
+}
+
+### build/index.d.ts#SignFlipOptions
+interface SignFlipOptions {
+  readonly exactMax?: number;
+  readonly runs?: number;
+  readonly seed?: number | string;
+}
+
+### build/index.d.ts#SignFlipResult
+interface SignFlipResult {
+  readonly observed: number;
+  readonly p: number;
+  readonly exact: boolean;
+  readonly runs: number;
 }
 
 ### build/index.d.ts#SmoothLaw
@@ -947,6 +974,9 @@ export declare function bootstrapMedian(values: readonly number[], options?: Boo
 ### build/index.d.ts#bootstrapMedianRatio
 export declare function bootstrapMedianRatio(numerator: readonly number[], denominator: readonly number[], options?: BootstrapOptions): Interval;
 
+### build/index.d.ts#bootstrapStrata
+export declare function bootstrapStrata<T>(strata: readonly (readonly T[])[], statistic: (samples: readonly (readonly T[])[]) => number, options?: BootstrapOptions): Interval;
+
 ### build/index.d.ts#bootstrapTwo
 export declare function bootstrapTwo<A, B>(a: readonly A[], b: readonly B[], statistic: (a: readonly A[], b: readonly B[]) => number, options?: BootstrapOptions): Interval;
 
@@ -1071,6 +1101,9 @@ export declare function sampleTotalInterval(values: readonly number[], options: 
 
 ### build/index.d.ts#sd
 export declare function sd(values: readonly number[]): number;
+
+### build/index.d.ts#signFlipTest
+export declare function signFlipTest(terms: readonly number[], options?: SignFlipOptions): SignFlipResult;
 
 ### build/index.d.ts#signTest
 export declare function signTest(better: number, worse: number, sides?: 1 | 2): number;
