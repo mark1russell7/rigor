@@ -83,7 +83,7 @@ function reversed(v: unknown): unknown {
 
 describe("canonicalJson", () => {
   it("gives the output of the example of RFC 8785, section 3.2.2", () => {
-    const input = JSON.parse(String.raw`{"numbers":[333333333.33333329,1E30,4.50,2e-3,0.000000000000000000000000001],"string":"€$\u000F\u000aA'B"\\\\"\/","literals":[null,true,false]}`);
+    const input = JSON.parse(String.raw`{"numbers":[333333333.33333329,1E30,4.50,2e-3,0.000000000000000000000000001],"string":"€$\u000F\u000aA'B\"\\\\\"\/","literals":[null,true,false]}`);
     expect(canonicalJson(input)).toBe(String.raw`{"literals":[null,true,false],"numbers":[333333333.3333333,1e+30,4.5,0.002,1e-27],"string":"€$\u000f\nA'B\"\\\\\"/"}`);
   });
 
