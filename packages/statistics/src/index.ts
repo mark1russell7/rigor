@@ -121,6 +121,7 @@ export {
   noiseVerdict,
 } from "./compare.ts";
 export { type OptionFloorOptions, optionFloor, tQuantile } from "./power.ts";
+export { normalCdf, normalQuantile } from "./normal.ts";
 export {
   type CoverageBar,
   type CoverageCell,

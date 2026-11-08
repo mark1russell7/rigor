@@ -149,6 +149,8 @@ modeCount: build/index.d.ts#modeCount
 negativeBinomialInterval: build/index.d.ts#negativeBinomialInterval
 noiseFloor: build/index.d.ts#noiseFloor
 noiseVerdict: build/index.d.ts#noiseVerdict
+normalCdf: build/index.d.ts#normalCdf
+normalQuantile: build/index.d.ts#normalQuantile
 optionFloor: build/index.d.ts#optionFloor
 pairProbabilities: build/index.d.ts#pairProbabilities
 pairedPermutation: build/index.d.ts#pairedPermutation
@@ -1053,6 +1055,12 @@ export declare function noiseFloor(values: readonly number[], options?: NoiseOpt
 export declare function noiseVerdict(values: readonly number[], options?: NoiseOptions & {
   readonly better?: "higher" | "lower";
 }): NoiseVerdict;
+
+### build/index.d.ts#normalCdf
+export declare function normalCdf(x: number): number;
+
+### build/index.d.ts#normalQuantile
+export declare function normalQuantile(p: number): number;
 
 ### build/index.d.ts#optionFloor
 export declare function optionFloor(options: OptionFloorOptions): number;
