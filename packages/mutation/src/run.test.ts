@@ -113,6 +113,20 @@ describe("rigor-mutation", () => {
     expect(run("list")).toBe(0);
   });
 
+  // rigor#137: parts that cut one file by line ranges cover it when the ranges cover each line of the file.
+  it("takes parts that cut a file by line ranges, and names the lines in no part", () => {
+    const lane = (to: number) => ({ packages: { lib: { dir: "packages/lib", mutate: ["src/**/*.ts", "!src/**/*.test.ts"], parts: { core: ["src/core/**/*.ts", "src/a.ts:1-1"], rest: [`src/a.ts:2-${String(to)}`] } } } });
+    put("mutation.json", JSON.stringify(lane(2)));
+    expect(run("list", "--runs")).toBe(0);
+    expect(out).toBe("lib.core\nlib.rest\n");
+    put("packages/lib/src/a.ts", "// a\nexport const a = 1;\nexport const b = 2;\n");
+    expect(() => run("list", "--runs")).toThrow(/lib: the lines 3-3 of src\/a\.ts are in no part/);
+    put("mutation.json", JSON.stringify(lane(3)));
+    put("changed.txt", "packages/lib/src/a.ts\n");
+    expect(run("config", "lib.rest", "--changed", "changed.txt", "--out", "tmp/s.json")).toBe(0);
+    expect(JSON.parse(readFileSync(join(root, "tmp/s.json"), "utf8"))).toMatchObject({ mutate: ["src/a.ts:2-3"] });
+  });
+
   it("gives only the runs with a changed file, and a config that mutates only the changed files", () => {
     put("changed.txt", "packages/lib/src/core/c.ts\nREADME.md\n\n");
     expect(run("list", "--runs", "--changed", "changed.txt")).toBe(0);

@@ -39,6 +39,7 @@ The lane file `mutation.json` is at the root of the repository:
 - `mutate` has the globs of the files to mutate, from `dir`. A glob with `!` removes the files of the globs before it.
 - `gate` is the lowest score in percent that passes. Without a gate, the lane only reports the score.
 - `parts` divides a big package. A part has its own globs, and the `!` globs of `mutate` also apply to it. Each file of `mutate` must be in exactly one part.
+- A glob with the suffix `:<from>-<to>` gives only those lines of its files, as Stryker reads it. Thus parts can cut one big file: `"a": ["src/module.ts:1-300"]` and `"b": ["src/module.ts:301-600"]`. The ranges of the parts must cover each line of the file one time.
 - `vitestConfig` names the Vitest config of the package, from `dir`. Without it, Vitest finds its config.
 - `timeoutMS` is the time in milliseconds that the clock adds to the time of the tests for each mutant. The default is 120000. The default of Stryker (5000) is too short on a loaded CI runner.
 - `dryRunTimeoutMinutes` is the time in minutes for the run of the tests without mutants. The default is 15.
@@ -47,7 +48,7 @@ The lane file `mutation.json` is at the root of the repository:
 
 A selection is one Stryker run: a package (`collections`) or a part (`collections.impl`). `rigor-mutation list --runs` gives the selections of a full run: the parts of each package with parts, else the package.
 
-A full run mutates only the files of the parts. Thus a file in no part has no score, and a file in two parts has two scores. `list --runs`, and `config` and `scores` of a part, examine the source files of the package. They fail and name each file that is in no part, in two parts, or in a part but not in `mutate`. In the example, a file `src/util.ts` is in no part, so the lane fails.
+A full run mutates only the files of the parts. Thus a file in no part has no score, and a file in two parts has two scores. `list --runs`, and `config` and `scores` of a part, examine the source files of the package. They fail and name each file that is in no part, in two parts, or in a part but not in `mutate`. For a file in line ranges, they name each gap and each overlap of the ranges, and the lines after the last range. In the example, a file `src/util.ts` is in no part, so the lane fails.
 
 ## A run
 

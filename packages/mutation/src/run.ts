@@ -121,13 +121,16 @@ function typescriptMajor(dir: string): number | undefined {
  *
  * @throws Error with each file that is in no part, in more than one part, or in a part and not in `mutate`
  */
+/** This function gives the number of lines of a text. A last line break does not start a line. */
+const lineCount = (text: string): number => (text === "" ? 0 : text.split("\n").length - (text.endsWith("\n") ? 1 : 0));
+
 function checkParts(lane: Lane, laneDir: string, pkgs: readonly string[]): void {
   const errors = pkgs.flatMap((pkg) => {
     const p = lane.packages[pkg];
     if (p?.parts === undefined) return [];
     const dir = resolve(laneDir, p.dir);
     if (!existsSync(dir)) return [`${pkg}: the folder ${p.dir} does not exist`];
-    return partErrors(lane, pkg, sourcesOf(dir, dir));
+    return partErrors(lane, pkg, sourcesOf(dir, dir), (file) => lineCount(readFileSync(resolve(dir, file), "utf8")));
   });
   if (errors.length > 0) throw new Error(`the parts do not cover each file exactly one time:\n  ${errors.join("\n  ")}`);
 }
