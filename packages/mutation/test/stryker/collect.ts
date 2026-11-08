@@ -1,7 +1,8 @@
-// Real runs of load-check --collect on the fixture package of parts.json. The clean package passes, and the runner
-// file names its Vitest. Then each fault in a test file gives exit code 1, the name of the file and its reason.
+// Real runs of load-check --collect on the fixture package of parts.json. The clean package passes, each part starts
+// its test file, and the runner file names its Vitest. Then each fault in a test file gives exit code 1, the name of
+// the file and its reason.
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,7 +36,10 @@ const check = (): { status: number | null; text: string } => {
 
 const clean = check();
 if (clean.status !== 0) fail(`load-check --collect on the clean package exited with ${String(clean.status)}, not 0.`);
-if (!/^load-check two: Vitest \S+ loads 2 test files$/m.test(clean.text)) fail("load-check --collect did not load the 2 test files of the package.");
+if (!/^load-check two: Vitest \S+ loads 2 test files in a copy of parts, and the selections start each one$/m.test(clean.text)) {
+  fail("load-check --collect did not load the 2 test files of the package in a copy, or a part did not start its test file.");
+}
+if (existsSync(join(here, "parts", ".stryker-tmp"))) fail("load-check --collect did not remove its copy of the folder.");
 const runners = JSON.parse(readFileSync(runner, "utf8")) as Record<string, { version?: string; path?: string }>;
 const two = runners["two"];
 if (typeof two?.version !== "string" || !two.path?.endsWith("/dist/node.js")) fail(`the runner file does not name the Vitest of the package: ${JSON.stringify(runners)}`);
@@ -50,9 +54,17 @@ const faults: { name: string; files: Record<string, string>; expect: string[] }[
   },
   { name: "a test file with no test", files: { "flip.test.ts": "export {};\n" }, expect: ["flip.test.ts: the file holds no test"] },
   {
-    name: "a dynamic import by a computed path",
-    files: { "flip.test.ts": `const name = ["rigor-mutation", "missing", "package"].join("-");\nawait import(name);\n${TEST}` },
-    expect: ["flip.test.ts: the file does not load", MISSING],
+    // The file loads, but the related mode does not follow the import, so no part starts it.
+    name: "a dynamic import of a module of the package by a computed path",
+    files: { "flip.test.ts": `import { expect, it } from "vitest";\nconst { add } = (await import(["./add", "ts"].join("."))) as { add: (a: number, b: number) => number };\nit("adds", () => {\n  expect(add(1, 2)).toBe(3);\n});\n` },
+    expect: ["src/flip.test.ts:2: a dynamic import with a computed path", "src/flip.test.ts: no selection starts the file"],
+  },
+  { name: "a test file that loads no file of a part", files: { "flip.test.ts": TEST }, expect: ["src/flip.test.ts: no selection starts the file"] },
+  {
+    // The path finds parts.json from the folder of the package, but not from the copy. The static check does not read a computed path.
+    name: "a path that finds a file only in the folder of the package",
+    files: { "flip.test.ts": `await import(["..", "..", "parts.json"].join("/"));\n${TEST}` },
+    expect: ["flip.test.ts: the file does not load", "parts.json"],
   },
 ];
 
@@ -71,4 +83,4 @@ for (const fault of faults) {
   console.log(`${fault.name}: exit code 1, with the file and the reason.`);
 }
 rmSync(out, { recursive: true, force: true });
-console.log("load-check --collect passes the clean package, and fails each test file that does not load or holds no test.");
+console.log("load-check --collect passes the clean package. It fails each test file that does not load in the copy, holds no test or that no part starts.");

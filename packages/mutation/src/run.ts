@@ -2,18 +2,18 @@
  * The CLI `rigor-mutation`. The work is in `runCli`, so a test can start the CLI in a fixture folder.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, appendFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync, appendFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { REPORT_DIR, rewritesTsconfig, strykerConfig } from "./config.ts";
 import { compareDisables, findDisables, type Disable } from "./disables.ts";
-import { collectFaults, leavingPaths, relatedTestFiles, type Collected } from "./load.ts";
+import { collectFaults, computedImports, leavingPaths, relatedTestFiles, type Collected, type CollectRequest, type PackageFile } from "./load.ts";
 import { changedFiles, globsSelect, MAX_TEST_FALL, parseLane, partErrors, runSelections, select, selectionNames, type Lane, type Selection } from "./lane.ts";
 import { PARTIAL_FILE } from "./reporter.ts";
-import { failScore, formatScore, packageScore, parsePartial, parseReport, partialScore, scoreReport, summaryMarkdown, testFall, testFileFaults, unreadTestFiles, type MutationReport, type Score } from "./score.ts";
+import { failScore, formatScore, packageScore, parsePartial, parseReport, readFaults, partialScore, scoreReport, summaryMarkdown, testFall, testFileFaults, unreadTestFiles, type MutationReport, type Score } from "./score.ts";
 
 /** The input and the output of the CLI. */
 export interface CliIo {
@@ -57,9 +57,11 @@ export const HELP: string = `rigor-mutation: the mutation tests of a repository,
                                                Stryker starts the tests in a copy of the folder, so such a
                                                path finds no file. No selection checks each package.
                                                With --collect, the Vitest of each package also loads each
-                                               test file, and a file that does not load or has no test
-                                               fails. With --runner, the version and the path of each
-                                               Vitest go in the file, as JSON.
+                                               test file in a copy of the folder, as Stryker does. A file
+                                               that does not load, has no test or that no selection
+                                               starts fails, and so does a computed dynamic import that
+                                               "computedImports" does not name. With --runner, the
+                                               version and the path of each Vitest go in the file.
 
   --lane <file>      the lane file. The default is mutation.json.
   --changed <file>   a file with one changed path on each line, from the folder of the lane file,
@@ -93,16 +95,46 @@ function sourcesOf(root: string, dir: string, tests = false): string[] {
 /** The script of `load-check --collect`. It is beside this file, in the source and in the build. */
 const COLLECT_SCRIPT = fileURLToPath(new URL(import.meta.url.endsWith(".ts") ? "./collect.ts" : "./collect.js", import.meta.url));
 
+// The entries of the folder of a package that the copy does not take. Stryker leaves them out of its sandbox too.
+const NOT_COPIED = new Set(["node_modules", ".git", ".stryker-tmp", "reports"]);
+
 /**
- * This function starts the collect of Vitest in the folder `dir`, in a new process. It gives the collect, or the reason
- * when the process gives no collect.
+ * This function copies the folder of a package to `<dir>/.stryker-tmp/load-check-*`, as Stryker copies it to its sandbox,
+ * and links its `node_modules`. A path that finds a file only in the folder of the package then fails in the copy too.
  */
-function collectIn(dir: string, vitestConfig: string | undefined): Collected | string {
+function copyOfFolder(dir: string): string {
+  const base = join(dir, ".stryker-tmp");
+  mkdirSync(base, { recursive: true });
+  const copy = mkdtempSync(join(base, "load-check-"));
+  for (const name of readdirSync(dir)) {
+    if (NOT_COPIED.has(name)) continue;
+    cpSync(join(dir, name), join(copy, name), { recursive: true, filter: (from) => basename(from) !== "node_modules" });
+  }
+  if (existsSync(join(dir, "node_modules"))) symlinkSync(join(dir, "node_modules"), join(copy, "node_modules"), "junction");
+  return copy;
+}
+
+/** This function removes a copy of `copyOfFolder`, and its folder `.stryker-tmp` when nothing else is in it. */
+function removeCopy(copy: string): void {
+  rmSync(copy, { recursive: true, force: true });
+  const base = dirname(copy);
+  if (readdirSync(base).length === 0) rmSync(base, { recursive: true, force: true });
+}
+
+/**
+ * This function starts the collect of Vitest in a copy of the folder `dir`, in a new process. It gives the collect, or
+ * the reason when the process gives no collect.
+ *
+ * @param selections - the mutated files of each selection, from `dir`
+ */
+function collectIn(dir: string, vitestConfig: string | undefined, selections: Readonly<Record<string, readonly string[]>>): Collected | string {
   const tmp = mkdtempSync(join(tmpdir(), "rigor-mutation-collect-"));
+  const copy = copyOfFolder(dir);
   try {
     const out = join(tmp, "collected.json");
-    const args = [COLLECT_SCRIPT, dir, out, ...(vitestConfig === undefined ? [] : [vitestConfig])];
-    const r = spawnSync(process.execPath, args, { cwd: dir, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+    const request: CollectRequest = { dir: copy, ...(vitestConfig === undefined ? {} : { config: vitestConfig }), selections };
+    writeFileSync(join(tmp, "request.json"), JSON.stringify(request));
+    const r = spawnSync(process.execPath, [COLLECT_SCRIPT, join(tmp, "request.json"), out], { cwd: copy, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
     // Vitest sets the exit code 1 for a file that does not load, so the file of the collect decides, not the code.
     if (!existsSync(out)) {
       const why = (r.error?.message ?? `${r.stdout}${r.stderr}`).trim().split("\n").slice(-5).join(" ");
@@ -111,6 +143,7 @@ function collectIn(dir: string, vitestConfig: string | undefined): Collected | s
     return JSON.parse(readFileSync(out, "utf8")) as Collected;
   } finally {
     rmSync(tmp, { recursive: true, force: true });
+    removeCopy(copy);
   }
 }
 
@@ -120,6 +153,36 @@ interface LoadCheckOptions {
   readonly collect: boolean;
   /** The file for the version and the path of the Vitest of each package (`--runner`). */
   readonly runner: string | undefined;
+}
+
+/**
+ * This function gives the faults of the collect of a package (`load-check --collect`). A test file that does not load
+ * is a fault. A test file that no selection starts is a fault (LANE.FILES). A computed dynamic import that the lane
+ * does not name is a fault.
+ */
+function collectCheck(lane: Lane, laneDir: string, pkg: string, files: readonly PackageFile[]): { readonly faults: string[]; readonly collected: Collected | undefined } {
+  const p = lane.packages[pkg];
+  if (p === undefined) return { faults: [], collected: undefined };
+  const own = runSelections(lane).map((n) => select(lane, n)).filter((s) => s.pkg === pkg);
+  const sources = files.map((f) => f.file).filter((f) => !TEST.test(f));
+  const mutated = Object.fromEntries(own.map((s) => [s.name, sources.filter((f) => globsSelect(s.mutate, f))]));
+  const collected = collectIn(resolve(laneDir, p.dir), p.vitestConfig, mutated);
+  const computed = computedImports(files, p.vitestConfig);
+  const allowed = p.computedImports ?? {};
+  const faults = [
+    ...computed.filter((c) => allowed[c.file] === undefined).map((c) => `${c.file}:${String(c.line)}: a dynamic import with a computed path. The related mode of Vitest does not follow it, so a test file that reaches the mutated files only through it starts in no selection. Import the file by its path, or give the reason in "computedImports"`),
+    ...Object.keys(allowed).filter((f) => !computed.some((c) => c.file === f)).map((f) => `"computedImports" is not true: ${f} has no dynamic import with a computed path that the run loads`),
+  ];
+  if (typeof collected === "string") return { faults: [collected, ...faults], collected: undefined };
+  const onDisk = files.map((f) => f.file).filter((f) => TEST.test(f));
+  const started = new Set(own.flatMap((s) => (runsAllTests(s) ? onDisk : (collected.selections[s.name] ?? []))));
+  const { unread, stale } = readFaults(started, onDisk, p.notRead);
+  faults.push(
+    ...collectFaults(collected),
+    ...unread.map((f) => `${f}: no selection starts the file, and "notRead" does not give its reason`),
+    ...stale.map((f) => `"notRead" is not true: ${f} is not on the disk, or a selection starts it`),
+  );
+  return { faults, collected };
 }
 
 /** This function checks the relative paths of the package of each selection, and with `--collect`, the load of each test file (`load-check`). */
@@ -144,12 +207,11 @@ function loadCheck(lane: Lane, laneDir: string, names: readonly string[], io: Cl
 `);
     else failed += 1;
     if (!options.collect) continue;
-    const collected = collectIn(dir, s.vitestConfig);
-    const faults = typeof collected === "string" ? [collected] : collectFaults(collected);
+    const { faults, collected } = collectCheck(lane, laneDir, pkg, files);
     for (const fault of faults) io.stderr(`${s.dir}: ${fault}\n`);
-    if (typeof collected !== "string") {
+    if (collected !== undefined) {
       runners[pkg] = { version: collected.version, path: collected.path };
-      if (faults.length === 0) io.stdout(`load-check ${pkg}: Vitest ${collected.version} loads ${String(collected.files.length)} test files\n`);
+      if (faults.length === 0) io.stdout(`load-check ${pkg}: Vitest ${collected.version} loads ${String(collected.files.length)} test files in a copy of ${s.dir}, and the selections start each one\n`);
     }
     if (faults.length > 0) unread += 1;
   }
@@ -160,7 +222,7 @@ function loadCheck(lane: Lane, laneDir: string, names: readonly string[], io: Cl
   }
   if (failed > 0) io.stderr(`load-check: ${String(failed)} packages have a relative path that leaves their folder. Import the file from its package, or move it into the folder.
 `);
-  if (unread > 0) io.stderr(`No read: ${String(unread)} packages have a test file that Vitest does not load, or that holds no test. A mutant that only this file detects survives, so a score of the package is not a reading.
+  if (unread > 0) io.stderr(`No read: ${String(unread)} packages have a test file that Vitest does not load, that holds no test, or that no selection starts. A mutant that only this file detects survives, so a score of the package is not a reading.
 `);
   return failed > 0 || unread > 0 ? 1 : 0;
 }

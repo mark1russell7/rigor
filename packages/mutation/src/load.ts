@@ -79,14 +79,25 @@ function target(file: string, path: string, known: ReadonlySet<string>): string 
  * @param vitestConfig - the field `vitestConfig` of the lane
  */
 export function leavingPaths(files: readonly PackageFile[], vitestConfig?: string): LeavingPath[] {
+  return loadWalk(files, vitestConfig).leaving.toSorted(byPlace);
+}
+
+/** This function orders places by file, then by line. */
+function byPlace(a: { readonly file: string; readonly line: number }, b: { readonly file: string; readonly line: number }): number {
+  if (a.file === b.file) return a.line - b.line;
+  return a.file < b.file ? -1 : 1;
+}
+
+/** This function walks the files that the run loads, from the test files and the config files. It gives them and the paths that leave the folder. */
+function loadWalk(files: readonly PackageFile[], vitestConfig: string | undefined): { readonly loaded: ReadonlySet<string>; readonly leaving: LeavingPath[] } {
   const texts = new Map(files.map((f) => [f.file, f.text]));
   const known = new Set(texts.keys());
   const queue = files.map((f) => f.file).filter((f) => TEST.test(f) || isConfigFile(f, vitestConfig));
   const loaded = new Set(queue);
-  const found: LeavingPath[] = [];
+  const leaving: LeavingPath[] = [];
   for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
     for (const { line, path } of pathsOf(next, texts.get(next) ?? "", vitestConfig)) {
-      if (leaves(next, path)) found.push({ file: next, line, path });
+      if (leaves(next, path)) leaving.push({ file: next, line, path });
       else {
         const t = target(next, path, known);
         if (t !== undefined && !loaded.has(t)) {
@@ -96,7 +107,34 @@ export function leavingPaths(files: readonly PackageFile[], vitestConfig?: strin
       }
     }
   }
-  return found.toSorted((a, b) => (a.file === b.file ? a.line - b.line : a.file < b.file ? -1 : 1));
+  return { loaded, leaving };
+}
+
+// A dynamic import whose path is not one string: a name, a call, or a template with an expression.
+const COMPUTED_IMPORT = /\bimport\s*\(\s*(?!(["'])[^"'`\r\n]*\1|`[^`$\r\n]*`)/;
+
+/** A dynamic import with a computed path in a file that the run loads. */
+export interface ComputedImport {
+  /** The file, from the folder of the package, with `/`. */
+  readonly file: string;
+  /** The line of the import, from 1. */
+  readonly line: number;
+}
+
+/**
+ * This function gives each dynamic import with a computed path in the files that the run loads. The related walk of
+ * Vitest does not follow this type of import. So no selection starts a test file that reaches the mutated files only through
+ * it, and each mutant of these files survives. The function does not read comments and config files.
+ *
+ * @param files - the files of the package, from its folder
+ * @param vitestConfig - the field `vitestConfig` of the lane
+ */
+export function computedImports(files: readonly PackageFile[], vitestConfig?: string): ComputedImport[] {
+  const { loaded } = loadWalk(files, vitestConfig);
+  return files
+    .filter((f) => loaded.has(f.file) && !isConfigFile(f.file, vitestConfig))
+    .flatMap((f) => f.text.split("\n").flatMap((lineText, i) => (COMMENT.test(lineText) || !COMPUTED_IMPORT.test(lineText) ? [] : [{ file: f.file, line: i + 1 }])))
+    .toSorted(byPlace);
 }
 
 // A type import or export to its semicolon, also on more than one line. The test runner removes it.
@@ -159,6 +197,18 @@ export interface Collected {
   readonly files: readonly CollectedFile[];
   /** The messages of the errors outside a test file. */
   readonly unhandled: readonly string[];
+  /** The test files that the related mode of Vitest starts for each selection, by the name of the selection. */
+  readonly selections: Readonly<Record<string, readonly string[]>>;
+}
+
+/** The request of the collect script: the folder, the config, and the mutated files of each selection. */
+export interface CollectRequest {
+  /** The folder where Vitest collects: the copy of the folder of the package. */
+  readonly dir: string;
+  /** The config of Vitest, from `dir`. */
+  readonly config?: string;
+  /** The mutated files of each selection, from `dir`, by the name of the selection. */
+  readonly selections: Readonly<Record<string, readonly string[]>>;
 }
 
 /**

@@ -156,12 +156,21 @@ packages/compiler/src/module-sheet.test.ts:12: "../../testkit/src/fc-timeout.ts"
 
 The check does not read comments, type imports and paths with a template expression.
 
-With `--collect`, the Vitest of each package also loads each test file, as Stryker does. It starts the collect of Vitest in a new process, with `staticParse: false`. Then each file starts, so the check finds a missing package, also through a helper or a computed dynamic import. These are faults:
+With `--collect`, the Vitest of each package also loads each test file, as Stryker does. The check copies the folder of the package to `.stryker-tmp/load-check-*` in that folder, and links its `node_modules`. Stryker makes its sandbox in the same form. The collect of Vitest starts in the copy, in a new process, with `staticParse: false`. Then each file starts, so the check finds a missing package, also through a helper. A path that finds a file only in the folder of the package fails in the copy too. Then for each selection of the package, Vitest gives the test files that its related mode starts for the mutated files. These are faults:
 
 - a test file that does not load,
 - a test file that holds no test,
 - an error outside a test file,
-- a package with no test file.
+- a package with no test file,
+- a test file that no selection starts, and that `notRead` does not name,
+- an entry of `notRead` for a file that is not on the disk, or that a selection starts,
+- a dynamic import with a computed path in a file that the run loads, unless `computedImports` of the package names the file with a reason.
+
+The related mode does not follow a computed import. A test file that reaches the mutated files only through this import thus starts in no selection, and each mutant that it detects survives.
+
+```json
+{ "computedImports": { "src/load-all.test.ts": "it imports each module of src/ops, and ops.test.ts tests each module" } }
+```
 
 On a fault, the check fails with a line that starts with `No read`. A score of that package is not a reading.
 
