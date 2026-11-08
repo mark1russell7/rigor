@@ -61,7 +61,8 @@ describe("eloUpdate", () => {
       fc.property(fc.double({ min: 0, max: 3000, noNaN: true }), fc.double({ min: 0, max: 3000, noNaN: true }), fc.constantFrom(0, 0.5, 1), (ra, rb, s) => {
         const u = eloUpdate(ra, rb, s, { k: 24 });
         expect(u.a + u.b).toBeCloseTo(ra + rb, 8);
-        expect(Math.sign(u.a - ra)).toBe(Math.sign(s - u.expected));
+        // A score above the expected score never lowers the rating, and one below never raises it. The move can round to 0: at a rating near 3000, k times a gap of 1e-16 is lost.
+        expect((u.a - ra) * Math.sign(s - u.expected)).toBeGreaterThanOrEqual(0);
       }),
     );
     const e = eloExpected(1700, 1500);
