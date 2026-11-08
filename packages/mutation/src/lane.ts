@@ -22,6 +22,11 @@ export interface PackageLane {
   readonly parts?: Readonly<Record<string, readonly string[]>>;
   /** This field gives the lowest mutation score in percent that passes. Without a gate, the lane only reports the score. */
   readonly gate?: number;
+  /**
+   * This field tells what the gate of a package with parts reads. With `part`, the default, each part must have a score
+   * at the gate. With `package`, the sum of the mutants of the parts must have a score at the gate.
+   */
+  readonly gateOver?: "part" | "package";
   /** This field gives the Vitest config file, from `dir`. Without it, Vitest finds its config in `dir`. */
   readonly vitestConfig?: string;
   /**
@@ -94,6 +99,9 @@ function packageErrors(name: string, p: unknown): string[] {
   if (!isGlobs(p["mutate"])) errors.push(`${name}: "mutate" is not a list of globs`);
   else if (p["mutate"].every((g) => g.startsWith("!"))) errors.push(`${name}: "mutate" has only "!" globs`);
   const gate = p["gate"];
+  const gateOver = p["gateOver"];
+  if (gateOver !== undefined && gateOver !== "part" && gateOver !== "package") errors.push(`${name}: "gateOver" is not "part" or "package"`);
+  else if (gateOver === "package" && p["parts"] === undefined) errors.push(`${name}: "gateOver" is "package", but the package has no parts`);
   if (gate !== undefined && (typeof gate !== "number" || !(gate >= 0 && gate <= 100))) errors.push(`${name}: "gate" is not a percent from 0 to 100`);
   if (p["vitestConfig"] !== undefined && typeof p["vitestConfig"] !== "string") errors.push(`${name}: "vitestConfig" is not a file name`);
   for (const field of ["timeoutMS", "dryRunTimeoutMinutes"]) {
@@ -216,17 +224,28 @@ function coverOf(globs: readonly string[], file: string): "all" | LineRange[] {
   return adds.flatMap((g) => rangeOf(g) ?? []);
 }
 
+/** A test file and its source file of the same name: `src/a.test.ts` tests `src/a.ts`. */
+const TEST_FILE = /^(.+)\.(?:test|spec)(\.[^./]+)$/;
+
 /**
  * This function gives the changed files of a selection, from the folder of its package. The globs of the selection
  * select the files. A file that the selection takes in line ranges gives one entry for each range, `src/a.ts:1-300`.
+ * A changed test file gives its source file of the same name, when the selection takes it and `exists` finds it.
  *
  * @param changed - the changed paths, from the folder of the lane file, with `/`
+ * @param exists - this function tells if a file, from the folder of the package, exists. The default finds each file.
  */
-export function changedFiles(selection: Selection, changed: readonly string[]): string[] {
+export function changedFiles(selection: Selection, changed: readonly string[], exists: (file: string) => boolean = () => true): string[] {
   const dir = posix.normalize(selection.dir.replaceAll("\\", "/"));
-  return changed
+  const sourceOf = (f: string): string | undefined => {
+    if (globsSelect(selection.mutate, f)) return f;
+    const source = f.replace(TEST_FILE, "$1$2");
+    return source !== f && globsSelect(selection.mutate, source) && exists(source) ? source : undefined;
+  };
+  const files = changed
     .map((f) => posix.relative(dir, posix.normalize(f.replaceAll("\\", "/"))))
-    .filter((f) => f !== "" && !f.startsWith("../") && !posix.isAbsolute(f) && globsSelect(selection.mutate, f))
+    .flatMap((f) => (f === "" || f.startsWith("../") || posix.isAbsolute(f) ? [] : (sourceOf(f) ?? [])));
+  return [...new Set(files)]
     .flatMap((f) => {
       const cover = coverOf(selection.mutate, f);
       return cover === "all" ? [f] : cover.map((r) => `${f}${r.entry.slice(r.glob.length)}`);

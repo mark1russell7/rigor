@@ -77,7 +77,7 @@ A run of mutation tests is long and it uses much memory. Start it in CI, and on 
 Two options make a run shorter:
 
 - `config --dry-run` gives a config that starts only the tests without mutants. Stryker does not stop at the first failed test. Use it to see if the tests pass under Stryker before a long run.
-- `--changed <file>` reads a file with one changed path on each line, from the folder of the lane file. Make the file with `git diff --name-only`. Then `list --runs` gives only the runs with a changed file, and `config` mutates only the changed files of the selection. `config` fails for a selection with no changed file.
+- `--changed <file>` reads a file with one changed path on each line, from the folder of the lane file. Make the file with `git diff --name-only`. Then `list --runs` gives only the runs with a changed file, and `config` mutates only the changed files of the selection. A changed test file, for example `src/a.test.ts`, selects its source file `src/a.ts` when the selection takes it. `config` fails for a selection with no changed file.
 
 ## The score
 
@@ -97,6 +97,11 @@ A selection fails in these conditions:
 - The selection has a gate, and the score is under it.
 
 The gate of a package with parts applies to each part. Each part must have a score at the gate or above it. A part under the gate fails, also when the score of all the parts together is above the gate.
+
+With `"gateOver": "package"`, the gate reads all the parts together. `scores` sums the mutants of the parts of the package, and gives one more line for the package. A part has no gate of its own, but a part that fails for another reason makes the package a no read.
+
+- Give `scores` all the parts in one command, so that the sum reads each part. `--reports <dir>` reads `<dir>/mutation-<selection>/mutation.json` for each selection.
+- A run of the changed files can have some of the parts only. Then the line of the package names the parts that it reads.
 
 ## The tests that a run read
 

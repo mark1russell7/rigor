@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { failScore, formatScore, parseReport, scoreReport, summaryMarkdown, testCount, testFall, unreadTestFiles, type MutationReport } from "./score.ts";
+import { failScore, formatScore, packageScore, parseReport, scoreReport, summaryMarkdown, testCount, testFall, unreadTestFiles, type MutationReport } from "./score.ts";
 
 const mutant = (status: string, line: number) =>
   status === "HitLimit"
@@ -66,6 +66,30 @@ describe("scoreReport", () => {
     const md = summaryMarkdown([scoreReport(report("Killed"), { name: "a", gate: 90 }), scoreReport(report("Survived", "Killed"), { name: "b", gate: undefined })]);
     expect(md).toContain("| a | 100.00 % | 1 | 1 | 0 | 0 | 100.00 % | 90 % | pass |");
     expect(md).toContain("| b | 50.00 % | 1 | 2 | 1 | 0 | 50.00 % | none | pass |");
+  });
+});
+
+// The MUTATIONREVIEW of Vex, item 4: a gate of 95 % over the sum of the parts of a package.
+describe("packageScore", () => {
+  const part = (name: string, killed: number, survived: number) =>
+    scoreReport(report(...Array<string>(killed).fill("Killed"), ...Array<string>(survived).fill("Survived")), { name, gate: undefined });
+
+  it("sums the mutants of the parts and applies the gate of the package to the sum", () => {
+    const s = packageScore("p", 95, [part("p.a", 100, 0), part("p.b", 92, 8)]);
+    expect(s).toMatchObject({ name: "p", gate: 95, detected: 192, valid: 200, percent: 96, pass: true, outcome: "pass" });
+    expect(s.survived).toHaveLength(8);
+    expect(formatScore(s)).toBe("p: 96.00 % (192 of 200, 8 survived), gate 95 %: pass");
+    expect(packageScore("p", 97, [part("p.a", 100, 0), part("p.b", 92, 8)])).toMatchObject({
+      pass: false,
+      outcome: "block",
+      reason: "the score 96.00 % of all the parts is under the gate 97 %",
+    });
+  });
+
+  it("is a no read when a part fails, or with no parts", () => {
+    const none = scoreReport(report("Survived"), { name: "p.b", gate: undefined });
+    expect(packageScore("p", 50, [part("p.a", 9, 1), none])).toMatchObject({ pass: false, outcome: "no read", reason: "the parts p.b fail, so the sum of the parts has no meaning" });
+    expect(packageScore("p", 50, [])).toMatchObject({ pass: false, outcome: "no read" });
   });
 });
 

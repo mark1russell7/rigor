@@ -9,7 +9,7 @@ import { REPORT_DIR, rewritesTsconfig, strykerConfig } from "./config.ts";
 import { compareDisables, findDisables, type Disable } from "./disables.ts";
 import { leavingPaths, relatedTestFiles } from "./load.ts";
 import { changedFiles, globsSelect, MAX_TEST_FALL, parseLane, partErrors, runSelections, select, selectionNames, type Lane, type Selection } from "./lane.ts";
-import { failScore, formatScore, parseReport, scoreReport, summaryMarkdown, testFall, unreadTestFiles, type MutationReport, type Score } from "./score.ts";
+import { failScore, formatScore, packageScore, parseReport, scoreReport, summaryMarkdown, testFall, unreadTestFiles, type MutationReport, type Score } from "./score.ts";
 
 /** The input and the output of the CLI. */
 export interface CliIo {
@@ -32,10 +32,12 @@ export const HELP: string = `rigor-mutation: the mutation tests of a repository,
                                                the Stryker config of a selection, as JSON. With --dry-run,
                                                Stryker starts only the tests. With --changed, it mutates only
                                                the changed files of the selection.
-  rigor-mutation scores <selection>... [--report <file>] [--summary <file>] [--last <file>]
-                       [--write-last <file>] [--test-files]
+  rigor-mutation scores <selection>... [--report <file> | --reports <dir>] [--summary <file>]
+                       [--last <file>] [--write-last <file>] [--test-files]
                                                the score of each selection, with its gate and its count
-                                               of tests. With --last, a fall of the count of more than
+                                               of tests. --reports reads <dir>/mutation-<selection>/mutation.json.
+                                               A package with "gateOver": "package" also gets
+                                               the score of its parts together. With --last, a fall of the count of more than
                                                maxTestFall % (default 20) against the file fails. With
                                                --write-last, the counts of the passed selections go in
                                                the file. With --test-files, a test file that the run
@@ -47,7 +49,8 @@ export const HELP: string = `rigor-mutation: the mutation tests of a repository,
 
   --lane <file>      the lane file. The default is mutation.json.
   --changed <file>   a file with one changed path on each line, from the folder of the lane file,
-                     for example the output of git diff --name-only.
+                     for example the output of git diff --name-only. A changed test file selects
+                     its source file of the same name.
 
 A selection is a package ("collections") or a part of a package ("collections.impl").
 Each file of a package with parts must be in exactly one part. list --runs, and config and scores
@@ -124,6 +127,12 @@ function typescriptMajor(dir: string): number | undefined {
 /** This function gives the number of lines of a text. A last line break does not start a line. */
 const lineCount = (text: string): number => (text === "" ? 0 : text.split("\n").length - (text.endsWith("\n") ? 1 : 0));
 
+/** This function tells if a file of the package of a selection, from its folder, exists. */
+const existsIn =
+  (laneDir: string, s: Selection) =>
+  (file: string): boolean =>
+    existsSync(resolve(laneDir, s.dir, file));
+
 function checkParts(lane: Lane, laneDir: string, pkgs: readonly string[]): void {
   const errors = pkgs.flatMap((pkg) => {
     const p = lane.packages[pkg];
@@ -172,6 +181,7 @@ function disables(lane: Lane, laneDir: string, write: boolean, io: CliIo): numbe
 /** The options of `scores`. */
 interface ScoresOptions {
   readonly report: string | undefined;
+  readonly reports: string | undefined;
   readonly summary: string | undefined;
   readonly last: string | undefined;
   readonly writeLast: string | undefined;
@@ -185,6 +195,7 @@ interface ScoresOptions {
 function scores(lane: Lane, laneDir: string, names: readonly string[], o: ScoresOptions, io: CliIo): number {
   if (names.length === 0) throw new Error(`"scores" takes one or more selections`);
   if (o.report !== undefined && names.length > 1) throw new Error(`--report takes one selection`);
+  if (o.report !== undefined && o.reports !== undefined) throw new Error(`"scores" takes --report or --reports, not both`);
   checkPartsOf(lane, laneDir, names);
   const lastFile = o.last === undefined ? undefined : resolve(io.cwd, o.last);
   const last = lastFile === undefined || !existsSync(lastFile) ? {} : readCounts(lastFile);
@@ -193,9 +204,18 @@ function scores(lane: Lane, laneDir: string, names: readonly string[], o: Scores
   const notes = new Map<string, string[]>(names.map((n) => [n, []]));
   const note = (name: string, line: string): void => void notes.get(name)?.push(line);
   const falls: PlannedFall[] = [];
+  // The gate of a package with "gateOver": "package" reads the sum of its parts, so a part has no gate of its own.
+  const byPackage = (s: Selection): boolean => s.name !== s.pkg && lane.packages[s.pkg]?.gateOver === "package";
   const results: Score[] = names.map((name) => {
-    const s = select(lane, name);
-    const file = o.report === undefined ? resolve(laneDir, s.dir, REPORT_DIR, "mutation.json") : resolve(io.cwd, o.report);
+    const all = select(lane, name);
+    const s = byPackage(all) ? { ...all, gate: undefined } : all;
+    if (s !== all) note(name, `  the gate of ${s.pkg} reads all its parts together`);
+    const file =
+      o.reports !== undefined
+        ? resolve(io.cwd, o.reports, `mutation-${name}`, "mutation.json")
+        : o.report === undefined
+          ? resolve(laneDir, s.dir, REPORT_DIR, "mutation.json")
+          : resolve(io.cwd, o.report);
     if (!existsSync(file)) {
       const reason = `the report ${relative(io.cwd, file)} does not exist`;
       return { name, gate: s.gate, detected: 0, hitLimit: 0, clockTimeouts: 0, valid: 0, survived: [], percent: 0, percentWithClock: 0, tests: undefined, pass: false, reason, outcome: "no read" };
@@ -219,7 +239,15 @@ function scores(lane: Lane, laneDir: string, names: readonly string[], o: Scores
     if (o.testFiles) score = checkTestFiles(lane, laneDir, s, report, score, (line) => note(name, line));
     return score;
   });
-  for (const s of results) {
+  const totals = [...new Set(names.map((n) => select(lane, n)).filter(byPackage).map((s) => s.pkg))].map((pkg) => {
+    const p = lane.packages[pkg];
+    const parts = results.filter((r) => select(lane, r.name).pkg === pkg && r.name !== pkg);
+    const count = Object.keys(p?.parts ?? {}).length;
+    notes.set(pkg, parts.length < count ? [`  the score reads ${String(parts.length)} of the ${String(count)} parts: ${parts.map((r) => r.name).join(", ")}`] : []);
+    return packageScore(pkg, p?.gate, parts);
+  });
+  const shown = [...results, ...totals];
+  for (const s of shown) {
     io.stdout(`${formatScore(s)}
 `);
     for (const line of notes.get(s.name) ?? []) io.stdout(`${line}
@@ -229,7 +257,7 @@ function scores(lane: Lane, laneDir: string, names: readonly string[], o: Scores
   }
   if (o.summary !== undefined) appendFileSync(resolve(io.cwd, o.summary), `### Mutation scores
 
-${summaryMarkdown(results)}
+${summaryMarkdown(shown)}
 `);
   if (o.writeLast !== undefined) {
     const out = resolve(io.cwd, o.writeLast);
@@ -239,9 +267,9 @@ ${summaryMarkdown(results)}
     writeFileSync(out, `${JSON.stringify(Object.fromEntries(Object.entries(counts).toSorted(([a], [b]) => (a < b ? -1 : 1))), null, 2)}
 `);
   }
-  if (io.env?.["GITHUB_ACTIONS"] === "true") for (const line of annotations(results, falls)) io.stdout(`${line}
+  if (io.env?.["GITHUB_ACTIONS"] === "true") for (const line of annotations(shown, falls)) io.stdout(`${line}
 `);
-  const failed = results.filter((s) => !s.pass).map((s) => s.name);
+  const failed = shown.filter((s) => !s.pass).map((s) => s.name);
   if (failed.length > 0) io.stderr(`The gate failed for ${failed.join(", ")}.
 `);
   return failed.length > 0 ? 1 : 0;
@@ -322,6 +350,7 @@ export function runCli(argv: readonly string[], io: CliIo): number {
       out: { type: "string" },
       concurrency: { type: "string" },
       report: { type: "string" },
+      reports: { type: "string" },
       summary: { type: "string" },
       write: { type: "boolean", default: false },
       runs: { type: "boolean", default: false },
@@ -357,7 +386,7 @@ export function runCli(argv: readonly string[], io: CliIo): number {
       if (values.runs) checkParts(lane, laneDir, Object.keys(lane.packages));
       if (changed !== undefined && !values.runs) throw new Error(`--changed of "list" takes --runs`);
       const runs = values.runs ? runSelections(lane) : selectionNames(lane);
-      const shown = changed === undefined ? runs : runs.filter((n) => changedFiles(select(lane, n), changed).length > 0);
+      const shown = changed === undefined ? runs : runs.filter((n) => changedFiles(select(lane, n), changed, existsIn(laneDir, select(lane, n))).length > 0);
       io.stdout(shown.length === 0 ? "" : `${shown.join("\n")}\n`);
       return 0;
     }
@@ -369,7 +398,7 @@ export function runCli(argv: readonly string[], io: CliIo): number {
       if (concurrency !== undefined && !(Number.isInteger(concurrency) && concurrency > 0)) throw new Error(`--concurrency is not a positive integer`);
       checkPartsOf(lane, laneDir, [one()]);
       const all = select(lane, one());
-      const files = changed === undefined ? undefined : changedFiles(all, changed);
+      const files = changed === undefined ? undefined : changedFiles(all, changed, existsIn(laneDir, all));
       if (files?.length === 0) throw new Error(`the selection ${all.name} has no changed file`);
       const selection = files === undefined ? all : { ...all, mutate: files };
       const tsconfigRewrite = rewritesTsconfig(typescriptMajor(resolve(laneDir, all.dir)));
@@ -383,7 +412,7 @@ export function runCli(argv: readonly string[], io: CliIo): number {
       return 0;
     }
     case "scores":
-      return scores(lane, laneDir, names, { report: values.report, summary: values.summary, last: values.last, writeLast: values["write-last"], testFiles: values["test-files"] }, io);
+      return scores(lane, laneDir, names, { report: values.report, reports: values.reports, summary: values.summary, last: values.last, writeLast: values["write-last"], testFiles: values["test-files"] }, io);
     case "disables":
       return disables(lane, laneDir, values.write, io);
     case "load-check":
