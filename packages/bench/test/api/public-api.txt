@@ -34,6 +34,7 @@ type CaseRead: build/index.d.ts#CaseRead
 type CaseResults: build/index.d.ts#CaseResults
 type CaseTail: build/index.d.ts#CaseTail
 type CaseTailLimit: build/index.d.ts#CaseTailLimit
+type CellBudget: build/index.d.ts#CellBudget
 type ChildPair: build/index.d.ts#ChildPair
 type ChildRecords: build/index.d.ts#ChildRecords
 type ChildSource: build/index.d.ts#ChildSource
@@ -43,6 +44,8 @@ type ControlFactors: build/index.d.ts#ControlFactors
 type ControlOptions: build/index.d.ts#ControlOptions
 type ControlRead: build/index.d.ts#ControlRead
 type ControlRow: build/index.d.ts#ControlRow
+type CostCells: build/index.d.ts#CostCells
+type CostProbe: build/index.d.ts#CostProbe
 type EntryCount: build/index.d.ts#EntryCount
 type FamilyCase: build/index.d.ts#FamilyCase
 type FamilyCount: build/index.d.ts#FamilyCount
@@ -74,6 +77,7 @@ type GrowthRound: build/index.d.ts#GrowthRound
 type GrowthStep: build/index.d.ts#GrowthStep
 type GrowthVerdict: build/index.d.ts#GrowthVerdict
 type GuardRead: build/index.d.ts#GuardRead
+type JobCost: build/index.d.ts#JobCost
 type JobEnv: build/index.d.ts#JobEnv
 type JobLimitVerdict: build/index.d.ts#JobLimitVerdict
 type JobModel: build/index.d.ts#JobModel
@@ -102,6 +106,7 @@ type MeasureRow: build/index.d.ts#MeasureRow
 type MeasureRule: build/index.d.ts#MeasureRule
 type MeasuredFactor: build/index.d.ts#MeasuredFactor
 type MedianBudget: build/index.d.ts#MedianBudget
+type ModelCost: build/index.d.ts#ModelCost
 type ModelLimits: build/index.d.ts#ModelLimits
 type ModelRead: build/index.d.ts#ModelRead
 type ModelRow: build/index.d.ts#ModelRow
@@ -137,6 +142,8 @@ type ResultVerdict: build/index.d.ts#ResultVerdict
 type Rounds: build/index.d.ts#Rounds
 type RoundsOptions: build/index.d.ts#RoundsOptions
 type RowRead: build/index.d.ts#RowRead
+type RunCost: build/index.d.ts#RunCost
+type RunCostOptions: build/index.d.ts#RunCostOptions
 type RunPairs: build/index.d.ts#RunPairs
 type Rung: build/index.d.ts#Rung
 type RungBudget: build/index.d.ts#RungBudget
@@ -202,6 +209,7 @@ pooledLimitVerdict: build/index.d.ts#pooledLimitVerdict
 pooledVerdict: build/index.d.ts#pooledVerdict
 resultRows: build/index.d.ts#resultRows
 resultVerdict: build/index.d.ts#resultVerdict
+runCost: build/index.d.ts#runCost
 rungVerdict: build/index.d.ts#rungVerdict
 tailFalseFails: build/index.d.ts#tailFalseFails
 tailLimitVerdict: build/index.d.ts#tailLimitVerdict
@@ -599,6 +607,12 @@ interface CaseTailLimit extends CaseTail {
   readonly outcome: LimitOutcome;
 }
 
+### build/index.d.ts#CellBudget
+interface CellBudget {
+  readonly upTo: number;
+  readonly ms: number;
+}
+
 ### build/index.d.ts#ChildPair
 type ChildPair = "candidate" | "aa";
 
@@ -669,6 +683,21 @@ interface ControlRow {
   readonly key: string;
   readonly value: number;
   readonly censored?: boolean;
+}
+
+### build/index.d.ts#CostCells
+interface CostCells {
+  readonly job: string;
+  readonly size: number;
+  readonly cells: number;
+}
+
+### build/index.d.ts#CostProbe
+interface CostProbe {
+  readonly job: string;
+  readonly size: number;
+  readonly model: string;
+  readonly ms: number;
 }
 
 ### build/index.d.ts#EntryCount
@@ -894,6 +923,16 @@ interface GuardRead {
   readonly partners: readonly PartnerRead[];
 }
 
+### build/index.d.ts#JobCost
+interface JobCost {
+  readonly job: string;
+  readonly minutes: number;
+  readonly callMinutes: number;
+  readonly cells: number;
+  readonly stopsAt: number | undefined;
+  readonly extrapolated: readonly number[];
+}
+
 ### build/index.d.ts#JobEnv
 interface JobEnv {
   readonly cpu: string;
@@ -1109,6 +1148,14 @@ interface MedianBudget {
   readonly limit: number;
   readonly maxDifference: number;
   readonly caseLevel?: number;
+}
+
+### build/index.d.ts#ModelCost
+interface ModelCost {
+  readonly model: string;
+  readonly minutes: number;
+  readonly jobs: readonly JobCost[];
+  readonly missing: readonly string[];
 }
 
 ### build/index.d.ts#ModelLimits
@@ -1374,6 +1421,26 @@ interface RoundsOptions {
 interface RowRead {
   readonly row: ResultRow;
   readonly line: string;
+}
+
+### build/index.d.ts#RunCost
+interface RunCost {
+  readonly models: readonly ModelCost[];
+  readonly low: number | undefined;
+  readonly high: number | undefined;
+}
+
+### build/index.d.ts#RunCostOptions
+interface RunCostOptions {
+  readonly calls: number;
+  readonly slow?: {
+    readonly ms: number;
+    readonly calls: number;
+  };
+  readonly budgets?: readonly CellBudget[];
+  readonly overruns?: number;
+  readonly overhead?: number;
+  readonly jobMinutes?: number;
 }
 
 ### build/index.d.ts#RunPairs
@@ -1672,6 +1739,9 @@ export declare function resultRows(content: unknown): ResultRow[];
 
 ### build/index.d.ts#resultVerdict
 export declare function resultVerdict(results: readonly CaseResults[], rows: ResultRows): ResultVerdict;
+
+### build/index.d.ts#runCost
+export declare function runCost(cells: readonly CostCells[], probes: readonly CostProbe[], options: RunCostOptions): RunCost;
 
 ### build/index.d.ts#rungVerdict
 export declare function rungVerdict(rung: Rung, record: RungRecord | undefined, options: LadderOptions): RungVerdict;

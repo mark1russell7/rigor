@@ -34,6 +34,7 @@ v.comparison;                                     // the cases that gain and dro
 | Function | What it gives |
 | --- | --- |
 | `growthVerdict(rounds, options)` | The growth of a cost for each step of size, from a ratio inside each job, against a limit, for example 15 times for each 10 times. |
+| `runCost(cells, probes, options)` | The minutes of a bench run before it starts, on each CPU model: the cells times the calls times the time of one call. |
 | `firstArm(round, offset)` | The arm that runs first. The order turns each round, and an odd offset starts with arm `b`. |
 | `armOrder(arms, round)` | The order of any count of arms in a round. Each pair of arms has each order within 1 after each count of rounds. A report that keeps no `first` for each pair states the order that it used, so that a reader can make `first` again. |
 | `checkPairedTime(record)` | The record, or a `RangeError` for a time that is not a finite number above 0. |
@@ -348,6 +349,36 @@ v.steps[0].exponent;        // the cost grows as the size to this power
 - The interval of each step is the distribution-free interval of the median of the jobs. With 5 jobs it is the full range, with the coverage 0.94. A step is `within` when the high end is less than `maxGrowth`.
 - A job that gives more than one value at a size gives their median.
 - The flip test of a growth gate is the old code: it must give `beyond`.
+
+## The cost of a run before it starts
+
+A run with a time budget stops a case when the budget ends. A plan of a run needs its cost before the start. `runCost` gives this cost from the cells that the run measures and from probes of one call.
+
+```ts
+const cost = runCost(
+  [
+    { job: "shelf", size: 100, cells: 40 },   // only the cells that the run measures
+    { job: "shelf", size: 1_000, cells: 40 },
+  ],
+  [
+    { job: "shelf", size: 100, model: "cpu-a", ms: 2 },     // probes of the same inputs
+    { job: "shelf", size: 1_000, model: "cpu-a", ms: 30 },
+  ],
+  { calls: 7, overhead: 1.45, budgets: [{ upTo: 10_000, ms: 60_000 }] },
+);
+
+cost.models[0].minutes;              // the minutes of the bench step on cpu-a
+cost.models[0].jobs[0].stopsAt;      // the size where a cell is over its budget, or undefined
+cost.low; cost.high;                 // the range over the CPU models
+```
+
+- Give only the cells that the run measures. A cell that a job does not support at its size is not a cell. A count of all the cells of a corpus can be 4 times too large.
+- Probe the same inputs that the run measures, on each CPU model. Times of other inputs can be 1.6 to 28 times off, also on one model.
+- A size between two probe sizes gets a time on the line of the log scales. `extrapolated` names each size outside the probe sizes.
+- More probes of one size give their mean, because a sum over cells follows the mean. The size 0 is not on the line.
+- `calls` is the count of the warmup starts and the timed starts of one cell. `slow` gives a slow cell its own count.
+- The first cell over its budget stops its job. The job then adds `overruns` budgets and no other cells.
+- `overhead` is the bench step minutes over the call minutes of an earlier run. `jobMinutes` adds the fixed minutes of each job.
 
 ## Time the rounds
 
