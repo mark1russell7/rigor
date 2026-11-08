@@ -12,6 +12,7 @@ import { REPORT_DIR, rewritesTsconfig, strykerConfig } from "./config.ts";
 import { compareDisables, findDisables, type Disable } from "./disables.ts";
 import { collectFaults, computedImports, leavingPaths, relatedTestFiles, type Collected, type CollectRequest, type PackageFile } from "./load.ts";
 import { changedFiles, globsSelect, MAX_TEST_FALL, parseLane, partErrors, runSelections, select, selectionNames, type Lane, type Selection } from "./lane.ts";
+import { parsePlan, PLAN_FILE, readPlan } from "./plan.ts";
 import { PARTIAL_FILE } from "./reporter.ts";
 import { copyOfFolder, ignoreRules, minimatchOf, removeCopy, sandboxFiles, tempDirOf } from "./sandbox.ts";
 import { failScore, formatScore, packageScore, parsePartial, parseReport, readFaults, partialScore, scoreReport, summaryMarkdown, testFall, testFileFaults, unreadTestFiles, type MutationReport, type Score } from "./score.ts";
@@ -33,10 +34,11 @@ export const HELP: string = `rigor-mutation: the mutation tests of a repository,
                                                selections of a full run: the parts of a package with parts.
                                                With --changed, only the runs with a changed file.
   rigor-mutation dir <selection>               the folder of the package of a selection
-  rigor-mutation config <selection> [--out <file>] [--concurrency <n>] [--dry-run] [--changed <file>]
+  rigor-mutation config <selection> [--out <file>] [--concurrency <n>] [--dry-run | --plan] [--changed <file>]
                                                the Stryker config of a selection, as JSON. With --dry-run,
-                                               Stryker starts only the tests. With --changed, it mutates only
-                                               the changed files of the selection.
+                                               Stryker starts only the tests. With --plan, Stryker also makes
+                                               its plan, writes it into plan.json and stops. With --changed,
+                                               it mutates only the changed files of the selection.
   rigor-mutation scores <selection>... [--report <file> | --reports <dir>] [--summary <file>]
                        [--last <file>] [--write-last <file>] [--test-files] [--alone]
                                                the score of each selection, with its gate and its count
@@ -52,6 +54,13 @@ export const HELP: string = `rigor-mutation: the mutation tests of a repository,
                                                --alone, a package with all its selections named also
                                                fails for a test file that no report reads, and for an
                                                entry of "notRead" that is not true.
+  rigor-mutation plan-check <selection>... [--report <file> | --reports <dir>]
+                                               the estimate of the clock of each selection from its plan.json,
+                                               against "targetMinutes" (default 100) and "stopMinutes" (default
+                                               140) at "planPerClock" (default 9.8). A selection over the
+                                               target gives a warning. A selection over the stop fails, and so
+                                               does a file over its count of "staticLimits". --reports reads
+                                               <dir>/mutation-<selection>/plan.json.
   rigor-mutation disables [--write]            compare the disable comments with their list
   rigor-mutation load-check [<selection>...] [--collect] [--runner <file>]
                                                refuse each relative path of a package that leaves its folder.
@@ -463,6 +472,55 @@ function annotations(results: readonly Score[], falls: readonly PlannedFall[]): 
   ];
 }
 
+/** The options of `plan-check`. */
+interface PlanCheckOptions {
+  readonly report: string | undefined;
+  readonly reports: string | undefined;
+}
+
+/**
+ * This function reads the plan of each selection (`plan-check`). It gives the estimate of the clock of each selection.
+ * It warns of a selection over its target. It fails a selection over its stop or with no plan, and a file over its
+ * limit of static runs.
+ */
+function planCheck(lane: Lane, laneDir: string, names: readonly string[], o: PlanCheckOptions, io: CliIo): number {
+  if (names.length === 0) throw new Error(`"plan-check" takes one or more selections`);
+  if (o.report !== undefined && names.length > 1) throw new Error(`--report takes one selection`);
+  if (o.report !== undefined && o.reports !== undefined) throw new Error(`"plan-check" takes --report or --reports, not both`);
+  let failed = 0;
+  let warned = 0;
+  const actions = io.env?.["GITHUB_ACTIONS"] === "true";
+  for (const name of names) {
+    const s = select(lane, name);
+    const file =
+      o.reports !== undefined
+        ? resolve(io.cwd, o.reports, `mutation-${name}`, PLAN_FILE)
+        : o.report === undefined
+          ? resolve(laneDir, s.dir, REPORT_DIR, PLAN_FILE)
+          : resolve(io.cwd, o.report);
+    if (!existsSync(file)) {
+      failed += 1;
+      io.stdout(`${name}: FAIL: there is no plan at ${relative(io.cwd, file).replaceAll("\\", "/")}. Start Stryker with the config of "config --plan".\n`);
+      continue;
+    }
+    const limits = lane.packages[s.pkg]?.staticLimits;
+    const read = readPlan(name, parsePlan(readJson(file)), {
+      ...(lane.planPerClock === undefined ? {} : { planPerClock: lane.planPerClock }),
+      ...(lane.targetMinutes === undefined ? {} : { targetMinutes: lane.targetMinutes }),
+      ...(lane.stopMinutes === undefined ? {} : { stopMinutes: lane.stopMinutes }),
+      ...(limits === undefined ? {} : { staticLimits: limits }),
+    });
+    io.stdout(`${read.line}\n${read.warnings.map((w) => `  WARN: ${w}\n`).join("")}${read.faults.map((f) => `  FAIL: ${f}\n`).join("")}`);
+    // The estimate has an error of 28 minutes in the mean, so a selection over its target gives a warning with a mark.
+    if (actions) for (const w of read.warnings) io.stdout(`::warning title=${escapeCommand("Mutation plan: over the target", true)}::${escapeCommand(w)}\n`);
+    if (read.warnings.length > 0) warned += 1;
+    if (read.faults.length > 0) failed += 1;
+  }
+  const over = warned === 0 ? "" : `, and ${String(warned)} of them are over the target`;
+  io.stdout(failed === 0 ? `plan-check: each plan of ${String(names.length)} selections is in its limits${over}\n` : `plan-check: ${String(failed)} of ${String(names.length)} selections fail${over}\n`);
+  return failed === 0 ? 0 : 1;
+}
+
 /** This function reads a file of test counts: an object from each selection to its count. */
 function readCounts(file: string): Record<string, number> {
   const json = readJson(file);
@@ -516,6 +574,7 @@ export function runCli(argv: readonly string[], io: CliIo): number {
       write: { type: "boolean", default: false },
       runs: { type: "boolean", default: false },
       "dry-run": { type: "boolean", default: false },
+      plan: { type: "boolean", default: false },
       changed: { type: "string" },
       last: { type: "string" },
       "write-last": { type: "string" },
@@ -560,13 +619,14 @@ export function runCli(argv: readonly string[], io: CliIo): number {
     case "config": {
       const concurrency = values.concurrency === undefined ? undefined : Number(values.concurrency);
       if (concurrency !== undefined && !(Number.isInteger(concurrency) && concurrency > 0)) throw new Error(`--concurrency is not a positive integer`);
+      if (values["dry-run"] && values.plan) throw new Error(`"config" takes --dry-run or --plan, not both`);
       checkPartsOf(lane, laneDir, [one()]);
       const all = select(lane, one());
       const files = changed === undefined ? undefined : changedFiles(all, changed, existsIn(laneDir, all));
       if (files?.length === 0) throw new Error(`the selection ${all.name} has no changed file`);
       const selection = files === undefined ? all : { ...all, mutate: files };
       const tsconfigRewrite = rewritesTsconfig(typescriptMajor(resolve(laneDir, all.dir)));
-      const options = { ...(concurrency === undefined ? {} : { concurrency }), dryRun: values["dry-run"], tsconfigRewrite };
+      const options = { ...(concurrency === undefined ? {} : { concurrency }), dryRun: values["dry-run"], plan: values.plan, tsconfigRewrite };
       const text = `${JSON.stringify(strykerConfig(selection, options), null, 2)}\n`;
       if (values.out === undefined) io.stdout(text);
       else {
@@ -577,6 +637,8 @@ export function runCli(argv: readonly string[], io: CliIo): number {
     }
     case "scores":
       return scores(lane, laneDir, names, { report: values.report, reports: values.reports, summary: values.summary, last: values.last, writeLast: values["write-last"], testFiles: values["test-files"], alone: values.alone }, io);
+    case "plan-check":
+      return planCheck(lane, laneDir, names, { report: values.report, reports: values.reports }, io);
     case "disables":
       return disables(lane, laneDir, values.write, io);
     case "load-check":

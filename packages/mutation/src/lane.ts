@@ -1,4 +1,5 @@
 import { matchesGlob, posix } from "node:path";
+import { STOP_MINUTES, TARGET_MINUTES } from "./plan.ts";
 
 /**
  * The lane file of a repository (`mutation.json`) names the packages that the mutation tests mutate. A package has
@@ -51,6 +52,11 @@ export interface PackageLane {
    * of Vitest does not follow this type of import. `load-check --collect` fails for each other file of the run with one.
    */
   readonly computedImports?: Readonly<Record<string, string>>;
+  /**
+   * This field gives the most static runs in the plan of each file, from `dir`. The key `*` gives the limit of each other
+   * file. A static run starts each test. `plan-check` fails a file over its limit.
+   */
+  readonly staticLimits?: Readonly<Record<string, number>>;
 }
 
 /** The keys of the Stryker config that the lane owns. The field `stryker` of a package cannot have them. */
@@ -68,6 +74,12 @@ export interface Lane {
   readonly maxTestFall?: number;
   /** Each selection of this field can have a higher fall of its test count. The value gives the reason. */
   readonly plannedFalls?: Readonly<Record<string, string>>;
+  /** This field gives the planned net time of one minute of the clock, for the estimate of `plan-check`. The default is 9.8. */
+  readonly planPerClock?: number;
+  /** This field gives the target of the estimate of a selection, in minutes. `plan-check` warns of a selection over it. The default is 100. */
+  readonly targetMinutes?: number;
+  /** This field gives the stop of the estimate of a selection, in minutes. `plan-check` fails a selection over it. The default is 140. */
+  readonly stopMinutes?: number;
 }
 
 /** The default of `maxTestFall` of the lane, in percent. */
@@ -123,6 +135,10 @@ function packageErrors(name: string, p: unknown): string[] {
   }
   if (p["notRead"] !== undefined && !isReasons(p["notRead"])) errors.push(`${name}: "notRead" is not an object of files, each with a reason`);
   if (p["computedImports"] !== undefined && !isReasons(p["computedImports"])) errors.push(`${name}: "computedImports" is not an object of files, each with a reason`);
+  const limits = p["staticLimits"];
+  if (limits !== undefined && !(isRecord(limits) && Object.values(limits).every((n) => typeof n === "number" && Number.isInteger(n) && n >= 0))) {
+    errors.push(`${name}: "staticLimits" is not an object of files, each with a count of 0 or more`);
+  }
   const parts = p["parts"];
   if (parts !== undefined) {
     if (!isRecord(parts) || Object.keys(parts).length === 0) errors.push(`${name}: "parts" is not an object with parts`);
@@ -150,6 +166,13 @@ export function parseLane(json: unknown): Lane {
   if (fall !== undefined && (typeof fall !== "number" || !(fall >= 0 && fall <= 100))) errors.push(`"maxTestFall" is not a percent from 0 to 100`);
   const planned = json["plannedFalls"];
   if (planned !== undefined && !isReasons(planned)) errors.push(`"plannedFalls" is not an object of selections, each with a reason`);
+  const positive = (v: unknown): v is number => typeof v === "number" && v > 0 && Number.isFinite(v);
+  for (const field of ["planPerClock", "targetMinutes", "stopMinutes"]) {
+    if (json[field] !== undefined && !positive(json[field])) errors.push(`"${field}" is not a positive number`);
+  }
+  const target = json["targetMinutes"] ?? TARGET_MINUTES;
+  const stop = json["stopMinutes"] ?? STOP_MINUTES;
+  if (positive(target) && positive(stop) && stop < target) errors.push(`"stopMinutes" (${String(stop)}) is less than "targetMinutes" (${String(target)})`);
   if (errors.length > 0) throw new Error(`the lane is not valid:\n  ${errors.join("\n  ")}`);
   const lane = json as unknown as Lane;
   const names = new Set(selectionNames(lane));
