@@ -97,6 +97,19 @@ describe("writeNoRead", () => {
     }
   });
 
+  it("writes an error for an enforced gate, and a warning by default", () => {
+    const line = noReadLine([{ case: "read-1", outcome: "no read" }, { case: "write-10", outcome: "no read" }], { title: "store gate", reason: "too few rounds", models: ONE });
+    const lines: string[] = [];
+    const error = writeNoRead(line, { log: (s) => lines.push(s), summary: undefined, level: "error" });
+    expect(error?.level).toBe("error");
+    expect(lines[0]).toBe("::error title=No read%3A store gate::store gate: no read for 2 of 2 cases: read-1, write-10. too few rounds. CPU a AMD EPYC 7763, b AMD EPYC 7763. A no read is not a pass.");
+    expect(error?.summary.startsWith("> [!CAUTION]\n")).toBe(true);
+    const warning = writeNoRead(line, { log: (s) => lines.push(s), summary: undefined });
+    expect(warning?.level).toBe("warning");
+    expect(lines[1]?.startsWith("::warning title=No read%3A store gate::")).toBe(true);
+    expect(warning?.summary.startsWith("> [!WARNING]\n")).toBe(true);
+  });
+
   it("writes only the log when there is no summary file", () => {
     const lines: string[] = [];
     const written = writeNoRead(noReadLine([], { title: "t" }), { log: (s) => lines.push(s), summary: "" });

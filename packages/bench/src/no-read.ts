@@ -111,8 +111,16 @@ function escapeProperty(text: string): string {
   return escapeData(text).replaceAll(":", "%3A").replaceAll(",", "%2C");
 }
 
+/** The level of a no-read annotation: `error` for an enforced gate, `warning` for a read that only reports. */
+export type NoReadLevel = "warning" | "error";
+
 /** The outputs of `writeNoRead`. The defaults are the standard output and the file of `GITHUB_STEP_SUMMARY`. */
 export interface NoReadOutputs {
+  /**
+   * The level of the annotation. Use `error` for a gate that decides the check, and `warning` for a read that only reports.
+   * The default is `warning`.
+   */
+  readonly level?: NoReadLevel;
   /** This function writes one line of the log. The default writes to the standard output. */
   readonly log?: (line: string) => void;
   /** The file of the step summary. The default is the variable `GITHUB_STEP_SUMMARY`. With no file, only the log gets the line. */
@@ -121,15 +129,18 @@ export interface NoReadOutputs {
 
 /** The text that `writeNoRead` wrote. */
 export interface NoReadWritten {
-  /** The warning command of GitHub Actions. */
+  /** The level of the annotation. */
+  readonly level: NoReadLevel;
+  /** The workflow command of GitHub Actions: a warning or an error. */
   readonly annotation: string;
   /** The line of the step summary. */
   readonly summary: string;
 }
 
 /**
- * This function writes a no-read line as a warning annotation and as a line of the step summary. A report-only run also
- * writes it, so its check shows the no-read. With no line, it writes nothing.
+ * This function writes a no-read line as an annotation and as a line of the step summary. A report-only run also writes
+ * it, so its check shows the no-read. With no line, it writes nothing.
+ * - The level `error` is for an enforced gate. The default level `warning` is for a read that only reports.
  *
  * @param line - The line of `noReadLine`.
  * @param outputs - The log and the file of the step summary.
@@ -137,10 +148,11 @@ export interface NoReadWritten {
  */
 export function writeNoRead(line: NoReadLine | undefined, outputs: NoReadOutputs = {}): NoReadWritten | undefined {
   if (line === undefined) return undefined;
-  const annotation = `::warning title=${escapeProperty(`No read: ${line.title}`)}::${escapeData(line.text)}`;
-  const summary = `> [!WARNING]\n> **No read.** ${line.text.replaceAll("\n", " ")}\n`;
+  const level = outputs.level ?? "warning";
+  const annotation = `::${level} title=${escapeProperty(`No read: ${line.title}`)}::${escapeData(line.text)}`;
+  const summary = `> [!${level === "error" ? "CAUTION" : "WARNING"}]\n> **No read.** ${line.text.replaceAll("\n", " ")}\n`;
   (outputs.log ?? ((s: string) => process.stdout.write(`${s}\n`)))(annotation);
   const file = "summary" in outputs ? outputs.summary : process.env["GITHUB_STEP_SUMMARY"];
   if (file !== undefined && file !== "") appendFileSync(file, `\n${summary}`);
-  return { annotation, summary };
+  return { level, annotation, summary };
 }

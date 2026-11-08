@@ -99,6 +99,7 @@ type ModelTestOptions: build/index.d.ts#ModelTestOptions
 NARROW_SPREAD_SHARE: build/index.d.ts#NARROW_SPREAD_SHARE
 type NoControl: build/index.d.ts#NoControl
 type NoFactor: build/index.d.ts#NoFactor
+type NoReadLevel: build/index.d.ts#NoReadLevel
 type NoReadLine: build/index.d.ts#NoReadLine
 type NoReadOptions: build/index.d.ts#NoReadOptions
 type NoReadOutputs: build/index.d.ts#NoReadOutputs
@@ -1093,6 +1094,9 @@ interface NoFactor extends GroupCounts {
   readonly reason: string;
 }
 
+### build/index.d.ts#NoReadLevel
+type NoReadLevel = "warning" | "error";
+
 ### build/index.d.ts#NoReadLine
 interface NoReadLine {
   readonly title: string;
@@ -1114,12 +1118,14 @@ interface NoReadOptions {
 
 ### build/index.d.ts#NoReadOutputs
 interface NoReadOutputs {
+  readonly level?: NoReadLevel;
   readonly log?: (line: string) => void;
   readonly summary?: string | undefined;
 }
 
 ### build/index.d.ts#NoReadWritten
 interface NoReadWritten {
+  readonly level: NoReadLevel;
   readonly annotation: string;
   readonly summary: string;
 }
