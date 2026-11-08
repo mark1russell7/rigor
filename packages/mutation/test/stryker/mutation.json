@@ -2,7 +2,7 @@
   "packages": {
     "slow": {
       "dir": "pkg",
-      "mutate": ["src/count.js"]
+      "mutate": ["src/count.ts"]
     }
   }
 }

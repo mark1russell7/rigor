@@ -1,7 +1,7 @@
 // The test of the stop check. Each test waits, so the run of all the mutants is long, and the stop comes first.
 import { setTimeout } from "node:timers/promises";
 import { expect, it } from "vitest";
-import { clamp, grade, total } from "./count.js";
+import { clamp, grade, total } from "./count.ts";
 
 it("grades a score", async () => {
   await setTimeout(1500);
