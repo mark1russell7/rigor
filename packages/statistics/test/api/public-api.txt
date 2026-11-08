@@ -18,6 +18,7 @@ type Effect: build/index.d.ts#Effect
 type Forecast: build/index.d.ts#Forecast
 type Interval: build/index.d.ts#Interval
 KENDALL_EXACT: build/index.d.ts#KENDALL_EXACT
+type Kappa: build/index.d.ts#Kappa
 type LeastSquaresFit: build/index.d.ts#LeastSquaresFit
 type LeastSquaresOptions: build/index.d.ts#LeastSquaresOptions
 type MedianInterval: build/index.d.ts#MedianInterval
@@ -93,6 +94,7 @@ bootstrapMedianRatio: build/index.d.ts#bootstrapMedianRatio
 bootstrapTwo: build/index.d.ts#bootstrapTwo
 brier: build/index.d.ts#brier
 calibration: build/index.d.ts#calibration
+cohenKappa: build/index.d.ts#cohenKappa
 compareRatios: build/index.d.ts#compareRatios
 fitResponse: build/index.d.ts#fitResponse
 heldOutError: build/index.d.ts#heldOutError
@@ -132,6 +134,7 @@ tQuantile: build/index.d.ts#tQuantile
 twoSamplePermutation: build/index.d.ts#twoSamplePermutation
 whenHolds: build/index.d.ts#whenHolds
 wilson: build/index.d.ts#wilson
+wilsonSampleSize: build/index.d.ts#wilsonSampleSize
 
 ## Declarations
 
@@ -231,6 +234,14 @@ interface Interval extends Partial<SideP> {
 
 ### build/index.d.ts#KENDALL_EXACT
 export declare const KENDALL_EXACT = 1500;
+
+### build/index.d.ts#Kappa
+interface Kappa {
+  readonly n: number;
+  readonly observed: number;
+  readonly chance: number;
+  readonly kappa: number | undefined;
+}
 
 ### build/index.d.ts#LeastSquaresFit
 interface LeastSquaresFit {
@@ -708,6 +719,9 @@ export declare function brier(forecasts: readonly Forecast[]): number;
 ### build/index.d.ts#calibration
 export declare function calibration(forecasts: readonly Forecast[]): CalibrationLevel[];
 
+### build/index.d.ts#cohenKappa
+export declare function cohenKappa<T>(a: readonly T[], b: readonly T[]): Kappa;
+
 ### build/index.d.ts#compareRatios
 export declare function compareRatios(ratios: readonly number[], options?: CompareOptions): Comparison;
 
@@ -826,3 +840,6 @@ export declare function whenHolds(dimension: ResponseDimension, values: Readonly
 
 ### build/index.d.ts#wilson
 export declare function wilson(k: number, n: number, z?: number): Proportion;
+
+### build/index.d.ts#wilsonSampleSize
+export declare function wilsonSampleSize(target: number, expected: number, z?: number, max?: number): number | undefined;

@@ -118,6 +118,8 @@ The default expansion has one product for each pair of levels of two dimensions.
 | `pairedPermutation(candidate, baseline, options)` | The paired permutation test (random sign flips). It uses the size of each difference. |
 | `twoSamplePermutation(a, b, options)` | The two-sample permutation test (a split of the pooled values). It reads each split when their count is `runs` or less, so the p is exact. It compares groups of different sizes, and its default statistic is the difference of the medians. |
 | `wilson(k, n, z)` | The Wilson interval of a proportion. |
+| `wilsonSampleSize(target, expected, z, max)` | The smallest number of trials at which the Wilson lower end reaches the target, at the expected proportion. |
+| `cohenKappa(a, b)` | The agreement of two raters beyond chance (Cohen's kappa), with the observed and the chance agreement. |
 | `medianInterval(values, level)` | The distribution-free interval of a median, from two order statistics. It gives `low`, `high`, the `rank` of `low` and the `coverage`. |
 | `quantileInterval(values, p, level)` | The distribution-free interval of a quantile, from two order statistics. A side with no rank is infinite. The values must be independent draws. |
 | `quantileSamples(p, level)` | The fewest independent values that give a quantile an upper bound. At the level 0.95: 72 values for p95, 368 for p99 and 3,688 for p99.9. |
