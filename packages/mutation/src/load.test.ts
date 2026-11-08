@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isConfigFile, leavingPaths, relatedTestFiles } from "./load.ts";
+import { collectFaults, isConfigFile, leavingPaths, relatedTestFiles, type Collected } from "./load.ts";
 
 describe("leavingPaths", () => {
   it("refuses each loaded path of a test file that leaves the folder, with its line (V-072)", () => {
@@ -106,5 +106,26 @@ describe("relatedTestFiles", () => {
       { file: "src/y.test.ts", text: "export const helper = 1;" },
     ];
     expect(relatedTestFiles(files, () => true)).toEqual([]);
+  });
+});
+
+describe("collectFaults", () => {
+  const base: Collected = { version: "5.0.5", path: "node_modules/vitest/dist/node.js", files: [], unhandled: [] };
+  const file = (name: string, errors: string[], children: number) => ({ file: name, errors, children });
+
+  it("gives no fault when each test file loads and holds a test", () => {
+    expect(collectFaults({ ...base, files: [file("src/a.test.ts", [], 2), file("src/b.test.ts", [], 1)] })).toEqual([]);
+  });
+
+  it("gives a file that does not load with its errors, and a file with no test (V-090)", () => {
+    const files = [file("src/a.test.ts", ["Cannot find package 'gone'", "a second error"], 0), file("src/b.test.ts", [], 0), file("src/c.test.ts", [], 1)];
+    expect(collectFaults({ ...base, files })).toEqual([
+      "src/a.test.ts: the file does not load: Cannot find package 'gone' a second error",
+      "src/b.test.ts: the file holds no test",
+    ]);
+  });
+
+  it("gives each error outside a test file, and a package with no test file", () => {
+    expect(collectFaults({ ...base, unhandled: ["setup failed"] })).toEqual(["an error outside a test file: setup failed", "Vitest finds no test file"]);
   });
 });

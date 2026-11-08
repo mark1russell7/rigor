@@ -156,6 +156,21 @@ packages/compiler/src/module-sheet.test.ts:12: "../../testkit/src/fc-timeout.ts"
 
 The check does not read comments, type imports and paths with a template expression.
 
+With `--collect`, the Vitest of each package also loads each test file, as Stryker does. It starts the collect of Vitest in a new process, with `staticParse: false`. Then each file starts, so the check finds a missing package, also through a helper or a computed dynamic import. These are faults:
+
+- a test file that does not load,
+- a test file that holds no test,
+- an error outside a test file,
+- a package with no test file.
+
+On a fault, the check fails with a line that starts with `No read`. A score of that package is not a reading.
+
+`--runner <file>` writes the version and the path of the Vitest of each package to the file, as JSON. Each package uses the Vitest that its folder resolves.
+
+```text
+rigor-mutation load-check --collect --runner reports/runner.json
+```
+
 ## The disabled mutants
 
 A comment `// Stryker disable next-line <Mutator>: <reason>` disables a mutant that is equivalent. The disable raises the score, so each one is also in the list, with its reason. `rigor-mutation disables` compares the comments of the sources of each package with the list. It fails when they are not the same, or when a comment has no reason. After you add or remove a disable, start `rigor-mutation disables --write` and examine the diff of the list.

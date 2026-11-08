@@ -1,13 +1,16 @@
 /**
  * The CLI `rigor-mutation`. The work is in `runCli`, so a test can start the CLI in a fixture folder.
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, appendFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { REPORT_DIR, rewritesTsconfig, strykerConfig } from "./config.ts";
 import { compareDisables, findDisables, type Disable } from "./disables.ts";
-import { leavingPaths, relatedTestFiles } from "./load.ts";
+import { collectFaults, leavingPaths, relatedTestFiles, type Collected } from "./load.ts";
 import { changedFiles, globsSelect, MAX_TEST_FALL, parseLane, partErrors, runSelections, select, selectionNames, type Lane, type Selection } from "./lane.ts";
 import { PARTIAL_FILE } from "./reporter.ts";
 import { failScore, formatScore, packageScore, parsePartial, parseReport, partialScore, scoreReport, summaryMarkdown, testFall, testFileFaults, unreadTestFiles, type MutationReport, type Score } from "./score.ts";
@@ -49,9 +52,14 @@ export const HELP: string = `rigor-mutation: the mutation tests of a repository,
                                                fails for a test file that no report reads, and for an
                                                entry of "notRead" that is not true.
   rigor-mutation disables [--write]            compare the disable comments with their list
-  rigor-mutation load-check [<selection>...]   refuse each relative path of a package that leaves its folder.
+  rigor-mutation load-check [<selection>...] [--collect] [--runner <file>]
+                                               refuse each relative path of a package that leaves its folder.
                                                Stryker starts the tests in a copy of the folder, so such a
                                                path finds no file. No selection checks each package.
+                                               With --collect, the Vitest of each package also loads each
+                                               test file, and a file that does not load or has no test
+                                               fails. With --runner, the version and the path of each
+                                               Vitest go in the file, as JSON.
 
   --lane <file>      the lane file. The default is mutation.json.
   --changed <file>   a file with one changed path on each line, from the folder of the lane file,
@@ -82,10 +90,44 @@ function sourcesOf(root: string, dir: string, tests = false): string[] {
     });
 }
 
-/** This function checks the relative paths of the package of each selection (`load-check`). */
-function loadCheck(lane: Lane, laneDir: string, names: readonly string[], io: CliIo): number {
+/** The script of `load-check --collect`. It is beside this file, in the source and in the build. */
+const COLLECT_SCRIPT = fileURLToPath(new URL(import.meta.url.endsWith(".ts") ? "./collect.ts" : "./collect.js", import.meta.url));
+
+/**
+ * This function starts the collect of Vitest in the folder `dir`, in a new process. It gives the collect, or the reason
+ * when the process gives no collect.
+ */
+function collectIn(dir: string, vitestConfig: string | undefined): Collected | string {
+  const tmp = mkdtempSync(join(tmpdir(), "rigor-mutation-collect-"));
+  try {
+    const out = join(tmp, "collected.json");
+    const args = [COLLECT_SCRIPT, dir, out, ...(vitestConfig === undefined ? [] : [vitestConfig])];
+    const r = spawnSync(process.execPath, args, { cwd: dir, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+    // Vitest sets the exit code 1 for a file that does not load, so the file of the collect decides, not the code.
+    if (!existsSync(out)) {
+      const why = (r.error?.message ?? `${r.stdout}${r.stderr}`).trim().split("\n").slice(-5).join(" ");
+      return `the collect of Vitest exited with ${String(r.status)}: ${why}`;
+    }
+    return JSON.parse(readFileSync(out, "utf8")) as Collected;
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+/** The options of `load-check`. */
+interface LoadCheckOptions {
+  /** With true, Vitest also collects each test file of each package (`--collect`). */
+  readonly collect: boolean;
+  /** The file for the version and the path of the Vitest of each package (`--runner`). */
+  readonly runner: string | undefined;
+}
+
+/** This function checks the relative paths of the package of each selection, and with `--collect`, the load of each test file (`load-check`). */
+function loadCheck(lane: Lane, laneDir: string, names: readonly string[], io: CliIo, options: LoadCheckOptions): number {
   const pkgs = [...new Set((names.length === 0 ? Object.keys(lane.packages) : names.map((n) => select(lane, n).pkg)))];
   let failed = 0;
+  let unread = 0;
+  const runners: Record<string, { version: string; path: string }> = {};
   for (const pkg of pkgs) {
     const s = select(lane, pkg);
     const dir = resolve(laneDir, s.dir);
@@ -101,10 +143,26 @@ function loadCheck(lane: Lane, laneDir: string, names: readonly string[], io: Cl
     if (found.length === 0) io.stdout(`load-check ${pkg}: ${String(files.length)} files, no relative path leaves ${s.dir}
 `);
     else failed += 1;
+    if (!options.collect) continue;
+    const collected = collectIn(dir, s.vitestConfig);
+    const faults = typeof collected === "string" ? [collected] : collectFaults(collected);
+    for (const fault of faults) io.stderr(`${s.dir}: ${fault}\n`);
+    if (typeof collected !== "string") {
+      runners[pkg] = { version: collected.version, path: collected.path };
+      if (faults.length === 0) io.stdout(`load-check ${pkg}: Vitest ${collected.version} loads ${String(collected.files.length)} test files\n`);
+    }
+    if (faults.length > 0) unread += 1;
+  }
+  if (options.runner !== undefined) {
+    const file = resolve(io.cwd, options.runner);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, `${JSON.stringify(runners, null, 2)}\n`);
   }
   if (failed > 0) io.stderr(`load-check: ${String(failed)} packages have a relative path that leaves their folder. Import the file from its package, or move it into the folder.
 `);
-  return failed > 0 ? 1 : 0;
+  if (unread > 0) io.stderr(`No read: ${String(unread)} packages have a test file that Vitest does not load, or that holds no test. A mutant that only this file detects survives, so a score of the package is not a reading.
+`);
+  return failed > 0 || unread > 0 ? 1 : 0;
 }
 
 const readJson = (file: string): unknown => JSON.parse(readFileSync(file, "utf8"));
@@ -419,6 +477,8 @@ export function runCli(argv: readonly string[], io: CliIo): number {
       "write-last": { type: "string" },
       "test-files": { type: "boolean", default: false },
       alone: { type: "boolean", default: false },
+      collect: { type: "boolean", default: false },
+      runner: { type: "string" },
       help: { type: "boolean", default: false },
     },
   });
@@ -476,7 +536,7 @@ export function runCli(argv: readonly string[], io: CliIo): number {
     case "disables":
       return disables(lane, laneDir, values.write, io);
     case "load-check":
-      return loadCheck(lane, laneDir, names, io);
+      return loadCheck(lane, laneDir, names, io, { collect: values.collect, runner: values.runner });
     default:
       io.stderr(`unknown command "${command}"\n\n${HELP}`);
       return 1;

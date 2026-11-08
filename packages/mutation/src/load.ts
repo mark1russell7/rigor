@@ -139,3 +139,39 @@ export function relatedTestFiles(files: readonly PackageFile[], selected: (file:
   };
   return files.map((f) => f.file).filter((f) => TEST.test(f) && reaches(f));
 }
+
+/** A test file as the collect of Vitest gives it (`load-check --collect`). */
+export interface CollectedFile {
+  /** The file, with `/`. */
+  readonly file: string;
+  /** The messages of the errors of the file. A file that does not load has one or more. */
+  readonly errors: readonly string[];
+  /** The number of tests and suites at the top of the file. */
+  readonly children: number;
+}
+
+/** The collect of Vitest in the folder of a package. */
+export interface Collected {
+  /** The version of Vitest that the folder of the package resolves. */
+  readonly version: string;
+  /** The real path of the entry `vitest/node` that the folder resolves. */
+  readonly path: string;
+  readonly files: readonly CollectedFile[];
+  /** The messages of the errors outside a test file. */
+  readonly unhandled: readonly string[];
+}
+
+/**
+ * This function gives the reason of each fault of a collect. A test file that does not load gives no failed test, so
+ * each mutant that it detects survives (V-090 of Vex). A test file with no test detects no mutant. An error outside a
+ * test file and a package with no test file are faults too.
+ */
+export function collectFaults(collected: Collected): string[] {
+  const faults = collected.files.flatMap((f) => {
+    if (f.errors.length > 0) return [`${f.file}: the file does not load: ${f.errors.join(" ")}`];
+    return f.children === 0 ? [`${f.file}: the file holds no test`] : [];
+  });
+  faults.push(...collected.unhandled.map((e) => `an error outside a test file: ${e}`));
+  if (collected.files.length === 0) faults.push("Vitest finds no test file");
+  return faults;
+}
