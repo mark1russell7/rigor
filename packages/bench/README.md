@@ -476,22 +476,6 @@ console.log(JSON.stringify(child.records)); // { candidate: PairedTime, aa: Pair
 
 The A/A pair is the base and its copy in the same child. Its spread is the noise of the order alone, so it gives the band of the candidate pair.
 
-## The check line of a gate
-
-A "no read" is not a pass. The check of a pull request names it, and not only the log of a job. `gateAnnotation` gives the workflow command of a GitHub annotation for a gate read. Print its line in the step of the gate.
-
-```ts
-import { gateAnnotation } from "@mark1russell7/rigor-bench";
-
-const line = gateAnnotation({ gate: "store gate", outcome: "no read", reason: "too few rounds.", cases: ["read-1"], envs, enforced: false });
-if (line !== undefined) console.log(line);
-```
-
-- A pass gives no line.
-- A "no read" or a block of an enforced gate is an error. A gate that only reports gives a warning.
-- The title gives the gate, the outcome and the count of the cases. The message gives the reason, the cases and each CPU model of the jobs.
-- Two CPU models or more are a mixed pair, and the message names each model.
-
 ## A result that changes on purpose
 
 A bench compares two arms, and two arms with different results do not do the same work. So a difference stops the merge. A pull request can change a result on purpose. Without a stated path, its author edits the case, and no gate reads that edit. A row in the diff gives that path, and it names the exact change.

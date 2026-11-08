@@ -54,7 +54,6 @@ GATE_LOOKS: build/index.d.ts#GATE_LOOKS
 type Gate: build/index.d.ts#Gate
 type GateCaseOutcome: build/index.d.ts#GateCaseOutcome
 type GateJobRead: build/index.d.ts#GateJobRead
-type GateNote: build/index.d.ts#GateNote
 type GateOutcome: build/index.d.ts#GateOutcome
 type GroupCounts: build/index.d.ts#GroupCounts
 type GroupFactor: build/index.d.ts#GroupFactor
@@ -166,7 +165,6 @@ controlFactor: build/index.d.ts#controlFactor
 familyPower: build/index.d.ts#familyPower
 familyRead: build/index.d.ts#familyRead
 firstArm: build/paired.d.ts#firstArm
-gateAnnotation: build/index.d.ts#gateAnnotation
 gateOf: build/index.d.ts#gateOf
 growthVerdict: build/index.d.ts#growthVerdict
 jointClaim: build/index.d.ts#jointClaim
@@ -743,18 +741,6 @@ interface GateJobRead {
   readonly notSlower: number;
   readonly slower: number;
   readonly centre: number | undefined;
-}
-
-### build/index.d.ts#GateNote
-interface GateNote {
-  readonly gate: string;
-  readonly outcome: GateOutcome;
-  readonly reason: string;
-  readonly cases: readonly string[];
-  readonly envs: readonly {
-    readonly cpu: string;
-  }[];
-  readonly enforced: boolean;
 }
 
 ### build/index.d.ts#GateOutcome
@@ -1511,9 +1497,6 @@ export declare function familyPower(options: FamilyPowerOptions): FamilyPower;
 
 ### build/index.d.ts#familyRead
 export declare function familyRead(items: readonly FamilyItem[], level?: number): FamilyRead;
-
-### build/index.d.ts#gateAnnotation
-export declare function gateAnnotation(note: GateNote): string | undefined;
 
 ### build/index.d.ts#gateOf
 export declare function gateOf(cases: readonly GateCaseOutcome[]): Gate;
