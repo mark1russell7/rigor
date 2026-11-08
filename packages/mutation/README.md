@@ -126,6 +126,10 @@ A score is a read of the tests only when the run read all of them. A run that re
 - `--test-files` compares the test files that the run starts with the test files of the report. A test file that the run starts and that the report does not read fails.
   - The Vitest runner of Stryker starts the test files that load a file of the selection, directly or through other files. So a part does not start the test files of the other parts.
   - The check reads the relative imports of the package, and not its type imports. With `vitest.related` false in the field `stryker`, it expects each test file.
+- With no `--alone`, `--test-files` also examines each package whose selections the command names in full. This is the gate job, which reads all the parts.
+  - A test file on the disk that no report reads fails, unless `notRead` gives its reason. One part does not show such a file, because a part starts only its related test files.
+  - An entry of `notRead` fails when its file is not on the disk, or when a report reads it.
+  - The fault fails the score of the package with `"gateOver": "package"`. Else it fails each selection of the package.
 
 The lane states each exception with its reason:
 

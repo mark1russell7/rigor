@@ -184,14 +184,46 @@ export function testFall(tests: number, last: number, maxFall: number): string |
  * @param dir - the folder of the package, to make a full path of the report relative
  */
 export function unreadTestFiles(report: MutationReport, onDisk: readonly string[], notRead: Readonly<Record<string, string>> = {}, dir = ""): string[] {
-  const root = dir.replaceAll("\\", "/").replace(/\/?$/, "/");
-  const read = new Set(
-    Object.keys(report.testFiles ?? {}).map((f) => {
-      const file = f.replaceAll("\\", "/");
-      return dir !== "" && file.startsWith(root) ? file.slice(root.length) : file.replace(/^\.\//, "");
-    }),
-  );
+  const read = readTestFiles([report], dir);
   return onDisk.filter((f) => !read.has(f) && notRead[f] === undefined);
+}
+
+/** This function gives the test files that the reports read, from the folder of the package, with `/`. */
+function readTestFiles(reports: readonly MutationReport[], dir: string): Set<string> {
+  const root = dir.replaceAll("\\", "/").replace(/\/?$/, "/");
+  return new Set(
+    reports.flatMap((report) =>
+      Object.keys(report.testFiles ?? {}).map((f) => {
+        const file = f.replaceAll("\\", "/");
+        return dir !== "" && file.startsWith(root) ? file.slice(root.length) : file.replace(/^\.\//, "");
+      }),
+    ),
+  );
+}
+
+/** The faults of the test files of a package over the reports of all its selections (LANE.FILES). */
+export interface TestFileFaults {
+  /** These test files are on the disk, no report reads them, and `notRead` does not name them. */
+  readonly unread: readonly string[];
+  /** These entries of `notRead` are not true: the file is not on the disk, or a report reads it. */
+  readonly stale: readonly string[];
+}
+
+/**
+ * This function examines the test files of a package over the reports of all its selections (LANE.FILES). A part
+ * starts only its related test files, so only all the parts together show a test file that no part reads.
+ *
+ * @param reports - the reports of all the selections of the package
+ * @param onDisk - the test files of the package, from its folder, with `/`
+ * @param dir - the folder of the package, to make a full path of a report relative
+ */
+export function testFileFaults(reports: readonly MutationReport[], onDisk: readonly string[], notRead: Readonly<Record<string, string>> = {}, dir = ""): TestFileFaults {
+  const read = readTestFiles(reports, dir);
+  const files = new Set(onDisk);
+  return {
+    unread: onDisk.filter((f) => !read.has(f) && notRead[f] === undefined),
+    stale: Object.keys(notRead).filter((f) => !files.has(f) || read.has(f)),
+  };
 }
 
 /**

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { failScore, formatScore, packageScore, parseReport, scoreReport, summaryMarkdown, testCount, testFall, unreadTestFiles, type MutationReport } from "./score.ts";
+import { failScore, formatScore, packageScore, parseReport, scoreReport, summaryMarkdown, testCount, testFall, testFileFaults, unreadTestFiles, type MutationReport } from "./score.ts";
 
 const mutant = (status: string, line: number) =>
   status === "HitLimit"
@@ -144,6 +144,16 @@ describe("the tests of a report (LANE.TESTS and LANE.FILES of Vex)", () => {
     const onDisk = ["src/a.test.ts", "src/b.test.ts", "src/c.test.ts", "src/d.test.ts", "bench/e.test.ts"];
     expect(unreadTestFiles(r, onDisk, {}, String.raw`D:\repo\pkg`)).toEqual(["src/d.test.ts", "bench/e.test.ts"]);
     expect(unreadTestFiles(r, onDisk, { "bench/e.test.ts": "a bench, CI starts it in its own job" }, "D:/repo/pkg/")).toEqual(["src/d.test.ts"]);
+  });
+
+  it("gives over all the reports each test file that no report reads, and each notRead entry that is not true", () => {
+    const a = { ...report("Killed"), testFiles: tests({ "D:/repo/pkg/src/a.test.ts": 1 }) };
+    const b = { ...report("Killed"), testFiles: tests({ "./src/b.test.ts": 1 }) };
+    const onDisk = ["src/a.test.ts", "src/b.test.ts", "src/c.test.ts", "bench/e.test.ts"];
+    expect(testFileFaults([a, b], onDisk, {}, "D:/repo/pkg")).toEqual({ unread: ["src/c.test.ts", "bench/e.test.ts"], stale: [] });
+    const notRead = { "bench/e.test.ts": "a bench", "src/b.test.ts": "read", "src/gone.test.ts": "not on the disk" };
+    expect(testFileFaults([a, b], onDisk, notRead, "D:/repo/pkg")).toEqual({ unread: ["src/c.test.ts"], stale: ["src/b.test.ts", "src/gone.test.ts"] });
+    expect(testFileFaults([a], onDisk, notRead, "D:/repo/pkg").stale).toEqual(["src/gone.test.ts"]);
   });
 
   it("keeps the first reason of a score that failed already", () => {
