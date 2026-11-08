@@ -72,9 +72,35 @@ describe("runCost", () => {
     // 7 x 1,000 ms is more than the budget of 2,000 ms at the size 100: 2 overruns cost 2 budgets
     expect(job?.stopsAt).toBe(100);
     expect(job?.cells).toBe(4);
+    expect(job?.overruns).toBe(2);
     expect(job?.callMinutes).toBeCloseTo((4 * 7 * 10 + 2 * 2000) / 60_000, 12);
     const one = runCost(cells, probes("rects", "cpu-a", [[10, 10], [100, 1000], [1000, 100_000]]), { calls: 7, budgets, overruns: 1 });
     expect(one.models[0]?.jobs[0]?.callMinutes).toBeCloseTo((4 * 7 * 10 + 2000) / 60_000, 12);
+  });
+
+  it("gives a share of the cells over budget from the spread of the probes", () => {
+    const spread = probes("rects", "cpu-a", [[100, 10], [100, 10], [100, 10], [100, 1000]]);
+    const budgets = [{ upTo: 1000, ms: 500 }];
+    // A quarter of the cells is over budget: 4 cells give 1 expected overrun, fewer than 2, so the job goes on
+    const few = runCost([{ job: "rects", size: 100, cells: 4 }], spread, { calls: 1, budgets }).models[0]?.jobs[0];
+    expect(few?.callMinutes).toBeCloseTo((3 * 10 + 500) / 60_000, 12);
+    expect(few?.cells).toBeCloseTo(3, 12);
+    expect(few?.overruns).toBeCloseTo(1, 12);
+    expect(few?.stopsAt).toBeUndefined();
+    // 40 cells give 10 expected overruns: the second overrun comes after 8 cells, and the job stops
+    const many = runCost([{ job: "rects", size: 100, cells: 40 }, { job: "rects", size: 1000, cells: 40 }], spread, { calls: 1, budgets }).models[0]?.jobs[0];
+    expect(many?.callMinutes).toBeCloseTo((6 * 10 + 2 * 500) / 60_000, 12);
+    expect(many?.cells).toBeCloseTo(6, 12);
+    expect(many?.overruns).toBe(2);
+    expect(many?.stopsAt).toBe(100);
+  });
+
+  it("scales the spread of the nearest probe size to the time on the line", () => {
+    const all = [...probes("rects", "cpu-a", [[10, 1], [10, 1], [10, 1], [10, 100]]), ...probes("rects", "cpu-a", [[1000, 100], [1000, 100], [1000, 100], [1000, 10_000]])];
+    // The time on the line at 100 is 10 times the mean at 10, so the spread at 10 times 10 gives 10, 10, 10 and 1,000 ms
+    const job = runCost([{ job: "rects", size: 100, cells: 4 }], all, { calls: 1, budgets: [{ upTo: 1000, ms: 500 }] }).models[0]?.jobs[0];
+    expect(job?.callMinutes).toBeCloseTo((3 * 10 + 500) / 60_000, 12);
+    expect(job?.overruns).toBeCloseTo(1, 12);
   });
 
   it("does not stop at a size that no budget covers", () => {

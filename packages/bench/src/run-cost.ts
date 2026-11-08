@@ -8,7 +8,9 @@
  * - A size between two probe sizes gets a time on the straight line through them, on log scales of size and time.
  * - The size 0, for example an empty input, is not on the line. It gets the time of a probe at 0, else of the smallest probe size.
  * - A size outside the probe sizes gets a time on the line through the two nearest probe sizes. The job cost names these sizes.
- * - A cell over its budget at a size stops the job. The cells after the stop cost 0.
+ * - The probes of the nearest probe size give the spread of the times at a size, scaled to its time on the line.
+ * - A cell at its budget or over it costs the budget. When the expected count of these cells at a size gets to `overruns`, the job stops.
+ * - The cells after the stop cost 0. Each count of cells in the result is an expected count, so it is not always a whole number.
  * - The bench step of a job costs more than its calls: the start, the checks and the writes. `overhead` and `jobMinutes` add it.
  */
 
@@ -61,11 +63,13 @@ export interface JobCost {
   readonly job: string;
   /** The minutes of the bench step: `callMinutes` times `overhead`, plus `jobMinutes`. */
   readonly minutes: number;
-  /** The minutes of the calls of the cells before the stop, and of the cells over budget at the stop. */
+  /** The minutes of the calls of the cells that the job measures, and the budgets of the cells over budget. */
   readonly callMinutes: number;
-  /** The count of the cells that the job measures before its stop. */
+  /** The expected count of the cells that the job measures in their budget. */
   readonly cells: number;
-  /** The size where the job stops, or `undefined` when no cell is over its budget. */
+  /** The expected count of the cells over their budget. */
+  readonly overruns: number;
+  /** The size where the job stops, or `undefined` when the expected overruns at each size are fewer than `overruns`. */
   readonly stopsAt: number | undefined;
   /** The sizes with a time outside the probe sizes of the job, in increasing order. */
   readonly extrapolated: readonly number[];
@@ -122,6 +126,21 @@ function timeAt(points: readonly (readonly [number, number])[], zero: number | u
     if (point[0] > size) return [onLine(size, points[i - 1] as readonly [number, number], point), false];
   }
   return [last[1], false];
+}
+
+/**
+ * This function gives the probe values of the probe size nearest to `size` on a log scale. The probes are of one job on
+ * one model. A probe at the size 0 is nearest only to the size 0. On a tie, the smaller probe size is nearest.
+ */
+function spreadAt(groups: ReadonlyMap<number, readonly number[]>, size: number): readonly number[] {
+  if (size === 0 && groups.has(0)) return groups.get(0) as readonly number[];
+  let best: number | undefined;
+  for (const probe of [...groups.keys()].sort((a, b) => a - b)) {
+    if (probe === 0) continue;
+    if (size === 0) return groups.get(probe) as readonly number[];
+    if (best === undefined || Math.abs(Math.log(size / probe)) < Math.abs(Math.log(size / best))) best = probe;
+  }
+  return groups.get(best ?? 0) as readonly number[];
 }
 
 /** This function gives the budget of one cell at `size`, or `undefined` when no budget covers the size. */
@@ -198,6 +217,7 @@ export function runCost(cells: readonly CostCells[], probes: readonly CostProbe[
       const zero = atZero === undefined ? undefined : mean(atZero);
       let ms = 0;
       let count = 0;
+      let over = 0;
       let stopsAt: number | undefined;
       const extrapolated: number[] = [];
       const sizes = [...(sizesOf.get(job) as Map<number, number>).entries()].sort((a, b) => a[0] - b[0]);
@@ -205,18 +225,29 @@ export function runCost(cells: readonly CostCells[], probes: readonly CostProbe[
         if (n === 0) continue;
         const [time, outside] = timeAt(points, zero, size);
         if (outside) extrapolated.push(size);
-        const cellMs = time * (options.slow !== undefined && time > options.slow.ms ? options.slow.calls : options.calls);
+        // The spread of the probes, scaled to the time on the line, gives the time of each kind of cell at this size
+        const spread = spreadAt(probed, size);
+        const scale = time / mean(spread);
+        const cellMs = spread.map((value) => value * scale * (options.slow !== undefined && value * scale > options.slow.ms ? options.slow.calls : options.calls));
         const budget = budgetAt(budgets, size);
-        if (budget !== undefined && cellMs > budget) {
-          ms += Math.min(overruns, n) * budget;
+        const inBudget = budget === undefined ? cellMs : cellMs.filter((value) => value < budget);
+        const share = 1 - inBudget.length / cellMs.length;
+        const inMean = inBudget.length === 0 ? 0 : mean(inBudget);
+        if (budget !== undefined && share > 0 && n * share >= overruns) {
+          // The expected count of the cells that start before the overrun that stops the job
+          const started = Math.min(n, overruns / share);
+          ms += (started - overruns) * inMean + overruns * budget;
+          count += started - overruns;
+          over += overruns;
           stopsAt = size;
           break;
         }
-        ms += n * cellMs;
-        count += n;
+        ms += n * (1 - share) * inMean + n * share * (budget ?? 0);
+        count += n * (1 - share);
+        over += n * share;
       }
       const callMinutes = ms / 60_000;
-      costs.push({ job, minutes: callMinutes * overhead + jobMinutes, callMinutes, cells: count, stopsAt, extrapolated });
+      costs.push({ job, minutes: callMinutes * overhead + jobMinutes, callMinutes, cells: count, overruns: over, stopsAt, extrapolated });
     }
     models.push({ model, minutes: costs.reduce((sum, cost) => sum + cost.minutes, 0), jobs: costs, missing });
   }

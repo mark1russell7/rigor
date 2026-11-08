@@ -368,7 +368,7 @@ const cost = runCost(
 );
 
 cost.models[0].minutes;              // the minutes of the bench step on cpu-a
-cost.models[0].jobs[0].stopsAt;      // the size where a cell is over its budget, or undefined
+cost.models[0].jobs[0].stopsAt;      // the size where the job stops on its overruns, or undefined
 cost.low; cost.high;                 // the range over the CPU models
 ```
 
@@ -377,7 +377,8 @@ cost.low; cost.high;                 // the range over the CPU models
 - A size between two probe sizes gets a time on the line of the log scales. `extrapolated` names each size outside the probe sizes.
 - More probes of one size give their mean, because a sum over cells follows the mean. The size 0 is not on the line.
 - `calls` is the count of the warmup starts and the timed starts of one cell. `slow` gives a slow cell its own count.
-- The first cell over its budget stops its job. The job then adds `overruns` budgets and no other cells.
+- The probes of the nearest probe size give the spread of the times at a size. A cell over its budget costs the budget.
+- When the expected count of the cells over budget at a size gets to `overruns`, the job stops. The counts of cells are expected counts.
 - `overhead` is the bench step minutes over the call minutes of an earlier run. `jobMinutes` adds the fixed minutes of each job.
 
 ## Time the rounds

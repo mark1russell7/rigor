@@ -929,6 +929,7 @@ interface JobCost {
   readonly minutes: number;
   readonly callMinutes: number;
   readonly cells: number;
+  readonly overruns: number;
   readonly stopsAt: number | undefined;
   readonly extrapolated: readonly number[];
 }
