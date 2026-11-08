@@ -1,8 +1,10 @@
 name: Stryker stop
 
 # One real run of Stryker on a fixture lane, which a TERM stops. It checks that Stryker loads the reporter
-# rigor-partial from the build, and that `rigor-mutation scores` gives a partial score after the stop. Then two full
+# rigor-partial from the build, and that `rigor-mutation scores` gives a partial score after the stop. A run with the
+# config of `config --plan` stops after the plan, and plan-check reads it (plan.ts). Then two full
 # runs on the two parts of a second fixture check that the test files of the reports match the disk (files.ts).
+# Last, load-check --collect passes that fixture and fails each fault of a test file (collect.ts).
 on:
   # Each pull request starts this workflow, so its summary check is always there. The job changes skips the
   # work when the pull request changes no file of the gate (CI.md of the template, "A gate with paths").
@@ -56,7 +58,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @mark1russell7/rigor-mutation build
       - run: node packages/mutation/test/stryker/stop.ts
+      - run: node packages/mutation/test/stryker/plan.ts
       - run: node packages/mutation/test/stryker/files.ts
+      - run: node packages/mutation/test/stryker/collect.ts
 
   stryker-stop-ok:
     name: Stryker stop OK

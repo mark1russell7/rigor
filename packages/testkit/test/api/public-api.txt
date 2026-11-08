@@ -13,6 +13,22 @@ fencedBlocks: build/markdown-examples.d.ts#fencedBlocks
 mapImports: build/markdown-examples.d.ts#mapImports
 markdownExamples: build/markdown-examples.d.ts#markdownExamples
 
+## ./propagation (build/propagation.d.ts): names
+
+GATE_NAMES: build/propagation.d.ts#GATE_NAMES
+PropagationCapture: build/propagation.d.ts#PropagationCapture
+PropagationGateOptions: build/propagation.d.ts#PropagationGateOptions
+PropagationLine: build/propagation.d.ts#PropagationLine
+PropagationLogRecord: build/propagation.d.ts#PropagationLogRecord
+PropagationMetricPoint: build/propagation.d.ts#PropagationMetricPoint
+PropagationReport: build/propagation.d.ts#PropagationReport
+PropagationSpan: build/propagation.d.ts#PropagationSpan
+PropagationTransport: build/propagation.d.ts#PropagationTransport
+formatPropagationReport: build/propagation.d.ts#formatPropagationReport
+localTransport: build/propagation.d.ts#localTransport
+losingContext: build/propagation.d.ts#losingContext
+propagationGate: build/propagation.d.ts#propagationGate
+
 ## Declarations
 
 ### build/markdown-examples.d.ts#FencedBlock
@@ -49,3 +65,89 @@ export declare function mapImports(code: string, imports: Readonly<Record<string
 
 ### build/markdown-examples.d.ts#markdownExamples
 export declare function markdownExamples(files: readonly string[], options?: MarkdownExampleOptions): MarkdownExample[];
+
+### build/propagation.d.ts#GATE_NAMES
+export declare const GATE_NAMES: {
+  readonly tracer: "@mark1russell7/rigor-testkit/propagation";
+  readonly clientSpan: "rigor.gate.client";
+  readonly handlerSpan: "rigor.gate.handler";
+  readonly logBody: "rigor.gate.handler";
+  readonly counter: "rigor.gate.calls";
+  readonly transportAttribute: "rigor.gate.transport";
+};
+
+### build/propagation.d.ts#PropagationCapture
+export interface PropagationCapture {
+  spans(): readonly PropagationSpan[] | Promise<readonly PropagationSpan[]>;
+  logRecords(): readonly PropagationLogRecord[] | Promise<readonly PropagationLogRecord[]>;
+  metricPoints(): readonly PropagationMetricPoint[] | Promise<readonly PropagationMetricPoint[]>;
+  reset(): void | Promise<void>;
+}
+
+### build/propagation.d.ts#PropagationGateOptions
+export interface PropagationGateOptions {
+  readonly key: string;
+  readonly transports: readonly PropagationTransport[];
+  readonly capture: PropagationCapture;
+  readonly withValue?: <T>(key: string, value: string, fn: () => T) => T;
+  readonly readValue?: (key: string) => string | undefined;
+  readonly cardinality?: "low" | "high";
+  readonly flip?: false | ((transport: PropagationTransport) => PropagationTransport);
+}
+
+### build/propagation.d.ts#PropagationLine
+export interface PropagationLine {
+  readonly transport: string;
+  readonly verdict: "pass" | "fail" | "no read";
+  readonly faults: readonly string[];
+}
+
+### build/propagation.d.ts#PropagationLogRecord
+export interface PropagationLogRecord {
+  readonly body?: unknown;
+  readonly attributes: Readonly<Record<string, unknown>>;
+  readonly spanContext?: {
+    readonly traceId: string;
+  } | undefined;
+}
+
+### build/propagation.d.ts#PropagationMetricPoint
+export interface PropagationMetricPoint {
+  readonly name: string;
+  readonly attributes: Readonly<Record<string, unknown>>;
+}
+
+### build/propagation.d.ts#PropagationReport
+export interface PropagationReport {
+  readonly key: string;
+  readonly lines: readonly PropagationLine[];
+  readonly ok: boolean;
+}
+
+### build/propagation.d.ts#PropagationSpan
+export interface PropagationSpan {
+  readonly name: string;
+  readonly attributes: Readonly<Record<string, unknown>>;
+  spanContext(): {
+    readonly traceId: string;
+  };
+}
+
+### build/propagation.d.ts#PropagationTransport
+export interface PropagationTransport {
+  readonly name: string;
+  readonly call?: (handler: () => Promise<void>) => Promise<void>;
+  readonly noRead?: string;
+}
+
+### build/propagation.d.ts#formatPropagationReport
+export declare function formatPropagationReport(report: PropagationReport): string;
+
+### build/propagation.d.ts#localTransport
+export declare function localTransport(internalCall?: <T>(fn: () => T) => T): PropagationTransport;
+
+### build/propagation.d.ts#losingContext
+export declare function losingContext(transport: PropagationTransport): PropagationTransport;
+
+### build/propagation.d.ts#propagationGate
+export declare function propagationGate(options: PropagationGateOptions): Promise<PropagationReport>;

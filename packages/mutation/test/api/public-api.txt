@@ -7,33 +7,53 @@
 ## . (build/index.d.ts): names
 
 type CliIo: build/index.d.ts#CliIo
+type Collected: build/index.d.ts#Collected
+type CollectedFile: build/index.d.ts#CollectedFile
+type ComputedImport: build/index.d.ts#ComputedImport
 type ConfigOptions: build/index.d.ts#ConfigOptions
 DRY_RUN_TIMEOUT_MINUTES: build/index.d.ts#DRY_RUN_TIMEOUT_MINUTES
 type Disable: build/index.d.ts#Disable
 type DisableCheck: build/index.d.ts#DisableCheck
+type FilePlan: build/reporter.chunk.d.ts#FilePlan
 HELP: build/index.d.ts#HELP
 type Lane: build/index.d.ts#Lane
 type LeavingPath: build/index.d.ts#LeavingPath
+type LinePlan: build/reporter.chunk.d.ts#LinePlan
 type Mutant: build/index.d.ts#Mutant
 type MutationReport: build/index.d.ts#MutationReport
 NO_TSCONFIG: build/index.d.ts#NO_TSCONFIG
-PARTIAL_FILE: build/reporter.d.ts#PARTIAL_FILE
+PARTIAL_FILE: build/reporter.chunk.d.ts#PARTIAL_FILE
 PARTIAL_PLUGIN: build/index.d.ts#PARTIAL_PLUGIN
+PLAN_FILE: build/reporter.chunk.d.ts#PLAN_FILE
+PLAN_PER_CLOCK: build/reporter.chunk.d.ts#PLAN_PER_CLOCK
 type PackageFile: build/index.d.ts#PackageFile
 type PackageLane: build/index.d.ts#PackageLane
 type PartialCosts: build/index.d.ts#PartialCosts
-type PartialLine: build/reporter.d.ts#PartialLine
-PartialReporter: build/reporter.d.ts#PartialReporter
+type PartialLine: build/reporter.chunk.d.ts#PartialLine
+PartialReporter: build/reporter.chunk.d.ts#PartialReporter
 type PartialRun: build/index.d.ts#PartialRun
+type PlanLimits: build/reporter.chunk.d.ts#PlanLimits
+type PlanOfMutant: build/reporter.chunk.d.ts#PlanOfMutant
+type PlanRead: build/reporter.chunk.d.ts#PlanRead
 REPORT_DIR: build/index.d.ts#REPORT_DIR
+type ReporterOptions: build/reporter.chunk.d.ts#ReporterOptions
+STOP_MINUTES: build/reporter.chunk.d.ts#STOP_MINUTES
 STRYKER_OWNED: build/index.d.ts#STRYKER_OWNED
 type Score: build/index.d.ts#Score
 type ScoreOutcome: build/index.d.ts#ScoreOutcome
 type Selection: build/index.d.ts#Selection
+type SelectionPlan: build/reporter.chunk.d.ts#SelectionPlan
 type StrykerConfig: build/index.d.ts#StrykerConfig
+TARGET_MINUTES: build/reporter.chunk.d.ts#TARGET_MINUTES
 TIMEOUT_MS: build/index.d.ts#TIMEOUT_MS
+type TestOfDryRun: build/reporter.chunk.d.ts#TestOfDryRun
+type TestPlan: build/reporter.chunk.d.ts#TestPlan
 changedFiles: build/index.d.ts#changedFiles
+clockMinutes: build/reporter.chunk.d.ts#clockMinutes
+collectFaults: build/index.d.ts#collectFaults
 compareDisables: build/index.d.ts#compareDisables
+computedImports: build/index.d.ts#computedImports
+filePlans: build/reporter.chunk.d.ts#filePlans
 findDisables: build/index.d.ts#findDisables
 formatScore: build/index.d.ts#formatScore
 isConfigFile: build/index.d.ts#isConfigFile
@@ -42,9 +62,11 @@ leavingPaths: build/index.d.ts#leavingPaths
 packageScore: build/index.d.ts#packageScore
 parseLane: build/index.d.ts#parseLane
 parsePartial: build/index.d.ts#parsePartial
+parsePlan: build/reporter.chunk.d.ts#parsePlan
 parseReport: build/index.d.ts#parseReport
 partErrors: build/index.d.ts#partErrors
 partialScore: build/index.d.ts#partialScore
+readPlan: build/reporter.chunk.d.ts#readPlan
 relatedTestFiles: build/index.d.ts#relatedTestFiles
 rewritesTsconfig: build/index.d.ts#rewritesTsconfig
 runCli: build/index.d.ts#runCli
@@ -52,8 +74,10 @@ runSelections: build/index.d.ts#runSelections
 scoreReport: build/index.d.ts#scoreReport
 select: build/index.d.ts#select
 selectionNames: build/index.d.ts#selectionNames
+staticFaults: build/reporter.chunk.d.ts#staticFaults
 strykerConfig: build/index.d.ts#strykerConfig
 summaryMarkdown: build/index.d.ts#summaryMarkdown
+testPlans: build/reporter.chunk.d.ts#testPlans
 
 ## bin: 1 commands
 
@@ -69,11 +93,34 @@ interface CliIo {
   readonly env?: Readonly<Record<string, string | undefined>>;
 }
 
+### build/index.d.ts#Collected
+interface Collected {
+  readonly version: string;
+  readonly path: string;
+  readonly files: readonly CollectedFile[];
+  readonly unhandled: readonly string[];
+  readonly selections: Readonly<Record<string, readonly string[]>>;
+}
+
+### build/index.d.ts#CollectedFile
+interface CollectedFile {
+  readonly file: string;
+  readonly errors: readonly string[];
+  readonly children: number;
+}
+
+### build/index.d.ts#ComputedImport
+interface ComputedImport {
+  readonly file: string;
+  readonly line: number;
+}
+
 ### build/index.d.ts#ConfigOptions
 interface ConfigOptions {
   readonly concurrency?: number;
   readonly reportDir?: string;
   readonly dryRun?: boolean;
+  readonly plan?: boolean;
   readonly tsconfigRewrite?: boolean;
 }
 
@@ -103,6 +150,9 @@ interface Lane {
   readonly disables?: string;
   readonly maxTestFall?: number;
   readonly plannedFalls?: Readonly<Record<string, string>>;
+  readonly planPerClock?: number;
+  readonly targetMinutes?: number;
+  readonly stopMinutes?: number;
 }
 
 ### build/index.d.ts#LeavingPath
@@ -160,6 +210,8 @@ interface PackageLane {
   readonly dryRunTimeoutMinutes?: number;
   readonly stryker?: Readonly<Record<string, unknown>>;
   readonly notRead?: Readonly<Record<string, string>>;
+  readonly computedImports?: Readonly<Record<string, string>>;
+  readonly staticLimits?: Readonly<Record<string, number>>;
 }
 
 ### build/index.d.ts#PartialCosts
@@ -244,6 +296,9 @@ interface StrykerConfig {
   readonly tsconfigFile?: string;
   readonly dryRunOnly?: true;
   readonly disableBail?: true;
+  readonly rigorPartial?: {
+    readonly stopAfterPlan: true;
+  };
 }
 
 ### build/index.d.ts#TIMEOUT_MS
@@ -252,8 +307,14 @@ export declare const TIMEOUT_MS = 12e4;
 ### build/index.d.ts#changedFiles
 export declare function changedFiles(selection: Selection, changed: readonly string[], exists?: (file: string) => boolean): string[];
 
+### build/index.d.ts#collectFaults
+export declare function collectFaults(collected: Collected): string[];
+
 ### build/index.d.ts#compareDisables
 export declare function compareDisables(found: readonly Disable[], listed: readonly Disable[]): DisableCheck;
+
+### build/index.d.ts#computedImports
+export declare function computedImports(files: readonly PackageFile[], vitestConfig?: string): ComputedImport[];
 
 ### build/index.d.ts#findDisables
 export declare function findDisables(files: readonly {
@@ -324,11 +385,30 @@ export declare function strykerConfig(selection: Selection, options?: ConfigOpti
 ### build/index.d.ts#summaryMarkdown
 export declare function summaryMarkdown(scores: readonly Score[]): string;
 
-### build/reporter.d.ts#PARTIAL_FILE
-export declare const PARTIAL_FILE = "partial.jsonl";
+### build/reporter.chunk.d.ts#FilePlan
+interface FilePlan {
+  readonly mutants: number;
+  readonly runs: number;
+  readonly static: number;
+  readonly netMs: number;
+  readonly limitMs: number;
+  readonly lines: readonly LinePlan[];
+}
 
-### build/reporter.d.ts#PartialLine
-export type PartialLine = {
+### build/reporter.chunk.d.ts#LinePlan
+type LinePlan = readonly [line: number, runs: number, staticRuns: number, netMs: number];
+
+### build/reporter.chunk.d.ts#PARTIAL_FILE
+declare const PARTIAL_FILE = "partial.jsonl";
+
+### build/reporter.chunk.d.ts#PLAN_FILE
+declare const PLAN_FILE = "plan.json";
+
+### build/reporter.chunk.d.ts#PLAN_PER_CLOCK
+declare const PLAN_PER_CLOCK = 9.8;
+
+### build/reporter.chunk.d.ts#PartialLine
+type PartialLine = {
   readonly event: "start";
   readonly at: number;
 } | {
@@ -344,25 +424,118 @@ export type PartialLine = {
   readonly statusReason?: string;
   readonly mutatorName: string;
   readonly line: number;
+  readonly netMs?: number;
+  readonly limitMs?: number;
+  readonly static?: boolean;
 } | {
   readonly event: "done";
   readonly at: number;
 };
 
-### build/reporter.d.ts#PartialReporter
-export declare class PartialReporter {
+### build/reporter.chunk.d.ts#PartialReporter
+declare class PartialReporter {
   static readonly inject: readonly ["options"];
   readonly file: string;
-  constructor(options: {
-    readonly jsonReporter?: {
-      readonly fileName?: string;
+  readonly planFile: string;
+  constructor(options: ReporterOptions, now?: () => number, cwd?: string, exit?: (code: number) => void);
+  onDryRunCompleted(event: {
+    readonly result: {
+      readonly tests: readonly TestOfDryRun[];
     };
-  }, now?: () => number, cwd?: string);
+  }): void;
   onMutationTestingPlanReady(event: {
-    readonly mutantPlans: readonly {
-      readonly plan: string;
-    }[];
+    readonly mutantPlans: readonly PlanOfMutant[];
   }): void;
   onMutantTested(result: TestedMutant): void;
   onMutationTestReportReady(): void;
 }
+
+### build/reporter.chunk.d.ts#PlanLimits
+interface PlanLimits {
+  readonly planPerClock?: number;
+  readonly targetMinutes?: number;
+  readonly stopMinutes?: number;
+  readonly staticLimits?: Readonly<Record<string, number>>;
+}
+
+### build/reporter.chunk.d.ts#PlanOfMutant
+interface PlanOfMutant {
+  readonly plan: string;
+  readonly mutant: {
+    readonly id: string;
+    readonly fileName: string;
+    readonly static?: boolean;
+    readonly location?: {
+      readonly start: {
+        readonly line: number;
+      };
+    };
+  };
+  readonly netTime?: number;
+  readonly runOptions?: {
+    readonly timeout?: number;
+    readonly testFilter?: readonly string[];
+  };
+}
+
+### build/reporter.chunk.d.ts#PlanRead
+interface PlanRead {
+  readonly runs: number;
+  readonly static: number;
+  readonly netMs: number;
+  readonly minutes: number;
+  readonly faults: readonly string[];
+  readonly warnings: readonly string[];
+  readonly line: string;
+}
+
+### build/reporter.chunk.d.ts#ReporterOptions
+interface ReporterOptions {
+  readonly jsonReporter?: {
+    readonly fileName?: string;
+  };
+  readonly rigorPartial?: {
+    readonly stopAfterPlan?: boolean;
+  };
+}
+
+### build/reporter.chunk.d.ts#STOP_MINUTES
+declare const STOP_MINUTES = 140;
+
+### build/reporter.chunk.d.ts#SelectionPlan
+interface SelectionPlan {
+  readonly files: Readonly<Record<string, FilePlan>>;
+  readonly tests: readonly TestPlan[];
+}
+
+### build/reporter.chunk.d.ts#TARGET_MINUTES
+declare const TARGET_MINUTES = 100;
+
+### build/reporter.chunk.d.ts#TestOfDryRun
+interface TestOfDryRun {
+  readonly id: string;
+  readonly name: string;
+  readonly fileName?: string;
+  readonly timeSpentMs: number;
+}
+
+### build/reporter.chunk.d.ts#TestPlan
+type TestPlan = readonly [name: string, file: string, ms: number, runs: number, costMs: number];
+
+### build/reporter.chunk.d.ts#clockMinutes
+declare function clockMinutes(netMs: number, planPerClock?: number): number;
+
+### build/reporter.chunk.d.ts#filePlans
+declare function filePlans(plans: readonly PlanOfMutant[], path?: (fileName: string) => string): Record<string, FilePlan>;
+
+### build/reporter.chunk.d.ts#parsePlan
+declare function parsePlan(json: unknown): SelectionPlan;
+
+### build/reporter.chunk.d.ts#readPlan
+declare function readPlan(name: string, plan: SelectionPlan, limits?: PlanLimits): PlanRead;
+
+### build/reporter.chunk.d.ts#staticFaults
+declare function staticFaults(files: Readonly<Record<string, FilePlan>>, limits?: Readonly<Record<string, number>>): string[];
+
+### build/reporter.chunk.d.ts#testPlans
+declare function testPlans(plans: readonly PlanOfMutant[], tests: readonly TestOfDryRun[], path?: (fileName: string) => string, top?: number): TestPlan[];

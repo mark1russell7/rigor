@@ -22,6 +22,7 @@ type CoverageCell: build/index.d.ts#CoverageCell
 type CoverageMinSample: build/index.d.ts#CoverageMinSample
 type CoverageReason: build/index.d.ts#CoverageReason
 type CoverageStep: build/index.d.ts#CoverageStep
+EMPTY_RUNNING: build/index.d.ts#EMPTY_RUNNING
 type Effect: build/index.d.ts#Effect
 type EloOptions: build/index.d.ts#EloOptions
 type EloUpdate: build/index.d.ts#EloUpdate
@@ -93,6 +94,7 @@ type RidgeOptions: build/index.d.ts#RidgeOptions
 type RidgeRankInput: build/index.d.ts#RidgeRankInput
 type RidgeResponseModel: build/index.d.ts#RidgeResponseModel
 type RidgeTerm: build/index.d.ts#RidgeTerm
+type RunningSummary: build/index.d.ts#RunningSummary
 SIGN_FLIP_EXACT_LIMIT: build/index.d.ts#SIGN_FLIP_EXACT_LIMIT
 SIGN_FLIP_EXACT_MAX: build/index.d.ts#SIGN_FLIP_EXACT_MAX
 type SampleTotalOptions: build/index.d.ts#SampleTotalOptions
@@ -115,6 +117,7 @@ type UStatisticMethod: build/index.d.ts#UStatisticMethod
 type UStatisticOptions: build/index.d.ts#UStatisticOptions
 U_STATISTIC_TIGHT_MIN_SAMPLE: build/index.d.ts#U_STATISTIC_TIGHT_MIN_SAMPLE
 Z95: build/index.d.ts#Z95
+addToRunning: build/index.d.ts#addToRunning
 bestSmoothLaw: build/index.d.ts#bestSmoothLaw
 binomialInterval: build/index.d.ts#binomialInterval
 binomialTest: build/index.d.ts#binomialTest
@@ -145,6 +148,7 @@ logLoss: build/index.d.ts#logLoss
 mean: build/index.d.ts#mean
 median: build/index.d.ts#median
 medianInterval: build/index.d.ts#medianInterval
+mergeRunning: build/index.d.ts#mergeRunning
 modeCount: build/index.d.ts#modeCount
 negativeBinomialInterval: build/index.d.ts#negativeBinomialInterval
 noiseFloor: build/index.d.ts#noiseFloor
@@ -165,6 +169,9 @@ ranks: build/index.d.ts#ranks
 ratingToStrength: build/index.d.ts#ratingToStrength
 responseCells: build/index.d.ts#responseCells
 ridgeSolve: build/index.d.ts#ridgeSolve
+runningMean: build/index.d.ts#runningMean
+runningOf: build/index.d.ts#runningOf
+runningSd: build/index.d.ts#runningSd
 sampleTotalInterval: build/index.d.ts#sampleTotalInterval
 sd: build/index.d.ts#sd
 signFlipTest: build/index.d.ts#signFlipTest
@@ -317,6 +324,9 @@ interface CoverageStep {
   readonly qualifies: boolean;
   readonly reason: CoverageReason;
 }
+
+### build/index.d.ts#EMPTY_RUNNING
+export declare const EMPTY_RUNNING: RunningSummary;
 
 ### build/index.d.ts#Effect
 interface Effect {
@@ -804,6 +814,15 @@ interface RidgeTerm {
   readonly weight: number;
 }
 
+### build/index.d.ts#RunningSummary
+interface RunningSummary {
+  readonly n: number;
+  readonly sum: number;
+  readonly min: number;
+  readonly max: number;
+  readonly m2: number;
+}
+
 ### build/index.d.ts#SIGN_FLIP_EXACT_LIMIT
 export declare const SIGN_FLIP_EXACT_LIMIT = 24;
 
@@ -952,6 +971,9 @@ export declare const U_STATISTIC_TIGHT_MIN_SAMPLE: number;
 ### build/index.d.ts#Z95
 export declare const Z95 = 1.959963984540054;
 
+### build/index.d.ts#addToRunning
+export declare function addToRunning(s: RunningSummary, value: number): RunningSummary;
+
 ### build/index.d.ts#bestSmoothLaw
 export declare function bestSmoothLaw(values: readonly number[]): SmoothLaw;
 
@@ -1042,6 +1064,9 @@ export declare function median(values: readonly number[]): number;
 ### build/index.d.ts#medianInterval
 export declare function medianInterval(values: readonly number[], level?: number): MedianInterval;
 
+### build/index.d.ts#mergeRunning
+export declare function mergeRunning(a: RunningSummary, b: RunningSummary): RunningSummary;
+
 ### build/index.d.ts#modeCount
 export declare function modeCount(values: readonly number[], options?: ModeOptions): number;
 
@@ -1103,6 +1128,15 @@ export declare function responseCells(record: Pick<ResponseRecord, "dimensions">
 
 ### build/index.d.ts#ridgeSolve
 export declare function ridgeSolve(gram: ArrayLike<number>, moment: ArrayLike<number>, lambda: number, options?: RidgeOptions): number[];
+
+### build/index.d.ts#runningMean
+export declare function runningMean(s: RunningSummary): number;
+
+### build/index.d.ts#runningOf
+export declare function runningOf(values: Iterable<number>): RunningSummary;
+
+### build/index.d.ts#runningSd
+export declare function runningSd(s: RunningSummary): number;
 
 ### build/index.d.ts#sampleTotalInterval
 export declare function sampleTotalInterval(values: readonly number[], options: SampleTotalOptions): Interval;

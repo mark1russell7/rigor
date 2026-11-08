@@ -218,7 +218,17 @@ export interface TestFileFaults {
  * @param dir - the folder of the package, to make a full path of a report relative
  */
 export function testFileFaults(reports: readonly MutationReport[], onDisk: readonly string[], notRead: Readonly<Record<string, string>> = {}, dir = ""): TestFileFaults {
-  const read = readTestFiles(reports, dir);
+  return readFaults(readTestFiles(reports, dir), onDisk, notRead);
+}
+
+/**
+ * This function examines the test files of a package against the test files that its selections read (LANE.FILES).
+ * `load-check --collect` gives the files that the selections start. The reports give the files that they read.
+ *
+ * @param read - the test files that the selections read, from the folder of the package, with `/`
+ * @param onDisk - the test files of the package, from its folder, with `/`
+ */
+export function readFaults(read: ReadonlySet<string>, onDisk: readonly string[], notRead: Readonly<Record<string, string>> = {}): TestFileFaults {
   const files = new Set(onDisk);
   return {
     unread: onDisk.filter((f) => !read.has(f) && notRead[f] === undefined),

@@ -1,16 +1,21 @@
 /**
  * The CLI `rigor-mutation`. The work is in `runCli`, so a test can start the CLI in a fixture folder.
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, appendFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { REPORT_DIR, rewritesTsconfig, strykerConfig } from "./config.ts";
 import { compareDisables, findDisables, type Disable } from "./disables.ts";
-import { leavingPaths, relatedTestFiles } from "./load.ts";
+import { collectFaults, computedImports, leavingPaths, relatedTestFiles, type Collected, type CollectRequest, type PackageFile } from "./load.ts";
 import { changedFiles, globsSelect, MAX_TEST_FALL, parseLane, partErrors, runSelections, select, selectionNames, type Lane, type Selection } from "./lane.ts";
+import { parsePlan, PLAN_FILE, readPlan } from "./plan.ts";
 import { PARTIAL_FILE } from "./reporter.ts";
-import { failScore, formatScore, packageScore, parsePartial, parseReport, partialScore, scoreReport, summaryMarkdown, testFall, testFileFaults, unreadTestFiles, type MutationReport, type Score } from "./score.ts";
+import { copyOfFolder, ignoreRules, minimatchOf, removeCopy, sandboxFiles, tempDirOf } from "./sandbox.ts";
+import { failScore, formatScore, packageScore, parsePartial, parseReport, readFaults, partialScore, scoreReport, summaryMarkdown, testFall, testFileFaults, unreadTestFiles, type MutationReport, type Score } from "./score.ts";
 
 /** The input and the output of the CLI. */
 export interface CliIo {
@@ -29,10 +34,11 @@ export const HELP: string = `rigor-mutation: the mutation tests of a repository,
                                                selections of a full run: the parts of a package with parts.
                                                With --changed, only the runs with a changed file.
   rigor-mutation dir <selection>               the folder of the package of a selection
-  rigor-mutation config <selection> [--out <file>] [--concurrency <n>] [--dry-run] [--changed <file>]
+  rigor-mutation config <selection> [--out <file>] [--concurrency <n>] [--dry-run | --plan] [--changed <file>]
                                                the Stryker config of a selection, as JSON. With --dry-run,
-                                               Stryker starts only the tests. With --changed, it mutates only
-                                               the changed files of the selection.
+                                               Stryker starts only the tests. With --plan, Stryker also makes
+                                               its plan, writes it into plan.json and stops. With --changed,
+                                               it mutates only the changed files of the selection.
   rigor-mutation scores <selection>... [--report <file> | --reports <dir>] [--summary <file>]
                        [--last <file>] [--write-last <file>] [--test-files] [--alone]
                                                the score of each selection, with its gate and its count
@@ -48,10 +54,24 @@ export const HELP: string = `rigor-mutation: the mutation tests of a repository,
                                                --alone, a package with all its selections named also
                                                fails for a test file that no report reads, and for an
                                                entry of "notRead" that is not true.
+  rigor-mutation plan-check <selection>... [--report <file> | --reports <dir>]
+                                               the estimate of the clock of each selection from its plan.json,
+                                               against "targetMinutes" (default 100) and "stopMinutes" (default
+                                               140) at "planPerClock" (default 9.8). A selection over the
+                                               target gives a warning. A selection over the stop fails, and so
+                                               does a file over its count of "staticLimits". --reports reads
+                                               <dir>/mutation-<selection>/plan.json.
   rigor-mutation disables [--write]            compare the disable comments with their list
-  rigor-mutation load-check [<selection>...]   refuse each relative path of a package that leaves its folder.
+  rigor-mutation load-check [<selection>...] [--collect] [--runner <file>]
+                                               refuse each relative path of a package that leaves its folder.
                                                Stryker starts the tests in a copy of the folder, so such a
                                                path finds no file. No selection checks each package.
+                                               With --collect, the Vitest of each package also loads each
+                                               test file in a copy of the folder, as Stryker does. A file
+                                               that does not load, has no test or that no selection
+                                               starts fails, and so does a computed dynamic import that
+                                               "computedImports" does not name. With --runner, the
+                                               version and the path of each Vitest go in the file.
 
   --lane <file>      the lane file. The default is mutation.json.
   --changed <file>   a file with one changed path on each line, from the folder of the lane file,
@@ -82,10 +102,86 @@ function sourcesOf(root: string, dir: string, tests = false): string[] {
     });
 }
 
-/** This function checks the relative paths of the package of each selection (`load-check`). */
-function loadCheck(lane: Lane, laneDir: string, names: readonly string[], io: CliIo): number {
+/** The script of `load-check --collect`. It is beside this file, in the source and in the build. */
+const COLLECT_SCRIPT = fileURLToPath(new URL(import.meta.url.endsWith(".ts") ? "./collect.ts" : "./collect.js", import.meta.url));
+
+/**
+ * This function starts the collect of Vitest in a copy of the folder `dir`, in a new process. The copy takes the files
+ * that Stryker copies to its sandbox. The function gives the collect, or the reason when the process gives no collect.
+ *
+ * @param selections - the mutated files of each selection, from `dir`
+ * @param config - the Stryker config of the package, for its ignore rules
+ */
+function collectIn(dir: string, vitestConfig: string | undefined, selections: Readonly<Record<string, readonly string[]>>, config: Readonly<Record<string, unknown>>): Collected | string {
+  const Minimatch = minimatchOf(dir);
+  if (typeof Minimatch === "string") return Minimatch;
+  const tmp = mkdtempSync(join(tmpdir(), "rigor-mutation-collect-"));
+  try {
+    const copy = copyOfFolder(dir, sandboxFiles(dir, ignoreRules(config), Minimatch), tempDirOf(config));
+    try {
+      const out = join(tmp, "collected.json");
+      const request: CollectRequest = { dir: copy, ...(vitestConfig === undefined ? {} : { config: vitestConfig }), selections };
+      writeFileSync(join(tmp, "request.json"), JSON.stringify(request));
+      const r = spawnSync(process.execPath, [COLLECT_SCRIPT, join(tmp, "request.json"), out], { cwd: copy, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+      // Vitest sets the exit code 1 for a file that does not load, so the file of the collect decides, not the code.
+      if (!existsSync(out)) {
+        const why = (r.error?.message ?? `${r.stdout}${r.stderr}`).trim().split("\n").slice(-5).join(" ");
+        return `the collect of Vitest exited with ${String(r.status)}: ${why}`;
+      }
+      return JSON.parse(readFileSync(out, "utf8")) as Collected;
+    } finally {
+      removeCopy(copy);
+    }
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+/** The options of `load-check`. */
+interface LoadCheckOptions {
+  /** With true, Vitest also collects each test file of each package (`--collect`). */
+  readonly collect: boolean;
+  /** The file for the version and the path of the Vitest of each package (`--runner`). */
+  readonly runner: string | undefined;
+}
+
+/**
+ * This function gives the faults of the collect of a package (`load-check --collect`). A test file that does not load
+ * is a fault. A test file that no selection starts is a fault (LANE.FILES). A computed dynamic import that the lane
+ * does not name is a fault.
+ */
+function collectCheck(lane: Lane, laneDir: string, pkg: string, files: readonly PackageFile[]): { readonly faults: string[]; readonly collected: Collected | undefined } {
+  const p = lane.packages[pkg];
+  if (p === undefined) return { faults: [], collected: undefined };
+  const own = runSelections(lane).map((n) => select(lane, n)).filter((s) => s.pkg === pkg);
+  const sources = files.map((f) => f.file).filter((f) => !TEST.test(f));
+  const mutated = Object.fromEntries(own.map((s) => [s.name, sources.filter((f) => globsSelect(s.mutate, f))]));
+  const config = own[0] === undefined ? {} : strykerConfig(own[0]);
+  const collected = collectIn(resolve(laneDir, p.dir), p.vitestConfig, mutated, config);
+  const computed = computedImports(files, p.vitestConfig);
+  const allowed = p.computedImports ?? {};
+  const faults = [
+    ...computed.filter((c) => allowed[c.file] === undefined).map((c) => `${c.file}:${String(c.line)}: a dynamic import with a computed path. The related mode of Vitest does not follow it, so a test file that reaches the mutated files only through it starts in no selection. Import the file by its path, or give the reason in "computedImports"`),
+    ...Object.keys(allowed).filter((f) => !computed.some((c) => c.file === f)).map((f) => `"computedImports" is not true: ${f} has no dynamic import with a computed path that the run loads`),
+  ];
+  if (typeof collected === "string") return { faults: [collected, ...faults], collected: undefined };
+  const onDisk = files.map((f) => f.file).filter((f) => TEST.test(f));
+  const started = new Set(own.flatMap((s) => (runsAllTests(s) ? onDisk : (collected.selections[s.name] ?? []))));
+  const { unread, stale } = readFaults(started, onDisk, p.notRead);
+  faults.push(
+    ...collectFaults(collected),
+    ...unread.map((f) => `${f}: no selection starts the file, and "notRead" does not give its reason`),
+    ...stale.map((f) => `"notRead" is not true: ${f} is not on the disk, or a selection starts it`),
+  );
+  return { faults, collected };
+}
+
+/** This function checks the relative paths of the package of each selection, and with `--collect`, the load of each test file (`load-check`). */
+function loadCheck(lane: Lane, laneDir: string, names: readonly string[], io: CliIo, options: LoadCheckOptions): number {
   const pkgs = [...new Set((names.length === 0 ? Object.keys(lane.packages) : names.map((n) => select(lane, n).pkg)))];
   let failed = 0;
+  let unread = 0;
+  const runners: Record<string, { version: string; path: string }> = {};
   for (const pkg of pkgs) {
     const s = select(lane, pkg);
     const dir = resolve(laneDir, s.dir);
@@ -101,10 +197,25 @@ function loadCheck(lane: Lane, laneDir: string, names: readonly string[], io: Cl
     if (found.length === 0) io.stdout(`load-check ${pkg}: ${String(files.length)} files, no relative path leaves ${s.dir}
 `);
     else failed += 1;
+    if (!options.collect) continue;
+    const { faults, collected } = collectCheck(lane, laneDir, pkg, files);
+    for (const fault of faults) io.stderr(`${s.dir}: ${fault}\n`);
+    if (collected !== undefined) {
+      runners[pkg] = { version: collected.version, path: collected.path };
+      if (faults.length === 0) io.stdout(`load-check ${pkg}: Vitest ${collected.version} loads ${String(collected.files.length)} test files in a copy of ${s.dir}, and the selections start each one\n`);
+    }
+    if (faults.length > 0) unread += 1;
+  }
+  if (options.runner !== undefined) {
+    const file = resolve(io.cwd, options.runner);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, `${JSON.stringify(runners, null, 2)}\n`);
   }
   if (failed > 0) io.stderr(`load-check: ${String(failed)} packages have a relative path that leaves their folder. Import the file from its package, or move it into the folder.
 `);
-  return failed > 0 ? 1 : 0;
+  if (unread > 0) io.stderr(`No read: ${String(unread)} packages have a test file that Vitest does not load, that holds no test, or that no selection starts. A mutant that only this file detects survives, so a score of the package is not a reading.
+`);
+  return failed > 0 || unread > 0 ? 1 : 0;
 }
 
 const readJson = (file: string): unknown => JSON.parse(readFileSync(file, "utf8"));
@@ -361,6 +472,55 @@ function annotations(results: readonly Score[], falls: readonly PlannedFall[]): 
   ];
 }
 
+/** The options of `plan-check`. */
+interface PlanCheckOptions {
+  readonly report: string | undefined;
+  readonly reports: string | undefined;
+}
+
+/**
+ * This function reads the plan of each selection (`plan-check`). It gives the estimate of the clock of each selection.
+ * It warns of a selection over its target. It fails a selection over its stop or with no plan, and a file over its
+ * limit of static runs.
+ */
+function planCheck(lane: Lane, laneDir: string, names: readonly string[], o: PlanCheckOptions, io: CliIo): number {
+  if (names.length === 0) throw new Error(`"plan-check" takes one or more selections`);
+  if (o.report !== undefined && names.length > 1) throw new Error(`--report takes one selection`);
+  if (o.report !== undefined && o.reports !== undefined) throw new Error(`"plan-check" takes --report or --reports, not both`);
+  let failed = 0;
+  let warned = 0;
+  const actions = io.env?.["GITHUB_ACTIONS"] === "true";
+  for (const name of names) {
+    const s = select(lane, name);
+    const file =
+      o.reports !== undefined
+        ? resolve(io.cwd, o.reports, `mutation-${name}`, PLAN_FILE)
+        : o.report === undefined
+          ? resolve(laneDir, s.dir, REPORT_DIR, PLAN_FILE)
+          : resolve(io.cwd, o.report);
+    if (!existsSync(file)) {
+      failed += 1;
+      io.stdout(`${name}: FAIL: there is no plan at ${relative(io.cwd, file).replaceAll("\\", "/")}. Start Stryker with the config of "config --plan".\n`);
+      continue;
+    }
+    const limits = lane.packages[s.pkg]?.staticLimits;
+    const read = readPlan(name, parsePlan(readJson(file)), {
+      ...(lane.planPerClock === undefined ? {} : { planPerClock: lane.planPerClock }),
+      ...(lane.targetMinutes === undefined ? {} : { targetMinutes: lane.targetMinutes }),
+      ...(lane.stopMinutes === undefined ? {} : { stopMinutes: lane.stopMinutes }),
+      ...(limits === undefined ? {} : { staticLimits: limits }),
+    });
+    io.stdout(`${read.line}\n${read.warnings.map((w) => `  WARN: ${w}\n`).join("")}${read.faults.map((f) => `  FAIL: ${f}\n`).join("")}`);
+    // The estimate has an error of 28 minutes in the mean, so a selection over its target gives a warning with a mark.
+    if (actions) for (const w of read.warnings) io.stdout(`::warning title=${escapeCommand("Mutation plan: over the target", true)}::${escapeCommand(w)}\n`);
+    if (read.warnings.length > 0) warned += 1;
+    if (read.faults.length > 0) failed += 1;
+  }
+  const over = warned === 0 ? "" : `, and ${String(warned)} of them are over the target`;
+  io.stdout(failed === 0 ? `plan-check: each plan of ${String(names.length)} selections is in its limits${over}\n` : `plan-check: ${String(failed)} of ${String(names.length)} selections fail${over}\n`);
+  return failed === 0 ? 0 : 1;
+}
+
 /** This function reads a file of test counts: an object from each selection to its count. */
 function readCounts(file: string): Record<string, number> {
   const json = readJson(file);
@@ -414,11 +574,14 @@ export function runCli(argv: readonly string[], io: CliIo): number {
       write: { type: "boolean", default: false },
       runs: { type: "boolean", default: false },
       "dry-run": { type: "boolean", default: false },
+      plan: { type: "boolean", default: false },
       changed: { type: "string" },
       last: { type: "string" },
       "write-last": { type: "string" },
       "test-files": { type: "boolean", default: false },
       alone: { type: "boolean", default: false },
+      collect: { type: "boolean", default: false },
+      runner: { type: "string" },
       help: { type: "boolean", default: false },
     },
   });
@@ -456,13 +619,14 @@ export function runCli(argv: readonly string[], io: CliIo): number {
     case "config": {
       const concurrency = values.concurrency === undefined ? undefined : Number(values.concurrency);
       if (concurrency !== undefined && !(Number.isInteger(concurrency) && concurrency > 0)) throw new Error(`--concurrency is not a positive integer`);
+      if (values["dry-run"] && values.plan) throw new Error(`"config" takes --dry-run or --plan, not both`);
       checkPartsOf(lane, laneDir, [one()]);
       const all = select(lane, one());
       const files = changed === undefined ? undefined : changedFiles(all, changed, existsIn(laneDir, all));
       if (files?.length === 0) throw new Error(`the selection ${all.name} has no changed file`);
       const selection = files === undefined ? all : { ...all, mutate: files };
       const tsconfigRewrite = rewritesTsconfig(typescriptMajor(resolve(laneDir, all.dir)));
-      const options = { ...(concurrency === undefined ? {} : { concurrency }), dryRun: values["dry-run"], tsconfigRewrite };
+      const options = { ...(concurrency === undefined ? {} : { concurrency }), dryRun: values["dry-run"], plan: values.plan, tsconfigRewrite };
       const text = `${JSON.stringify(strykerConfig(selection, options), null, 2)}\n`;
       if (values.out === undefined) io.stdout(text);
       else {
@@ -473,10 +637,12 @@ export function runCli(argv: readonly string[], io: CliIo): number {
     }
     case "scores":
       return scores(lane, laneDir, names, { report: values.report, reports: values.reports, summary: values.summary, last: values.last, writeLast: values["write-last"], testFiles: values["test-files"], alone: values.alone }, io);
+    case "plan-check":
+      return planCheck(lane, laneDir, names, { report: values.report, reports: values.reports }, io);
     case "disables":
       return disables(lane, laneDir, values.write, io);
     case "load-check":
-      return loadCheck(lane, laneDir, names, io);
+      return loadCheck(lane, laneDir, names, io, { collect: values.collect, runner: values.runner });
     default:
       io.stderr(`unknown command "${command}"\n\n${HELP}`);
       return 1;

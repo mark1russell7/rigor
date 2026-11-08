@@ -45,6 +45,10 @@ The lane file `mutation.json` is at the root of the repository:
 - `dryRunTimeoutMinutes` is the time in minutes for the run of the tests without mutants. The default is 15.
 - `stryker` has more options for the Stryker config of each selection of the package, for example `{ "ignoreStatic": true }`. Its keys replace the keys of the config, but `--concurrency` replaces its `concurrency`. The lane owns `mutate`, `thresholds`, `jsonReporter`, `htmlReporter`, `timeoutMS` and `dryRunTimeoutMinutes`, so `stryker` cannot have them.
 - `disables` (at the root of the lane) names the list of the disabled mutants. The default is `mutation-disables.json`.
+- `staticLimits` gives the most static runs of each file of the package, from the folder where Stryker starts. The key `*` gives the limit of the other files. `plan-check` reads it.
+- `targetMinutes` (at the root of the lane) is the target of the estimate of each selection, in minutes. The default is 100.
+- `stopMinutes` (at the root of the lane) is the stop of the estimate of each selection, in minutes. The default is 140. It is not less than `targetMinutes`.
+- `planPerClock` (at the root of the lane) is the planned net time of one minute of the clock. The default is 9.8, from a nightly run of Vex.
 
 A selection is one Stryker run: a package (`collections`) or a part (`collections.impl`). `rigor-mutation list --runs` gives the selections of a full run: the parts of each package with parts, else the package.
 
@@ -92,6 +96,31 @@ lib.rest: 50.00 % (1 of 2, 1 survived), no gate: FAIL: partial: Stryker stopped 
 A partial score is a no read, because it does not read all the mutants. Its field `partial` gives the costs. Use the estimate to divide the package into parts. The estimate does not count the mutants with an early result, because they take no time.
 
 The workflow `stryker-stop.yml` checks the reporter in a real run. It stops Stryker on the fixture lane `test/stryker/mutation.json` and examines the partial score.
+
+### The cost plan
+
+After the run of the tests without mutants, Stryker makes a plan of the mutants. The reporter `rigor-partial` writes it to `plan.json`, next to `mutation.json`:
+
+- `files` gives the plan of each file: its mutants, the runs, the static runs, the planned net time and the time limits in milliseconds. `lines` gives the runs, the static runs and the net time of each line.
+- `tests` gives the 40 tests of the largest cost. The cost of a test is its time, times the runs that start it.
+
+Each line of a mutant in `partial.jsonl` also gives its planned net time and its time limit.
+
+`rigor-mutation config <selection> --plan` gives a config that stops Stryker after the plan. Stryker starts no mutant, so the plan costs only the run of the tests.
+
+`rigor-mutation plan-check <selection>...` reads the plan of each selection. It gives the estimate of the clock. It gives a warning when the estimate is over `targetMinutes`, and in GitHub Actions also a warning annotation. The estimate has an error of 28 minutes in the mean, so the target does not fail. These conditions fail a selection:
+
+- The estimate is over `stopMinutes`. Stryker cannot end the selection before the stop, so it cannot give a full score.
+- A file has more static runs than its limit in `staticLimits`.
+
+A static run starts each test, so it costs the time of all the tests. Code outside a function gives a static mutant.
+
+```text
+vex.kernel: 812 runs, 3 of them static, with a planned net time of 12.4 h. The estimate is 76 minutes of the clock, the target is 100 and the stop is 140.
+plan-check: each plan of 1 selections is in its limits
+```
+
+`--report <file>` reads the plan of one selection from a file. `--reports <dir>` reads `<dir>/mutation-<selection>/plan.json`. The workflow `stryker-stop.yml` checks the plan in a real run.
 
 ## The score
 
@@ -155,6 +184,30 @@ packages/compiler/src/module-sheet.test.ts:12: "../../testkit/src/fc-timeout.ts"
 ```
 
 The check does not read comments, type imports and paths with a template expression.
+
+With `--collect`, the Vitest of each package also loads each test file, as Stryker does. The check copies the folder of the package to `.stryker-tmp/load-check-*` in that folder, and links its `node_modules`. Stryker makes its sandbox in the same form. The copy takes only the files that Stryker copies. The ignore rules of Stryker 10 and the `ignorePatterns` of the `stryker` field of the lane leave out the other files. The collect of Vitest starts in the copy, in a new process, with `staticParse: false`. Then each file starts, so the check finds a missing package, also through a helper. A path that finds a file only in the folder of the package fails in the copy too. Then for each selection of the package, Vitest gives the test files that its related mode starts for the mutated files. These are faults:
+
+- a test file that does not load,
+- a test file that holds no test,
+- an error outside a test file,
+- a package with no test file,
+- a test file that no selection starts, and that `notRead` does not name,
+- an entry of `notRead` for a file that is not on the disk, or that a selection starts,
+- a dynamic import with a computed path in a file that the run loads, unless `computedImports` of the package names the file with a reason.
+
+The related mode does not follow a computed import. A test file that reaches the mutated files only through this import thus starts in no selection, and each mutant that it detects survives.
+
+```json
+{ "computedImports": { "src/load-all.test.ts": "it imports each module of src/ops, and ops.test.ts tests each module" } }
+```
+
+On a fault, the check fails with a line that starts with `No read`. A score of that package is not a reading.
+
+`--runner <file>` writes the version and the path of the Vitest of each package to the file, as JSON. Each package uses the Vitest that its folder resolves.
+
+```text
+rigor-mutation load-check --collect --runner reports/runner.json
+```
 
 ## The disabled mutants
 
