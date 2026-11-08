@@ -375,6 +375,7 @@ export interface FreshOptions {
   readonly aa?: boolean;
   readonly args?: (caseId: string) => readonly string[];
   readonly timeoutMs?: number;
+  readonly overLimit?: "error" | "skip";
   readonly maxBuffer?: number;
   readonly job?: string;
   readonly env?: BenchEnv;

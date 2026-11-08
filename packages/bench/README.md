@@ -528,7 +528,8 @@ run.pairs["old~aa"];                              // the records of the A/A pair
 - `pairOrder` gives the order. Pair `p` starts with `firstArm(round, caseIndex + p)`, and the pair that starts first turns each second round.
 - The arguments of a case come after the command. The default is `--case <id>`.
 - A child that exits with an error, takes too long or prints no JSON line stops the run with an error. The error names the arm, the case, the round and the tail of `stderr`.
-- Only a line with `skipped` skips a case. A skip line does not need a time.
+- A line with `skipped` skips a case. A skip line does not need a time.
+- With `overLimit: "skip"`, a child over `timeoutMs` in the first round skips its case with the reason `took more than <timeoutMs> ms`. A case that does not end is then a result with a reason, and the job ends in time. The gate of the run decides what such a skip means. For a gate on a cost, it is a block.
 - A skip in the first round of the job removes the case from each pair, and the run starts no more children for it. A skip after the first round stops the run with an error, because the child is not deterministic.
 - A child that does not stop at the time limit gets SIGTERM, and SIGKILL after 1 second. The signals go to its process group. On Windows, `taskkill /T /F` stops its tree.
 - A child must stop each process that it starts before it exits. On Windows, the runner cannot find a process that a child leaves after a normal exit.
