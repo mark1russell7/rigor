@@ -79,7 +79,7 @@ export interface GateLine {
   readonly cpu: string | undefined;
   /** This value is `true` when the arms are not one known model, or when the jobs are on more than one model. */
   readonly mixed: boolean;
-  /** The line: the title, the blocks, the no-reads, the reason and the CPU models. */
+  /** The line: the title, the blocks, the no-reads, the reason and the CPU models. Each sentence after the title starts with a capital letter. */
   readonly text: string;
 }
 
@@ -100,7 +100,7 @@ function isJobModels(models: ArmModels | readonly JobModel[]): models is readonl
 function cpuText(models: ArmModels | readonly JobModel[]): { text: string; mixed: boolean } {
   if (isJobModels(models)) {
     const each = models.map((m) => `${m.model} (${m.jobs} ${m.jobs === 1 ? "job" : "jobs"})`).join(", ");
-    return { text: `jobs on ${models.length} CPU ${models.length === 1 ? "model" : "models"}: ${each}`, mixed: models.length > 1 };
+    return { text: `Jobs on ${models.length} CPU ${models.length === 1 ? "model" : "models"}: ${each}`, mixed: models.length > 1 };
   }
   const side = (values: readonly string[]): string => values.join(" + ");
   const pair = `CPU a ${side(models.a)}, b ${side(models.b)}`;
@@ -112,6 +112,11 @@ function part(text: string): string {
   let end = text.trim();
   while (end.endsWith(".")) end = end.slice(0, -1);
   return end;
+}
+
+/** This function gives a part of the line with a capital first letter, because the part starts a sentence. */
+function sentence(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 /**
@@ -149,7 +154,7 @@ export function gateLine(reads: readonly CaseRead[], options: GateLineOptions): 
     reason,
     cpu: models?.text,
     mixed: models?.mixed ?? false,
-    text: `${options.title}: ${parts.map((p) => `${p}.`).join(" ")}${close}`,
+    text: `${options.title}: ${parts.map((p, i) => `${i === 0 ? p : sentence(p)}.`).join(" ")}${close}`,
   };
 }
 
