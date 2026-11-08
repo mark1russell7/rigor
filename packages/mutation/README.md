@@ -156,7 +156,7 @@ packages/compiler/src/module-sheet.test.ts:12: "../../testkit/src/fc-timeout.ts"
 
 The check does not read comments, type imports and paths with a template expression.
 
-With `--collect`, the Vitest of each package also loads each test file, as Stryker does. The check copies the folder of the package to `.stryker-tmp/load-check-*` in that folder, and links its `node_modules`. Stryker makes its sandbox in the same form. The collect of Vitest starts in the copy, in a new process, with `staticParse: false`. Then each file starts, so the check finds a missing package, also through a helper. A path that finds a file only in the folder of the package fails in the copy too. Then for each selection of the package, Vitest gives the test files that its related mode starts for the mutated files. These are faults:
+With `--collect`, the Vitest of each package also loads each test file, as Stryker does. The check copies the folder of the package to `.stryker-tmp/load-check-*` in that folder, and links its `node_modules`. Stryker makes its sandbox in the same form. The copy takes only the files that Stryker copies. The ignore rules of Stryker 10 and the `ignorePatterns` of the `stryker` field of the lane leave out the other files. The collect of Vitest starts in the copy, in a new process, with `staticParse: false`. Then each file starts, so the check finds a missing package, also through a helper. A path that finds a file only in the folder of the package fails in the copy too. Then for each selection of the package, Vitest gives the test files that its related mode starts for the mutated files. These are faults:
 
 - a test file that does not load,
 - a test file that holds no test,

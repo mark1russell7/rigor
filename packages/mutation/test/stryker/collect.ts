@@ -27,8 +27,8 @@ const fail = (message: string): never => {
 };
 
 /** This function starts load-check --collect on the fixture package. */
-const check = (): { status: number | null; text: string } => {
-  const r = spawnSync(process.execPath, [cli, "load-check", "two", "--collect", "--lane", lane, "--runner", runner], { cwd: here, encoding: "utf8" });
+const check = (laneFile = lane): { status: number | null; text: string } => {
+  const r = spawnSync(process.execPath, [cli, "load-check", "two", "--collect", "--lane", laneFile, "--runner", runner], { cwd: here, encoding: "utf8" });
   const text = `${r.stdout}${r.stderr}`;
   console.log(text);
   return { status: r.status, text };
@@ -44,8 +44,8 @@ const runners = JSON.parse(readFileSync(runner, "utf8")) as Record<string, { ver
 const two = runners["two"];
 if (typeof two?.version !== "string" || !two.path?.endsWith("/dist/node.js")) fail(`the runner file does not name the Vitest of the package: ${JSON.stringify(runners)}`);
 
-/** Each fault: its files, and the texts that the output must hold. */
-const faults: { name: string; files: Record<string, string>; expect: string[] }[] = [
+/** Each fault: its files, its lane when it is not parts.json, and the texts that the output must hold. */
+const faults: { name: string; files: Record<string, string>; lane?: string; expect: string[] }[] = [
   { name: "a missing package, direct", files: { "flip.test.ts": `import "${MISSING}";\n${TEST}` }, expect: ["flip.test.ts: the file does not load", MISSING] },
   {
     name: "a missing package through a helper",
@@ -66,6 +66,13 @@ const faults: { name: string; files: Record<string, string>; expect: string[] }[
     files: { "flip.test.ts": `await import(["..", "..", "parts.json"].join("/"));\n${TEST}` },
     expect: ["flip.test.ts: the file does not load", "parts.json"],
   },
+  {
+    // The lane gives Stryker the ignorePatterns ["/src/flip-data.ts"]. The file is in the folder, but not in the sandbox.
+    name: "a file that a test loads and that the ignorePatterns of Stryker leave out",
+    files: { "flip.test.ts": `import { data } from "./flip-data.ts";\n${TEST}it("reads the data", () => {\n  expect(data).toBe(1);\n});\n`, "flip-data.ts": "export const data = 1;\n" },
+    lane: join(here, "parts-ignore.json"),
+    expect: ["flip.test.ts: the file does not load", "flip-data"],
+  },
 ];
 
 for (const fault of faults) {
@@ -74,7 +81,7 @@ for (const fault of faults) {
     writeFileSync(join(src, file), text);
   }
   try {
-    const bad = check();
+    const bad = check(fault.lane);
     if (bad.status !== 1) fail(`${fault.name}: load-check --collect exited with ${String(bad.status)}, not 1.`);
     for (const text of [...fault.expect, "No read: 1 packages"]) if (!bad.text.includes(text)) fail(`${fault.name}: the output does not hold "${text}".`);
   } finally {

@@ -2,10 +2,10 @@
  * The CLI `rigor-mutation`. The work is in `runCli`, so a test can start the CLI in a fixture folder.
  */
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync, appendFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, appendFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { REPORT_DIR, rewritesTsconfig, strykerConfig } from "./config.ts";
@@ -13,6 +13,7 @@ import { compareDisables, findDisables, type Disable } from "./disables.ts";
 import { collectFaults, computedImports, leavingPaths, relatedTestFiles, type Collected, type CollectRequest, type PackageFile } from "./load.ts";
 import { changedFiles, globsSelect, MAX_TEST_FALL, parseLane, partErrors, runSelections, select, selectionNames, type Lane, type Selection } from "./lane.ts";
 import { PARTIAL_FILE } from "./reporter.ts";
+import { copyOfFolder, ignoreRules, minimatchOf, removeCopy, sandboxFiles, tempDirOf } from "./sandbox.ts";
 import { failScore, formatScore, packageScore, parsePartial, parseReport, readFaults, partialScore, scoreReport, summaryMarkdown, testFall, testFileFaults, unreadTestFiles, type MutationReport, type Score } from "./score.ts";
 
 /** The input and the output of the CLI. */
@@ -95,55 +96,35 @@ function sourcesOf(root: string, dir: string, tests = false): string[] {
 /** The script of `load-check --collect`. It is beside this file, in the source and in the build. */
 const COLLECT_SCRIPT = fileURLToPath(new URL(import.meta.url.endsWith(".ts") ? "./collect.ts" : "./collect.js", import.meta.url));
 
-// The entries of the folder of a package that the copy does not take. Stryker leaves them out of its sandbox too.
-const NOT_COPIED = new Set(["node_modules", ".git", ".stryker-tmp", "reports"]);
-
 /**
- * This function copies the folder of a package to `<dir>/.stryker-tmp/load-check-*`, as Stryker copies it to its sandbox,
- * and links its `node_modules`. A path that finds a file only in the folder of the package then fails in the copy too.
- */
-function copyOfFolder(dir: string): string {
-  const base = join(dir, ".stryker-tmp");
-  mkdirSync(base, { recursive: true });
-  const copy = mkdtempSync(join(base, "load-check-"));
-  for (const name of readdirSync(dir)) {
-    if (NOT_COPIED.has(name)) continue;
-    cpSync(join(dir, name), join(copy, name), { recursive: true, filter: (from) => basename(from) !== "node_modules" });
-  }
-  if (existsSync(join(dir, "node_modules"))) symlinkSync(join(dir, "node_modules"), join(copy, "node_modules"), "junction");
-  return copy;
-}
-
-/** This function removes a copy of `copyOfFolder`, and its folder `.stryker-tmp` when nothing else is in it. */
-function removeCopy(copy: string): void {
-  rmSync(copy, { recursive: true, force: true });
-  const base = dirname(copy);
-  if (readdirSync(base).length === 0) rmSync(base, { recursive: true, force: true });
-}
-
-/**
- * This function starts the collect of Vitest in a copy of the folder `dir`, in a new process. It gives the collect, or
- * the reason when the process gives no collect.
+ * This function starts the collect of Vitest in a copy of the folder `dir`, in a new process. The copy takes the files
+ * that Stryker copies to its sandbox. The function gives the collect, or the reason when the process gives no collect.
  *
  * @param selections - the mutated files of each selection, from `dir`
+ * @param config - the Stryker config of the package, for its ignore rules
  */
-function collectIn(dir: string, vitestConfig: string | undefined, selections: Readonly<Record<string, readonly string[]>>): Collected | string {
+function collectIn(dir: string, vitestConfig: string | undefined, selections: Readonly<Record<string, readonly string[]>>, config: Readonly<Record<string, unknown>>): Collected | string {
+  const Minimatch = minimatchOf(dir);
+  if (typeof Minimatch === "string") return Minimatch;
   const tmp = mkdtempSync(join(tmpdir(), "rigor-mutation-collect-"));
-  const copy = copyOfFolder(dir);
   try {
-    const out = join(tmp, "collected.json");
-    const request: CollectRequest = { dir: copy, ...(vitestConfig === undefined ? {} : { config: vitestConfig }), selections };
-    writeFileSync(join(tmp, "request.json"), JSON.stringify(request));
-    const r = spawnSync(process.execPath, [COLLECT_SCRIPT, join(tmp, "request.json"), out], { cwd: copy, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
-    // Vitest sets the exit code 1 for a file that does not load, so the file of the collect decides, not the code.
-    if (!existsSync(out)) {
-      const why = (r.error?.message ?? `${r.stdout}${r.stderr}`).trim().split("\n").slice(-5).join(" ");
-      return `the collect of Vitest exited with ${String(r.status)}: ${why}`;
+    const copy = copyOfFolder(dir, sandboxFiles(dir, ignoreRules(config), Minimatch), tempDirOf(config));
+    try {
+      const out = join(tmp, "collected.json");
+      const request: CollectRequest = { dir: copy, ...(vitestConfig === undefined ? {} : { config: vitestConfig }), selections };
+      writeFileSync(join(tmp, "request.json"), JSON.stringify(request));
+      const r = spawnSync(process.execPath, [COLLECT_SCRIPT, join(tmp, "request.json"), out], { cwd: copy, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+      // Vitest sets the exit code 1 for a file that does not load, so the file of the collect decides, not the code.
+      if (!existsSync(out)) {
+        const why = (r.error?.message ?? `${r.stdout}${r.stderr}`).trim().split("\n").slice(-5).join(" ");
+        return `the collect of Vitest exited with ${String(r.status)}: ${why}`;
+      }
+      return JSON.parse(readFileSync(out, "utf8")) as Collected;
+    } finally {
+      removeCopy(copy);
     }
-    return JSON.parse(readFileSync(out, "utf8")) as Collected;
   } finally {
     rmSync(tmp, { recursive: true, force: true });
-    removeCopy(copy);
   }
 }
 
@@ -166,7 +147,8 @@ function collectCheck(lane: Lane, laneDir: string, pkg: string, files: readonly 
   const own = runSelections(lane).map((n) => select(lane, n)).filter((s) => s.pkg === pkg);
   const sources = files.map((f) => f.file).filter((f) => !TEST.test(f));
   const mutated = Object.fromEntries(own.map((s) => [s.name, sources.filter((f) => globsSelect(s.mutate, f))]));
-  const collected = collectIn(resolve(laneDir, p.dir), p.vitestConfig, mutated);
+  const config = own[0] === undefined ? {} : strykerConfig(own[0]);
+  const collected = collectIn(resolve(laneDir, p.dir), p.vitestConfig, mutated, config);
   const computed = computedImports(files, p.vitestConfig);
   const allowed = p.computedImports ?? {};
   const faults = [
