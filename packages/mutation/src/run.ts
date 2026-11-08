@@ -7,8 +7,8 @@ import { dirname, join, relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { REPORT_DIR, rewritesTsconfig, strykerConfig } from "./config.ts";
 import { compareDisables, findDisables, type Disable } from "./disables.ts";
-import { leavingPaths } from "./load.ts";
-import { changedFiles, MAX_TEST_FALL, parseLane, partErrors, runSelections, select, selectionNames, type Lane } from "./lane.ts";
+import { leavingPaths, relatedTestFiles } from "./load.ts";
+import { changedFiles, globsSelect, MAX_TEST_FALL, parseLane, partErrors, runSelections, select, selectionNames, type Lane, type Selection } from "./lane.ts";
 import { failScore, formatScore, parseReport, scoreReport, summaryMarkdown, testFall, unreadTestFiles, type MutationReport, type Score } from "./score.ts";
 
 /** The input and the output of the CLI. */
@@ -38,8 +38,8 @@ export const HELP: string = `rigor-mutation: the mutation tests of a repository,
                                                of tests. With --last, a fall of the count of more than
                                                maxTestFall % (default 20) against the file fails. With
                                                --write-last, the counts of the passed selections go in
-                                               the file. With --test-files, a test file on the disk that
-                                               the report does not read fails.
+                                               the file. With --test-files, a test file that the run
+                                               starts and that the report does not read fails.
   rigor-mutation disables [--write]            compare the disable comments with their list
   rigor-mutation load-check [<selection>...]   refuse each relative path of a package that leaves its folder.
                                                Stryker starts the tests in a copy of the folder, so such a
@@ -177,7 +177,7 @@ interface ScoresOptions {
 
 /**
  * This function gives the score of each selection (`scores`). With `last`, it compares the test count with the last
- * good count (LANE.TESTS of Vex). With `testFiles`, it compares the test files on the disk with the report (LANE.FILES).
+ * good count (LANE.TESTS of Vex). With `testFiles`, it compares the test files that the run starts with the report (LANE.FILES).
  */
 function scores(lane: Lane, laneDir: string, names: readonly string[], o: ScoresOptions, io: CliIo): number {
   if (names.length === 0) throw new Error(`"scores" takes one or more selections`);
@@ -213,7 +213,7 @@ function scores(lane: Lane, laneDir: string, names: readonly string[], o: Scores
         }
       }
     }
-    if (o.testFiles) score = checkTestFiles(lane, laneDir, s.pkg, report, score, (line) => note(name, line));
+    if (o.testFiles) score = checkTestFiles(lane, laneDir, s, report, score, (line) => note(name, line));
     return score;
   });
   for (const s of results) {
@@ -279,17 +279,34 @@ function readCounts(file: string): Record<string, number> {
   return json as Record<string, number>;
 }
 
-/** This function fails a score when a test file of its package is on the disk and the report does not read it. */
-function checkTestFiles(lane: Lane, laneDir: string, pkg: string, report: MutationReport, score: Score, note: (line: string) => void): Score {
-  const p = lane.packages[pkg];
+/** This function tells if the Vitest runner of a selection starts all the tests: the lane sets `vitest.related` to false. */
+function runsAllTests(s: Selection): boolean {
+  const vitest = s.stryker?.["vitest"];
+  return typeof vitest === "object" && vitest !== null && (vitest as Record<string, unknown>)["related"] === false;
+}
+
+/**
+ * This function fails a score when the report does not read a test file that the run starts. The related mode of the
+ * Vitest runner starts each test file that loads a file of the selection (LANE.FILES). So a part does not start the
+ * test files of the other parts. With `vitest.related` false, the run starts each test file on the disk.
+ */
+function checkTestFiles(lane: Lane, laneDir: string, s: Selection, report: MutationReport, score: Score, note: (line: string) => void): Score {
+  const p = lane.packages[s.pkg];
   if (p === undefined) return score;
   const dir = resolve(laneDir, p.dir);
   if (report.testFiles === undefined) return failScore(score, `the report has no "testFiles", so the test files that it read are not known`);
-  const onDisk = sourcesOf(dir, dir, true).filter((f) => TEST.test(f) && !f.endsWith(".d.ts"));
-  const unread = unreadTestFiles(report, onDisk, p.notRead, dir);
+  const files = sourcesOf(dir, dir, true).filter((f) => !f.endsWith(".d.ts"));
+  const onDisk = files.filter((f) => TEST.test(f));
+  const started = runsAllTests(s)
+    ? onDisk
+    : relatedTestFiles(
+        files.map((file) => ({ file, text: readFileSync(resolve(dir, file), "utf8") })),
+        (file) => globsSelect(s.mutate, file),
+      );
+  const unread = unreadTestFiles(report, started, p.notRead, dir);
   for (const f of unread) note(`  not read: ${p.dir}/${f}`);
   if (unread.length === 0) return score;
-  return failScore(score, `the report does not read ${String(unread.length)} test files on the disk. Each one is no read, unless "notRead" of the package gives its reason`);
+  return failScore(score, `the report does not read ${String(unread.length)} test files that the run starts. Each one is no read, unless "notRead" of the package gives its reason`);
 }
 
 /** This function starts the CLI with its arguments and gives the exit code. */

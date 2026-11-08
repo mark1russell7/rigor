@@ -102,7 +102,9 @@ The gate of a package with parts applies to each part. Each part must have a sco
 A score is a read of the tests only when the run read all of them. A run that read half of the tests gives a score with no meaning. Two options of `scores` find such a run. They need the field `testFiles` of the report, which the Vitest runner gives.
 
 - Each score line gives the count of the tests of the run. `--last <file>` compares it with the last good count of the selection in the file. A fall of more than `maxTestFall` percent fails, also above the gate. The default of `maxTestFall` is 20. `--write-last <file>` writes the counts of the selections that pass.
-- `--test-files` compares the test files on the disk with the test files of the report. A test file on the disk that the report does not read fails.
+- `--test-files` compares the test files that the run starts with the test files of the report. A test file that the run starts and that the report does not read fails.
+  - The Vitest runner of Stryker starts the test files that load a file of the selection, directly or through other files. So a part does not start the test files of the other parts.
+  - The check reads the relative imports of the package, and not its type imports. With `vitest.related` false in the field `stryker`, it expects each test file.
 
 The lane states each exception with its reason:
 
@@ -145,4 +147,4 @@ const score = scoreReport(parseReport(JSON.parse(reportText)), selection);
 console.log(formatScore(score)); // collections.impl: 91.20 % (456 of 500, 44 survived), gate 80 %: pass
 ```
 
-The package also exports `selectionNames`, `runSelections`, `summaryMarkdown`, `findDisables`, `compareDisables`, `leavingPaths`, `isConfigFile`, `testCount`, `testFall`, `unreadTestFiles`, `failScore` and `runCli`.
+The package also exports `selectionNames`, `runSelections`, `summaryMarkdown`, `findDisables`, `compareDisables`, `leavingPaths`, `relatedTestFiles`, `isConfigFile`, `testCount`, `testFall`, `unreadTestFiles`, `failScore` and `runCli`.

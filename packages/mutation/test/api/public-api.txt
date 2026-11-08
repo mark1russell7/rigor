@@ -36,6 +36,7 @@ leavingPaths: build/index.d.ts#leavingPaths
 parseLane: build/index.d.ts#parseLane
 parseReport: build/index.d.ts#parseReport
 partErrors: build/index.d.ts#partErrors
+relatedTestFiles: build/index.d.ts#relatedTestFiles
 rewritesTsconfig: build/index.d.ts#rewritesTsconfig
 runCli: build/index.d.ts#runCli
 runSelections: build/index.d.ts#runSelections
@@ -252,6 +253,9 @@ export declare function parseReport(json: unknown): MutationReport;
 
 ### build/index.d.ts#partErrors
 export declare function partErrors(lane: Lane, pkg: string, files: readonly string[]): string[];
+
+### build/index.d.ts#relatedTestFiles
+export declare function relatedTestFiles(files: readonly PackageFile[], selected: (file: string) => boolean): string[];
 
 ### build/index.d.ts#rewritesTsconfig
 export declare function rewritesTsconfig(major: number | undefined): boolean;
