@@ -41,8 +41,8 @@ function overPowerOfTwo(num: bigint, n: number): number {
 
 /**
  * P(X >= k) for X ~ Binomial(n, 1/2). For n up to SIGN_TEST_EXACT_LIMIT it adds C(n, i) as whole numbers (BigInt),
- * so the only error is the last rounding to a double. Above it, it adds the terms as ratios of term k in linear
- * space, above the middle; at or below the middle it is 1 - P(X >= n - k + 1), by symmetry. (An earlier form added
+ * so the only error is the last rounding to a double. Above the limit and above the middle, it adds the terms as
+ * ratios of term k in linear space. At or below the middle, it gives 1 - P(X >= n - k + 1), by symmetry. (An earlier form added
  * logs and called Math.exp, and its error grew with n: up to 2.5e-14 for n <= 80, rigor#158. The floating-point
  * form above the limit was at most 1.1e-14 relative at n = 4097 and 5000, above 2^-1000.)
  */
