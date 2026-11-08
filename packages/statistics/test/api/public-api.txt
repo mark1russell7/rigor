@@ -84,6 +84,11 @@ type Summary: build/index.d.ts#Summary
 type TableResponseModel: build/index.d.ts#TableResponseModel
 type TwoSamplePermutationOptions: build/index.d.ts#TwoSamplePermutationOptions
 type TwoSamplePermutationResult: build/index.d.ts#TwoSamplePermutationResult
+type UStatisticInterval: build/index.d.ts#UStatisticInterval
+type UStatisticMean: build/index.d.ts#UStatisticMean
+type UStatisticMethod: build/index.d.ts#UStatisticMethod
+type UStatisticOptions: build/index.d.ts#UStatisticOptions
+U_STATISTIC_TIGHT_MIN_SAMPLE: build/index.d.ts#U_STATISTIC_TIGHT_MIN_SAMPLE
 Z95: build/index.d.ts#Z95
 bestSmoothLaw: build/index.d.ts#bestSmoothLaw
 binomialInterval: build/index.d.ts#binomialInterval
@@ -134,6 +139,7 @@ summarize: build/index.d.ts#summarize
 surfaceResponse: build/index.d.ts#surfaceResponse
 tQuantile: build/index.d.ts#tQuantile
 twoSamplePermutation: build/index.d.ts#twoSamplePermutation
+uStatisticInterval: build/index.d.ts#uStatisticInterval
 whenHolds: build/index.d.ts#whenHolds
 wilson: build/index.d.ts#wilson
 wilsonSampleSize: build/index.d.ts#wilsonSampleSize
@@ -694,6 +700,42 @@ interface TwoSamplePermutationResult extends PermutationResult {
   readonly exact: boolean;
 }
 
+### build/index.d.ts#UStatisticInterval
+interface UStatisticInterval {
+  readonly estimate: number;
+  readonly low: number;
+  readonly high: number;
+  readonly level: number;
+  readonly method: "conservative" | "tight";
+  readonly requested: UStatisticMethod;
+  readonly mean: UStatisticMean;
+  readonly subsets: number;
+  readonly standardError?: number;
+  readonly df?: number;
+}
+
+### build/index.d.ts#UStatisticMean
+interface UStatisticMean {
+  readonly estimate: number;
+  readonly low: number;
+  readonly high: number;
+}
+
+### build/index.d.ts#UStatisticMethod
+type UStatisticMethod = "conservative" | "tight" | "auto";
+
+### build/index.d.ts#UStatisticOptions
+interface UStatisticOptions {
+  readonly order: number;
+  readonly population: number;
+  readonly method: UStatisticMethod;
+  readonly level?: number;
+  readonly range?: readonly [low: number, high: number];
+}
+
+### build/index.d.ts#U_STATISTIC_TIGHT_MIN_SAMPLE
+export declare const U_STATISTIC_TIGHT_MIN_SAMPLE: number;
+
 ### build/index.d.ts#Z95
 export declare const Z95 = 1.959963984540054;
 
@@ -845,6 +887,9 @@ export declare function tQuantile(p: number, df: number): number;
 
 ### build/index.d.ts#twoSamplePermutation
 export declare function twoSamplePermutation(a: readonly number[], b: readonly number[], options?: TwoSamplePermutationOptions): TwoSamplePermutationResult;
+
+### build/index.d.ts#uStatisticInterval
+export declare function uStatisticInterval(totals: readonly number[], options: UStatisticOptions): UStatisticInterval;
 
 ### build/index.d.ts#whenHolds
 export declare function whenHolds(dimension: ResponseDimension, values: Readonly<Record<string, unknown>>): boolean;
