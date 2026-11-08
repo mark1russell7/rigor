@@ -21,6 +21,7 @@ describe("coverageMinSample", () => {
       BAR,
     );
     expect(result.minSample).toBe(8);
+    expect(result.blocking).toBeUndefined();
     expect(result.steps.map((s) => [s.sample, s.cells, s.reason])).toEqual([
       [8, 6, "qualifies"],
       [20, 4, "qualifies"],
@@ -46,6 +47,7 @@ describe("coverageMinSample", () => {
     expect(first?.pooled.low).toBeGreaterThanOrEqual(0.94);
     expect(first?.smallestAdjusted).toBe(holm([...input, low].map((c) => binomialTest(c.hits, c.draws, 0.95, "less")))[6]?.adjusted);
     expect(result.minSample).toBe(20);
+    expect(result.blocking).toBe(8);
   });
 
   it("does not reject a cell that is low only before the Holm correction", () => {
@@ -73,6 +75,7 @@ describe("coverageMinSample", () => {
     expect(result.steps[0]?.pooled.low).toBeLessThan(0.94);
     expect(result.steps[1]?.reason).toBe("qualifies");
     expect(result.minSample).toBe(40);
+    expect(result.blocking).toBe(8);
   });
 
   it("gives Infinity when no m qualifies, and names the two failed tests", () => {
@@ -85,12 +88,32 @@ describe("coverageMinSample", () => {
       BAR,
     );
     expect(result.minSample).toBe(Number.POSITIVE_INFINITY);
+    expect(result.blocking).toBe(108);
     expect(result.steps.map((s) => s.reason)).toEqual(["cell-rejected", "cell-rejected-and-pooled-low", "cell-rejected-and-pooled-low"]);
     expect(result.steps[2]?.rejected).toEqual(["k0 m108", "k1 m108"]);
     expect(coverageMinSample([], BAR)).toEqual({ minSample: Number.POSITIVE_INFINITY, steps: [] });
   });
 
-  it("reads each step on its own, so a larger m can fail when a smaller m passes", () => {
+  it("closes the set upward: a failed m blocks each smaller m, so m = 20 passes but the result is 108", () => {
+    // At m >= 20 the pool holds 10 good cells and passes. At m >= 60 the 4 cells of 940 pull the pool below 0.94.
+    const result = coverageMinSample(
+      cells([
+        [20, 990, 1000, 10],
+        [60, 940, 1000, 4],
+        [108, 960, 1000, 1],
+      ]),
+      BAR,
+    );
+    expect(result.steps.map((s) => [s.sample, s.qualifies, s.reason])).toEqual([
+      [20, true, "qualifies"],
+      [60, false, "pooled-low"],
+      [108, true, "qualifies"],
+    ]);
+    expect(result.minSample).toBe(108);
+    expect(result.blocking).toBe(60);
+  });
+
+  it("gives Infinity when the largest m fails, even when each smaller m passes", () => {
     // At m >= 8 the Holm family has 12 cells and the pooled coverage is high. At m >= 40 only the 2 low cells stay.
     const result = coverageMinSample(
       cells([
@@ -100,7 +123,8 @@ describe("coverageMinSample", () => {
       BAR,
     );
     expect(result.steps.map((s) => s.reason)).toEqual(["qualifies", "pooled-low"]);
-    expect(result.minSample).toBe(8);
+    expect(result.minSample).toBe(Number.POSITIVE_INFINITY);
+    expect(result.blocking).toBe(40);
   });
 
   it("refuses a bad cell or a bad bar", () => {

@@ -55,8 +55,13 @@ export interface CoverageStep {
 
 /** The result of `coverageMinSample`. */
 export interface CoverageMinSample {
-  /** The smallest sample size `m` of the cells that passes the bar. It is infinite when no `m` passes. */
+  /**
+   * The smallest sample size `m` of the cells such that each size of `m` or more passes the bar. It is infinite when
+   * the largest size fails.
+   */
   readonly minSample: number;
+  /** The largest sample size that fails the bar. It blocks each smaller size. The result has no `blocking` when each size passes. */
+  readonly blocking?: number;
   /** One step for each sample size of the cells, from the smallest to the largest. */
   readonly steps: readonly CoverageStep[];
 }
@@ -66,7 +71,7 @@ function whole(name: string, value: number, min: number): void {
 }
 
 /**
- * This function applies a fixed bar of coverage to the cells of a study. It gives the smallest sample size `m` at
+ * This function applies a fixed bar of coverage to the cells of a study. It gives the smallest sample size `m` from
  * which an interval method keeps its level. The method qualifies at `m` when the cells with a sample of `m` or more
  * pass two tests:
  *
@@ -75,13 +80,17 @@ function whole(name: string, value: number, min: number): void {
  * 2. The Wilson lower end of the pooled coverage, the sum of the hits over the sum of the draws, is `pooledLow`
  *    or more.
  *
- * The result is the smallest `m` of the cells that qualifies. It is infinite when no `m` qualifies. Each step tells
- * the result of the two tests at its `m`. A step does not depend on the steps of other sizes, so a larger `m` can
- * fail when a smaller `m` passes. The steps show this case.
+ * Each step tells the result of the two tests at its `m`. A step does not depend on the steps of other sizes. At a
+ * small `m`, the pool also holds the cells of the larger sizes. Thus a small `m` can pass while a larger `m` fails
+ * alone, for example near `m = n`.
+ *
+ * Thus the set of sizes is closed upward. The result is the smallest `m` of the cells such that each size of `m` or
+ * more qualifies. The field `blocking` gives the largest size that fails. When the largest size fails, the result is
+ * infinite.
  *
  * @param cells - The hits and the draws of each cell. Each cell has its own sample size.
  * @param bar - The level, the alpha of the Holm family and the pooled lower end.
- * @returns The smallest qualifying sample size, and the result of the bar at each sample size.
+ * @returns The smallest size from which each size qualifies, the size that blocks, and the result at each size.
  */
 export function coverageMinSample(cells: readonly CoverageCell[], bar: CoverageBar): CoverageMinSample {
   const { level, alpha, pooledLow } = bar;
@@ -118,6 +127,16 @@ export function coverageMinSample(cells: readonly CoverageCell[], bar: CoverageB
     const reason: CoverageReason = cellOk ? (pooledOk ? "qualifies" : "pooled-low") : pooledOk ? "cell-rejected" : "cell-rejected-and-pooled-low";
     return { sample: m, cells: at.length, rejected, smallestAdjusted, hits, draws, pooled, qualifies: cellOk && pooledOk, reason };
   });
-  const first = steps.find((step) => step.qualifies);
-  return { minSample: first === undefined ? Number.POSITIVE_INFINITY : first.sample, steps };
+  // The set is closed upward: read the steps from the largest size down, and stop at the first size that fails.
+  let minSample = Number.POSITIVE_INFINITY;
+  let blocking: number | undefined;
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const step = steps[i] as CoverageStep;
+    if (!step.qualifies) {
+      blocking = step.sample;
+      break;
+    }
+    minSample = step.sample;
+  }
+  return blocking === undefined ? { minSample, steps } : { minSample, blocking, steps };
 }

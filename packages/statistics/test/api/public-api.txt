@@ -245,6 +245,7 @@ interface CoverageCell {
 ### build/index.d.ts#CoverageMinSample
 interface CoverageMinSample {
   readonly minSample: number;
+  readonly blocking?: number;
   readonly steps: readonly CoverageStep[];
 }
 

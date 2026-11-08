@@ -9,8 +9,9 @@ export type UStatisticMethod = "conservative" | "tight" | "auto";
 
 /**
  * The smallest sample `m` at which the method `"auto"` uses the method `"tight"`. The calibration study
- * `u-statistic-interval` gives the value with `coverageMinSample`. Until a run of the study gives a value, the value
- * is infinite. The TSDoc of `uStatisticInterval` gives the bar of the study.
+ * `u-statistic-interval` gives the value with `coverageMinSample`. The value is the smallest `m` of the grid such that
+ * each `m` of the grid from this value up passes the bar. Until a run of the study gives a value, the value is
+ * infinite. The TSDoc of `uStatisticInterval` gives the bar of the study.
  */
 export const U_STATISTIC_TIGHT_MIN_SAMPLE: number = Number.POSITIVE_INFINITY;
 
@@ -121,8 +122,14 @@ export interface UStatisticInterval {
  *
  * First, no cell rejects the coverage 0.95 in a one-sided exact binomial test at alpha 0.05, with the Holm
  * correction over these cells. Second, the Wilson lower end of the pooled coverage of these cells is 0.94 or more.
- * The constant is the smallest `m` that qualifies, or infinite when no `m` qualifies. `coverageMinSample` applies
- * this bar. Until a run of the study gives a value, the constant is infinite. Thus the method `"auto"` uses the method `"conservative"` at each `m` less than `n`.
+ * `coverageMinSample` applies this bar.
+ *
+ * The set of sizes is closed upward. The constant is the smallest `m` of the grid such that each `m` of the grid from
+ * this value up qualifies. A small `m` pools the good cells of the larger sizes, so it can pass while a larger `m`
+ * fails alone. The upward rule keeps the method `"auto"` away from a size that failed.
+ *
+ * When the largest `m` fails, the constant is infinite. Until a run of the study gives a value, the constant is infinite. Thus the method `"auto"`
+ * uses the method `"conservative"` at each `m` less than `n`.
  *
  * With `range`, the interval of the mean stays in `[a, b]`, and each total is in the range of a sum of
  * `C(m - 1, r - 1)` kernel values.

@@ -43,4 +43,6 @@ for (const step of record.result.steps) {
   const pooled = `${step.hits}/${step.draws}, Wilson ${step.pooled.low.toFixed(4)} to ${step.pooled.high.toFixed(4)}`;
   console.log(`m >= ${step.sample}: ${step.reason} (${step.cells} cells, pooled ${pooled}, rejected: ${step.rejected.join("; ") || "none"})`);
 }
-console.log(`The smallest qualifying m is ${record.result.minSample}.`);
+const { minSample: mStar, blocking } = record.result;
+const verdict = Number.isFinite(mStar) ? `m* is ${mStar}: each m of the grid from ${mStar} up qualifies.` : "m* is Infinity: the largest m of the grid fails.";
+console.log(`${verdict} ${blocking === undefined ? "No m fails." : `The largest m that fails is ${blocking}.`}`);
