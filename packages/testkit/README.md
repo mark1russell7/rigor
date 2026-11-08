@@ -61,6 +61,38 @@ assert.equal(double(2), 4);
 
 `fencedBlocks(text)` gives each fenced block of a Markdown text with its language, its flags and its line. `mapImports(code, imports, root)` changes the mapped import specifiers of a code text to file URLs.
 
+## The propagation gate
+
+The entry `@mark1russell7/rigor-testkit/propagation` examines one claim: one context id goes from a client to a server. From there, it goes to the spans, the log records and the metrics. It uses the OpenTelemetry API only. Install `@opentelemetry/api` and `@opentelemetry/api-logs` to use it.
+
+```ts no-run
+import { localTransport, propagationGate, formatPropagationReport } from "@mark1russell7/rigor-testkit/propagation";
+
+const report = await propagationGate({
+  key: "request.id",
+  capture,
+  transports: [localTransport(withInternalCall), httpTransport, { name: "port", noRead: "no worker in this test" }],
+});
+console.log(formatPropagationReport(report));
+expect(report.ok).toBe(true);
+```
+
+For each transport, the gate sets the value of `key` on the client side and makes one call. The handler on the server side writes a span, a log record and a metric. It also injects the context into the headers of a call to a third party. The gate then examines these claims:
+
+- The handler reads the same value.
+- The span and the log record of the handler are in the trace of the client, and have the value as an attribute.
+- No metric point has the key as an attribute. For a key of low cardinality, give `cardinality: "low"`.
+- The call to the third party has no `baggage` header.
+
+### The rules
+
+- The program under test registers the context manager, the propagator and the processors. The option `capture` gives its records, for example from the in-memory exporters of the SDK.
+- A transport with `noRead` gets a "no read" line. That line is not a failure, but it is not a pass.
+- The flip: the gate also runs a broken copy of each transport that passes, and the copy must fail. The default copy, `losingContext`, runs the handler in the root context. Give your own function in `flip`, for example a copy that removes a header.
+- `withValue` and `readValue` set and read the value. The default uses the baggage. Give `withContext` and `contextValue` of the program when it keeps the value in a different way.
+- `localTransport(internalCall)` sends the context through a carrier in the same process. `internalCall` marks the call as internal, for a propagator that sends the baggage only on internal calls.
+- `formatPropagationReport(report)` gives a Markdown table for the summary of a CI job.
+
 ## License
 
 MIT
