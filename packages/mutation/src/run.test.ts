@@ -154,6 +154,13 @@ describe("rigor-mutation", () => {
     out = "";
     expect(run("scores", "lib.rest", "--reports", "reports", "--alone")).toBe(0);
     expect(out).toBe("lib.rest: 50.00 % (5 of 10, 5 survived), no gate: pass\n  the gate of lib reads all its parts together\n");
+    // With "gateOver": "part", the default, --alone keeps the gate of each part.
+    put("mutation.json", JSON.stringify({ packages: { lib: { ...lib, gateOver: undefined } } }));
+    out = "";
+    expect(run("scores", "lib.rest", "--reports", "reports", "--alone")).toBe(1);
+    expect(out).toMatch(/^lib\.rest: 50\.00 % \(5 of 10, 5 survived\), gate 80 %: FAIL/);
+    expect(out).not.toContain("reads all its parts together");
+    put("mutation.json", JSON.stringify({ packages: { lib } }));
     expect(() => run("scores", "lib.core", "--reports", "reports", "--report", "r.json")).toThrow(/--report or --reports/);
     put("mutation.json", JSON.stringify({ packages: { lib: { ...lib, parts: undefined } } }));
     expect(() => run("list")).toThrow(/"gateOver" is "package", but the package has no parts/);
