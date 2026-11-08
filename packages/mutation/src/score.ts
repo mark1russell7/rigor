@@ -169,6 +169,35 @@ export function scoreReport(report: MutationReport, selection: { readonly name: 
   return { name, gate, detected, hitLimit, clockTimeouts, valid, survived, percent, percentWithClock, tests: testCount(report), pass: reason === undefined, reason, outcome };
 }
 
+/**
+ * This function gives the score of a package from the scores of its parts, and applies the gate of the package. It sums
+ * the mutants of the parts. A part that fails makes the package a no read: a part has no gate of its own here.
+ * A missing part also makes the package a no read, because the sum does not count its mutants.
+ *
+ * @param missing - the parts of the package that have no score in this read
+ */
+export function packageScore(name: string, gate: number | undefined, parts: readonly Score[], missing: readonly string[] = []): Score {
+  const sum = (count: (s: Score) => number): number => parts.reduce((total, s) => total + count(s), 0);
+  const detected = sum((s) => s.detected);
+  const valid = sum((s) => s.valid);
+  const clockTimeouts = sum((s) => s.clockTimeouts);
+  const percent = valid === 0 ? 0 : (100 * detected) / valid;
+  const percentWithClock = valid === 0 ? 0 : (100 * (detected + clockTimeouts)) / valid;
+  const failed = parts.filter((s) => !s.pass).map((s) => s.name);
+  const [outcome, reason]: [ScoreOutcome, string | undefined] =
+    parts.length === 0
+      ? ["no read", "the package has no scores of its parts"]
+      : missing.length > 0
+        ? ["no read", `the read has no score of the parts ${missing.join(", ")}, so the sum does not count their mutants`]
+        : failed.length > 0
+          ? ["no read", `the parts ${failed.join(", ")} fail, so the sum of the parts has no meaning`]
+          : gate !== undefined && percent < gate
+            ? ["block", `the score ${percent.toFixed(2)} % of all the parts is under the gate ${String(gate)} %`]
+            : ["pass", undefined];
+  const tests = parts.every((s) => s.tests !== undefined) ? sum((s) => s.tests ?? 0) : undefined;
+  return { name, gate, detected, hitLimit: sum((s) => s.hitLimit), clockTimeouts, valid, survived: parts.flatMap((s) => s.survived), percent, percentWithClock, tests, pass: reason === undefined, reason, outcome };
+}
+
 /** This function gives the time-outs of a score as text: the count of each kind, and the score that counts the clock time-outs as detected. */
 const timeouts = (s: Score): string =>
   `time-outs: ${String(s.hitLimit)} hit limit, ${String(s.clockTimeouts)} clock (${s.percentWithClock.toFixed(2)} % with the clock time-outs as detected)`;

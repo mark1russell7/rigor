@@ -144,6 +144,16 @@ describe("changedFiles", () => {
     expect(changedFiles(select(lane, "small"), ["packages/smaller/src/x.ts", "packages/small"])).toEqual([]);
   });
 
+  // The MUTATIONREVIEW of Vex, item 7: a change of a test file changes what the run reads of its source file.
+  it("gives the source file of a changed test file of the same name", () => {
+    const tests = ["packages/collections/src/impl/a.test.ts", "packages/collections/src/core/b.test.ts"];
+    expect(changedFiles(select(lane, "collections.impl"), tests)).toEqual(["src/impl/a.ts"]);
+    expect(changedFiles(select(lane, "collections"), [...tests, "packages/collections/src/impl/a.ts"])).toEqual(["src/impl/a.ts", "src/core/b.ts"]);
+    expect(changedFiles(select(lane, "collections"), tests, (f) => f !== "src/impl/a.ts")).toEqual(["src/core/b.ts"]);
+    // The source of src/index.test.ts is src/index.ts, and mutate removes it.
+    expect(changedFiles(select(lane, "collections"), ["packages/collections/src/index.test.ts"])).toEqual([]);
+  });
+
   // rigor#137: a changed file that a part takes in line ranges keeps the ranges of that part.
   it("keeps the line ranges of a changed file", () => {
     const cut = parseLane({ packages: { p: { dir: "p", mutate: ["src/**/*.ts"], parts: { a: ["src/m.ts:1-120", "src/m.ts:200-300"], b: ["src/m.ts:121-199", "src/x.ts"] } } } });

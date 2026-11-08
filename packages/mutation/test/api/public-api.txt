@@ -33,6 +33,7 @@ formatScore: build/index.d.ts#formatScore
 isConfigFile: build/index.d.ts#isConfigFile
 isHitLimit: build/index.d.ts#isHitLimit
 leavingPaths: build/index.d.ts#leavingPaths
+packageScore: build/index.d.ts#packageScore
 parseLane: build/index.d.ts#parseLane
 parseReport: build/index.d.ts#parseReport
 partErrors: build/index.d.ts#partErrors
@@ -142,6 +143,7 @@ interface PackageLane {
   readonly mutate: readonly string[];
   readonly parts?: Readonly<Record<string, readonly string[]>>;
   readonly gate?: number;
+  readonly gateOver?: "part" | "package";
   readonly vitestConfig?: string;
   readonly timeoutMS?: number;
   readonly dryRunTimeoutMinutes?: number;
@@ -222,7 +224,7 @@ interface StrykerConfig {
 export declare const TIMEOUT_MS = 12e4;
 
 ### build/index.d.ts#changedFiles
-export declare function changedFiles(selection: Selection, changed: readonly string[]): string[];
+export declare function changedFiles(selection: Selection, changed: readonly string[], exists?: (file: string) => boolean): string[];
 
 ### build/index.d.ts#compareDisables
 export declare function compareDisables(found: readonly Disable[], listed: readonly Disable[]): DisableCheck;
@@ -244,6 +246,9 @@ export declare const isHitLimit: (m: Mutant) => boolean;
 
 ### build/index.d.ts#leavingPaths
 export declare function leavingPaths(files: readonly PackageFile[], vitestConfig?: string): LeavingPath[];
+
+### build/index.d.ts#packageScore
+export declare function packageScore(name: string, gate: number | undefined, parts: readonly Score[], missing?: readonly string[]): Score;
 
 ### build/index.d.ts#parseLane
 export declare function parseLane(json: unknown): Lane;
