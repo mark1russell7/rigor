@@ -24,6 +24,7 @@ type BudgetResult: build/index.d.ts#BudgetResult
 type BudgetRound: build/index.d.ts#BudgetRound
 type BudgetVerdict: build/index.d.ts#BudgetVerdict
 CEILING_ONLY: build/index.d.ts#CEILING_ONLY
+CHILD_SOURCES: build/index.d.ts#CHILD_SOURCES
 type CaseBudget: build/index.d.ts#CaseBudget
 type CaseGate: build/index.d.ts#CaseGate
 type CaseInterval: build/index.d.ts#CaseInterval
@@ -32,6 +33,10 @@ type CaseRatio: build/paired.d.ts#CaseRatio
 type CaseResults: build/index.d.ts#CaseResults
 type CaseTail: build/index.d.ts#CaseTail
 type CaseTailLimit: build/index.d.ts#CaseTailLimit
+type ChildPair: build/index.d.ts#ChildPair
+type ChildRecords: build/index.d.ts#ChildRecords
+type ChildSource: build/index.d.ts#ChildSource
+type ChildStep: build/index.d.ts#ChildStep
 type Comparison: build/index.d.ts#Comparison
 type ControlFactors: build/index.d.ts#ControlFactors
 type ControlOptions: build/index.d.ts#ControlOptions
@@ -97,6 +102,8 @@ type NotSlowerOptions: build/index.d.ts#NotSlowerOptions
 type NotSlowerRead: build/index.d.ts#NotSlowerRead
 type NotSlowerVerdict: build/index.d.ts#NotSlowerVerdict
 type OrderSize: build/paired.d.ts#OrderSize
+type PairedChild: build/index.d.ts#PairedChild
+type PairedChildOptions: build/index.d.ts#PairedChildOptions
 type PairedTime: build/paired.d.ts#PairedTime
 type PartnerRead: build/index.d.ts#PartnerRead
 type PoolFacts: build/index.d.ts#PoolFacts
@@ -152,6 +159,8 @@ caseTails: build/index.d.ts#caseTails
 checkLadder: build/index.d.ts#checkLadder
 checkMeasures: build/index.d.ts#checkMeasures
 checkPairedTime: build/paired.d.ts#checkPairedTime
+childRecords: build/index.d.ts#childRecords
+childTimes: build/index.d.ts#childTimes
 controlFactor: build/index.d.ts#controlFactor
 familyPower: build/index.d.ts#familyPower
 familyRead: build/index.d.ts#familyRead
@@ -166,6 +175,8 @@ modelRowText: build/index.d.ts#modelRowText
 modelTest: build/index.d.ts#modelTest
 notSlowerVerdict: build/index.d.ts#notSlowerVerdict
 orderSize: build/paired.d.ts#orderSize
+pairedChild: build/index.d.ts#pairedChild
+pairedChildOrder: build/index.d.ts#pairedChildOrder
 poolRecords: build/index.d.ts#poolRecords
 pooledBand: build/index.d.ts#pooledBand
 pooledLimitVerdict: build/index.d.ts#pooledLimitVerdict
@@ -494,6 +505,9 @@ interface BudgetVerdict {
 ### build/index.d.ts#CEILING_ONLY
 export declare const CEILING_ONLY = "gain not read on this model, ceiling only";
 
+### build/index.d.ts#CHILD_SOURCES
+export declare const CHILD_SOURCES: readonly ["base", "candidate", "copy"];
+
 ### build/index.d.ts#CaseBudget
 interface CaseBudget {
   readonly case: string;
@@ -553,6 +567,24 @@ interface CaseTailLimit extends CaseTail {
   readonly overMedian: boolean;
   readonly overTail: boolean;
   readonly outcome: LimitOutcome;
+}
+
+### build/index.d.ts#ChildPair
+type ChildPair = "candidate" | "aa";
+
+### build/index.d.ts#ChildRecords
+interface ChildRecords {
+  readonly candidate: PairedTime;
+  readonly aa: PairedTime;
+}
+
+### build/index.d.ts#ChildSource
+type ChildSource = (typeof CHILD_SOURCES)[number];
+
+### build/index.d.ts#ChildStep
+interface ChildStep {
+  readonly pair: ChildPair;
+  readonly source: ChildSource;
 }
 
 ### build/index.d.ts#Comparison
@@ -1069,6 +1101,22 @@ interface NotSlowerVerdict extends Gate {
   readonly more: readonly BudgetMore[];
 }
 
+### build/index.d.ts#PairedChild
+interface PairedChild {
+  readonly order: readonly ChildStep[];
+  readonly times: readonly number[];
+  readonly records: ChildRecords;
+}
+
+### build/index.d.ts#PairedChildOptions
+interface PairedChildOptions {
+  readonly case: string;
+  readonly round: number;
+  readonly offset: number;
+  readonly steps: number;
+  readonly sample: Readonly<Record<ChildSource, (tag: string) => Promise<number>>>;
+}
+
 ### build/index.d.ts#PartnerRead
 interface PartnerRead {
   readonly partner: string;
@@ -1434,6 +1482,12 @@ export declare function checkLadder(ladder: Ladder): readonly string[];
 ### build/index.d.ts#checkMeasures
 export declare function checkMeasures(rows: readonly MeasureRow[], options: MeasureCheckOptions): MeasureChecks;
 
+### build/index.d.ts#childRecords
+export declare function childRecords(caseName: string, round: number, offset: number, order: readonly ChildStep[], times: readonly number[]): ChildRecords;
+
+### build/index.d.ts#childTimes
+export declare function childTimes(order: readonly ChildStep[], times: readonly number[]): Record<ChildPair, Record<ChildSource, number[]>>;
+
 ### build/index.d.ts#controlFactor
 export declare function controlFactor(rows: readonly ControlRow[], options?: ControlOptions): ControlFactors;
 
@@ -1469,6 +1523,12 @@ export declare function modelTest(reads: readonly ModelRead[], options?: ModelTe
 
 ### build/index.d.ts#notSlowerVerdict
 export declare function notSlowerVerdict(jobs: readonly JobRecords[], options: NotSlowerOptions): NotSlowerVerdict;
+
+### build/index.d.ts#pairedChild
+export declare function pairedChild(options: PairedChildOptions): Promise<PairedChild>;
+
+### build/index.d.ts#pairedChildOrder
+export declare function pairedChildOrder(round: number, offset: number, steps: number): ChildStep[];
 
 ### build/index.d.ts#poolRecords
 export declare function poolRecords(jobs: readonly JobRecords[]): PooledRecords;
