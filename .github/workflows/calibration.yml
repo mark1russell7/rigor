@@ -1,0 +1,63 @@
+# A calibration study counts the hits of an interval method on the true value in seeded cells, and applies a bar that
+# is fixed before the run. Each study is a module of the registry packages/statistics/src/calibration/registry.ts.
+# A new interval function adds a study to the registry and a name to the choice study, not a new workflow.
+# A person starts a run: gh workflow run calibration.yml -f study=u-statistic-interval -f seed=1
+# The artifact holds the raw counts of each cell, the seeds and the result of the bar, as JSON.
+name: Calibration
+
+on:
+  workflow_dispatch:
+    inputs:
+      study:
+        description: The study of the registry to run
+        type: choice
+        required: true
+        options:
+          - u-statistic-interval
+      seed:
+        description: The seed of the run. Each cell gets its own seed from it
+        type: string
+        required: true
+        default: "1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: calibration-${{ github.workflow }}-${{ github.ref }}-${{ inputs.study }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  study:
+    name: Study ${{ inputs.study }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run the study
+        env:
+          STUDY: ${{ inputs.study }}
+          SEED: ${{ inputs.seed }}
+        run: |
+          node scripts/calibration.ts --study "$STUDY" --seed "$SEED" --out calibration.json | tee summary.txt
+          { echo "## Calibration: $STUDY, seed $SEED"; echo '```'; cat summary.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: calibration-${{ inputs.study }}-${{ github.run_id }}
+          path: calibration.json
+          retention-days: 90
+          if-no-files-found: error

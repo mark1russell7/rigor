@@ -6,6 +6,7 @@
 
 ## . (build/index.d.ts): names
 
+type BinomialSide: build/index.d.ts#BinomialSide
 type BootstrapOptions: build/index.d.ts#BootstrapOptions
 type CalibrationLevel: build/index.d.ts#CalibrationLevel
 type CategoricalDimension: build/index.d.ts#CategoricalDimension
@@ -14,6 +15,11 @@ type Comparison: build/index.d.ts#Comparison
 type ContinuousDimension: build/index.d.ts#ContinuousDimension
 type Corrected: build/index.d.ts#Corrected
 type CountInterval: build/index.d.ts#CountInterval
+type CoverageBar: build/index.d.ts#CoverageBar
+type CoverageCell: build/index.d.ts#CoverageCell
+type CoverageMinSample: build/index.d.ts#CoverageMinSample
+type CoverageReason: build/index.d.ts#CoverageReason
+type CoverageStep: build/index.d.ts#CoverageStep
 type Effect: build/index.d.ts#Effect
 type Forecast: build/index.d.ts#Forecast
 type Interval: build/index.d.ts#Interval
@@ -92,6 +98,7 @@ U_STATISTIC_TIGHT_MIN_SAMPLE: build/index.d.ts#U_STATISTIC_TIGHT_MIN_SAMPLE
 Z95: build/index.d.ts#Z95
 bestSmoothLaw: build/index.d.ts#bestSmoothLaw
 binomialInterval: build/index.d.ts#binomialInterval
+binomialTest: build/index.d.ts#binomialTest
 bootstrap: build/index.d.ts#bootstrap
 bootstrapClusters: build/index.d.ts#bootstrapClusters
 bootstrapLeastSquares: build/index.d.ts#bootstrapLeastSquares
@@ -102,6 +109,7 @@ brier: build/index.d.ts#brier
 calibration: build/index.d.ts#calibration
 cohenKappa: build/index.d.ts#cohenKappa
 compareRatios: build/index.d.ts#compareRatios
+coverageMinSample: build/index.d.ts#coverageMinSample
 fitResponse: build/index.d.ts#fitResponse
 heldOutError: build/index.d.ts#heldOutError
 heldOutErrorAt: build/index.d.ts#heldOutErrorAt
@@ -145,6 +153,9 @@ wilson: build/index.d.ts#wilson
 wilsonSampleSize: build/index.d.ts#wilsonSampleSize
 
 ## Declarations
+
+### build/index.d.ts#BinomialSide
+type BinomialSide = "less" | "greater";
 
 ### build/index.d.ts#BootstrapOptions
 interface BootstrapOptions {
@@ -213,6 +224,44 @@ interface CountInterval {
   readonly low: number;
   readonly high: number;
   readonly coverage: number;
+}
+
+### build/index.d.ts#CoverageBar
+interface CoverageBar {
+  readonly level: number;
+  readonly alpha: number;
+  readonly pooledLow: number;
+  readonly z?: number;
+}
+
+### build/index.d.ts#CoverageCell
+interface CoverageCell {
+  readonly name: string;
+  readonly sample: number;
+  readonly hits: number;
+  readonly draws: number;
+}
+
+### build/index.d.ts#CoverageMinSample
+interface CoverageMinSample {
+  readonly minSample: number;
+  readonly steps: readonly CoverageStep[];
+}
+
+### build/index.d.ts#CoverageReason
+type CoverageReason = "qualifies" | "cell-rejected" | "pooled-low" | "cell-rejected-and-pooled-low";
+
+### build/index.d.ts#CoverageStep
+interface CoverageStep {
+  readonly sample: number;
+  readonly cells: number;
+  readonly rejected: readonly string[];
+  readonly smallestAdjusted: number;
+  readonly hits: number;
+  readonly draws: number;
+  readonly pooled: Proportion;
+  readonly qualifies: boolean;
+  readonly reason: CoverageReason;
 }
 
 ### build/index.d.ts#Effect
@@ -745,6 +794,9 @@ export declare function bestSmoothLaw(values: readonly number[]): SmoothLaw;
 ### build/index.d.ts#binomialInterval
 export declare function binomialInterval(n: number, p: number, level?: number): CountInterval;
 
+### build/index.d.ts#binomialTest
+export declare function binomialTest(k: number, n: number, p: number, side: BinomialSide): number;
+
 ### build/index.d.ts#bootstrap
 export declare function bootstrap<T>(data: readonly T[], statistic: (sample: readonly T[]) => number, options?: BootstrapOptions): Interval;
 
@@ -774,6 +826,9 @@ export declare function cohenKappa<T>(a: readonly T[], b: readonly T[]): Kappa;
 
 ### build/index.d.ts#compareRatios
 export declare function compareRatios(ratios: readonly number[], options?: CompareOptions): Comparison;
+
+### build/index.d.ts#coverageMinSample
+export declare function coverageMinSample(cells: readonly CoverageCell[], bar: CoverageBar): CoverageMinSample;
 
 ### build/index.d.ts#fitResponse
 export declare function fitResponse(data: ResponseData, options?: ResponseFitOptions): ResponseRecord;

@@ -8,9 +8,9 @@ import { tQuantile } from "./power.ts";
 export type UStatisticMethod = "conservative" | "tight" | "auto";
 
 /**
- * The smallest sample `m` at which the method `"auto"` uses the method `"tight"`. The value comes from the pinned
- * counts of the tests. No measured `m` obeys the rule, so the value is infinite. The TSDoc of `uStatisticInterval`
- * gives the rule and the counts.
+ * The smallest sample `m` at which the method `"auto"` uses the method `"tight"`. The calibration study
+ * `u-statistic-interval` gives the value with `coverageMinSample`. Until a run of the study gives a value, the value
+ * is infinite. The TSDoc of `uStatisticInterval` gives the bar of the study.
  */
 export const U_STATISTIC_TIGHT_MIN_SAMPLE: number = Number.POSITIVE_INFINITY;
 
@@ -115,10 +115,14 @@ export interface UStatisticInterval {
  * The method `"auto"` needs `range`. It uses the method `"tight"` when `m` is `U_STATISTIC_TIGHT_MIN_SAMPLE` or more
  * and the variance is more than 0. Otherwise, it uses the method `"conservative"`.
  *
- * The rule for `U_STATISTIC_TIGHT_MIN_SAMPLE` is the smallest `m` of the table with 190 of 200 or more in each cell.
- * No `m` of the table obeys the rule. The last `m` with a count below 190 is 108, the largest `m` of the table. The
- * table has no larger `m`, so the constant is infinite. Thus the method `"auto"` uses the method `"conservative"` at
- * each `m` less than `n`.
+ * The calibration study `u-statistic-interval` sets `U_STATISTIC_TIGHT_MIN_SAMPLE`. Its bar was fixed before its run.
+ * The study draws 1000 samples in each cell of the 3 kernels and the 17 cells of the table. The method `"tight"`
+ * qualifies at `m` when the cells with a sample of `m` or more pass two tests.
+ *
+ * First, no cell rejects the coverage 0.95 in a one-sided exact binomial test at alpha 0.05, with the Holm
+ * correction over these cells. Second, the Wilson lower end of the pooled coverage of these cells is 0.94 or more.
+ * The constant is the smallest `m` that qualifies, or infinite when no `m` qualifies. `coverageMinSample` applies
+ * this bar. Until a run of the study gives a value, the constant is infinite. Thus the method `"auto"` uses the method `"conservative"` at each `m` less than `n`.
  *
  * With `range`, the interval of the mean stays in `[a, b]`, and each total is in the range of a sum of
  * `C(m - 1, r - 1)` kernel values.

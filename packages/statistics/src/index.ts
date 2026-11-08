@@ -86,10 +86,12 @@ export {
 export { type Kappa, cohenKappa } from "./agreement.ts";
 export { KENDALL_EXACT, kendallTau, ranks, spearman } from "./rank.ts";
 export {
+  type BinomialSide,
   type CountInterval,
   type MedianInterval,
   type QuantileInterval,
   binomialInterval,
+  binomialTest,
   medianInterval,
   negativeBinomialInterval,
   quantileInterval,
@@ -111,6 +113,14 @@ export {
   noiseVerdict,
 } from "./compare.ts";
 export { type OptionFloorOptions, optionFloor, tQuantile } from "./power.ts";
+export {
+  type CoverageBar,
+  type CoverageCell,
+  type CoverageMinSample,
+  type CoverageReason,
+  type CoverageStep,
+  coverageMinSample,
+} from "./coverage.ts";
 export {
   U_STATISTIC_TIGHT_MIN_SAMPLE,
   type UStatisticInterval,

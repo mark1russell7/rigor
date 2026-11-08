@@ -169,6 +169,45 @@ export function binomialInterval(n: number, p: number, level = 0.95): CountInter
   return { low, high, coverage: Math.min(1, coverage) };
 }
 
+/** The side of `binomialTest`: `"less"` gives `P(X <= k)`, and `"greater"` gives `P(X >= k)`. */
+export type BinomialSide = "less" | "greater";
+
+/**
+ * This function gives the p of the exact one-sided binomial test of `k` successes in `n` trials, with
+ * X ~ Binomial(n, p). The side `"less"` gives `P(X <= k)`. A small value rejects the claim "the chance is `p` or
+ * more". The side `"greater"` gives `P(X >= k)`. A small value rejects the claim "the chance is `p` or less".
+ *
+ * The sum starts at the largest term of the tail, so a small tail keeps its digits. At `p = 1/2`, the side
+ * `"greater"` is equal to the one-sided `signTest(k, n - k)`.
+ *
+ * @param k - The count of successes, a whole number from 0 to `n`.
+ * @param n - The count of trials, a whole number of 0 or more.
+ * @param p - The chance of a success under the claim, from 0 to 1.
+ * @param side - The side of the tail.
+ * @returns The p of the test, from 0 to 1.
+ */
+export function binomialTest(k: number, n: number, p: number, side: BinomialSide): number {
+  whole("binomialTest", k);
+  whole("binomialTest", n);
+  if (k > n) throw new RangeError(`binomialTest: k ${k} is more than n ${n}.`);
+  if (!(p >= 0 && p <= 1)) throw new RangeError(`binomialTest: p is from 0 to 1, not ${p}.`);
+  if (side !== "less" && side !== "greater") throw new RangeError(`binomialTest: side is "less" or "greater", not ${String(side)}.`);
+  const [from, to] = side === "less" ? [0, k] : [k, n];
+  if (from === 0 && to === n) return 1;
+  if (p === 0) return from === 0 ? 1 : 0;
+  if (p === 1) return to === n ? 1 : 0;
+  const [logP, logQ] = [Math.log(p), Math.log1p(-p)];
+  const logs: number[] = [];
+  let logChoose = 0;
+  for (let i = 0; i <= to; i++) {
+    if (i > 0) logChoose += Math.log((n - i + 1) / i);
+    if (i >= from) logs.push(logChoose + i * logP + (n - i) * logQ);
+  }
+  const top = Math.max(...logs);
+  const sum = logs.reduce((s, l) => s + Math.exp(l - top), 0);
+  return Math.min(1, Math.exp(top) * sum);
+}
+
 /**
  * The central interval of a negative binomial count. X is the count of failures before `successes` successes, and
  * `p` is the chance of a success at each try. `low` is the smallest k with P(X <= k) > (1 - level) / 2.
