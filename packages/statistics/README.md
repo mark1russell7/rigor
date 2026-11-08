@@ -188,6 +188,7 @@ logLoss([{ p: p.a, hit: true }]);                // the probability of the obser
 | `spearman`, `kendallTau`, `ranks` | The rank correlations, with mean ranks for ties. |
 | `compareRatios`, `noiseFloor`, `noiseVerdict` | The comparison with a baseline, the noise floor of the 5-seed rule with a margin of practical effect, and the state of a difference over the seeds. |
 | `optionFloor({ sigma, delta, tests, alpha, power })`, `tQuantile(p, df)` | The fewest values for each of two options, so that one test of a Bonferroni family finds a difference of `delta` with the stated power, from the Student t law. It assumes unpaired groups of equal size and equal `sigma`. The quantile of the Student t law. |
+| `normalCdf(x)`, `normalQuantile(p)` | The distribution function of the standard normal law and its quantile (AS 241 of Wichura). Both keep their relative digits in the lower tail, to `p = 1e-300`. |
 | `modeCount(values, { minShare, valleyRatio })` | The count of the modes of a sample, from a kernel density estimate. |
 | `smoothLawScores(values)`, `bestSmoothLaw(values)` | The mean log density of the uniform, normal, exponential, log-normal and Pareto laws at their fits, and the best of them. |
 | `brier`, `calibration` | The Brier score of predictions, and the hit rate of each stated level. |
@@ -287,6 +288,7 @@ The tests prove that these functions give the same numbers as the copies in the 
 | `bootstrapMedian` of packing | `bootstrapMedian(sortedValues, { runs, level, seed })`. Give the values sorted, because packing draws from the sorted list. |
 | `bootstrapMedian` of highways | `bootstrap(values, (s) => quantile(s, 0.5), { runs, level, seed })` |
 | `bootstrap` of layout-contract | `bootstrapClusters(rows, (r) => r.cluster, statistic, { runs, seed, ends: [0.025, 0.975] })` |
+| `normalQuantile` of lag (Acklam, relative error below 1.2e-9) | `normalQuantile(p)`. The values change by 1.2e-9 or less, because the new function is more exact. A `p` out of 0 to 1 throws. |
 | `signTestP` of packing | `signTest(better, worse)` |
 | `signTestPower` of highways | `signTestPower(n, level)` |
 | `wilson` of packing | `wilson(k, n, z)`. packing rounds the ends to 4 places at the call. |
