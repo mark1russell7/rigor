@@ -54,6 +54,79 @@ export interface Score {
   readonly reason: string | undefined;
   /** The read of the score. The functions of this package always give it. A score from an older version has no outcome. */
   readonly outcome?: ScoreOutcome;
+  /** This field marks a partial score: a time limit stopped Stryker, and the score reads only the mutants that ran. */
+  readonly partial?: PartialCosts;
+}
+
+/** The costs of a run that a time limit stopped. */
+export interface PartialCosts {
+  /** The mutants that Stryker tested before the stop. */
+  readonly tested: number;
+  /** The mutants of the plan. It is undefined when the run stopped before the plan. */
+  readonly planned: number | undefined;
+  /** The minutes from the start of Stryker to the last line of the file. */
+  readonly minutes: number;
+  /** The minutes for all the mutants of the plan, at the rate of the mutants that ran. It is undefined with no rate. */
+  readonly estimate: number | undefined;
+}
+
+/** The read of `partial.jsonl`: a report of the mutants that ran, and the costs of the run. */
+export interface PartialRun extends PartialCosts {
+  readonly report: MutationReport;
+  /** This field tells if Stryker wrote its last line. Then the run did not stop. */
+  readonly done: boolean;
+}
+
+/**
+ * This function reads the lines of the reporter `rigor-partial`. A stop of the process can cut the last line, so the
+ * function ignores a last line that is not JSON.
+ *
+ * @throws Error when a line before the last one is not JSON, or when the file has no start line
+ */
+export function parsePartial(text: string): PartialRun {
+  const raw = text.split("\n").filter((line) => line.trim() !== "");
+  const lines = raw.flatMap((line, i): Record<string, unknown>[] => {
+    try {
+      return [JSON.parse(line) as Record<string, unknown>];
+    } catch (error) {
+      if (i === raw.length - 1) return [];
+      throw new Error(`the line ${String(i + 1)} of the partial file is not JSON`, { cause: error });
+    }
+  });
+  const at = (l: Record<string, unknown> | undefined): number => (typeof l?.["at"] === "number" ? l["at"] : 0);
+  const start = lines.find((l) => l["event"] === "start");
+  if (start === undefined) throw new Error(`the partial file has no start line`);
+  const plan = lines.find((l) => l["event"] === "plan");
+  const mutants = lines.filter((l) => l["event"] === "mutant");
+  const files: Record<string, { mutants: Mutant[] }> = {};
+  for (const m of mutants) {
+    const reason = typeof m["statusReason"] === "string" ? { statusReason: m["statusReason"] } : {};
+    (files[String(m["file"])] ??= { mutants: [] }).mutants.push({ status: String(m["status"]), ...reason, mutatorName: String(m["mutatorName"]), location: { start: { line: Number(m["line"]) } } });
+  }
+  const minutes = (to: number, from: number): number => (to - from) / 60_000;
+  const last = at(lines.at(-1));
+  const planned = typeof plan?.["mutants"] === "number" ? plan["mutants"] : undefined;
+  const run = typeof plan?.["run"] === "number" ? plan["run"] : undefined;
+  // The mutants of the plan with an early result take no time, so the rate reads only the mutants that run.
+  const lastMutant = at(mutants.at(-1));
+  const estimate =
+    plan === undefined || run === undefined || mutants.length === 0 || lastMutant <= at(plan)
+      ? undefined
+      : minutes(at(plan), at(start)) + (minutes(lastMutant, at(plan)) * run) / mutants.length;
+  return { report: { files }, tested: mutants.length, planned, minutes: minutes(last, at(start)), estimate, done: lines.some((l) => l["event"] === "done") };
+}
+
+/**
+ * This function gives the score of a run that a time limit stopped. The score reads only the mutants that ran, so it
+ * is a no read with the mark `partial`. The reason gives the costs, for the size of the next parts.
+ */
+export function partialScore(run: PartialRun, selection: { readonly name: string; readonly gate: number | undefined }): Score {
+  const score = scoreReport(run.report, selection);
+  const of = run.planned === undefined ? "an unknown count of" : String(run.planned);
+  const estimate = run.estimate === undefined ? "" : ` All the mutants need an estimated ${run.estimate.toFixed(0)} minutes.`;
+  const reason = `partial: Stryker stopped after ${run.minutes.toFixed(1)} minutes and tested ${String(run.tested)} of ${of} mutants. The score of the mutants that ran is ${score.percent.toFixed(2)} %.${estimate}`;
+  const { tested, planned, minutes } = run;
+  return { ...score, pass: false, reason, outcome: "no read", partial: { tested, planned, minutes, estimate: run.estimate } };
 }
 
 const UNDETECTED = new Set(["Survived", "NoCoverage"]);
