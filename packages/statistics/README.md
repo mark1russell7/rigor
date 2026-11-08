@@ -291,8 +291,6 @@ The tests prove that these functions give the same numbers as the copies in the 
 | `bootstrapMedian` of packing | `bootstrapMedian(sortedValues, { runs, level, seed })`. Give the values sorted, because packing draws from the sorted list. |
 | `bootstrapMedian` of highways | `bootstrap(values, (s) => quantile(s, 0.5), { runs, level, seed })` |
 | `bootstrap` of layout-contract | `bootstrapClusters(rows, (r) => r.cluster, statistic, { runs, seed, ends: [0.025, 0.975] })` |
-| The stratified bootstrap of `verdict` of layout-contract | `bootstrapStrata(families, meanOfMeans, { runs, seed: deriveSeed(seed, "verdict.stratified"), ends })` |
-| The permutation test of `verdict` of layout-contract | `signFlipTest(terms, { exactMax, runs, seed: deriveSeed(seed, "verdict.permutation") })` |
 | `normalQuantile` of lag (Acklam, relative error below 1.2e-9) | `normalQuantile(p)`. The values change by 1.2e-9 or less, because the new function is more exact. A `p` out of 0 to 1 throws. |
 | `signTestP` of packing | `signTest(better, worse)` |
 | `signTestPower` of highways | `signTestPower(n, level)` |
