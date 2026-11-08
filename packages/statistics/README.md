@@ -164,6 +164,7 @@ logLoss([{ p: p.a, hit: true }]);                // the probability of the obser
 | `bootstrap(data, statistic, options)` | A percentile bootstrap interval of any statistic. The options are `runs`, `level` or `ends`, `seed`, `method` and `against`. |
 | The option `against` | The interval also gives `pAbove` and `pBelow`, the bootstrap p of each side of the value, from the same draws. The smallest p is 1 / (`finite` + 1). Give `holm` enough runs: with m tests at level a, `runs` is more than m / a. |
 | `bootstrapMedian`, `bootstrapClusters` | The interval of the median, and a bootstrap that draws whole clusters (boards, seeds, sites). |
+| `bootstrapStrata(strata, statistic, options)` | A stratified bootstrap. Each run draws inside each stratum, so each sample keeps the size of each stratum. |
 | `bootstrapTwo(a, b, statistic, options)` | A bootstrap interval of a statistic of two independent samples, for example two arms of a benchmark. Each run draws all of `a`, then all of `b`. |
 | `bootstrapMedianRatio(numerator, denominator, options)` | The interval of `median(numerator) / median(denominator)`. It is the uncertainty of the ratio, not the spread of the samples. |
 | `sampleTotalInterval(values, { population, scale })` | The interval of the total of a population from a uniform sample of `m` of its `n` items without replacement. The deviations get the finite population correction `sqrt(1 - m / n)`. `scale` is `n / m` by default. When `m` is `n`, the interval is the estimate. For a small `m`, the interval is too narrow: at `m = 8` of `n = 40`, the coverage is 0.865. For a total over pairs, use `uStatisticInterval`. |
@@ -173,6 +174,7 @@ logLoss([{ p: p.a, hit: true }]);                // the probability of the obser
 | `ridgeSolve(gram, moment, lambda, { free })` | The ridge coefficients from the normal equations `X'X` and `X'y`, with a Cholesky factorization. The `free` coefficients have no penalty. A matrix that is not positive definite gives NaN coefficients. |
 | `signTest(better, worse, sides)`, `signTestPower(n, level)` | The sign test, and the fewest wins out of `n` that the test calls significant. |
 | `pairedPermutation(candidate, baseline, options)` | The paired permutation test (random sign flips). It uses the size of each difference. |
+| `signFlipTest(terms, options)` | The sign-flip test of a sum of terms, for example a weighted mean of differences. Up to `exactMax` terms (16), it reads each sign set, so the p is exact. |
 | `twoSamplePermutation(a, b, options)` | The two-sample permutation test (a split of the pooled values). It reads each split when their count is `runs` or less, so the p is exact. It compares groups of different sizes, and its default statistic is the difference of the medians. |
 | `wilson(k, n, z)` | The Wilson interval of a proportion. |
 | `wilsonSampleSize(target, expected, z, max)` | The smallest number of trials at which the Wilson lower end reaches the target, at the expected proportion. |
@@ -287,6 +289,8 @@ The tests prove that these functions give the same numbers as the copies in the 
 | `bootstrapMedian` of packing | `bootstrapMedian(sortedValues, { runs, level, seed })`. Give the values sorted, because packing draws from the sorted list. |
 | `bootstrapMedian` of highways | `bootstrap(values, (s) => quantile(s, 0.5), { runs, level, seed })` |
 | `bootstrap` of layout-contract | `bootstrapClusters(rows, (r) => r.cluster, statistic, { runs, seed, ends: [0.025, 0.975] })` |
+| The stratified bootstrap of `verdict` of layout-contract | `bootstrapStrata(families, meanOfMeans, { runs, seed: deriveSeed(seed, "verdict.stratified"), ends })` |
+| The permutation test of `verdict` of layout-contract | `signFlipTest(terms, { exactMax, runs, seed: deriveSeed(seed, "verdict.permutation") })` |
 | `signTestP` of packing | `signTest(better, worse)` |
 | `signTestPower` of highways | `signTestPower(n, level)` |
 | `wilson` of packing | `wilson(k, n, z)`. packing rounds the ends to 4 places at the call. |
