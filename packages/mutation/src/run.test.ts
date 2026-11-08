@@ -217,14 +217,14 @@ describe("rigor-mutation", () => {
     expect(annotationsOf(out)).toEqual([]);
   });
 
-  // The flip of LANE.FILES: a test file on the disk that the report does not read fails, unless notRead names it.
-  it("fails a test file on the disk that the report does not read, unless notRead gives its reason", () => {
-    put("packages/app/src/b.test.ts", "");
-    put("packages/app/bench/e.test.ts", "");
+  // The flip of LANE.FILES: a test file that the run starts and that the report does not read fails, unless notRead names it.
+  it("fails a test file that the run starts and that the report does not read, unless notRead gives its reason", () => {
+    put("packages/app/src/b.test.ts", 'import { b } from "./b.ts";\n');
+    put("packages/app/bench/e.test.ts", 'import { b } from "../src/b.ts";\n');
     put("packages/app/src/types.d.ts", "");
     put("packages/app/reports/mutation/mutation.json", JSON.stringify({ ...mutants(9, 1), testFiles: { "src/b.test.ts": { tests: [{ name: "b" }] } } }));
     expect(run("scores", "app", "--test-files")).toBe(1);
-    expect(out).toContain("app: 90.00 % (9 of 10, 1 survived, 1 tests), no gate: FAIL: the report does not read 1 test files on the disk");
+    expect(out).toContain("app: 90.00 % (9 of 10, 1 survived, 1 tests), no gate: FAIL: the report does not read 1 test files that the run starts");
     expect(out).toContain("  not read: packages/app/bench/e.test.ts\n");
     expect(out).not.toContain("types.d.ts");
     expect(run("scores", "app")).toBe(0);
@@ -237,6 +237,33 @@ describe("rigor-mutation", () => {
     put("packages/app/reports/mutation/mutation.json", JSON.stringify(mutants(9, 1)));
     expect(run("scores", "app", "--test-files")).toBe(1);
     expect(out).toContain(`FAIL: the report has no "testFiles", so the test files that it read are not known`);
+  });
+
+  // The related mode of the Vitest runner starts only the test files that load a file of the selection (LANE.FILES).
+  it("expects of a part only the test files that load a file of the part, and each test file with related false", () => {
+    put("packages/lib/src/core/c.test.ts", 'import { c } from "./c.ts";\n');
+    put("packages/lib/src/a.test.ts", 'import { a } from "./a.ts";\n');
+    put("packages/lib/src/via.ts", 'export { c as via } from "./core/c.ts";\n');
+    put("packages/lib/src/types.test.ts", 'import type {\n  c,\n} from "./core/c.ts";\n// import { c } from "./core/c.ts";\n');
+    put("packages/lib/reports/mutation/mutation.json", JSON.stringify({ ...mutants(9, 1), testFiles: { "src/core/c.test.ts": { tests: [{ name: "c" }] } } }));
+    expect(run("scores", "lib.core", "--test-files")).toBe(0);
+    expect(out).not.toContain("not read");
+
+    // A test file that loads the part through another file is related too.
+    put("packages/lib/src/via.test.ts", 'import { via } from "./via.ts";\n');
+    out = "";
+    expect(run("scores", "lib.core", "--test-files")).toBe(1);
+    expect(out).toContain("FAIL: the report does not read 1 test files that the run starts");
+    expect(out).toContain("  not read: packages/lib/src/via.test.ts\n");
+
+    // With related false, the run starts each test file, so each one that the report does not read fails.
+    const lane = JSON.parse(readFileSync(join(root, "mutation.json"), "utf8")) as { packages: Record<string, Record<string, unknown>> };
+    lane.packages["lib"] = { ...lane.packages["lib"], stryker: { vitest: { related: false } } };
+    put("mutation.json", JSON.stringify(lane));
+    out = "";
+    expect(run("scores", "lib.core", "--test-files")).toBe(1);
+    expect(out).toContain("FAIL: the report does not read 3 test files that the run starts");
+    expect(out).toContain("  not read: packages/lib/src/types.test.ts\n");
   });
 
   it("gives the help, and refuses an unknown command", () => {
