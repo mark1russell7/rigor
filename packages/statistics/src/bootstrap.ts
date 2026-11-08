@@ -254,6 +254,36 @@ export function bootstrapClusters<T>(
   return result.finite === 0 ? { ...result, estimate, low: estimate, high: estimate } : { ...result, estimate };
 }
 
+/**
+ * A stratified bootstrap: each run draws, inside each stratum, as many items as the stratum has, with replacement.
+ * So each sample keeps the size of each stratum. Use it when the strata are fixed by the design, for example the
+ * families of the inputs of a benchmark. The draws of one run go through the strata in the order of the list. With one
+ * stratum, the draws are equal to the draws of `bootstrap` with the same seed. The estimate is the statistic of all
+ * the strata. A run whose statistic is not finite does not count.
+ */
+export function bootstrapStrata<T>(
+  strata: readonly (readonly T[])[],
+  statistic: (samples: readonly (readonly T[])[]) => number,
+  options: BootstrapOptions = {},
+): Interval {
+  if (strata.length === 0) throw new RangeError("bootstrapStrata: there is no stratum.");
+  for (const [i, stratum] of strata.entries()) if (stratum.length === 0) throw new RangeError(`bootstrapStrata: the stratum ${i} is empty.`);
+  const samples = strata.map((stratum) => new Array<T>(stratum.length));
+  return percentile(
+    "bootstrapStrata",
+    options,
+    (r) => {
+      for (const [k, stratum] of strata.entries()) {
+        const sample = samples[k] as T[];
+        const n = stratum.length;
+        for (let i = 0; i < n; i++) sample[i] = stratum[r.below(n)] as T;
+      }
+      return statistic(samples);
+    },
+    () => statistic(strata),
+  );
+}
+
 export interface SampleTotalOptions extends BootstrapOptions {
   /** The number of items in the whole population, `n`. It is a whole number, and it is not less than the sample. */
   readonly population: number;
