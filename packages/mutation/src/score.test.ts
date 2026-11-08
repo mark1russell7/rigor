@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { failScore, formatScore, packageScore, parseReport, scoreReport, summaryMarkdown, testCount, testFall, testFileFaults, unreadTestFiles, type MutationReport } from "./score.ts";
+import { failScore, formatScore, packageScore, parseReport, scoreReport, summaryMarkdown, testCount, testFall, readFaults, testFileFaults, unreadTestFiles, type MutationReport } from "./score.ts";
 
 const mutant = (status: string, line: number) =>
   status === "HitLimit"
@@ -154,6 +154,13 @@ describe("the tests of a report (LANE.TESTS and LANE.FILES of Vex)", () => {
     const notRead = { "bench/e.test.ts": "a bench", "src/b.test.ts": "read", "src/gone.test.ts": "not on the disk" };
     expect(testFileFaults([a, b], onDisk, notRead, "D:/repo/pkg")).toEqual({ unread: ["src/c.test.ts"], stale: ["src/b.test.ts", "src/gone.test.ts"] });
     expect(testFileFaults([a], onDisk, notRead, "D:/repo/pkg").stale).toEqual(["src/gone.test.ts"]);
+  });
+
+  it("gives the same faults for a set of read files, as load-check --collect gives it", () => {
+    const onDisk = ["src/a.test.ts", "src/b.test.ts", "bench/e.test.ts"];
+    const notRead = { "bench/e.test.ts": "a bench", "src/a.test.ts": "read", "src/gone.test.ts": "not on the disk" };
+    expect(readFaults(new Set(["src/a.test.ts"]), onDisk)).toEqual({ unread: ["src/b.test.ts", "bench/e.test.ts"], stale: [] });
+    expect(readFaults(new Set(["src/a.test.ts"]), onDisk, notRead)).toEqual({ unread: ["src/b.test.ts"], stale: ["src/a.test.ts", "src/gone.test.ts"] });
   });
 
   it("keeps the first reason of a score that failed already", () => {

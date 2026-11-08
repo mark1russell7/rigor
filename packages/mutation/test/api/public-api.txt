@@ -9,6 +9,7 @@
 type CliIo: build/index.d.ts#CliIo
 type Collected: build/index.d.ts#Collected
 type CollectedFile: build/index.d.ts#CollectedFile
+type ComputedImport: build/index.d.ts#ComputedImport
 type ConfigOptions: build/index.d.ts#ConfigOptions
 DRY_RUN_TIMEOUT_MINUTES: build/index.d.ts#DRY_RUN_TIMEOUT_MINUTES
 type Disable: build/index.d.ts#Disable
@@ -37,6 +38,7 @@ TIMEOUT_MS: build/index.d.ts#TIMEOUT_MS
 changedFiles: build/index.d.ts#changedFiles
 collectFaults: build/index.d.ts#collectFaults
 compareDisables: build/index.d.ts#compareDisables
+computedImports: build/index.d.ts#computedImports
 findDisables: build/index.d.ts#findDisables
 formatScore: build/index.d.ts#formatScore
 isConfigFile: build/index.d.ts#isConfigFile
@@ -78,6 +80,7 @@ interface Collected {
   readonly path: string;
   readonly files: readonly CollectedFile[];
   readonly unhandled: readonly string[];
+  readonly selections: Readonly<Record<string, readonly string[]>>;
 }
 
 ### build/index.d.ts#CollectedFile
@@ -85,6 +88,12 @@ interface CollectedFile {
   readonly file: string;
   readonly errors: readonly string[];
   readonly children: number;
+}
+
+### build/index.d.ts#ComputedImport
+interface ComputedImport {
+  readonly file: string;
+  readonly line: number;
 }
 
 ### build/index.d.ts#ConfigOptions
@@ -178,6 +187,7 @@ interface PackageLane {
   readonly dryRunTimeoutMinutes?: number;
   readonly stryker?: Readonly<Record<string, unknown>>;
   readonly notRead?: Readonly<Record<string, string>>;
+  readonly computedImports?: Readonly<Record<string, string>>;
 }
 
 ### build/index.d.ts#PartialCosts
@@ -275,6 +285,9 @@ export declare function collectFaults(collected: Collected): string[];
 
 ### build/index.d.ts#compareDisables
 export declare function compareDisables(found: readonly Disable[], listed: readonly Disable[]): DisableCheck;
+
+### build/index.d.ts#computedImports
+export declare function computedImports(files: readonly PackageFile[], vitestConfig?: string): ComputedImport[];
 
 ### build/index.d.ts#findDisables
 export declare function findDisables(files: readonly {

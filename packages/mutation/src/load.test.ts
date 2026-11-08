@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { collectFaults, isConfigFile, leavingPaths, relatedTestFiles, type Collected } from "./load.ts";
+import { collectFaults, computedImports, isConfigFile, leavingPaths, relatedTestFiles, type Collected } from "./load.ts";
 
 describe("leavingPaths", () => {
   it("refuses each loaded path of a test file that leaves the folder, with its line (V-072)", () => {
@@ -110,7 +110,7 @@ describe("relatedTestFiles", () => {
 });
 
 describe("collectFaults", () => {
-  const base: Collected = { version: "5.0.5", path: "node_modules/vitest/dist/node.js", files: [], unhandled: [] };
+  const base: Collected = { version: "5.0.5", path: "node_modules/vitest/dist/node.js", files: [], unhandled: [], selections: {} };
   const file = (name: string, errors: string[], children: number) => ({ file: name, errors, children });
 
   it("gives no fault when each test file loads and holds a test", () => {
@@ -127,5 +127,25 @@ describe("collectFaults", () => {
 
   it("gives each error outside a test file, and a package with no test file", () => {
     expect(collectFaults({ ...base, unhandled: ["setup failed"] })).toEqual(["an error outside a test file: setup failed", "Vitest finds no test file"]);
+  });
+});
+
+describe("computedImports", () => {
+  it("gives each dynamic import with a computed path in a file that the run loads, and keeps the imports of one string", () => {
+    const files = [
+      { file: "src/a.test.ts", text: 'import "./helper.ts";\nconst m = await import(name);\nawait import("./b.ts");\nawait import(`./c.ts`);' },
+      { file: "src/helper.ts", text: "// await import(name) in a comment\nexport const load = (n: string) => import(`./ops/${n}.ts`);" },
+      { file: "src/unloaded.ts", text: "await import(name);" },
+      { file: "vitest.config.ts", text: "await import(name);" },
+    ];
+    expect(computedImports(files)).toEqual([
+      { file: "src/a.test.ts", line: 2 },
+      { file: "src/helper.ts", line: 2 },
+    ]);
+  });
+
+  it("does not take an import of a type, vi.importActual or import.meta", () => {
+    const text = 'type T = typeof import("vitest/node");\nconst real = await vi.importActual(name);\nconst url = import.meta.url;';
+    expect(computedImports([{ file: "src/a.test.ts", text }])).toEqual([]);
   });
 });

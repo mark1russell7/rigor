@@ -225,6 +225,9 @@ describe("the lane fields of the test checks", () => {
     const notRead = { packages: { a: { dir: "a", mutate: ["src/*.ts"], notRead: { "bench/x.test.ts": "a bench" } } } };
     expect(parseLane(notRead)).toBe(notRead);
     expect(() => parseLane({ packages: { a: { dir: "a", mutate: ["src/*.ts"], notRead: { "x.test.ts": " " } } } })).toThrow(/a: "notRead" is not an object of files, each with a reason/);
+    const computed = { packages: { a: { dir: "a", mutate: ["src/*.ts"], computedImports: { "src/all.test.ts": "it loads each op" } } } };
+    expect(parseLane(computed)).toBe(computed);
+    expect(() => parseLane({ packages: { a: { dir: "a", mutate: ["src/*.ts"], computedImports: ["src/all.test.ts"] } } })).toThrow(/a: "computedImports" is not an object of files, each with a reason/);
     expect(() => parseLane({ ...LANE, maxTestFall: 120 })).toThrow(/"maxTestFall" is not a percent/);
     expect(() => parseLane({ ...LANE, plannedFalls: { collections: "" } })).toThrow(/"plannedFalls" is not an object/);
     expect(() => parseLane({ ...LANE, plannedFalls: { "collections.nope": "a reason" } })).toThrow(/"plannedFalls" names no selection of the lane: collections\.nope/);

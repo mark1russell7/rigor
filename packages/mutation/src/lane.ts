@@ -46,6 +46,11 @@ export interface PackageLane {
    * --test-files` fails for each other test file on the disk that the report does not read. The file is from `dir`.
    */
   readonly notRead?: Readonly<Record<string, string>>;
+  /**
+   * Each file of this field has a dynamic import with a computed path, and the value gives the reason. The related walk
+   * of Vitest does not follow this type of import. `load-check --collect` fails for each other file of the run with one.
+   */
+  readonly computedImports?: Readonly<Record<string, string>>;
 }
 
 /** The keys of the Stryker config that the lane owns. The field `stryker` of a package cannot have them. */
@@ -117,6 +122,7 @@ function packageErrors(name: string, p: unknown): string[] {
     }
   }
   if (p["notRead"] !== undefined && !isReasons(p["notRead"])) errors.push(`${name}: "notRead" is not an object of files, each with a reason`);
+  if (p["computedImports"] !== undefined && !isReasons(p["computedImports"])) errors.push(`${name}: "computedImports" is not an object of files, each with a reason`);
   const parts = p["parts"];
   if (parts !== undefined) {
     if (!isRecord(parts) || Object.keys(parts).length === 0) errors.push(`${name}: "parts" is not an object with parts`);
