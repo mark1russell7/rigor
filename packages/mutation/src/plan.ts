@@ -113,10 +113,11 @@ export interface RunnerPlan {
  * This function gives the speed of the runner of each selection, relative to the other selections of its group. Each part
  * runs on its own runner, and in Vex the same tests took from 83 s to 149 s on the runners of one group.
  *
- * - When each plan of a group has a `dryRun` with the same count of tests, the factor is the net time of the dry run
- *   over the median of the group.
- * - Otherwise the factor is the median, over the shared tests, of the time of a test over its median time in the group.
- *   A shared test takes `SPEED_MIN_MS` or more, and the plans of half of the group or more name it, with 2 at least.
+ * - When each plan of a group has a `dryRun` with the same count of tests, the factor uses the dry runs. It is the
+ *   net time of the dry run over the median of the group.
+ * - Otherwise the factor is the median of the ratios of the shared tests. The ratio of a test is its time over its
+ *   median time in the group. A shared test takes `SPEED_MIN_MS` or more. At least half of the plans of the group
+ *   name it, and at least 2 plans.
  * - A selection with no shared test, or alone in its group, has the factor 1. A factor over 1 is a slow runner.
  */
 export function speedFactors(plans: readonly RunnerPlan[]): Map<string, number> {

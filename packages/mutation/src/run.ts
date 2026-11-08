@@ -570,7 +570,7 @@ function planCheck(lane: Lane, laneDir: string, names: readonly string[], o: Pla
  * This function writes the cost maps of the lane from the plans of a run (`costs`). It adds the plan lines of each file
  * over the selections, so a file in two parts gets one map. A file that a selection mutates with no plan gets a map of
  * 0. The maps of the files of the other selections stay. The function divides the net time of each part by the speed factor
- * of its runner (`speedFactors`), so a slow runner does not make its files look slow.
+ * of its runner (`speedFactors`). Thus a slow runner does not make its files look slow.
  */
 function writeCosts(lane: Lane, laneDir: string, run: string, reports: string | undefined, io: CliIo): number {
   if (lane.costs === undefined) throw new Error(`the lane has no field "costs" for the file of the cost maps`);

@@ -151,8 +151,8 @@ The cut reads only the files on the disk and the cost maps. Thus each job of a r
 
 Each part runs on its own runner, and the speed of the runners differs. In a run of Vex, the same 1191 tests took from 83 s to 149 s. Thus `costs` divides the net time of each part by the speed factor of its runner, and it prints the factors:
 
-- When each plan of a group has a `dryRun` with the same count of tests, the factor is the time of the dry run over the median of the group.
-- Otherwise the factor is the median ratio of the time of a shared test to its median time in the group. A shared test takes 200 ms or more (`SPEED_MIN_MS`), and half of the plans of the group or more name it, with 2 at least.
+- When each plan of a group has a `dryRun` with the same count of tests, the factor uses the dry runs. It is the time of the dry run over the median of the group.
+- Otherwise the factor is the median ratio of the time of a shared test to its median time in the group. A shared test takes 200 ms or more (`SPEED_MIN_MS`). At least half of the plans of the group name it, and at least 2 plans.
 - A selection alone in its group, or with no shared test, has the factor 1. A factor over 1 is a slow runner.
 
 `rigor-mutation cost-check [<selection>...]` gives the estimate of the clock of each numbered part under the committed maps. A part over `targetMinutes` fails, and so does a group with no map. The check reads no plan, so each commit gives one result. Thus a check of the pull request can hold each part under its target.
