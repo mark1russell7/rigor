@@ -479,8 +479,9 @@ interface PlanCheckOptions {
 }
 
 /**
- * This function reads the plan of each selection (`plan-check`). It gives the estimate of the clock of each selection,
- * and it fails a selection over its target, a file over its limit of static runs, and a selection with no plan.
+ * This function reads the plan of each selection (`plan-check`). It gives the estimate of the clock of each selection.
+ * It warns of a selection over its target. It fails a selection over its stop or with no plan, and a file over its
+ * limit of static runs.
  */
 function planCheck(lane: Lane, laneDir: string, names: readonly string[], o: PlanCheckOptions, io: CliIo): number {
   if (names.length === 0) throw new Error(`"plan-check" takes one or more selections`);
@@ -504,9 +505,9 @@ function planCheck(lane: Lane, laneDir: string, names: readonly string[], o: Pla
     }
     const limits = lane.packages[s.pkg]?.staticLimits;
     const read = readPlan(name, parsePlan(readJson(file)), {
-      planPerClock: lane.planPerClock,
-      targetMinutes: lane.targetMinutes,
-      stopMinutes: lane.stopMinutes,
+      ...(lane.planPerClock === undefined ? {} : { planPerClock: lane.planPerClock }),
+      ...(lane.targetMinutes === undefined ? {} : { targetMinutes: lane.targetMinutes }),
+      ...(lane.stopMinutes === undefined ? {} : { stopMinutes: lane.stopMinutes }),
       ...(limits === undefined ? {} : { staticLimits: limits }),
     });
     io.stdout(`${read.line}\n${read.warnings.map((w) => `  WARN: ${w}\n`).join("")}${read.faults.map((f) => `  FAIL: ${f}\n`).join("")}`);

@@ -1,8 +1,9 @@
 /**
  * The cost plan of a selection. Stryker makes a plan of the mutants after the run of the tests without mutants. The
- * reporter `rigor-partial` writes the plan of each file and each line into `plan.json`. `plan-check` reads the file,
- * gives the estimate of the clock of the selection. It warns of a selection over its target, and fails a selection over
- * its stop or a file over its limit of static runs. The cut of the parts can then follow the cost of the lines, and not the size of the files.
+ * reporter `rigor-partial` writes the plan of each file and each line into `plan.json`. `plan-check` reads the file and
+ * gives the estimate of the clock of the selection. It warns of a selection over its target. It fails a selection over
+ * its stop, and a file over its limit of static runs. The cut of the parts can then follow the cost of the lines, and
+ * not the size of the files.
  */
 
 /** The name of the file of the plan, in the folder of the JSON report. */

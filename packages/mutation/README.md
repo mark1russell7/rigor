@@ -108,10 +108,10 @@ Each line of a mutant in `partial.jsonl` also gives its planned net time and its
 
 `rigor-mutation config <selection> --plan` gives a config that stops Stryker after the plan. Stryker starts no mutant, so the plan costs only the run of the tests.
 
-`rigor-mutation plan-check <selection>...` reads the plan of each selection. It gives the estimate of the clock. It gives a warning when the estimate is over `targetMinutes`, and in GitHub Actions also a warning annotation. The estimate has an error of 28 minutes in the mean, so the target does not fail. It fails a selection when:
+`rigor-mutation plan-check <selection>...` reads the plan of each selection. It gives the estimate of the clock. It gives a warning when the estimate is over `targetMinutes`, and in GitHub Actions also a warning annotation. The estimate has an error of 28 minutes in the mean, so the target does not fail. These conditions fail a selection:
 
-- the estimate is over `stopMinutes`. Stryker cannot end the selection before the stop, so it cannot give a full score;
-- a file has more static runs than its limit in `staticLimits`.
+- The estimate is over `stopMinutes`. Stryker cannot end the selection before the stop, so it cannot give a full score.
+- A file has more static runs than its limit in `staticLimits`.
 
 A static run starts each test, so it costs the time of all the tests. Code outside a function gives a static mutant.
 
