@@ -160,6 +160,7 @@ logLoss([{ p: p.a, hit: true }]);                // the probability of the obser
 | Function | What it gives |
 | --- | --- |
 | `mean`, `sd`, `median`, `summarize` | The descriptive statistics. `sd` is the sample standard deviation. |
+| `runningOf`, `addToRunning`, `mergeRunning`, `runningMean`, `runningSd` | A running summary of a stream: the count, the sum, the extremes and the spread, one value at a time. `mergeRunning` joins the summaries of two parts. `runningMean` gives exactly `mean` of the values. |
 | `quantile(values, p, method)`, `quantileSorted` | The `p` quantile, with the `"linear"` method (type 7, the default), the `"nearest-rank"` method (type 1) or the `"higher"` method (`sorted[Math.ceil(p * (n - 1))]`, as NumPy). |
 | `bootstrap(data, statistic, options)` | A percentile bootstrap interval of any statistic. The options are `runs`, `level` or `ends`, `seed`, `method` and `against`. |
 | The option `against` | The interval also gives `pAbove` and `pBelow`, the bootstrap p of each side of the value, from the same draws. The smallest p is 1 / (`finite` + 1). Give `holm` enough runs: with m tests at level a, `runs` is more than m / a. |
@@ -299,6 +300,7 @@ The tests prove that these functions give the same numbers as the copies in the 
 | `spearman` of the highways backtest, `kendallTau` of highways | `spearman`, `kendallTau` |
 | `medianInterval` of the harness and kind of systems | `medianInterval(sortedValues)`, with `low` and `high` |
 | The binomial band of `targetConnections` and `negativeBinomial` of the cells of systems | `binomialInterval(n, p, cover)` and `negativeBinomialInterval(successes, p, cover)` |
+| `summarizingNumber` of collections (`count`, `sum`, `min`, `max`, `average`) | `addToRunning` in the accumulator, then `n`, `sum`, `min`, `max` and `runningMean`. The average was `sum / count`, so the bits stay. |
 
 A copy that gives NaN, 0 or `undefined` for an empty list must test the list at the call, because these functions throw.
 

@@ -1,4 +1,5 @@
 export { type QuantileMethod, type Summary, mean, median, quantile, quantileSorted, sd, sorted, summarize } from "./describe.ts";
+export { type RunningSummary, EMPTY_RUNNING, addToRunning, mergeRunning, runningMean, runningOf, runningSd } from "./running.ts";
 export {
   type BootstrapOptions,
   type Interval,
