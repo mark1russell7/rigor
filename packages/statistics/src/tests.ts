@@ -161,6 +161,74 @@ export function pairedPermutation(candidate: readonly number[], baseline: readon
   return { observed, p: (1 + extreme) / (1 + runs), runs };
 }
 
+/** The default of the option `exactMax` of `signFlipTest`. */
+export const SIGN_FLIP_EXACT_MAX = 16;
+
+/** The largest value of the option `exactMax` of `signFlipTest`: 2^24 sign sets. */
+export const SIGN_FLIP_EXACT_LIMIT = 24;
+
+/** The options of `signFlipTest`. */
+export interface SignFlipOptions {
+  /** The largest count of terms for which the test reads each of the `2^n` sign sets. The default is 16. The most is 24. */
+  readonly exactMax?: number;
+  /** The count of random sign sets above `exactMax`. The default is 10 000. */
+  readonly runs?: number;
+  /** The default is 1. */
+  readonly seed?: number | string;
+}
+
+/** The result of `signFlipTest`. */
+export interface SignFlipResult {
+  /** The absolute value of the sum of the terms. */
+  readonly observed: number;
+  /** The two-sided p. */
+  readonly p: number;
+  /** This field is true when the test read each sign set, so the p has no noise from the draws. */
+  readonly exact: boolean;
+  /** The count of the sign sets that the test read: `2^n` when it is exact, otherwise the count of the draws. */
+  readonly runs: number;
+}
+
+/**
+ * The sign-flip test of a sum of terms. Under the null, each term has the sign + or - with equal chance. The statistic
+ * is the absolute value of the sum. A weighted mean of paired differences is such a sum: give the terms `w[i] * d[i]`.
+ *
+ * Up to `exactMax` terms, the test reads each sign set. The p is the share of the sets that are as far from 0 or
+ * farther. The observed set is one of them. Above `exactMax`, the test draws `runs` sets, and the p is (1 + the extreme
+ * draws) / (1 + runs). A sum within `1e-12` of the sum of the absolute terms counts as extreme, so rounding does not
+ * hide a tie.
+ */
+export function signFlipTest(terms: readonly number[], options: SignFlipOptions = {}): SignFlipResult {
+  const exactMax = options.exactMax ?? SIGN_FLIP_EXACT_MAX;
+  if (!Number.isInteger(exactMax) || exactMax < 0 || exactMax > SIGN_FLIP_EXACT_LIMIT) {
+    throw new RangeError(`signFlipTest: exactMax is a whole number from 0 to ${SIGN_FLIP_EXACT_LIMIT}, not ${exactMax}.`);
+  }
+  for (const [i, t] of terms.entries()) if (!Number.isFinite(t)) throw new RangeError(`signFlipTest: the term ${i} is ${t}, not a finite number.`);
+  const n = terms.length;
+  const observed = Math.abs(terms.reduce((sum, t) => sum + t, 0));
+  const slack = 1e-12 * terms.reduce((sum, t) => sum + Math.abs(t), 0);
+  if (n <= exactMax) {
+    const total = 2 ** n;
+    let hits = 0;
+    for (let mask = 0; mask < total; mask++) {
+      let sum = 0;
+      for (let i = 0; i < n; i++) sum += mask & (1 << i) ? -(terms[i] as number) : (terms[i] as number);
+      if (Math.abs(sum) >= observed - slack) hits++;
+    }
+    return { observed, p: hits / total, exact: true, runs: total };
+  }
+  const runs = options.runs ?? 10_000;
+  if (!Number.isSafeInteger(runs) || runs < 1) throw new RangeError(`signFlipTest: runs is a whole number of 1 or more, not ${runs}.`);
+  const r = random(options.seed ?? 1);
+  let hits = 0;
+  for (let run = 0; run < runs; run++) {
+    let sum = 0;
+    for (let i = 0; i < n; i++) sum += r.next() < 0.5 ? -(terms[i] as number) : (terms[i] as number);
+    if (Math.abs(sum) >= observed - slack) hits++;
+  }
+  return { observed, p: (1 + hits) / (1 + runs), exact: false, runs };
+}
+
 /** The options of `twoSamplePermutation`. */
 export interface TwoSamplePermutationOptions {
   /** The largest number of splits that the test reads. The default is 10 000. */
