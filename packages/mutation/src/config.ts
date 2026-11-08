@@ -11,6 +11,11 @@ export interface ConfigOptions {
    * test. Use it to see if the tests pass under Stryker before a long run.
    */
   readonly dryRun?: boolean;
+  /**
+   * When this option is false, Stryker does not rewrite the tsconfig of the package in its sandbox. The default is true.
+   * The rewrite uses `parseConfigFileTextToJson`, and TypeScript 7 does not have it. Refer to `rewritesTsconfig`.
+   */
+  readonly tsconfigRewrite?: boolean;
 }
 
 /** The Stryker config of one selection, as JSON. Stryker starts in the folder of the package. The field `stryker` of the lane adds keys. */
@@ -28,6 +33,7 @@ export interface StrykerConfig {
   readonly concurrency: number;
   readonly timeoutMS: number;
   readonly dryRunTimeoutMinutes: number;
+  readonly tsconfigFile?: string;
   readonly dryRunOnly?: true;
   readonly disableBail?: true;
 }
@@ -40,6 +46,21 @@ export const REPORT_DIR = "reports/mutation";
  * Stryker is 5000. On a loaded CI runner that time stopped mutants that the tests detected later.
  */
 export const TIMEOUT_MS = 120_000;
+
+/**
+ * The value of `tsconfigFile` when the rewrite of the tsconfig is off. No project has this file, so Stryker finds no
+ * tsconfig to rewrite.
+ */
+export const NO_TSCONFIG = "tsconfig.no-stryker-rewrite.json";
+
+/**
+ * This function tells if Stryker can rewrite a tsconfig with a TypeScript of the major version `major`. Stryker 10.1
+ * parses the tsconfig with `parseConfigFileTextToJson`, and TypeScript 7 removed it. When no TypeScript is found, the
+ * answer is true, and the config keeps the default of Stryker.
+ */
+export function rewritesTsconfig(major: number | undefined): boolean {
+  return major === undefined || major < 7;
+}
 
 /** The default time in minutes for the run of the tests without mutants. The default of Stryker is 5. */
 export const DRY_RUN_TIMEOUT_MINUTES = 15;
@@ -65,6 +86,7 @@ export function strykerConfig(selection: Selection, options: ConfigOptions = {})
     concurrency: options.concurrency ?? 2,
     timeoutMS: selection.timeoutMS ?? TIMEOUT_MS,
     dryRunTimeoutMinutes: selection.dryRunTimeoutMinutes ?? DRY_RUN_TIMEOUT_MINUTES,
+    ...(options.tsconfigRewrite === false ? { tsconfigFile: NO_TSCONFIG } : {}),
     // The keys of the lane field "stryker" replace the keys above, but "--concurrency" replaces its "concurrency".
     ...selection.stryker,
     ...(options.concurrency === undefined ? {} : { concurrency: options.concurrency }),
