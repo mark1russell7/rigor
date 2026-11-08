@@ -90,7 +90,7 @@ function inputsOf(dimensions: readonly ResponseDimension[], row: readonly (numbe
   return inputs;
 }
 
-/** The outputs of the matrices, after the subtraction of their mean. */
+/** The outputs of the matrices, as the model gives them. The estimators subtract the mean where they use it. */
 interface Outputs {
   readonly a: Float64Array;
   readonly b: Float64Array;
@@ -150,7 +150,9 @@ function estimate(outputs: Outputs, rows: readonly number[] | null, n: number, c
  * - The first-order index is `mean(f(B) * (f(AB_i) - f(A))) / V` (Saltelli, 2010).
  * - The total index is `mean((f(A) - f(AB_i)) ** 2) / 2 / V` (Jansen, 1999).
  * - V is the variance of the outputs of A and B together.
- * - The function subtracts the mean of these outputs before the sums. This step keeps the estimators unbiased, and it decreases their error.
+ * - The variance uses the outputs of A and B less their mean. The first-order sum uses `f(B)` less that mean.
+ * - The total sum uses differences of outputs, so it uses no mean.
+ * - This step keeps the estimators unbiased, and it decreases their error when the mean is large.
  *
  * A model with a constant output has the variance 0. Then each index is 0, not NaN. An estimate can be a little
  * below 0 or above 1, from the Monte Carlo error. The function does not clip it.
