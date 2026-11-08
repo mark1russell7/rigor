@@ -255,4 +255,4 @@ const score = scoreReport(parseReport(JSON.parse(reportText)), selection);
 console.log(formatScore(score)); // collections.impl: 91.20 % (456 of 500, 44 survived), gate 80 %: pass
 ```
 
-The package also exports `selectionNames`, `runSelections`, `packageRuns`, `cutByCost`, `costMapOf`, `segmentsOf`, `lineWeights`, `weightedFiles`, `plannedMs`, `parseCostMaps`, `summaryMarkdown`, `findDisables`, `compareDisables`, `leavingPaths`, `relatedTestFiles`, `isConfigFile`, `testCount`, `testFall`, `unreadTestFiles`, `failScore` and `runCli`.
+The package also exports `selectionNames`, `runSelections`, `packageRuns`, `summaryMarkdown`, `findDisables`, `compareDisables`, `leavingPaths`, `relatedTestFiles`, `isConfigFile`, `testCount`, `testFall`, `unreadTestFiles`, `failScore` and `runCli`. The cut by cost has the exports `cutByCost`, `costMapOf`, `segmentsOf`, `lineWeights`, `weightedFiles`, `plannedMs` and `parseCostMaps`.
