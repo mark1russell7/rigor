@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { NO_TSCONFIG } from "./config.ts";
 import { runCli } from "./run.ts";
 
 let root = "";
@@ -115,6 +116,24 @@ describe("rigor-mutation", () => {
     put("none.txt", "docs/a.md\n");
     expect(run("list", "--runs", "--changed", "none.txt")).toBe(0);
     expect(out).toBe("");
+  });
+
+  it("turns off the tsconfig rewrite of Stryker only when the package resolves TypeScript 7 or later", () => {
+    expect(run("config", "app")).toBe(0);
+    expect(JSON.parse(out)).not.toHaveProperty("tsconfigFile");
+    put("packages/app/node_modules/typescript/package.json", JSON.stringify({ name: "typescript", version: "6.0.3" }));
+    out = "";
+    expect(run("config", "app")).toBe(0);
+    expect(JSON.parse(out)).not.toHaveProperty("tsconfigFile");
+    put("packages/app/node_modules/typescript/package.json", JSON.stringify({ name: "typescript", version: "7.0.2" }));
+    out = "";
+    expect(run("config", "app")).toBe(0);
+    expect(JSON.parse(out)).toMatchObject({ tsconfigFile: NO_TSCONFIG });
+    // The lane field "stryker" replaces the key
+    put("mutation.json", JSON.stringify({ packages: { app: { dir: "packages/app", mutate: ["src/**/*.ts"], stryker: { tsconfigFile: "tsconfig.json" } } } }));
+    out = "";
+    expect(run("config", "app")).toBe(0);
+    expect(JSON.parse(out)).toMatchObject({ tsconfigFile: "tsconfig.json" });
   });
 
   it("writes a config for a dry run", () => {

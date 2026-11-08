@@ -2,9 +2,10 @@
  * The CLI `rigor-mutation`. The work is in `runCli`, so a test can start the CLI in a fixture folder.
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
-import { dirname, relative, resolve } from "node:path";
+import { createRequire } from "node:module";
+import { dirname, join, relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { REPORT_DIR, strykerConfig } from "./config.ts";
+import { REPORT_DIR, rewritesTsconfig, strykerConfig } from "./config.ts";
 import { compareDisables, findDisables, type Disable } from "./disables.ts";
 import { leavingPaths } from "./load.ts";
 import { changedFiles, MAX_TEST_FALL, parseLane, partErrors, runSelections, select, selectionNames, type Lane } from "./lane.ts";
@@ -96,6 +97,22 @@ function loadCheck(lane: Lane, laneDir: string, names: readonly string[], io: Cl
 }
 
 const readJson = (file: string): unknown => JSON.parse(readFileSync(file, "utf8"));
+
+/**
+ * This function gives the major version of the `typescript` that the folder `dir` resolves, or undefined when the
+ * folder resolves none. In a usual install, Stryker resolves the same version, because it starts in that folder.
+ */
+function typescriptMajor(dir: string): number | undefined {
+  let file: string;
+  try {
+    file = createRequire(join(dir, "package.json")).resolve("typescript/package.json");
+  } catch {
+    return undefined;
+  }
+  const version: unknown = (readJson(file) as { version?: unknown }).version;
+  const major = typeof version === "string" ? Number.parseInt(version, 10) : Number.NaN;
+  return Number.isInteger(major) ? major : undefined;
+}
 
 /**
  * This function examines the parts of the packages against their source files.
@@ -299,7 +316,8 @@ export function runCli(argv: readonly string[], io: CliIo): number {
       const files = changed === undefined ? undefined : changedFiles(all, changed);
       if (files?.length === 0) throw new Error(`the selection ${all.name} has no changed file`);
       const selection = files === undefined ? all : { ...all, mutate: files };
-      const options = { ...(concurrency === undefined ? {} : { concurrency }), dryRun: values["dry-run"] };
+      const tsconfigRewrite = rewritesTsconfig(typescriptMajor(resolve(laneDir, all.dir)));
+      const options = { ...(concurrency === undefined ? {} : { concurrency }), dryRun: values["dry-run"], tsconfigRewrite };
       const text = `${JSON.stringify(strykerConfig(selection, options), null, 2)}\n`;
       if (values.out === undefined) io.stdout(text);
       else {

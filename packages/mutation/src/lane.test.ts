@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { strykerConfig } from "./config.ts";
+import { NO_TSCONFIG, rewritesTsconfig, strykerConfig } from "./config.ts";
 import { changedFiles, globsSelect, parseLane, partErrors, runSelections, select, selectionNames } from "./lane.ts";
 
 const LANE = {
@@ -135,6 +135,14 @@ describe("strykerConfig", () => {
     const opts = parseLane({ packages: { s: { dir: "s", mutate: ["x"], stryker: { ignoreStatic: true, concurrency: 1, plugins: ["a", "b"] } } } });
     expect(strykerConfig(select(opts, "s"))).toMatchObject({ ignoreStatic: true, concurrency: 1, plugins: ["a", "b"], mutate: ["x"] });
     expect(strykerConfig(select(opts, "s"), { concurrency: 3 })).toMatchObject({ ignoreStatic: true, concurrency: 3 });
+  });
+
+  // Stryker 10.1 rewrites the tsconfig with parseConfigFileTextToJson, and TypeScript 7 does not have it.
+  it("points tsconfigFile at no file when the rewrite is off, and only TypeScript 7 or later turns it off", () => {
+    expect(strykerConfig(select(lane, "small"), { tsconfigRewrite: false })).toMatchObject({ tsconfigFile: NO_TSCONFIG });
+    expect(strykerConfig(select(lane, "small"), { tsconfigRewrite: true })).not.toHaveProperty("tsconfigFile");
+    expect(strykerConfig(select(lane, "small"))).not.toHaveProperty("tsconfigFile");
+    expect([undefined, 5, 6, 7, 8].map(rewritesTsconfig)).toEqual([true, true, true, false, false]);
   });
 
   it("starts only the tests with dryRun, and does not stop at the first failed test", () => {

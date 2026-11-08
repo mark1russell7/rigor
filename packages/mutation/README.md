@@ -14,6 +14,10 @@ npm install --save-dev @mark1russell7/rigor-mutation @stryker-mutator/core @stry
 
 Use Stryker 10.1.0 or later with Vitest 5. Stryker 10.0 started no test on each mutant with Vitest 5 ([stryker-js#6210](https://github.com/stryker-mutator/stryker-js/issues/6210)). The score then fails, because the tests detect no mutant.
 
+Stryker 10.1 rewrites the `tsconfig.json` of the package in its copy with `parseConfigFileTextToJson`. TypeScript 7 does not have that function, so Stryker stops before the first test. When the folder of the package resolves TypeScript 7 or later, `config` sets `tsconfigFile` to `tsconfig.no-stryker-rewrite.json`. No project has that file, so Stryker does not start the rewrite.
+
+The rewrite changes only a relative `extends` or `references` path. A `tsconfig.json` that extends a package needs no rewrite. To keep the rewrite, set `tsconfigFile` in the lane field `stryker`.
+
 ## The lane file
 
 The lane file `mutation.json` is at the root of the repository:

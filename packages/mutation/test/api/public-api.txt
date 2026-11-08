@@ -16,6 +16,7 @@ type Lane: build/index.d.ts#Lane
 type LeavingPath: build/index.d.ts#LeavingPath
 type Mutant: build/index.d.ts#Mutant
 type MutationReport: build/index.d.ts#MutationReport
+NO_TSCONFIG: build/index.d.ts#NO_TSCONFIG
 type PackageFile: build/index.d.ts#PackageFile
 type PackageLane: build/index.d.ts#PackageLane
 REPORT_DIR: build/index.d.ts#REPORT_DIR
@@ -34,6 +35,7 @@ leavingPaths: build/index.d.ts#leavingPaths
 parseLane: build/index.d.ts#parseLane
 parseReport: build/index.d.ts#parseReport
 partErrors: build/index.d.ts#partErrors
+rewritesTsconfig: build/index.d.ts#rewritesTsconfig
 runCli: build/index.d.ts#runCli
 runSelections: build/index.d.ts#runSelections
 scoreReport: build/index.d.ts#scoreReport
@@ -60,6 +62,7 @@ interface ConfigOptions {
   readonly concurrency?: number;
   readonly reportDir?: string;
   readonly dryRun?: boolean;
+  readonly tsconfigRewrite?: boolean;
 }
 
 ### build/index.d.ts#DRY_RUN_TIMEOUT_MINUTES
@@ -120,6 +123,9 @@ interface MutationReport {
     }[];
   }>> | undefined;
 }
+
+### build/index.d.ts#NO_TSCONFIG
+export declare const NO_TSCONFIG = "tsconfig.no-stryker-rewrite.json";
 
 ### build/index.d.ts#PackageFile
 interface PackageFile {
@@ -200,6 +206,7 @@ interface StrykerConfig {
   readonly concurrency: number;
   readonly timeoutMS: number;
   readonly dryRunTimeoutMinutes: number;
+  readonly tsconfigFile?: string;
   readonly dryRunOnly?: true;
   readonly disableBail?: true;
 }
@@ -239,6 +246,9 @@ export declare function parseReport(json: unknown): MutationReport;
 
 ### build/index.d.ts#partErrors
 export declare function partErrors(lane: Lane, pkg: string, files: readonly string[]): string[];
+
+### build/index.d.ts#rewritesTsconfig
+export declare function rewritesTsconfig(major: number | undefined): boolean;
 
 ### build/index.d.ts#runCli
 export declare function runCli(argv: readonly string[], io: CliIo): number;
