@@ -30,6 +30,7 @@ type CaseGate: build/index.d.ts#CaseGate
 type CaseInterval: build/index.d.ts#CaseInterval
 type CaseLimit: build/index.d.ts#CaseLimit
 type CaseRatio: build/paired.d.ts#CaseRatio
+type CaseRead: build/index.d.ts#CaseRead
 type CaseResults: build/index.d.ts#CaseResults
 type CaseTail: build/index.d.ts#CaseTail
 type CaseTailLimit: build/index.d.ts#CaseTailLimit
@@ -97,6 +98,10 @@ type ModelTestOptions: build/index.d.ts#ModelTestOptions
 NARROW_SPREAD_SHARE: build/index.d.ts#NARROW_SPREAD_SHARE
 type NoControl: build/index.d.ts#NoControl
 type NoFactor: build/index.d.ts#NoFactor
+type NoReadLine: build/index.d.ts#NoReadLine
+type NoReadOptions: build/index.d.ts#NoReadOptions
+type NoReadOutputs: build/index.d.ts#NoReadOutputs
+type NoReadWritten: build/index.d.ts#NoReadWritten
 type NoiseCheck: build/index.d.ts#NoiseCheck
 type NotSlowerOptions: build/index.d.ts#NotSlowerOptions
 type NotSlowerRead: build/index.d.ts#NotSlowerRead
@@ -167,12 +172,14 @@ familyRead: build/index.d.ts#familyRead
 firstArm: build/paired.d.ts#firstArm
 gateOf: build/index.d.ts#gateOf
 growthVerdict: build/index.d.ts#growthVerdict
+isNoRead: build/index.d.ts#isNoRead
 jointClaim: build/index.d.ts#jointClaim
 ladderVerdict: build/index.d.ts#ladderVerdict
 limitOnModel: build/index.d.ts#limitOnModel
 limitVerdict: build/index.d.ts#limitVerdict
 modelRowText: build/index.d.ts#modelRowText
 modelTest: build/index.d.ts#modelTest
+noReadLine: build/index.d.ts#noReadLine
 notSlowerVerdict: build/index.d.ts#notSlowerVerdict
 orderSize: build/paired.d.ts#orderSize
 pairedChild: build/index.d.ts#pairedChild
@@ -192,6 +199,7 @@ verdictMargin: build/index.d.ts#verdictMargin
 verdictPower: build/index.d.ts#verdictPower
 visibleShift: build/index.d.ts#visibleShift
 winClaim: build/index.d.ts#winClaim
+writeNoRead: build/index.d.ts#writeNoRead
 
 ## ./code-stamp (build/code-stamp.d.ts): names
 
@@ -544,6 +552,12 @@ interface CaseLimit extends CaseInterval {
   readonly bound: number;
   readonly floor: number;
   readonly outcome: LimitOutcome;
+}
+
+### build/index.d.ts#CaseRead
+interface CaseRead {
+  readonly case: string;
+  readonly outcome: string;
 }
 
 ### build/index.d.ts#CaseResults
@@ -1072,6 +1086,35 @@ interface NoFactor extends GroupCounts {
   readonly reason: string;
 }
 
+### build/index.d.ts#NoReadLine
+interface NoReadLine {
+  readonly title: string;
+  readonly count: number;
+  readonly total: number;
+  readonly cases: readonly string[];
+  readonly cpu: string | undefined;
+  readonly mixed: boolean;
+  readonly text: string;
+}
+
+### build/index.d.ts#NoReadOptions
+interface NoReadOptions {
+  readonly title: string;
+  readonly models?: ArmModels;
+}
+
+### build/index.d.ts#NoReadOutputs
+interface NoReadOutputs {
+  readonly log?: (line: string) => void;
+  readonly summary?: string | undefined;
+}
+
+### build/index.d.ts#NoReadWritten
+interface NoReadWritten {
+  readonly annotation: string;
+  readonly summary: string;
+}
+
 ### build/index.d.ts#NoiseCheck
 interface NoiseCheck {
   readonly spread: number | undefined;
@@ -1503,6 +1546,9 @@ export declare function gateOf(cases: readonly GateCaseOutcome[]): Gate;
 ### build/index.d.ts#growthVerdict
 export declare function growthVerdict(rounds: readonly GrowthRound[], options: GrowthOptions): GrowthVerdict;
 
+### build/index.d.ts#isNoRead
+export declare function isNoRead(outcome: string): boolean;
+
 ### build/index.d.ts#jointClaim
 export declare function jointClaim(check: MeasureChecks, measures: readonly string[], entry: string, stratum?: string): JointClaim;
 
@@ -1520,6 +1566,9 @@ export declare function modelRowText(row: ModelRow, family: number): string;
 
 ### build/index.d.ts#modelTest
 export declare function modelTest(reads: readonly ModelRead[], options?: ModelTestOptions): ModelTest;
+
+### build/index.d.ts#noReadLine
+export declare function noReadLine(reads: readonly CaseRead[], options: NoReadOptions): NoReadLine | undefined;
 
 ### build/index.d.ts#notSlowerVerdict
 export declare function notSlowerVerdict(jobs: readonly JobRecords[], options: NotSlowerOptions): NotSlowerVerdict;
@@ -1574,6 +1623,9 @@ export declare function visibleShift(values: readonly number[], rest: readonly n
 
 ### build/index.d.ts#winClaim
 export declare function winClaim(check: MeasureChecks, measure: string, entry: string, stratum?: string): WinClaim;
+
+### build/index.d.ts#writeNoRead
+export declare function writeNoRead(line: NoReadLine | undefined, outputs?: NoReadOutputs): NoReadWritten | undefined;
 
 ### build/paired.d.ts#Arm
 type Arm = "a" | "b";

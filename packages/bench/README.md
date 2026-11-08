@@ -55,6 +55,8 @@ v.comparison;                                     // the cases that gain and dro
 | `armModels(pairs)` | The CPU models of each arm of a set of pairs, and if all the reads come from one known model. |
 | `tailFalseFails(aa, options)` | The cases of an A/A arm that the rule of `tailLimitVerdict` fails, and apart from these the cases with a limit under 1. |
 | `gateOf(cases)` | The gate of a list of case outcomes: `pass`, `block` or `no read`. |
+| `noReadLine(cases, options)` | The line of the cases with no read: the count, each case and the CPU pair, or undefined when each case has a read. |
+| `writeNoRead(line, outputs)` | The line as a warning annotation of GitHub Actions and as a line of the step summary. |
 | `notSlowerVerdict(jobs, options)` | The gate of the claim "not slower by more than the margin", with looks and a family level. |
 | `budgetVerdict(rounds, aa, options)` | The verdict of the claim "the median of each case is at most `limit`", for one build: `within`, `beyond` or `cannot decide`. |
 | `budgetLooksVerdict(rounds, aa, options)` | The budget verdict of a run that adds rounds to the cases with no outcome, up to a stated budget. |
@@ -167,6 +169,23 @@ gate.more;                                        // the next look of each case 
 - `no read` is not a pass. A caller adds the rounds of `more`, then more jobs. A job that it adds after the last look is one more look, and the level does not count it.
 
 The level needs independent rounds. Rounds with a shared cause, for example a slow computer for one job, do not have it.
+
+## Show a no read on the check
+
+A case with no read is not a pass. A run that shows it only in a table of its summary is a silent pass. `noReadLine` gives one line for the check of the run, and `writeNoRead` writes it.
+
+```ts
+const line = noReadLine(cases, { title: "evaluator bench", models: armModels(pairs) });
+writeNoRead(line);   // a ::warning annotation, and a line of the file of GITHUB_STEP_SUMMARY
+```
+
+- The input is a list of `{ case, outcome }`. The cases of `gateOf`, `limitVerdict` and `budgetVerdict` have this form. Give one entry for each `timeVerdict`.
+- The outcomes `cannot decide` and `no read` are no-reads. `isNoRead` tells them.
+- With a read for each case, the line is undefined and `writeNoRead` writes nothing.
+- An empty list gives a line, because `gateOf` gives `no read` for it.
+- The line has the count, the total and the name of each case with no read, not only the first.
+- With `models`, the line names the CPU models of the two arms. It tells when they are a mixed pair.
+- Write the line also when the run is report only, so its check shows the no-read.
 
 ## A claim with a budget
 
