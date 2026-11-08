@@ -53,7 +53,7 @@ describe("gateLine", () => {
     expect(line?.outcome).toBe(gateOf(reads as Parameters<typeof gateOf>[0]).outcome);
     expect(line).toMatchObject({ outcome: "block", blocks: { count: 1, cases: ["read-1"] }, noReads: { count: 2, cases: ["read-10", "write-10"] } });
     expect(line?.text).toBe(
-      "store gate: block for 1 of 4 cases: read-1. no read for 2 of 4 cases: read-10, write-10. too few rounds. CPU a AMD EPYC 7763, b AMD EPYC 7763. A no read is not a pass.",
+      "store gate: block for 1 of 4 cases: read-1. No read for 2 of 4 cases: read-10, write-10. Too few rounds. CPU a AMD EPYC 7763, b AMD EPYC 7763. A no read is not a pass.",
     );
     expect(written(line).lines[0]).toBe(`::error title=store gate%3A block%2C 1 block and 2 no reads::${line?.text}`);
   });
@@ -91,7 +91,7 @@ describe("gateLine", () => {
   it("puts a reason after the counts", () => {
     const line = gateLine([{ case: "a", outcome: "cannot decide" }], { title: "t", reason: "a decision needs 3 jobs, not 2.", models: ONE });
     expect(line?.reason).toBe("a decision needs 3 jobs, not 2");
-    expect(line?.text).toBe("t: no read for 1 of 1 cases: a. a decision needs 3 jobs, not 2. CPU a AMD EPYC 7763, b AMD EPYC 7763. A no read is not a pass.");
+    expect(line?.text).toBe("t: no read for 1 of 1 cases: a. A decision needs 3 jobs, not 2. CPU a AMD EPYC 7763, b AMD EPYC 7763. A no read is not a pass.");
     expect(gateLine([{ case: "a", outcome: "cannot decide" }], { title: "t", reason: " " })?.reason).toBeUndefined();
   });
 
@@ -106,10 +106,10 @@ describe("gateLine", () => {
   it("names each model and its jobs in the job form, with no claim about a pair", () => {
     const reads = [{ case: "a", outcome: "cannot decide" }];
     const two = gateLine(reads, { title: "budget", models: [{ model: "AMD EPYC 7763", jobs: 2 }, { model: "AMD EPYC 9V74", jobs: 1 }] });
-    expect(two).toMatchObject({ cpu: "jobs on 2 CPU models: AMD EPYC 7763 (2 jobs), AMD EPYC 9V74 (1 job)", mixed: true });
+    expect(two).toMatchObject({ cpu: "Jobs on 2 CPU models: AMD EPYC 7763 (2 jobs), AMD EPYC 9V74 (1 job)", mixed: true });
     expect(two?.text).not.toContain("pair");
     const one = gateLine(reads, { title: "budget", models: [{ model: "AMD EPYC 7763", jobs: 3 }] });
-    expect(one).toMatchObject({ cpu: "jobs on 1 CPU model: AMD EPYC 7763 (3 jobs)", mixed: false });
+    expect(one).toMatchObject({ cpu: "Jobs on 1 CPU model: AMD EPYC 7763 (3 jobs)", mixed: false });
     expect(one?.text).not.toContain("pair");
   });
 
@@ -124,7 +124,32 @@ describe("gateLine", () => {
       { model: "b", jobs: 1 },
     ]);
     expect(jobModels([])).toEqual([]);
-    expect(gateLine([{ case: "x", outcome: "cannot decide" }], { title: "t", models: jobModels(envs) })?.cpu).toBe("jobs on 2 CPU models: AMD EPYC 7763 (1 job), Intel Xeon 8370C (2 jobs)");
+    expect(gateLine([{ case: "x", outcome: "cannot decide" }], { title: "t", models: jobModels(envs) })?.cpu).toBe("Jobs on 2 CPU models: AMD EPYC 7763 (1 job), Intel Xeon 8370C (2 jobs)");
+  });
+
+  it("starts each sentence after the title with a capital letter, in each form of the line", () => {
+    const reads = [
+      { case: "a", outcome: "beyond" },
+      { case: "b", outcome: "cannot decide" },
+      { case: "c", outcome: "within" },
+    ];
+    const jobs = jobModels([{ cpu: "AMD EPYC 7763" }, { cpu: "Intel Xeon 8370C" }]);
+    const lines = [
+      gateLine(reads.slice(0, 1), { title: "t" }),
+      gateLine(reads.slice(1), { title: "t", models: ONE }),
+      gateLine(reads, { title: "t", models: MIXED, reason: "the rounds are too few" }),
+      gateLine(reads, { title: "t", enforced: true, models: jobs, reason: "`minimum` is 5" }),
+      gateLine([], { title: "t", models: jobModels([{ cpu: "AMD EPYC 7763" }]) }),
+    ];
+    let count = 0;
+    for (const line of lines) {
+      expect(line).toBeDefined();
+      const sentences = (line?.text ?? "").slice("t: ".length).split(". ").slice(1);
+      count += sentences.length;
+      for (const s of sentences) expect(s, line?.text).toMatch(/^[A-Z`]/u);
+    }
+    // The 5 forms have 0, 2, 4, 4 and 2 sentences after the first: the no-reads, the reasons, the models and the close.
+    expect(count).toBe(12);
   });
 
   it("knows the words of a no-read and of a block", () => {
