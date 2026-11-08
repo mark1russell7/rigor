@@ -10,7 +10,7 @@ import { compareDisables, findDisables, type Disable } from "./disables.ts";
 import { leavingPaths, relatedTestFiles } from "./load.ts";
 import { changedFiles, globsSelect, MAX_TEST_FALL, parseLane, partErrors, runSelections, select, selectionNames, type Lane, type Selection } from "./lane.ts";
 import { PARTIAL_FILE } from "./reporter.ts";
-import { failScore, formatScore, packageScore, parsePartial, parseReport, partialScore, scoreReport, summaryMarkdown, testFall, unreadTestFiles, type MutationReport, type Score } from "./score.ts";
+import { failScore, formatScore, packageScore, parsePartial, parseReport, partialScore, scoreReport, summaryMarkdown, testFall, testFileFaults, unreadTestFiles, type MutationReport, type Score } from "./score.ts";
 
 /** The input and the output of the CLI. */
 export interface CliIo {
@@ -44,7 +44,10 @@ export const HELP: string = `rigor-mutation: the mutation tests of a repository,
                                                maxTestFall % (default 20) against the file fails. With
                                                --write-last, the counts of the passed selections go in
                                                the file. With --test-files, a test file that the run
-                                               starts and that the report does not read fails.
+                                               starts and that the report does not read fails. With no
+                                               --alone, a package with all its selections named also
+                                               fails for a test file that no report reads, and for an
+                                               entry of "notRead" that is not true.
   rigor-mutation disables [--write]            compare the disable comments with their list
   rigor-mutation load-check [<selection>...]   refuse each relative path of a package that leaves its folder.
                                                Stryker starts the tests in a copy of the folder, so such a
@@ -207,7 +210,8 @@ function scores(lane: Lane, laneDir: string, names: readonly string[], o: Scores
   if (lastFile !== undefined && !existsSync(lastFile)) io.stdout(`scores: the file ${o.last ?? ""} does not exist, so no count is compared
 `);
   const notes = new Map<string, string[]>(names.map((n) => [n, []]));
-  const note = (name: string, line: string): void => void notes.get(name)?.push(line);
+  const note = (name: string, line: string): void => void notes.set(name, [...(notes.get(name) ?? []), line]);
+  const reports = new Map<string, MutationReport>();
   const falls: PlannedFall[] = [];
   // The gate of a package with "gateOver": "package" reads the sum of its parts, so a part has no gate of its own.
   const byPackage = (s: Selection): boolean => s.name !== s.pkg && lane.packages[s.pkg]?.gateOver === "package";
@@ -229,6 +233,7 @@ function scores(lane: Lane, laneDir: string, names: readonly string[], o: Scores
       return { name, gate: s.gate, detected: 0, hitLimit: 0, clockTimeouts: 0, valid: 0, survived: [], percent: 0, percentWithClock: 0, tests: undefined, pass: false, reason, outcome: "no read" };
     }
     const report = parseReport(readJson(file));
+    reports.set(name, report);
     let score = scoreReport(report, s);
     const before = last[name];
     if (lastFile !== undefined && before !== undefined) {
@@ -247,6 +252,7 @@ function scores(lane: Lane, laneDir: string, names: readonly string[], o: Scores
     if (o.testFiles) score = checkTestFiles(lane, laneDir, s, report, score, (line) => note(name, line));
     return score;
   });
+  const faults = o.testFiles && o.alone !== true ? testFileReasons(lane, laneDir, names, reports, note) : new Map<string, string>();
   const packages = o.alone === true ? [] : names.map((n) => select(lane, n)).filter(byPackage).map((s) => s.pkg);
   const totals = [...new Set(packages)].map((pkg) => {
     const p = lane.packages[pkg];
@@ -257,7 +263,16 @@ function scores(lane: Lane, laneDir: string, names: readonly string[], o: Scores
       .filter((n) => !names.includes(n));
     return packageScore(pkg, p?.gate, parts, missing);
   });
-  const shown = [...results, ...totals];
+  // A fault of the test files of a package fails its sum, or each of its selections when it has no sum.
+  const withFault = (s: Score, pkg: string): Score => {
+    const reason = faults.get(pkg);
+    return reason === undefined ? s : failScore(s, reason);
+  };
+  const summed = new Set(totals.map((t) => t.name));
+  const shown = [
+    ...results.map((r) => (summed.has(select(lane, r.name).pkg) ? r : withFault(r, select(lane, r.name).pkg))),
+    ...totals.map((t) => withFault(t, t.name)),
+  ];
   for (const s of shown) {
     io.stdout(`${formatScore(s)}
 `);
@@ -284,6 +299,39 @@ ${summaryMarkdown(shown)}
   if (failed.length > 0) io.stderr(`The gate failed for ${failed.join(", ")}.
 `);
   return failed.length > 0 ? 1 : 0;
+}
+
+/**
+ * This function examines the test files of each package whose selections the command names in full, over all their
+ * reports (LANE.FILES). A part starts only its related test files, so one part does not show a test file that no part
+ * reads. The function gives the reason of the fault of each package, and notes each file.
+ */
+function testFileReasons(lane: Lane, laneDir: string, names: readonly string[], reports: ReadonlyMap<string, MutationReport>, note: (name: string, line: string) => void): Map<string, string> {
+  const reasons = new Map<string, string>();
+  for (const [pkg, p] of Object.entries(lane.packages)) {
+    const own = p.parts === undefined ? [pkg] : Object.keys(p.parts).map((part) => `${pkg}.${part}`);
+    const read = own.flatMap((n) => reports.get(n) ?? []);
+    // A selection that is not named, or that has no full report, is a no read already.
+    if (!own.every((n) => names.includes(n)) || read.length < own.length) continue;
+    // The notes go under the sum of the package, or else under its last selection.
+    const at = p.parts === undefined || p.gateOver === "package" ? pkg : (own.at(-1) ?? pkg);
+    // A report with no "testFiles" fails its own selection. The note tells that the check over the parts did not run.
+    const blind = own.filter((n) => reports.get(n)?.testFiles === undefined);
+    if (blind.length > 0) {
+      note(at, `  the test files of ${pkg} over all its selections are not known: the reports of ${blind.join(", ")} have no "testFiles"`);
+      continue;
+    }
+    const dir = resolve(laneDir, p.dir);
+    const onDisk = sourcesOf(dir, dir, true).filter((f) => TEST.test(f) && !f.endsWith(".d.ts"));
+    const { unread, stale } = testFileFaults(read, onDisk, p.notRead, dir);
+    for (const f of unread) note(at, `  read by no selection: ${p.dir}/${f}`);
+    for (const f of stale) note(at, `  "notRead" is not true: ${p.dir}/${f}`);
+    const parts: string[] = [];
+    if (unread.length > 0) parts.push(`no selection reads ${String(unread.length)} test files, and "notRead" does not give their reason`);
+    if (stale.length > 0) parts.push(`${String(stale.length)} entries of "notRead" name a file that is not on the disk or that a report reads`);
+    if (parts.length > 0) reasons.set(pkg, `the test files of ${pkg}: ${parts.join(". Also, ")}`);
+  }
+  return reasons;
 }
 
 /** A fall of the test count that the lane plans, with its text. The score passes, and its annotation tells the fall. */
