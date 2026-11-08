@@ -238,3 +238,16 @@ export function twoSamplePermutation(a: readonly number[], b: readonly number[],
   }
   return { observed, p: (1 + extreme) / (1 + runs), runs, exact: false };
 }
+
+/**
+ * The smallest number of trials `n` at which the Wilson lower end reaches `target`, when the true proportion is
+ * `expected`. Each `n` takes `round(expected × n)` successes. The function gives `undefined` when `expected` is not
+ * above `target`, or when no `n` up to `max` reaches it. An audit of an agreement uses it to fix its size.
+ */
+export function wilsonSampleSize(target: number, expected: number, z: number = Z95, max = 1_000_000): number | undefined {
+  if (!(target >= 0 && target <= 1 && expected >= 0 && expected <= 1)) throw new RangeError(`wilsonSampleSize: target ${target} and expected ${expected} must be from 0 to 1.`);
+  whole("wilsonSampleSize", max);
+  if (expected <= target) return undefined;
+  for (let n = 1; n <= max; n++) if (wilson(Math.round(expected * n), n, z).low >= target) return n;
+  return undefined;
+}

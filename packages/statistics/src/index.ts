@@ -79,7 +79,9 @@ export {
   signTestPower,
   twoSamplePermutation,
   wilson,
+  wilsonSampleSize,
 } from "./tests.ts";
+export { type Kappa, cohenKappa } from "./agreement.ts";
 export { KENDALL_EXACT, kendallTau, ranks, spearman } from "./rank.ts";
 export {
   type CountInterval,
