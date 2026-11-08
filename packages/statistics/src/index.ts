@@ -108,6 +108,7 @@ export {
   type NoiseVerdict,
   brier,
   calibration,
+  logLoss,
   compareRatios,
   noiseFloor,
   noiseVerdict,
@@ -129,3 +130,27 @@ export {
   type UStatisticOptions,
   uStatisticInterval,
 } from "./u-statistic.ts";
+export {
+  type EloOptions,
+  type EloUpdate,
+  type Glicko2Game,
+  type Glicko2Options,
+  type Glicko2Rating,
+  type PairProbabilities,
+  type RatingScale,
+  eloExpected,
+  eloUpdate,
+  glicko2Idle,
+  glicko2Update,
+  pairProbabilities,
+  ratingToStrength,
+  strengthToRating,
+} from "./rating.ts";
+export {
+  type BradleyTerryFit,
+  type BradleyTerryOptions,
+  type PairComparison,
+  type PairOutcome,
+  type TieModel,
+  bradleyTerry,
+} from "./bradley-terry.ts";
