@@ -1,4 +1,5 @@
 export { type QuantileMethod, type Summary, mean, median, quantile, quantileSorted, sd, sorted, summarize } from "./describe.ts";
+export { type RunningSummary, EMPTY_RUNNING, addToRunning, mergeRunning, runningMean, runningOf, runningSd } from "./running.ts";
 export {
   type BootstrapOptions,
   type Interval,
@@ -9,6 +10,7 @@ export {
   bootstrapLeastSquares,
   bootstrapMedian,
   bootstrapMedianRatio,
+  bootstrapStrata,
   bootstrapTwo,
   sampleTotalInterval,
 } from "./bootstrap.ts";
@@ -66,17 +68,23 @@ export {
 } from "./response.ts";
 export { type ParsedResponseRecord, type ResponseFault, RESPONSE_MAX_POWER, parseResponseRecord } from "./response-parse.ts";
 export { type ResponseFitOptions, RESPONSE_LAMBDAS, RESPONSE_MAX_TERMS, fitResponse } from "./response-fit.ts";
+export { type SobolIndex, type SobolIndices, type SobolOptions, sobolIndices } from "./response-sobol.ts";
 export {
   type Corrected,
   type PermutationOptions,
   type PermutationResult,
   type Proportion,
+  SIGN_FLIP_EXACT_LIMIT,
+  SIGN_FLIP_EXACT_MAX,
+  type SignFlipOptions,
+  type SignFlipResult,
   type TwoSamplePermutationOptions,
   type TwoSamplePermutationResult,
   Z95,
   holm,
   pairedPermutation,
   partialConjunction,
+  signFlipTest,
   signTest,
   signTestPower,
   twoSamplePermutation,
@@ -114,6 +122,7 @@ export {
   noiseVerdict,
 } from "./compare.ts";
 export { type OptionFloorOptions, optionFloor, tQuantile } from "./power.ts";
+export { normalCdf, normalQuantile } from "./normal.ts";
 export {
   type CoverageBar,
   type CoverageCell,

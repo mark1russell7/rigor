@@ -27,7 +27,7 @@ r.normal(10, 2); // a normal value with the mean 10 and the standard deviation 2
 r.fork("lanes"); // an independent generator for one part of the work
 r.seed; // the 32-bit seed: write it in each failure message
 
-// The seeds of a run: the seed of the environment variable SEED, else the defaults.
+// The seeds of a run: the seeds of the environment variable SEED (for example "7" or "1,3,9-11"), else the defaults.
 for (const seed of seedsFrom(process.env.SEED, [1, 2, 3, 4, 5])) {
   // ...
 }
