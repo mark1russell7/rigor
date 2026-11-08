@@ -25,7 +25,7 @@ A copy with a different algorithm, or with different constants, is not a move. K
 | ireko | `packages/site/src/playground/fuzz.ts` | next |
 | Jqy | `packages/site/src/playground/fuzz.ts` | next |
 | lag | `packages/load/src/rng.ts` (`createRng`), `packages/site/src/fixtures/sample-results.ts`, `packages/site/build/og-image.ts` | next |
-| layout-contract | `packages/layout-contract/src/balance.test.ts`, `measures.test.ts`, `text.test.ts`, `text-cache.test.ts`. `src/random.ts` uses `mulberry32` and `fnv1a32` of the package since layout-contract 0.7.0. | next |
+| layout-contract | `packages/layout-contract/src/balance.test.ts`, `measures.test.ts`, `text.test.ts`, `text-cache.test.ts` (layout-contract#279). `src/random.ts` uses `mulberry32` and `fnv1a32` of the package since layout-contract 0.8.0 (layout-contract#277). | done |
 | packing | `packages/packing/src/strategy.ts`, `free.test.ts`, `pack.test.ts`, `shelf.test.ts`, `bench/coverage.ts`, `packages/site/src/model.ts` | next |
 | systems | `packages/service/src/fakes.ts` (`seeded`) | next |
 
