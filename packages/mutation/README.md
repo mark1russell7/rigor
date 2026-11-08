@@ -79,6 +79,20 @@ Two options make a run shorter:
 - `config --dry-run` gives a config that starts only the tests without mutants. Stryker does not stop at the first failed test. Use it to see if the tests pass under Stryker before a long run.
 - `--changed <file>` reads a file with one changed path on each line, from the folder of the lane file. Make the file with `git diff --name-only`. Then `list --runs` gives only the runs with a changed file, and `config` mutates only the changed files of the selection. A changed test file, for example `src/a.test.ts`, selects its source file `src/a.ts` when the selection takes it. `config` fails for a selection with no changed file.
 
+### A run that a time limit stops
+
+The config adds the reporter `rigor-partial` to Stryker. It writes each tested mutant to `partial.jsonl`, next to `mutation.json`, at once.
+
+A time limit can stop Stryker before it writes `mutation.json`. Then `scores` reads `partial.jsonl` and gives a partial score:
+
+```text
+lib.rest: 50.00 % (1 of 2, 1 survived), no gate: FAIL: partial: Stryker stopped after 3.0 minutes and tested 2 of 10 mutants. The score of the mutants that ran is 50.00 %. All the mutants need an estimated 11 minutes.
+```
+
+A partial score is a no read, because it does not read all the mutants. Its field `partial` gives the costs. Use the estimate to divide the package into parts. The estimate does not count the mutants with an early result, because they take no time.
+
+The workflow `stryker-stop.yml` checks the reporter in a real run. It stops Stryker on the fixture lane `test/stryker/mutation.json` and examines the partial score.
+
 ## The score
 
 The score counts the detected mutants, out of the mutants that a test covers or that survive. Compile errors, runtime errors and ignored mutants do not count.

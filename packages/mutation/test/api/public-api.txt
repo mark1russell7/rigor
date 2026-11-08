@@ -17,8 +17,14 @@ type LeavingPath: build/index.d.ts#LeavingPath
 type Mutant: build/index.d.ts#Mutant
 type MutationReport: build/index.d.ts#MutationReport
 NO_TSCONFIG: build/index.d.ts#NO_TSCONFIG
+PARTIAL_FILE: build/reporter.d.ts#PARTIAL_FILE
+PARTIAL_PLUGIN: build/index.d.ts#PARTIAL_PLUGIN
 type PackageFile: build/index.d.ts#PackageFile
 type PackageLane: build/index.d.ts#PackageLane
+type PartialCosts: build/index.d.ts#PartialCosts
+type PartialLine: build/reporter.d.ts#PartialLine
+PartialReporter: build/reporter.d.ts#PartialReporter
+type PartialRun: build/index.d.ts#PartialRun
 REPORT_DIR: build/index.d.ts#REPORT_DIR
 STRYKER_OWNED: build/index.d.ts#STRYKER_OWNED
 type Score: build/index.d.ts#Score
@@ -35,8 +41,10 @@ isHitLimit: build/index.d.ts#isHitLimit
 leavingPaths: build/index.d.ts#leavingPaths
 packageScore: build/index.d.ts#packageScore
 parseLane: build/index.d.ts#parseLane
+parsePartial: build/index.d.ts#parsePartial
 parseReport: build/index.d.ts#parseReport
 partErrors: build/index.d.ts#partErrors
+partialScore: build/index.d.ts#partialScore
 relatedTestFiles: build/index.d.ts#relatedTestFiles
 rewritesTsconfig: build/index.d.ts#rewritesTsconfig
 runCli: build/index.d.ts#runCli
@@ -131,6 +139,9 @@ interface MutationReport {
 ### build/index.d.ts#NO_TSCONFIG
 export declare const NO_TSCONFIG = "tsconfig.no-stryker-rewrite.json";
 
+### build/index.d.ts#PARTIAL_PLUGIN
+export declare const PARTIAL_PLUGIN: string;
+
 ### build/index.d.ts#PackageFile
 interface PackageFile {
   readonly file: string;
@@ -149,6 +160,20 @@ interface PackageLane {
   readonly dryRunTimeoutMinutes?: number;
   readonly stryker?: Readonly<Record<string, unknown>>;
   readonly notRead?: Readonly<Record<string, string>>;
+}
+
+### build/index.d.ts#PartialCosts
+interface PartialCosts {
+  readonly tested: number;
+  readonly planned: number | undefined;
+  readonly minutes: number;
+  readonly estimate: number | undefined;
+}
+
+### build/index.d.ts#PartialRun
+interface PartialRun extends PartialCosts {
+  readonly report: MutationReport;
+  readonly done: boolean;
 }
 
 ### build/index.d.ts#REPORT_DIR
@@ -172,6 +197,7 @@ interface Score {
   readonly pass: boolean;
   readonly reason: string | undefined;
   readonly outcome?: ScoreOutcome;
+  readonly partial?: PartialCosts;
 }
 
 ### build/index.d.ts#ScoreOutcome
@@ -253,11 +279,20 @@ export declare function packageScore(name: string, gate: number | undefined, par
 ### build/index.d.ts#parseLane
 export declare function parseLane(json: unknown): Lane;
 
+### build/index.d.ts#parsePartial
+export declare function parsePartial(text: string): PartialRun;
+
 ### build/index.d.ts#parseReport
 export declare function parseReport(json: unknown): MutationReport;
 
 ### build/index.d.ts#partErrors
 export declare function partErrors(lane: Lane, pkg: string, files: readonly string[], lines?: (file: string) => number): string[];
+
+### build/index.d.ts#partialScore
+export declare function partialScore(run: PartialRun, selection: {
+  readonly name: string;
+  readonly gate: number | undefined;
+}): Score;
 
 ### build/index.d.ts#relatedTestFiles
 export declare function relatedTestFiles(files: readonly PackageFile[], selected: (file: string) => boolean): string[];
@@ -288,3 +323,46 @@ export declare function strykerConfig(selection: Selection, options?: ConfigOpti
 
 ### build/index.d.ts#summaryMarkdown
 export declare function summaryMarkdown(scores: readonly Score[]): string;
+
+### build/reporter.d.ts#PARTIAL_FILE
+export declare const PARTIAL_FILE = "partial.jsonl";
+
+### build/reporter.d.ts#PartialLine
+export type PartialLine = {
+  readonly event: "start";
+  readonly at: number;
+} | {
+  readonly event: "plan";
+  readonly at: number;
+  readonly mutants: number;
+  readonly run: number;
+} | {
+  readonly event: "mutant";
+  readonly at: number;
+  readonly file: string;
+  readonly status: string;
+  readonly statusReason?: string;
+  readonly mutatorName: string;
+  readonly line: number;
+} | {
+  readonly event: "done";
+  readonly at: number;
+};
+
+### build/reporter.d.ts#PartialReporter
+export declare class PartialReporter {
+  static readonly inject: readonly ["options"];
+  readonly file: string;
+  constructor(options: {
+    readonly jsonReporter?: {
+      readonly fileName?: string;
+    };
+  }, now?: () => number, cwd?: string);
+  onMutationTestingPlanReady(event: {
+    readonly mutantPlans: readonly {
+      readonly plan: string;
+    }[];
+  }): void;
+  onMutantTested(result: TestedMutant): void;
+  onMutationTestReportReady(): void;
+}

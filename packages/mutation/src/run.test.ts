@@ -161,6 +161,25 @@ describe("rigor-mutation", () => {
     expect(out).toMatch(/^lib\.rest: 50\.00 % \(5 of 10, 5 survived\), gate 80 %: FAIL/);
     expect(out).not.toContain("reads all its parts together");
     put("mutation.json", JSON.stringify({ packages: { lib } }));
+    // The MUTATIONREVIEW of Vex, item 2: a part that a time limit stopped has a partial score, and the package is a no read.
+    rmSync(join(root, "reports/mutation-lib.rest/mutation.json"));
+    const at = (minute: number) => minute * 60_000;
+    put(
+      "reports/mutation-lib.rest/partial.jsonl",
+      [
+        { event: "start", at: at(0) },
+        { event: "plan", at: at(1), mutants: 10, run: 10 },
+        { event: "mutant", at: at(2), file: "src/x.ts", status: "Killed", mutatorName: "BooleanLiteral", line: 1 },
+        { event: "mutant", at: at(3), file: "src/x.ts", status: "Survived", mutatorName: "BooleanLiteral", line: 2 },
+      ]
+        .map((l) => JSON.stringify(l))
+        .join("\n"),
+    );
+    out = "";
+    expect(run("scores", "lib.core", "lib.rest", "--reports", "reports")).toBe(1);
+    expect(out).toContain("lib.rest: 50.00 % (1 of 2, 1 survived), no gate: FAIL: partial: Stryker stopped after 3.0 minutes and tested 2 of 10 mutants.");
+    expect(out).toContain("All the mutants need an estimated 11 minutes.");
+    expect(out).toContain("lib: 91.67 % (11 of 12, 1 survived), gate 80 %: FAIL: the parts lib.rest fail, so the sum of the parts has no meaning");
     expect(() => run("scores", "lib.core", "--reports", "reports", "--report", "r.json")).toThrow(/--report or --reports/);
     put("mutation.json", JSON.stringify({ packages: { lib: { ...lib, parts: undefined } } }));
     expect(() => run("list")).toThrow(/"gateOver" is "package", but the package has no parts/);

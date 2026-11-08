@@ -9,7 +9,8 @@ import { REPORT_DIR, rewritesTsconfig, strykerConfig } from "./config.ts";
 import { compareDisables, findDisables, type Disable } from "./disables.ts";
 import { leavingPaths, relatedTestFiles } from "./load.ts";
 import { changedFiles, globsSelect, MAX_TEST_FALL, parseLane, partErrors, runSelections, select, selectionNames, type Lane, type Selection } from "./lane.ts";
-import { failScore, formatScore, packageScore, parseReport, scoreReport, summaryMarkdown, testFall, unreadTestFiles, type MutationReport, type Score } from "./score.ts";
+import { PARTIAL_FILE } from "./reporter.ts";
+import { failScore, formatScore, packageScore, parsePartial, parseReport, partialScore, scoreReport, summaryMarkdown, testFall, unreadTestFiles, type MutationReport, type Score } from "./score.ts";
 
 /** The input and the output of the CLI. */
 export interface CliIo {
@@ -221,6 +222,9 @@ function scores(lane: Lane, laneDir: string, names: readonly string[], o: Scores
           ? resolve(laneDir, s.dir, REPORT_DIR, "mutation.json")
           : resolve(io.cwd, o.report);
     if (!existsSync(file)) {
+      // A time limit stopped Stryker: the reporter rigor-partial wrote the mutants that ran, with the costs.
+      const partial = join(dirname(file), PARTIAL_FILE);
+      if (existsSync(partial)) return partialScore(parsePartial(readFileSync(partial, "utf8")), s);
       const reason = `the report ${relative(io.cwd, file)} does not exist`;
       return { name, gate: s.gate, detected: 0, hitLimit: 0, clockTimeouts: 0, valid: 0, survived: [], percent: 0, percentWithClock: 0, tests: undefined, pass: false, reason, outcome: "no read" };
     }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NO_TSCONFIG, rewritesTsconfig, strykerConfig } from "./config.ts";
+import { NO_TSCONFIG, PARTIAL_PLUGIN, rewritesTsconfig, strykerConfig } from "./config.ts";
 import { changedFiles, globsSelect, parseLane, partErrors, runSelections, select, selectionNames } from "./lane.ts";
 
 const LANE = {
@@ -182,7 +182,8 @@ describe("strykerConfig", () => {
   // A config with no plugins starts no test (ireko nightly of 2026-11-06), so each config names the runner.
   it("names the Vitest runner plugin, so Stryker finds it under pnpm", () => {
     for (const name of selectionNames(lane)) {
-      expect(strykerConfig(select(lane, name)).plugins).toEqual(["@stryker-mutator/vitest-runner"]);
+      expect(strykerConfig(select(lane, name)).plugins).toEqual(["@stryker-mutator/vitest-runner", PARTIAL_PLUGIN]);
+      expect(strykerConfig(select(lane, name)).reporters).toContain("rigor-partial");
     }
   });
 
