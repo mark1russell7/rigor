@@ -23,6 +23,12 @@ export interface MutationReport {
   readonly testFiles?: Readonly<Record<string, { readonly tests: readonly { readonly name: string }[] }>> | undefined;
 }
 
+/**
+ * The three reads of a score. A `block` is a score under its gate. A `no read` is a score that does not read the tests.
+ * Its cause is no report, no mutant that counts, no detected mutant, or a run that did not read all the tests. A no read is not a pass.
+ */
+export type ScoreOutcome = "pass" | "block" | "no read";
+
 /** The score of one selection. */
 export interface Score {
   readonly name: string;
@@ -46,6 +52,8 @@ export interface Score {
   readonly pass: boolean;
   /** The reason of a failure. */
   readonly reason: string | undefined;
+  /** The read of the score. The functions of this package always give it. A score from an older version has no outcome. */
+  readonly outcome?: ScoreOutcome;
 }
 
 const UNDETECTED = new Set(["Survived", "NoCoverage"]);
@@ -111,9 +119,12 @@ export function unreadTestFiles(report: MutationReport, onDisk: readonly string[
   return onDisk.filter((f) => !read.has(f) && notRead[f] === undefined);
 }
 
-/** This function gives a score that fails for a reason. A score that failed already keeps its first reason, and gets the new one after it. */
+/**
+ * This function gives a score that fails for a reason, with the outcome `no read`. A score that failed already keeps its
+ * first reason, and gets the new one after it. A score under its gate with a second reason is also a no read.
+ */
 export function failScore(score: Score, reason: string): Score {
-  return { ...score, pass: false, reason: score.reason === undefined ? reason : `${score.reason}. Also ${reason}` };
+  return { ...score, pass: false, outcome: "no read", reason: score.reason === undefined ? reason : `${score.reason}. Also ${reason}` };
 }
 
 /**
@@ -147,15 +158,15 @@ export function scoreReport(report: MutationReport, selection: { readonly name: 
   const percent = valid === 0 ? 0 : (100 * detected) / valid;
   const percentWithClock = valid === 0 ? 0 : (100 * (detected + clockTimeouts)) / valid;
   const { name, gate } = selection;
-  const reason =
+  const [outcome, reason]: [ScoreOutcome, string | undefined] =
     valid === 0
-      ? "the report has no mutants that count: Stryker found no files to mutate, or it did not start"
+      ? ["no read", "the report has no mutants that count: Stryker found no files to mutate, or it did not start"]
       : detected === 0
-        ? `the tests detected none of the ${String(valid)} mutants: the test runner started no test on the mutants`
+        ? ["no read", `the tests detected none of the ${String(valid)} mutants: the test runner started no test on the mutants`]
         : gate !== undefined && percent < gate
-          ? `the score ${percent.toFixed(2)} % is under the gate ${String(gate)} %`
-          : undefined;
-  return { name, gate, detected, hitLimit, clockTimeouts, valid, survived, percent, percentWithClock, tests: testCount(report), pass: reason === undefined, reason };
+          ? ["block", `the score ${percent.toFixed(2)} % is under the gate ${String(gate)} %`]
+          : ["pass", undefined];
+  return { name, gate, detected, hitLimit, clockTimeouts, valid, survived, percent, percentWithClock, tests: testCount(report), pass: reason === undefined, reason, outcome };
 }
 
 /** This function gives the time-outs of a score as text: the count of each kind, and the score that counts the clock time-outs as detected. */

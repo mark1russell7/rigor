@@ -63,6 +63,14 @@ Each run starts the tests of `dir` only. A test in another folder, for example a
 
 `rigor-mutation scores` reads `<dir>/reports/mutation/mutation.json` and applies the gate. It exits with 1 when a selection fails. With `--summary "$GITHUB_STEP_SUMMARY"`, it adds a table of the scores to the summary of the job. The shared workflow `reusable-mutation.yml` of the template starts these steps on one runner for each selection.
 
+Each score has one of three outcomes: `pass`, `block` or `no read`. A block is a score under its gate. A no read is a score that does not read the tests. Its cause is a missing report, no mutants that count, no detected mutant, or a run that read only some of the tests. A no read is not a pass.
+
+In GitHub Actions (`GITHUB_ACTIONS` is `true`), `scores` writes a warning annotation for each no read, each block and each planned fall. Thus the line is on the check, also when the workflow only reports. The title of a no read gives the count of the no reads and of the selections:
+
+```text
+::warning title=Mutation gate%3A no read%2C 1 of 6 selections::collections.maps: the report has no mutants that count: Stryker found no files to mutate, or it did not start
+```
+
 A run of mutation tests is long and it uses much memory. Start it in CI, and on a local computer start one part with `--concurrency 2`.
 
 Two options make a run shorter:

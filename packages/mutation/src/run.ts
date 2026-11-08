@@ -16,6 +16,8 @@ export interface CliIo {
   readonly cwd: string;
   readonly stdout: (text: string) => void;
   readonly stderr: (text: string) => void;
+  /** The environment. With `GITHUB_ACTIONS` set to `true`, `scores` writes an annotation for each score that does not pass and each planned fall. */
+  readonly env?: Readonly<Record<string, string | undefined>>;
 }
 
 /** The help text of the CLI. */
@@ -187,12 +189,13 @@ function scores(lane: Lane, laneDir: string, names: readonly string[], o: Scores
 `);
   const notes = new Map<string, string[]>(names.map((n) => [n, []]));
   const note = (name: string, line: string): void => void notes.get(name)?.push(line);
+  const falls: PlannedFall[] = [];
   const results: Score[] = names.map((name) => {
     const s = select(lane, name);
     const file = o.report === undefined ? resolve(laneDir, s.dir, REPORT_DIR, "mutation.json") : resolve(io.cwd, o.report);
     if (!existsSync(file)) {
       const reason = `the report ${relative(io.cwd, file)} does not exist`;
-      return { name, gate: s.gate, detected: 0, hitLimit: 0, clockTimeouts: 0, valid: 0, survived: [], percent: 0, percentWithClock: 0, tests: undefined, pass: false, reason };
+      return { name, gate: s.gate, detected: 0, hitLimit: 0, clockTimeouts: 0, valid: 0, survived: [], percent: 0, percentWithClock: 0, tests: undefined, pass: false, reason, outcome: "no read" };
     }
     const report = parseReport(readJson(file));
     let score = scoreReport(report, s);
@@ -203,7 +206,11 @@ function scores(lane: Lane, laneDir: string, names: readonly string[], o: Scores
         const fall = testFall(score.tests, before, lane.maxTestFall ?? MAX_TEST_FALL);
         const planned = lane.plannedFalls?.[name];
         if (fall !== undefined && planned === undefined) score = failScore(score, fall);
-        else if (fall !== undefined) note(name, `  a planned fall: ${fall.replace(/, so the score is no read$/, "")}. The reason: ${planned ?? ""}`);
+        else if (fall !== undefined) {
+          const text = `${fall.replace(/, so the score is no read$/, "")}. The reason: ${planned ?? ""}`;
+          note(name, `  a planned fall: ${text}`);
+          falls.push({ name, text });
+        }
       }
     }
     if (o.testFiles) score = checkTestFiles(lane, laneDir, s.pkg, report, score, (line) => note(name, line));
@@ -229,10 +236,39 @@ ${summaryMarkdown(results)}
     writeFileSync(out, `${JSON.stringify(Object.fromEntries(Object.entries(counts).toSorted(([a], [b]) => (a < b ? -1 : 1))), null, 2)}
 `);
   }
+  if (io.env?.["GITHUB_ACTIONS"] === "true") for (const line of annotations(results, falls)) io.stdout(`${line}
+`);
   const failed = results.filter((s) => !s.pass).map((s) => s.name);
   if (failed.length > 0) io.stderr(`The gate failed for ${failed.join(", ")}.
 `);
   return failed.length > 0 ? 1 : 0;
+}
+
+/** A fall of the test count that the lane plans, with its text. The score passes, and its annotation tells the fall. */
+interface PlannedFall {
+  readonly name: string;
+  readonly text: string;
+}
+
+/** This function escapes the text of a workflow command of GitHub Actions. A property escapes also `:` and `,`. */
+const escapeCommand = (text: string, property = false): string => {
+  const data = text.replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A");
+  return property ? data.replaceAll(":", "%3A").replaceAll(",", "%2C") : data;
+};
+
+/**
+ * This function gives a warning annotation for each score that does not pass and each planned fall. The annotation is on
+ * the check line, so a no read is not a green check with the reason only in the log. This is true also for a run that
+ * only reports. The title of a no read gives the count of the no reads and of the selections.
+ */
+function annotations(results: readonly Score[], falls: readonly PlannedFall[]): string[] {
+  const noReads = results.filter((s) => !s.pass && s.outcome !== "block");
+  const line = (title: string, message: string): string => `::warning title=${escapeCommand(title, true)}::${escapeCommand(message)}`;
+  return [
+    ...noReads.map((s) => line(`Mutation gate: no read, ${String(noReads.length)} of ${String(results.length)} selections`, `${s.name}: ${s.reason ?? ""}`)),
+    ...results.filter((s) => !s.pass && s.outcome === "block").map((s) => line("Mutation gate: under the gate", `${s.name}: ${s.reason ?? ""}`)),
+    ...falls.map((f) => line("Mutation gate: a planned fall of the tests", `${f.name}: ${f.text}`)),
+  ];
 }
 
 /** This function reads a file of test counts: an object from each selection to its count. */

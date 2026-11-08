@@ -22,6 +22,7 @@ type PackageLane: build/index.d.ts#PackageLane
 REPORT_DIR: build/index.d.ts#REPORT_DIR
 STRYKER_OWNED: build/index.d.ts#STRYKER_OWNED
 type Score: build/index.d.ts#Score
+type ScoreOutcome: build/index.d.ts#ScoreOutcome
 type Selection: build/index.d.ts#Selection
 type StrykerConfig: build/index.d.ts#StrykerConfig
 TIMEOUT_MS: build/index.d.ts#TIMEOUT_MS
@@ -55,6 +56,7 @@ interface CliIo {
   readonly cwd: string;
   readonly stdout: (text: string) => void;
   readonly stderr: (text: string) => void;
+  readonly env?: Readonly<Record<string, string | undefined>>;
 }
 
 ### build/index.d.ts#ConfigOptions
@@ -166,7 +168,11 @@ interface Score {
   readonly tests: number | undefined;
   readonly pass: boolean;
   readonly reason: string | undefined;
+  readonly outcome?: ScoreOutcome;
 }
+
+### build/index.d.ts#ScoreOutcome
+type ScoreOutcome = "pass" | "block" | "no read";
 
 ### build/index.d.ts#Selection
 interface Selection {
