@@ -34,6 +34,7 @@ v.comparison;                                     // the cases that gain and dro
 | Function | What it gives |
 | --- | --- |
 | `growthVerdict(rounds, options)` | The growth of a cost for each step of size, from a ratio inside each job, against a limit, for example 15 times for each 10 times. |
+| `runCost(cells, probes, options)` | The minutes of a bench run before it starts, on each CPU model: the cells times the calls times the time of one call. |
 | `firstArm(round, offset)` | The arm that runs first. The order turns each round, and an odd offset starts with arm `b`. |
 | `armOrder(arms, round)` | The order of any count of arms in a round. Each pair of arms has each order within 1 after each count of rounds. A report that keeps no `first` for each pair states the order that it used, so that a reader can make `first` again. |
 | `checkPairedTime(record)` | The record, or a `RangeError` for a time that is not a finite number above 0. |
@@ -55,6 +56,10 @@ v.comparison;                                     // the cases that gain and dro
 | `armModels(pairs)` | The CPU models of each arm of a set of pairs, and if all the reads come from one known model. |
 | `tailFalseFails(aa, options)` | The cases of an A/A arm that the rule of `tailLimitVerdict` fails, and apart from these the cases with a limit under 1. |
 | `gateOf(cases)` | The gate of a list of case outcomes: `pass`, `block` or `no read`. |
+| `gateLine(cases, options)` | The check line of a read: the blocks and the no-reads with each case, the reason and the CPU models, or undefined when each case passed. |
+| `jobModels(envs, options)` | The count of the jobs on each CPU model, sorted by model, for the job form of the models of `gateLine`. The option `cores` keeps the cores. |
+| `writeGateLine(line, outputs)` | The line as an annotation of GitHub Actions, an error for an enforced gate or a warning, and as a line of the step summary. |
+| `gateLineCli(argv, io)` | The command of the bin `rigor-gate-line`: a gate line from a JSON document of a shell step. |
 | `notSlowerVerdict(jobs, options)` | The gate of the claim "not slower by more than the margin", with looks and a family level. |
 | `budgetVerdict(rounds, aa, options)` | The verdict of the claim "the median of each case is at most `limit`", for one build: `within`, `beyond` or `cannot decide`. |
 | `budgetLooksVerdict(rounds, aa, options)` | The budget verdict of a run that adds rounds to the cases with no outcome, up to a stated budget. |
@@ -167,6 +172,62 @@ gate.more;                                        // the next look of each case 
 - `no read` is not a pass. A caller adds the rounds of `more`, then more jobs. A job that it adds after the last look is one more look, and the level does not count it.
 
 The level needs independent rounds. Rounds with a shared cause, for example a slow computer for one job, do not have it.
+
+## Show a gate read on the check
+
+A block or a no-read that shows only in a table of the summary is easy to miss. A no-read is not a pass. `gateLine` gives one line for the check of the run, and `writeGateLine` writes it.
+
+```ts
+const line = gateLine(cases, { title: "evaluator bench", enforced: false, models: armModels(pairs) });
+writeGateLine(line);   // a ::warning annotation (::error when enforced), and a line of the file of GITHUB_STEP_SUMMARY
+```
+
+- The input is a list of `{ case, outcome }`. The cases of `limitVerdict` and `budgetVerdict` have this form. Give one entry for each `timeVerdict`.
+- The outcomes `cannot decide` and `no read` are no-reads, and `isNoRead` tells them. The outcomes `beyond` and `slower` are blocks, and `isBlock` tells them.
+- When each case passed, the line is undefined and `writeGateLine` writes nothing.
+- An empty list gives a line, because `gateOf` gives `no read` for it.
+- One line names the blocks and the no-reads, each with its count and the names of its cases.
+  - The line names at most `GATE_LINE_NAMES` (10) cases of each kind, then "and 15 more". The counts are exact.
+  - `blocks.cases` and `noReads.cases` keep each case. Only the text names fewer cases.
+  - The text has at most `GATE_LINE_LIMIT` (4096) characters. A case name of more than 120 characters ends with an ellipsis in the text.
+  - The Checks API of GitHub limits the message of an annotation to 64 KB and its title to 255 characters. The documents of the workflow commands give no limit. Thus 4096 is a conservative limit.
+- The outcome of the line is `block` when a case blocks, else `no read`, as in `gateOf`.
+- The level is `error` when `enforced` is `true`. The default is `warning`, for a read that only reports. The title of a read that only reports says so.
+- With `reason`, the line tells the reason after the counts, for example "a decision needs 3 jobs, not 2".
+- With `models`, the line names the CPU models. Give one of two forms, not both.
+  - An `ArmModels` of `armModels` names the models of the two arms. The line tells a mixed pair, because a ratio can then compare two computers.
+  - A list of `{ model, jobs }` names each model and its count of jobs, for a time budget with its ratios inside one job. The line makes no claim about the ratios. The line is `mixed` when the jobs are on more than one model.
+  - `jobModels(envs)` gives this list from the computer of each job: the count of the jobs on each CPU model, sorted by model.
+  - `jobModels(envs, { cores: true })` also keeps the count of the cores. Each model and count of cores has an entry, and the line names the cores: "AMD EPYC 7763 with 4 cores (2 jobs)".
+  - Without the option `cores`, the entries and the text do not change.
+  - An empty list gives the sentence "The jobs have no CPU model".
+- Write the line also when the run is report only, so its check shows the read.
+- `writeGateLine` writes the annotation to the standard output. With `stream: "stderr"`, it writes to the standard error. GitHub Actions reads the annotation from the two streams.
+
+### A gate line from a shell step
+
+The bin `rigor-gate-line` writes a gate line from a JSON document. A shell step uses it when the reads are in a file.
+
+```sh
+rigor-gate-line --from gate.json                  # the annotation on stdout, and a line of GITHUB_STEP_SUMMARY
+rigor-gate-line --stream stderr < gate.json        # the document from stdin, the annotation on stderr
+rigor-gate-line --from gate.json --summary own.md  # a summary file that is not GITHUB_STEP_SUMMARY
+```
+
+```json
+{
+  "reads": [{ "case": "read-1", "outcome": "beyond" }, { "case": "read-10", "outcome": "cannot decide" }],
+  "options": { "title": "store gate", "enforced": false, "reason": "too few rounds" },
+  "jobs": [{ "cpu": "AMD EPYC 7763", "cores": 4 }],
+  "cores": true
+}
+```
+
+- `reads` and `options` are the two arguments of `gateLine`. `options.models` takes the two forms of `models`.
+- `jobs` gives the models with `jobModels` when `options` has no `models`. With `"cores": true`, the line names the cores.
+- The exit code is 0 for a line and for no line. The line informs, and the step decides its own exit.
+- A bad argument or a bad document gives the exit code 2, with the reason on stderr.
+- `gateLineCli(argv, io)` is the same command as a function, for a test or a script of its own.
 
 ## A claim with a budget
 
@@ -288,6 +349,37 @@ v.steps[0].exponent;        // the cost grows as the size to this power
 - The interval of each step is the distribution-free interval of the median of the jobs. With 5 jobs it is the full range, with the coverage 0.94. A step is `within` when the high end is less than `maxGrowth`.
 - A job that gives more than one value at a size gives their median.
 - The flip test of a growth gate is the old code: it must give `beyond`.
+
+## The cost of a run before it starts
+
+A run with a time budget stops a case when the budget ends. A plan of a run needs its cost before the start. `runCost` gives this cost from the cells that the run measures and from probes of one call.
+
+```ts
+const cost = runCost(
+  [
+    { job: "shelf", size: 100, cells: 40 },   // only the cells that the run measures
+    { job: "shelf", size: 1_000, cells: 40 },
+  ],
+  [
+    { job: "shelf", size: 100, model: "cpu-a", ms: 2 },     // probes of the same inputs
+    { job: "shelf", size: 1_000, model: "cpu-a", ms: 30 },
+  ],
+  { calls: 7, overhead: 1.45, budgets: [{ upTo: 10_000, ms: 60_000 }] },
+);
+
+cost.models[0].minutes;              // the minutes of the bench step on cpu-a
+cost.models[0].jobs[0].stopsAt;      // the size where the job stops on its overruns, or undefined
+cost.low; cost.high;                 // the range over the CPU models
+```
+
+- Give only the cells that the run measures. A cell that a job does not support at its size is not a cell. A count of all the cells of a corpus can be 4 times too large.
+- Probe the same inputs that the run measures, on each CPU model. Times of other inputs can be 1.6 to 28 times off, also on one model.
+- A size between two probe sizes gets a time on the line of the log scales. `extrapolated` names each size outside the probe sizes.
+- More probes of one size give their mean, because a sum over cells follows the mean. The size 0 is not on the line.
+- `calls` is the count of the warmup starts and the timed starts of one cell. `slow` gives a slow cell its own count.
+- The probes of the nearest probe size give the spread of the times at a size. A cell over its budget costs the budget.
+- When the expected count of the cells over budget at a size gets to `overruns`, the job stops. The counts of cells are expected counts.
+- `overhead` is the bench step minutes over the call minutes of an earlier run. `jobMinutes` adds the fixed minutes of each job.
 
 ## Time the rounds
 

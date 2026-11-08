@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NO_TSCONFIG, rewritesTsconfig, strykerConfig } from "./config.ts";
+import { NO_TSCONFIG, PARTIAL_PLUGIN, rewritesTsconfig, strykerConfig } from "./config.ts";
 import { changedFiles, globsSelect, parseLane, partErrors, runSelections, select, selectionNames } from "./lane.ts";
 
 const LANE = {
@@ -67,6 +67,14 @@ describe("globsSelect", () => {
     expect(globsSelect(["src/**/*.ts", "!src/gen/**", "src/gen/keep.ts"], "src/gen/keep.ts")).toBe(true);
     expect(globsSelect(["src/**/*.ts"], "scripts/x.ts")).toBe(false);
   });
+
+  // rigor#137: Stryker reads "src/module.ts:1-300" as the lines 1 to 300 of src/module.ts.
+  it("reads a glob with a line range as its file", () => {
+    expect(globsSelect(["src/module.ts:1-300"], "src/module.ts")).toBe(true);
+    expect(globsSelect(["src/**/*.ts:5:2-9:1"], "src/a/b.ts")).toBe(true);
+    expect(globsSelect(["src/module.ts:1-300"], "src/module.tsx")).toBe(false);
+    expect(globsSelect(["src/*.ts", "!src/module.ts:1-3"], "src/module.ts")).toBe(false);
+  });
 });
 
 // rigor#110: the parts of a package must cover each file of "mutate" exactly one time.
@@ -90,6 +98,39 @@ describe("partErrors", () => {
       'p: the file scripts/y.ts is in the part b, but not in "mutate"',
     ]);
   });
+
+  // rigor#137: the Vex lane cuts module.ts into parts by line ranges.
+  describe("a file in line ranges", () => {
+    const cut = (parts: Record<string, string[]>) => parseLane({ packages: { p: { dir: "p", mutate: ["src/**/*.ts"], parts: { rest: ["src/x.ts"], ...parts } } } });
+    const lines = (file: string): number => (file === "src/m.ts" ? 300 : 10);
+
+    it("gives no errors when the ranges cover each line one time", () => {
+      const lane = cut({ a: ["src/m.ts:1-120"], b: ["src/m.ts:121-200", "src/m.ts:201-300"] });
+      expect(partErrors(lane, "p", ["src/m.ts", "src/x.ts"], lines)).toEqual([]);
+      // A range can end after the last line.
+      expect(partErrors(cut({ a: ["src/m.ts:1-120"], b: ["src/m.ts:121-999"] }), "p", ["src/m.ts"], lines)).toEqual([]);
+    });
+
+    it("names a gap, an overlap and the lines after the last range", () => {
+      const lane = cut({ a: ["src/m.ts:1-100", "src/m.ts:150-220"], b: ["src/m.ts:101-120", "src/m.ts:200-250"] });
+      expect(partErrors(lane, "p", ["src/m.ts"], lines)).toEqual([
+        "p: the lines 121-149 of src/m.ts are in no part",
+        "p: the lines 200-220 of src/m.ts are in the parts a and b",
+        "p: the lines 251-300 of src/m.ts are in no part",
+      ]);
+      // Without the number of lines, the function does not know the last line.
+      expect(partErrors(lane, "p", ["src/m.ts"])).toHaveLength(2);
+      expect(partErrors(cut({ a: ["src/m.ts:2-300"] }), "p", ["src/m.ts"], lines)).toEqual(["p: the lines 1-1 of src/m.ts are in no part"]);
+    });
+
+    it("names a range with columns or with no lines, and a range beside the whole file", () => {
+      expect(partErrors(cut({ a: ["src/m.ts:1:1-300:1"] }), "p", ["src/m.ts"], lines)).toEqual([
+        "p: the range src/m.ts:1:1-300:1 of the part a has columns. A part can cut a file only by lines",
+      ]);
+      expect(partErrors(cut({ a: ["src/m.ts:1-300", "src/m.ts:9-8"] }), "p", ["src/m.ts"], lines)).toEqual(["p: the range src/m.ts:9-8 of the part a has no lines"]);
+      expect(partErrors(cut({ a: ["src/m.ts:1-300"], b: ["src/m.ts"] }), "p", ["src/m.ts"], lines)).toEqual(["p: the file src/m.ts is in more than one part: a, b"]);
+    });
+  });
 });
 
 describe("changedFiles", () => {
@@ -101,6 +142,24 @@ describe("changedFiles", () => {
     expect(changedFiles(select(lane, "collections"), changed)).toEqual(["src/impl/a.ts", "src/core/b.ts"]);
     expect(changedFiles(select(lane, "small"), ["packages\\small\\src\\x.ts"])).toEqual(["src/x.ts"]);
     expect(changedFiles(select(lane, "small"), ["packages/smaller/src/x.ts", "packages/small"])).toEqual([]);
+  });
+
+  // The MUTATIONREVIEW of Vex, item 7: a change of a test file changes what the run reads of its source file.
+  it("gives the source file of a changed test file of the same name", () => {
+    const tests = ["packages/collections/src/impl/a.test.ts", "packages/collections/src/core/b.test.ts"];
+    expect(changedFiles(select(lane, "collections.impl"), tests)).toEqual(["src/impl/a.ts"]);
+    expect(changedFiles(select(lane, "collections"), [...tests, "packages/collections/src/impl/a.ts"])).toEqual(["src/impl/a.ts", "src/core/b.ts"]);
+    expect(changedFiles(select(lane, "collections"), tests, (f) => f !== "src/impl/a.ts")).toEqual(["src/core/b.ts"]);
+    // The source of src/index.test.ts is src/index.ts, and mutate removes it.
+    expect(changedFiles(select(lane, "collections"), ["packages/collections/src/index.test.ts"])).toEqual([]);
+  });
+
+  // rigor#137: a changed file that a part takes in line ranges keeps the ranges of that part.
+  it("keeps the line ranges of a changed file", () => {
+    const cut = parseLane({ packages: { p: { dir: "p", mutate: ["src/**/*.ts"], parts: { a: ["src/m.ts:1-120", "src/m.ts:200-300"], b: ["src/m.ts:121-199", "src/x.ts"] } } } });
+    expect(changedFiles(select(cut, "p.a"), ["p/src/m.ts", "p/src/x.ts"])).toEqual(["src/m.ts:1-120", "src/m.ts:200-300"]);
+    expect(changedFiles(select(cut, "p.b"), ["p/src/m.ts", "p/src/x.ts"])).toEqual(["src/m.ts:121-199", "src/x.ts"]);
+    expect(changedFiles(select(cut, "p"), ["p/src/m.ts"])).toEqual(["src/m.ts"]);
   });
 });
 
@@ -123,7 +182,8 @@ describe("strykerConfig", () => {
   // A config with no plugins starts no test (ireko nightly of 2026-11-06), so each config names the runner.
   it("names the Vitest runner plugin, so Stryker finds it under pnpm", () => {
     for (const name of selectionNames(lane)) {
-      expect(strykerConfig(select(lane, name)).plugins).toEqual(["@stryker-mutator/vitest-runner"]);
+      expect(strykerConfig(select(lane, name)).plugins).toEqual(["@stryker-mutator/vitest-runner", PARTIAL_PLUGIN]);
+      expect(strykerConfig(select(lane, name)).reporters).toContain("rigor-partial");
     }
   });
 

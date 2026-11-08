@@ -1,14 +1,18 @@
 export { type QuantileMethod, type Summary, mean, median, quantile, quantileSorted, sd, sorted, summarize } from "./describe.ts";
+export { type RunningSummary, EMPTY_RUNNING, addToRunning, mergeRunning, runningMean, runningOf, runningSd } from "./running.ts";
 export {
   type BootstrapOptions,
   type Interval,
+  type SampleTotalOptions,
   type SideP,
   bootstrap,
   bootstrapClusters,
   bootstrapLeastSquares,
   bootstrapMedian,
   bootstrapMedianRatio,
+  bootstrapStrata,
   bootstrapTwo,
+  sampleTotalInterval,
 } from "./bootstrap.ts";
 export { type ModeOptions, type SmoothLaw, type SmoothLawScore, bestSmoothLaw, modeCount, smoothLawScores } from "./distribution.ts";
 export { type LeastSquaresFit, type LeastSquaresOptions, leastSquares } from "./regression.ts";
@@ -64,28 +68,38 @@ export {
 } from "./response.ts";
 export { type ParsedResponseRecord, type ResponseFault, RESPONSE_MAX_POWER, parseResponseRecord } from "./response-parse.ts";
 export { type ResponseFitOptions, RESPONSE_LAMBDAS, RESPONSE_MAX_TERMS, fitResponse } from "./response-fit.ts";
+export { type SobolIndex, type SobolIndices, type SobolOptions, sobolIndices } from "./response-sobol.ts";
 export {
   type Corrected,
   type PermutationOptions,
   type PermutationResult,
   type Proportion,
+  SIGN_FLIP_EXACT_LIMIT,
+  SIGN_FLIP_EXACT_MAX,
+  type SignFlipOptions,
+  type SignFlipResult,
   type TwoSamplePermutationOptions,
   type TwoSamplePermutationResult,
   Z95,
   holm,
   pairedPermutation,
   partialConjunction,
+  signFlipTest,
   signTest,
   signTestPower,
   twoSamplePermutation,
   wilson,
+  wilsonSampleSize,
 } from "./tests.ts";
+export { type Kappa, cohenKappa } from "./agreement.ts";
 export { KENDALL_EXACT, kendallTau, ranks, spearman } from "./rank.ts";
 export {
+  type BinomialSide,
   type CountInterval,
   type MedianInterval,
   type QuantileInterval,
   binomialInterval,
+  binomialTest,
   medianInterval,
   negativeBinomialInterval,
   quantileInterval,
@@ -102,8 +116,50 @@ export {
   type NoiseVerdict,
   brier,
   calibration,
+  logLoss,
   compareRatios,
   noiseFloor,
   noiseVerdict,
 } from "./compare.ts";
 export { type OptionFloorOptions, optionFloor, tQuantile } from "./power.ts";
+export { normalCdf, normalQuantile } from "./normal.ts";
+export {
+  type CoverageBar,
+  type CoverageCell,
+  type CoverageMinSample,
+  type CoverageReason,
+  type CoverageStep,
+  coverageMinSample,
+} from "./coverage.ts";
+export {
+  U_STATISTIC_TIGHT_MIN_SAMPLE,
+  type UStatisticInterval,
+  type UStatisticMean,
+  type UStatisticMethod,
+  type UStatisticOptions,
+  uStatisticInterval,
+} from "./u-statistic.ts";
+export {
+  type EloOptions,
+  type EloUpdate,
+  type Glicko2Game,
+  type Glicko2Options,
+  type Glicko2Rating,
+  type PairProbabilities,
+  type RatingScale,
+  eloExpected,
+  eloUpdate,
+  glicko2Idle,
+  glicko2Update,
+  pairProbabilities,
+  ratingToStrength,
+  strengthToRating,
+} from "./rating.ts";
+export {
+  type BradleyTerryFit,
+  type BradleyTerryOptions,
+  type PairComparison,
+  type PairOutcome,
+  type TieModel,
+  bradleyTerry,
+} from "./bradley-terry.ts";

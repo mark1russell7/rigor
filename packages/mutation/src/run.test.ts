@@ -14,6 +14,15 @@ const run = (...argv: string[]): number =>
     stdout: (t) => (out += t),
     stderr: (t) => (err += t),
   });
+/** This function starts the CLI as a step of GitHub Actions starts it. */
+const runInActions = (...argv: string[]): number =>
+  runCli(argv, {
+    cwd: root,
+    stdout: (t) => (out += t),
+    stderr: (t) => (err += t),
+    env: { GITHUB_ACTIONS: "true" },
+  });
+const annotationsOf = (text: string): string[] => text.split("\n").filter((line) => line.startsWith("::"));
 const put = (file: string, text: string): void => {
   mkdirSync(dirname(join(root, file)), { recursive: true });
   writeFileSync(join(root, file), text);
@@ -104,6 +113,78 @@ describe("rigor-mutation", () => {
     expect(run("list")).toBe(0);
   });
 
+  // rigor#137: parts that cut one file by line ranges cover it when the ranges cover each line of the file.
+  it("takes parts that cut a file by line ranges, and names the lines in no part", () => {
+    const lane = (to: number) => ({ packages: { lib: { dir: "packages/lib", mutate: ["src/**/*.ts", "!src/**/*.test.ts"], parts: { core: ["src/core/**/*.ts", "src/a.ts:1-1"], rest: [`src/a.ts:2-${String(to)}`] } } } });
+    put("mutation.json", JSON.stringify(lane(2)));
+    expect(run("list", "--runs")).toBe(0);
+    expect(out).toBe("lib.core\nlib.rest\n");
+    put("packages/lib/src/a.ts", "// a\nexport const a = 1;\nexport const b = 2;\n");
+    expect(() => run("list", "--runs")).toThrow(/lib: the lines 3-3 of src\/a\.ts are in no part/);
+    put("mutation.json", JSON.stringify(lane(3)));
+    put("changed.txt", "packages/lib/src/a.ts\n");
+    expect(run("config", "lib.rest", "--changed", "changed.txt", "--out", "tmp/s.json")).toBe(0);
+    expect(JSON.parse(readFileSync(join(root, "tmp/s.json"), "utf8"))).toMatchObject({ mutate: ["src/a.ts:2-3"] });
+  });
+
+  // The MUTATIONREVIEW of Vex, item 4: the gate reads the sum of the parts, in one command over all the parts.
+  it("applies the gate of a package with gateOver package to the sum of its parts", () => {
+    const lib = { dir: "packages/lib", mutate: ["src/**/*.ts", "!src/**/*.test.ts"], gate: 80, gateOver: "package", parts: { core: ["src/core/**/*.ts"], rest: ["src/*.ts"] } };
+    put("mutation.json", JSON.stringify({ packages: { lib } }));
+    put("reports/mutation-lib.core/mutation.json", JSON.stringify(mutants(10, 0)));
+    put("reports/mutation-lib.rest/mutation.json", JSON.stringify(mutants(7, 3)));
+    expect(run("scores", "lib.core", "lib.rest", "--reports", "reports")).toBe(0);
+    expect(out.split("\n")).toEqual([
+      "lib.core: 100.00 % (10 of 10, 0 survived), no gate: pass",
+      "  the gate of lib reads all its parts together",
+      "lib.rest: 70.00 % (7 of 10, 3 survived), no gate: pass",
+      "  the gate of lib reads all its parts together",
+      "lib: 85.00 % (17 of 20, 3 survived), gate 80 %: pass",
+      "",
+    ]);
+    put("reports/mutation-lib.rest/mutation.json", JSON.stringify(mutants(5, 5)));
+    out = "";
+    expect(run("scores", "lib.core", "lib.rest", "--reports", "reports")).toBe(1);
+    expect(out).toContain("lib: 75.00 % (15 of 20, 5 survived), gate 80 %: FAIL: the score 75.00 % of all the parts is under the gate 80 %");
+    expect(err).toContain("The gate failed for lib.");
+    out = "";
+    expect(run("scores", "lib.core", "--reports", "reports")).toBe(1);
+    expect(out).toContain("lib: 100.00 % (10 of 10, 0 survived), gate 80 %: FAIL: the read has no score of the parts lib.rest, so the sum does not count their mutants");
+    // The job of one part: --alone gives no line for the package, and the part has no gate of its own.
+    out = "";
+    expect(run("scores", "lib.rest", "--reports", "reports", "--alone")).toBe(0);
+    expect(out).toBe("lib.rest: 50.00 % (5 of 10, 5 survived), no gate: pass\n  the gate of lib reads all its parts together\n");
+    // With "gateOver": "part", the default, --alone keeps the gate of each part.
+    put("mutation.json", JSON.stringify({ packages: { lib: { ...lib, gateOver: undefined } } }));
+    out = "";
+    expect(run("scores", "lib.rest", "--reports", "reports", "--alone")).toBe(1);
+    expect(out).toMatch(/^lib\.rest: 50\.00 % \(5 of 10, 5 survived\), gate 80 %: FAIL/);
+    expect(out).not.toContain("reads all its parts together");
+    put("mutation.json", JSON.stringify({ packages: { lib } }));
+    // The MUTATIONREVIEW of Vex, item 2: a part that a time limit stopped has a partial score, and the package is a no read.
+    rmSync(join(root, "reports/mutation-lib.rest/mutation.json"));
+    const at = (minute: number) => minute * 60_000;
+    put(
+      "reports/mutation-lib.rest/partial.jsonl",
+      [
+        { event: "start", at: at(0) },
+        { event: "plan", at: at(1), mutants: 10, run: 10 },
+        { event: "mutant", at: at(2), file: "src/x.ts", status: "Killed", mutatorName: "BooleanLiteral", line: 1 },
+        { event: "mutant", at: at(3), file: "src/x.ts", status: "Survived", mutatorName: "BooleanLiteral", line: 2 },
+      ]
+        .map((l) => JSON.stringify(l))
+        .join("\n"),
+    );
+    out = "";
+    expect(run("scores", "lib.core", "lib.rest", "--reports", "reports")).toBe(1);
+    expect(out).toContain("lib.rest: 50.00 % (1 of 2, 1 survived), no gate: FAIL: partial: Stryker stopped after 3.0 minutes and tested 2 of 10 mutants.");
+    expect(out).toContain("All the mutants need an estimated 11 minutes.");
+    expect(out).toContain("lib: 91.67 % (11 of 12, 1 survived), gate 80 %: FAIL: the parts lib.rest fail, so the sum of the parts has no meaning");
+    expect(() => run("scores", "lib.core", "--reports", "reports", "--report", "r.json")).toThrow(/--report or --reports/);
+    put("mutation.json", JSON.stringify({ packages: { lib: { ...lib, parts: undefined } } }));
+    expect(() => run("list")).toThrow(/"gateOver" is "package", but the package has no parts/);
+  });
+
   it("gives only the runs with a changed file, and a config that mutates only the changed files", () => {
     put("changed.txt", "packages/lib/src/core/c.ts\nREADME.md\n\n");
     expect(run("list", "--runs", "--changed", "changed.txt")).toBe(0);
@@ -112,6 +193,11 @@ describe("rigor-mutation", () => {
     expect(JSON.parse(readFileSync(join(root, "tmp/s.json"), "utf8"))).toMatchObject({ mutate: ["src/core/c.ts"] });
     expect(() => run("config", "lib.rest", "--changed", "changed.txt")).toThrow(/lib\.rest has no changed file/);
     expect(() => run("list", "--changed", "changed.txt")).toThrow(/takes --runs/);
+    // A changed test file selects its source file, when the file exists.
+    put("tests.txt", "packages/lib/src/a.test.ts\npackages/lib/src/core/gone.test.ts\n");
+    out = "";
+    expect(run("list", "--runs", "--changed", "tests.txt")).toBe(0);
+    expect(out).toBe("lib.rest\n");
     out = "";
     put("none.txt", "docs/a.md\n");
     expect(run("list", "--runs", "--changed", "none.txt")).toBe(0);
@@ -176,14 +262,46 @@ describe("rigor-mutation", () => {
     expect(out).toContain("the file none.json does not exist, so no count is compared");
   });
 
-  // The flip of LANE.FILES: a test file on the disk that the report does not read fails, unless notRead names it.
-  it("fails a test file on the disk that the report does not read, unless notRead gives its reason", () => {
-    put("packages/app/src/b.test.ts", "");
-    put("packages/app/bench/e.test.ts", "");
+  // A gate never shows a no read as a pass: each no read is a warning on the check line, also in a run that only reports.
+  it("writes a warning annotation for each no read, each score under the gate and each planned fall in GitHub Actions", () => {
+    put("packages/lib/reports/mutation/mutation.json", JSON.stringify(mutants(1, 9)));
+    expect(runInActions("scores", "lib", "app")).toBe(1);
+    expect(annotationsOf(out)).toEqual([
+      `::warning title=Mutation gate%3A no read%2C 1 of 2 selections::app: the report ${join("packages", "app", "reports", "mutation", "mutation.json")} does not exist`,
+      "::warning title=Mutation gate%3A under the gate::lib: the score 10.00 %25 is under the gate 80 %25",
+    ]);
+
+    out = "";
+    put("packages/app/reports/mutation/mutation.json", JSON.stringify({ files: { "src/b.ts": { mutants: [] } } }));
+    expect(runInActions("scores", "app")).toBe(1);
+    expect(annotationsOf(out)).toEqual([
+      "::warning title=Mutation gate%3A no read%2C 1 of 1 selections::app: the report has no mutants that count: Stryker found no files to mutate, or it did not start",
+    ]);
+
+    out = "";
+    const withTests = (n: number) => ({ ...mutants(9, 1), testFiles: { "src/a.test.ts": { tests: Array.from({ length: n }, (_, i) => ({ name: `t${String(i)}` })) } } });
+    put("packages/app/reports/mutation/mutation.json", JSON.stringify(withTests(10)));
+    put("last.json", JSON.stringify({ app: 20 }));
+    const lane = JSON.parse(readFileSync(join(root, "mutation.json"), "utf8")) as Record<string, unknown>;
+    put("mutation.json", JSON.stringify({ ...lane, plannedFalls: { app: "100 % of the tests\nmoved" } }));
+    expect(runInActions("scores", "app", "--last", "last.json")).toBe(0);
+    expect(annotationsOf(out)).toEqual([
+      "::warning title=Mutation gate%3A a planned fall of the tests::app: the run read 10 tests, 50.0 %25 fewer than the last good count 20 (the limit is 20 %25). The reason: 100 %25 of the tests%0Amoved",
+    ]);
+
+    out = "";
+    expect(run("scores", "app", "--last", "last.json")).toBe(0);
+    expect(annotationsOf(out)).toEqual([]);
+  });
+
+  // The flip of LANE.FILES: a test file that the run starts and that the report does not read fails, unless notRead names it.
+  it("fails a test file that the run starts and that the report does not read, unless notRead gives its reason", () => {
+    put("packages/app/src/b.test.ts", 'import { b } from "./b.ts";\n');
+    put("packages/app/bench/e.test.ts", 'import { b } from "../src/b.ts";\n');
     put("packages/app/src/types.d.ts", "");
     put("packages/app/reports/mutation/mutation.json", JSON.stringify({ ...mutants(9, 1), testFiles: { "src/b.test.ts": { tests: [{ name: "b" }] } } }));
     expect(run("scores", "app", "--test-files")).toBe(1);
-    expect(out).toContain("app: 90.00 % (9 of 10, 1 survived, 1 tests), no gate: FAIL: the report does not read 1 test files on the disk");
+    expect(out).toContain("app: 90.00 % (9 of 10, 1 survived, 1 tests), no gate: FAIL: the report does not read 1 test files that the run starts");
     expect(out).toContain("  not read: packages/app/bench/e.test.ts\n");
     expect(out).not.toContain("types.d.ts");
     expect(run("scores", "app")).toBe(0);
@@ -196,6 +314,86 @@ describe("rigor-mutation", () => {
     put("packages/app/reports/mutation/mutation.json", JSON.stringify(mutants(9, 1)));
     expect(run("scores", "app", "--test-files")).toBe(1);
     expect(out).toContain(`FAIL: the report has no "testFiles", so the test files that it read are not known`);
+  });
+
+  // The related mode of the Vitest runner starts only the test files that load a file of the selection (LANE.FILES).
+  it("expects of a part only the test files that load a file of the part, and each test file with related false", () => {
+    put("packages/lib/src/core/c.test.ts", 'import { c } from "./c.ts";\n');
+    put("packages/lib/src/a.test.ts", 'import { a } from "./a.ts";\n');
+    put("packages/lib/src/via.ts", 'export { c as via } from "./core/c.ts";\n');
+    put("packages/lib/src/types.test.ts", 'import type {\n  c,\n} from "./core/c.ts";\n// import { c } from "./core/c.ts";\n');
+    put("packages/lib/reports/mutation/mutation.json", JSON.stringify({ ...mutants(9, 1), testFiles: { "src/core/c.test.ts": { tests: [{ name: "c" }] } } }));
+    expect(run("scores", "lib.core", "--test-files")).toBe(0);
+    expect(out).not.toContain("not read");
+
+    // A test file that loads the part through another file is related too.
+    put("packages/lib/src/via.test.ts", 'import { via } from "./via.ts";\n');
+    out = "";
+    expect(run("scores", "lib.core", "--test-files")).toBe(1);
+    expect(out).toContain("FAIL: the report does not read 1 test files that the run starts");
+    expect(out).toContain("  not read: packages/lib/src/via.test.ts\n");
+
+    // With related false, the run starts each test file, so each one that the report does not read fails.
+    const lane = JSON.parse(readFileSync(join(root, "mutation.json"), "utf8")) as { packages: Record<string, Record<string, unknown>> };
+    lane.packages["lib"] = { ...lane.packages["lib"], stryker: { vitest: { related: false } } };
+    put("mutation.json", JSON.stringify(lane));
+    out = "";
+    expect(run("scores", "lib.core", "--test-files")).toBe(1);
+    expect(out).toContain("FAIL: the report does not read 3 test files that the run starts");
+    expect(out).toContain("  not read: packages/lib/src/types.test.ts\n");
+  });
+
+  // The flip of LANE.FILES over the parts: each part reads only its related test files. So only all the parts together
+  // show a test file that no part reads, and a "notRead" entry that is not true.
+  it("fails a test file that no selection of a package reads, and a stale entry of notRead, over all the parts", () => {
+    put("packages/lib/src/core/c.test.ts", 'import { c } from "./c.ts";\n');
+    put("packages/lib/src/a.test.ts", 'import { a } from "./a.ts";\n');
+    put("packages/lib/test/docs.test.ts", 'import { readFileSync } from "node:fs";\n');
+    const reads = (file: string): string => JSON.stringify({ ...mutants(9, 1), testFiles: { [file]: { tests: [{ name: "t" }] } } });
+    put("reports/mutation-lib.core/mutation.json", reads("src/core/c.test.ts"));
+    put("reports/mutation-lib.rest/mutation.json", reads("src/a.test.ts"));
+    put("reports/mutation-app/mutation.json", JSON.stringify({ ...mutants(9, 1), testFiles: {} }));
+    const all = ["lib.core", "lib.rest", "app", "--reports", "reports"];
+    expect(run("scores", "lib.core", "--reports", "reports", "--test-files", "--alone")).toBe(0);
+    expect(run("scores", "lib.rest", "--reports", "reports", "--test-files", "--alone")).toBe(0);
+    expect(run("scores", ...all)).toBe(0);
+    out = "";
+    expect(run("scores", ...all, "--test-files")).toBe(1);
+    expect(out).toMatch(/^lib\.core: .*FAIL: the test files of lib: no selection reads 1 test files, and "notRead" does not give their reason$/m);
+    expect(out).toMatch(/^lib\.rest: .*FAIL: the test files of lib/m);
+    expect(out).toContain("lib.rest: 90.00 % (9 of 10, 1 survived, 1 tests), gate 80 %: FAIL");
+    expect(out).toContain("  read by no selection: packages/lib/test/docs.test.ts\n");
+    expect(out).toMatch(/^app: .*: pass$/m);
+    expect(err).toBe("The gate failed for lib.core, lib.rest.\n");
+
+    const lane = JSON.parse(readFileSync(join(root, "mutation.json"), "utf8")) as { packages: Record<string, Record<string, unknown>> };
+    const lib = lane.packages["lib"] ?? {};
+    // An entry is stale when a report reads its file, or when the file is not on the disk.
+    put("mutation.json", JSON.stringify({ ...lane, packages: { ...lane.packages, lib: { ...lib, notRead: { "test/docs.test.ts": "it reads the docs", "src/a.test.ts": "x", "src/gone.test.ts": "y" } } } }));
+    out = "";
+    expect(run("scores", ...all, "--test-files")).toBe(1);
+    expect(out).toContain('FAIL: the test files of lib: 2 entries of "notRead" name a file that is not on the disk or that a report reads');
+    expect(out).toContain('  "notRead" is not true: packages/lib/src/a.test.ts\n  "notRead" is not true: packages/lib/src/gone.test.ts\n');
+    put("mutation.json", JSON.stringify({ ...lane, packages: { ...lane.packages, lib: { ...lib, notRead: { "test/docs.test.ts": "it reads the docs" } } } }));
+    out = "";
+    expect(run("scores", ...all, "--test-files")).toBe(0);
+
+    // With "gateOver": "package", the fault fails the sum of the package, and the parts keep their reads.
+    put("mutation.json", JSON.stringify({ ...lane, packages: { ...lane.packages, lib: { ...lib, gateOver: "package" } } }));
+    out = "";
+    err = "";
+    expect(run("scores", ...all, "--test-files")).toBe(1);
+    expect(out).toMatch(/^lib: .*FAIL: the test files of lib: no selection reads 1 test files/m);
+    expect(out).not.toMatch(/^lib\.core: .*FAIL/m);
+    expect(err).toBe("The gate failed for lib.\n");
+
+    // A full report with no "testFiles" is a no read of its selection, so the sum is a no read, and a note tells why.
+    put("reports/mutation-lib.rest/mutation.json", JSON.stringify(mutants(9, 1)));
+    out = "";
+    expect(run("scores", ...all, "--test-files")).toBe(1);
+    expect(out).toContain('lib.rest: 90.00 % (9 of 10, 1 survived), no gate: FAIL: the report has no "testFiles", so the test files that it read are not known');
+    expect(out).toMatch(/^lib: .*FAIL: the parts lib\.rest fail, so the sum of the parts has no meaning$/m);
+    expect(out).toContain('  the test files of lib over all its selections are not known: the reports of lib.rest have no "testFiles"\n');
   });
 
   it("gives the help, and refuses an unknown command", () => {

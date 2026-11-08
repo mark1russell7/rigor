@@ -38,6 +38,12 @@ export interface StrykerConfig {
   readonly disableBail?: true;
 }
 
+/**
+ * The file URL of the module of the reporter `rigor-partial`: the source in the workspace, the build in the package of
+ * npm. The reporter writes each tested mutant at once, so a stop of Stryker keeps a partial score.
+ */
+export const PARTIAL_PLUGIN: string = new URL(import.meta.url.endsWith(".ts") ? "./reporter.ts" : "./reporter.js", import.meta.url).href;
+
 /** The default folder of the reports, from the folder of the package. */
 export const REPORT_DIR = "reports/mutation";
 
@@ -75,11 +81,11 @@ export function strykerConfig(selection: Selection, options: ConfigOptions = {})
   const low = selection.gate ?? 60;
   return {
     testRunner: "vitest",
-    plugins: ["@stryker-mutator/vitest-runner"],
+    plugins: ["@stryker-mutator/vitest-runner", PARTIAL_PLUGIN],
     ...(selection.vitestConfig === undefined ? {} : { vitest: { configFile: selection.vitestConfig } }),
     mutate: selection.mutate,
     coverageAnalysis: "perTest",
-    reporters: ["clear-text", "progress", "html", "json"],
+    reporters: ["clear-text", "progress", "html", "json", "rigor-partial"],
     htmlReporter: { fileName: `${reportDir}/index.html` },
     jsonReporter: { fileName: `${reportDir}/mutation.json` },
     thresholds: { high: Math.max(low, 90), low, break: null },

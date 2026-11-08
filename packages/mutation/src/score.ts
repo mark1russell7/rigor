@@ -23,6 +23,12 @@ export interface MutationReport {
   readonly testFiles?: Readonly<Record<string, { readonly tests: readonly { readonly name: string }[] }>> | undefined;
 }
 
+/**
+ * The three reads of a score. A `block` is a score under its gate. A `no read` is a score that does not read the tests.
+ * Its cause is no report, no mutant that counts, no detected mutant, or a run that did not read all the tests. A no read is not a pass.
+ */
+export type ScoreOutcome = "pass" | "block" | "no read";
+
 /** The score of one selection. */
 export interface Score {
   readonly name: string;
@@ -46,6 +52,83 @@ export interface Score {
   readonly pass: boolean;
   /** The reason of a failure. */
   readonly reason: string | undefined;
+  /** The read of the score. The functions of this package always give it. A score from an older version has no outcome. */
+  readonly outcome?: ScoreOutcome;
+  /** This field marks a partial score: a time limit stopped Stryker, and the score reads only the mutants that ran. */
+  readonly partial?: PartialCosts;
+}
+
+/** The costs of a run that a time limit stopped. */
+export interface PartialCosts {
+  /** The mutants that Stryker tested before the stop. */
+  readonly tested: number;
+  /** The mutants of the plan. It is undefined when the run stopped before the plan. */
+  readonly planned: number | undefined;
+  /** The minutes from the start of Stryker to the last line of the file. */
+  readonly minutes: number;
+  /** The minutes for all the mutants of the plan, at the rate of the mutants that ran. Early results do not count. It is undefined with no rate. */
+  readonly estimate: number | undefined;
+}
+
+/** The read of `partial.jsonl`: a report of the mutants that ran, and the costs of the run. */
+export interface PartialRun extends PartialCosts {
+  readonly report: MutationReport;
+  /** This field tells if Stryker wrote its last line. Then the run did not stop. */
+  readonly done: boolean;
+}
+
+/**
+ * This function reads the lines of the reporter `rigor-partial`. A stop of the process can cut the last line, so the
+ * function ignores a last line that is not JSON.
+ *
+ * @throws Error when a line before the last one is not JSON, or when the file has no start line
+ */
+export function parsePartial(text: string): PartialRun {
+  const raw = text.split("\n").filter((line) => line.trim() !== "");
+  const lines = raw.flatMap((line, i): Record<string, unknown>[] => {
+    try {
+      return [JSON.parse(line) as Record<string, unknown>];
+    } catch (error) {
+      if (i === raw.length - 1) return [];
+      throw new Error(`the line ${String(i + 1)} of the partial file is not JSON`, { cause: error });
+    }
+  });
+  const at = (l: Record<string, unknown> | undefined): number => (typeof l?.["at"] === "number" ? l["at"] : 0);
+  const start = lines.find((l) => l["event"] === "start");
+  if (start === undefined) throw new Error(`the partial file has no start line`);
+  const plan = lines.find((l) => l["event"] === "plan");
+  const mutants = lines.filter((l) => l["event"] === "mutant");
+  const files: Record<string, { mutants: Mutant[] }> = {};
+  for (const m of mutants) {
+    const reason = typeof m["statusReason"] === "string" ? { statusReason: m["statusReason"] } : {};
+    (files[String(m["file"])] ??= { mutants: [] }).mutants.push({ status: String(m["status"]), ...reason, mutatorName: String(m["mutatorName"]), location: { start: { line: Number(m["line"]) } } });
+  }
+  const minutes = (to: number, from: number): number => (to - from) / 60_000;
+  const last = at(lines.at(-1));
+  const planned = typeof plan?.["mutants"] === "number" ? plan["mutants"] : undefined;
+  const run = typeof plan?.["run"] === "number" ? plan["run"] : undefined;
+  // Stryker reports the mutants with an early result (no coverage, ignored, from the cache) just after the plan, and
+  // they take no time. So the rate reads only the tested mutants that ran: the lines of all the mutants less the early ones.
+  const lastMutant = at(mutants.at(-1));
+  const ran = planned === undefined || run === undefined ? 0 : mutants.length - (planned - run);
+  const estimate =
+    run === undefined || ran <= 0 || lastMutant <= at(plan)
+      ? undefined
+      : minutes(at(plan), at(start)) + (minutes(lastMutant, at(plan)) * run) / ran;
+  return { report: { files }, tested: mutants.length, planned, minutes: minutes(last, at(start)), estimate, done: lines.some((l) => l["event"] === "done") };
+}
+
+/**
+ * This function gives the score of a run that a time limit stopped. The score reads only the mutants that ran, so it
+ * is a no read with the mark `partial`. The reason gives the costs, for the size of the next parts.
+ */
+export function partialScore(run: PartialRun, selection: { readonly name: string; readonly gate: number | undefined }): Score {
+  const score = scoreReport(run.report, selection);
+  const of = run.planned === undefined ? "an unknown count of" : String(run.planned);
+  const estimate = run.estimate === undefined ? "" : ` All the mutants need an estimated ${run.estimate.toFixed(0)} minutes.`;
+  const reason = `partial: Stryker stopped after ${run.minutes.toFixed(1)} minutes and tested ${String(run.tested)} of ${of} mutants. The score of the mutants that ran is ${score.percent.toFixed(2)} %.${estimate}`;
+  const { tested, planned, minutes } = run;
+  return { ...score, pass: false, reason, outcome: "no read", partial: { tested, planned, minutes, estimate: run.estimate } };
 }
 
 const UNDETECTED = new Set(["Survived", "NoCoverage"]);
@@ -101,19 +184,54 @@ export function testFall(tests: number, last: number, maxFall: number): string |
  * @param dir - the folder of the package, to make a full path of the report relative
  */
 export function unreadTestFiles(report: MutationReport, onDisk: readonly string[], notRead: Readonly<Record<string, string>> = {}, dir = ""): string[] {
-  const root = dir.replaceAll("\\", "/").replace(/\/?$/, "/");
-  const read = new Set(
-    Object.keys(report.testFiles ?? {}).map((f) => {
-      const file = f.replaceAll("\\", "/");
-      return dir !== "" && file.startsWith(root) ? file.slice(root.length) : file.replace(/^\.\//, "");
-    }),
-  );
+  const read = readTestFiles([report], dir);
   return onDisk.filter((f) => !read.has(f) && notRead[f] === undefined);
 }
 
-/** This function gives a score that fails for a reason. A score that failed already keeps its first reason, and gets the new one after it. */
+/** This function gives the test files that the reports read, from the folder of the package, with `/`. */
+function readTestFiles(reports: readonly MutationReport[], dir: string): Set<string> {
+  const root = dir.replaceAll("\\", "/").replace(/\/?$/, "/");
+  return new Set(
+    reports.flatMap((report) =>
+      Object.keys(report.testFiles ?? {}).map((f) => {
+        const file = f.replaceAll("\\", "/");
+        return dir !== "" && file.startsWith(root) ? file.slice(root.length) : file.replace(/^\.\//, "");
+      }),
+    ),
+  );
+}
+
+/** The faults of the test files of a package over the reports of all its selections (LANE.FILES). */
+export interface TestFileFaults {
+  /** These test files are on the disk, no report reads them, and `notRead` does not name them. */
+  readonly unread: readonly string[];
+  /** These entries of `notRead` are not true: the file is not on the disk, or a report reads it. */
+  readonly stale: readonly string[];
+}
+
+/**
+ * This function examines the test files of a package over the reports of all its selections (LANE.FILES). A part
+ * starts only its related test files, so only all the parts together show a test file that no part reads.
+ *
+ * @param reports - the reports of all the selections of the package
+ * @param onDisk - the test files of the package, from its folder, with `/`
+ * @param dir - the folder of the package, to make a full path of a report relative
+ */
+export function testFileFaults(reports: readonly MutationReport[], onDisk: readonly string[], notRead: Readonly<Record<string, string>> = {}, dir = ""): TestFileFaults {
+  const read = readTestFiles(reports, dir);
+  const files = new Set(onDisk);
+  return {
+    unread: onDisk.filter((f) => !read.has(f) && notRead[f] === undefined),
+    stale: Object.keys(notRead).filter((f) => !files.has(f) || read.has(f)),
+  };
+}
+
+/**
+ * This function gives a score that fails for a reason, with the outcome `no read`. A score that failed already keeps its
+ * first reason, and gets the new one after it. A score under its gate with a second reason is also a no read.
+ */
 export function failScore(score: Score, reason: string): Score {
-  return { ...score, pass: false, reason: score.reason === undefined ? reason : `${score.reason}. Also ${reason}` };
+  return { ...score, pass: false, outcome: "no read", reason: score.reason === undefined ? reason : `${score.reason}. Also ${reason}` };
 }
 
 /**
@@ -147,15 +265,44 @@ export function scoreReport(report: MutationReport, selection: { readonly name: 
   const percent = valid === 0 ? 0 : (100 * detected) / valid;
   const percentWithClock = valid === 0 ? 0 : (100 * (detected + clockTimeouts)) / valid;
   const { name, gate } = selection;
-  const reason =
+  const [outcome, reason]: [ScoreOutcome, string | undefined] =
     valid === 0
-      ? "the report has no mutants that count: Stryker found no files to mutate, or it did not start"
+      ? ["no read", "the report has no mutants that count: Stryker found no files to mutate, or it did not start"]
       : detected === 0
-        ? `the tests detected none of the ${String(valid)} mutants: the test runner started no test on the mutants`
+        ? ["no read", `the tests detected none of the ${String(valid)} mutants: the test runner started no test on the mutants`]
         : gate !== undefined && percent < gate
-          ? `the score ${percent.toFixed(2)} % is under the gate ${String(gate)} %`
-          : undefined;
-  return { name, gate, detected, hitLimit, clockTimeouts, valid, survived, percent, percentWithClock, tests: testCount(report), pass: reason === undefined, reason };
+          ? ["block", `the score ${percent.toFixed(2)} % is under the gate ${String(gate)} %`]
+          : ["pass", undefined];
+  return { name, gate, detected, hitLimit, clockTimeouts, valid, survived, percent, percentWithClock, tests: testCount(report), pass: reason === undefined, reason, outcome };
+}
+
+/**
+ * This function gives the score of a package from the scores of its parts, and applies the gate of the package. It sums
+ * the mutants of the parts. A part that fails makes the package a no read: a part has no gate of its own here.
+ * A missing part also makes the package a no read, because the sum does not count its mutants.
+ *
+ * @param missing - the parts of the package that have no score in this read
+ */
+export function packageScore(name: string, gate: number | undefined, parts: readonly Score[], missing: readonly string[] = []): Score {
+  const sum = (count: (s: Score) => number): number => parts.reduce((total, s) => total + count(s), 0);
+  const detected = sum((s) => s.detected);
+  const valid = sum((s) => s.valid);
+  const clockTimeouts = sum((s) => s.clockTimeouts);
+  const percent = valid === 0 ? 0 : (100 * detected) / valid;
+  const percentWithClock = valid === 0 ? 0 : (100 * (detected + clockTimeouts)) / valid;
+  const failed = parts.filter((s) => !s.pass).map((s) => s.name);
+  const [outcome, reason]: [ScoreOutcome, string | undefined] =
+    parts.length === 0
+      ? ["no read", "the package has no scores of its parts"]
+      : missing.length > 0
+        ? ["no read", `the read has no score of the parts ${missing.join(", ")}, so the sum does not count their mutants`]
+        : failed.length > 0
+          ? ["no read", `the parts ${failed.join(", ")} fail, so the sum of the parts has no meaning`]
+          : gate !== undefined && percent < gate
+            ? ["block", `the score ${percent.toFixed(2)} % of all the parts is under the gate ${String(gate)} %`]
+            : ["pass", undefined];
+  const tests = parts.every((s) => s.tests !== undefined) ? sum((s) => s.tests ?? 0) : undefined;
+  return { name, gate, detected, hitLimit: sum((s) => s.hitLimit), clockTimeouts, valid, survived: parts.flatMap((s) => s.survived), percent, percentWithClock, tests, pass: reason === undefined, reason, outcome };
 }
 
 /** This function gives the time-outs of a score as text: the count of each kind, and the score that counts the clock time-outs as detected. */

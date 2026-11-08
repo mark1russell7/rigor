@@ -14,6 +14,7 @@ export {
   budgetVerdict,
 } from "./budget.ts";
 export { type GrowthOptions, type GrowthOutcome, type GrowthRound, type GrowthStep, type GrowthVerdict, growthVerdict } from "./growth.ts";
+export { type CellBudget, type CostCells, type CostProbe, type JobCost, type ModelCost, type RunCost, type RunCostOptions, runCost } from "./run-cost.ts";
 export {
   type CaseGate,
   GATE_LOOKS,
@@ -27,6 +28,26 @@ export {
   gateOf,
   notSlowerVerdict,
 } from "./gate.ts";
+export {
+  type CaseRead,
+  GATE_LINE_LIMIT,
+  GATE_LINE_NAMES,
+  type GateLine,
+  type GateLineCases,
+  type GateLineLevel,
+  type GateLineOptions,
+  type GateLineOutputs,
+  type GateLineWritten,
+  type JobEnv,
+  type JobModel,
+  type JobModelsOptions,
+  gateLine,
+  isBlock,
+  isNoRead,
+  jobModels,
+  writeGateLine,
+} from "./gate-line.ts";
+export { GATE_LINE_HELP, type GateLineCliIo, gateLineCli } from "./gate-line-cli.ts";
 export { type ControlFactors, type ControlOptions, type ControlRow, type GroupCounts, type GroupFactor, type MeasuredFactor, type NoFactor, controlFactor } from "./control.ts";
 export {
   type BudgetResult,

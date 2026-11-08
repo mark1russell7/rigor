@@ -7,6 +7,8 @@
 ## . (build/index.d.ts): names
 
 type CliIo: build/index.d.ts#CliIo
+type Collected: build/index.d.ts#Collected
+type CollectedFile: build/index.d.ts#CollectedFile
 type ConfigOptions: build/index.d.ts#ConfigOptions
 DRY_RUN_TIMEOUT_MINUTES: build/index.d.ts#DRY_RUN_TIMEOUT_MINUTES
 type Disable: build/index.d.ts#Disable
@@ -17,24 +19,36 @@ type LeavingPath: build/index.d.ts#LeavingPath
 type Mutant: build/index.d.ts#Mutant
 type MutationReport: build/index.d.ts#MutationReport
 NO_TSCONFIG: build/index.d.ts#NO_TSCONFIG
+PARTIAL_FILE: build/reporter.chunk.d.ts#PARTIAL_FILE
+PARTIAL_PLUGIN: build/index.d.ts#PARTIAL_PLUGIN
 type PackageFile: build/index.d.ts#PackageFile
 type PackageLane: build/index.d.ts#PackageLane
+type PartialCosts: build/index.d.ts#PartialCosts
+type PartialLine: build/reporter.chunk.d.ts#PartialLine
+PartialReporter: build/reporter.chunk.d.ts#PartialReporter
+type PartialRun: build/index.d.ts#PartialRun
 REPORT_DIR: build/index.d.ts#REPORT_DIR
 STRYKER_OWNED: build/index.d.ts#STRYKER_OWNED
 type Score: build/index.d.ts#Score
+type ScoreOutcome: build/index.d.ts#ScoreOutcome
 type Selection: build/index.d.ts#Selection
 type StrykerConfig: build/index.d.ts#StrykerConfig
 TIMEOUT_MS: build/index.d.ts#TIMEOUT_MS
 changedFiles: build/index.d.ts#changedFiles
+collectFaults: build/index.d.ts#collectFaults
 compareDisables: build/index.d.ts#compareDisables
 findDisables: build/index.d.ts#findDisables
 formatScore: build/index.d.ts#formatScore
 isConfigFile: build/index.d.ts#isConfigFile
 isHitLimit: build/index.d.ts#isHitLimit
 leavingPaths: build/index.d.ts#leavingPaths
+packageScore: build/index.d.ts#packageScore
 parseLane: build/index.d.ts#parseLane
+parsePartial: build/index.d.ts#parsePartial
 parseReport: build/index.d.ts#parseReport
 partErrors: build/index.d.ts#partErrors
+partialScore: build/index.d.ts#partialScore
+relatedTestFiles: build/index.d.ts#relatedTestFiles
 rewritesTsconfig: build/index.d.ts#rewritesTsconfig
 runCli: build/index.d.ts#runCli
 runSelections: build/index.d.ts#runSelections
@@ -55,6 +69,22 @@ interface CliIo {
   readonly cwd: string;
   readonly stdout: (text: string) => void;
   readonly stderr: (text: string) => void;
+  readonly env?: Readonly<Record<string, string | undefined>>;
+}
+
+### build/index.d.ts#Collected
+interface Collected {
+  readonly version: string;
+  readonly path: string;
+  readonly files: readonly CollectedFile[];
+  readonly unhandled: readonly string[];
+}
+
+### build/index.d.ts#CollectedFile
+interface CollectedFile {
+  readonly file: string;
+  readonly errors: readonly string[];
+  readonly children: number;
 }
 
 ### build/index.d.ts#ConfigOptions
@@ -127,6 +157,9 @@ interface MutationReport {
 ### build/index.d.ts#NO_TSCONFIG
 export declare const NO_TSCONFIG = "tsconfig.no-stryker-rewrite.json";
 
+### build/index.d.ts#PARTIAL_PLUGIN
+export declare const PARTIAL_PLUGIN: string;
+
 ### build/index.d.ts#PackageFile
 interface PackageFile {
   readonly file: string;
@@ -139,11 +172,26 @@ interface PackageLane {
   readonly mutate: readonly string[];
   readonly parts?: Readonly<Record<string, readonly string[]>>;
   readonly gate?: number;
+  readonly gateOver?: "part" | "package";
   readonly vitestConfig?: string;
   readonly timeoutMS?: number;
   readonly dryRunTimeoutMinutes?: number;
   readonly stryker?: Readonly<Record<string, unknown>>;
   readonly notRead?: Readonly<Record<string, string>>;
+}
+
+### build/index.d.ts#PartialCosts
+interface PartialCosts {
+  readonly tested: number;
+  readonly planned: number | undefined;
+  readonly minutes: number;
+  readonly estimate: number | undefined;
+}
+
+### build/index.d.ts#PartialRun
+interface PartialRun extends PartialCosts {
+  readonly report: MutationReport;
+  readonly done: boolean;
 }
 
 ### build/index.d.ts#REPORT_DIR
@@ -166,7 +214,12 @@ interface Score {
   readonly tests: number | undefined;
   readonly pass: boolean;
   readonly reason: string | undefined;
+  readonly outcome?: ScoreOutcome;
+  readonly partial?: PartialCosts;
 }
+
+### build/index.d.ts#ScoreOutcome
+type ScoreOutcome = "pass" | "block" | "no read";
 
 ### build/index.d.ts#Selection
 interface Selection {
@@ -215,7 +268,10 @@ interface StrykerConfig {
 export declare const TIMEOUT_MS = 12e4;
 
 ### build/index.d.ts#changedFiles
-export declare function changedFiles(selection: Selection, changed: readonly string[]): string[];
+export declare function changedFiles(selection: Selection, changed: readonly string[], exists?: (file: string) => boolean): string[];
+
+### build/index.d.ts#collectFaults
+export declare function collectFaults(collected: Collected): string[];
 
 ### build/index.d.ts#compareDisables
 export declare function compareDisables(found: readonly Disable[], listed: readonly Disable[]): DisableCheck;
@@ -238,14 +294,29 @@ export declare const isHitLimit: (m: Mutant) => boolean;
 ### build/index.d.ts#leavingPaths
 export declare function leavingPaths(files: readonly PackageFile[], vitestConfig?: string): LeavingPath[];
 
+### build/index.d.ts#packageScore
+export declare function packageScore(name: string, gate: number | undefined, parts: readonly Score[], missing?: readonly string[]): Score;
+
 ### build/index.d.ts#parseLane
 export declare function parseLane(json: unknown): Lane;
+
+### build/index.d.ts#parsePartial
+export declare function parsePartial(text: string): PartialRun;
 
 ### build/index.d.ts#parseReport
 export declare function parseReport(json: unknown): MutationReport;
 
 ### build/index.d.ts#partErrors
-export declare function partErrors(lane: Lane, pkg: string, files: readonly string[]): string[];
+export declare function partErrors(lane: Lane, pkg: string, files: readonly string[], lines?: (file: string) => number): string[];
+
+### build/index.d.ts#partialScore
+export declare function partialScore(run: PartialRun, selection: {
+  readonly name: string;
+  readonly gate: number | undefined;
+}): Score;
+
+### build/index.d.ts#relatedTestFiles
+export declare function relatedTestFiles(files: readonly PackageFile[], selected: (file: string) => boolean): string[];
 
 ### build/index.d.ts#rewritesTsconfig
 export declare function rewritesTsconfig(major: number | undefined): boolean;
@@ -273,3 +344,46 @@ export declare function strykerConfig(selection: Selection, options?: ConfigOpti
 
 ### build/index.d.ts#summaryMarkdown
 export declare function summaryMarkdown(scores: readonly Score[]): string;
+
+### build/reporter.chunk.d.ts#PARTIAL_FILE
+declare const PARTIAL_FILE = "partial.jsonl";
+
+### build/reporter.chunk.d.ts#PartialLine
+type PartialLine = {
+  readonly event: "start";
+  readonly at: number;
+} | {
+  readonly event: "plan";
+  readonly at: number;
+  readonly mutants: number;
+  readonly run: number;
+} | {
+  readonly event: "mutant";
+  readonly at: number;
+  readonly file: string;
+  readonly status: string;
+  readonly statusReason?: string;
+  readonly mutatorName: string;
+  readonly line: number;
+} | {
+  readonly event: "done";
+  readonly at: number;
+};
+
+### build/reporter.chunk.d.ts#PartialReporter
+declare class PartialReporter {
+  static readonly inject: readonly ["options"];
+  readonly file: string;
+  constructor(options: {
+    readonly jsonReporter?: {
+      readonly fileName?: string;
+    };
+  }, now?: () => number, cwd?: string);
+  onMutationTestingPlanReady(event: {
+    readonly mutantPlans: readonly {
+      readonly plan: string;
+    }[];
+  }): void;
+  onMutantTested(result: TestedMutant): void;
+  onMutationTestReportReady(): void;
+}

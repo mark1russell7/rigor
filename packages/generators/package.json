@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/rigor-generators",
-  "version": "0.1.6",
-  "description": "A seeded random number generator (mulberry32) with the draws that tests and benchmarks make: integers, picks, weights, shuffles, samples, normal values and named streams.",
+  "version": "0.1.8",
+  "description": "A seeded random number generator (mulberry32) with the draws that tests and benchmarks make: integers, picks, weights, shuffles, samples, normal values and named streams. It also gives a content hash: SHA-256 and canonical JSON (RFC 8785).",
   "keywords": [
     "random",
     "seed",
@@ -10,6 +10,9 @@
     "prng",
     "mulberry32",
     "fnv1a",
+    "sha256",
+    "canonical-json",
+    "jcs",
     "deterministic",
     "testing",
     "benchmark",

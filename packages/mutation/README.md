@@ -39,6 +39,7 @@ The lane file `mutation.json` is at the root of the repository:
 - `mutate` has the globs of the files to mutate, from `dir`. A glob with `!` removes the files of the globs before it.
 - `gate` is the lowest score in percent that passes. Without a gate, the lane only reports the score.
 - `parts` divides a big package. A part has its own globs, and the `!` globs of `mutate` also apply to it. Each file of `mutate` must be in exactly one part.
+- A glob with the suffix `:<from>-<to>` gives only those lines of its files, as Stryker reads it. Thus parts can cut one big file: `"a": ["src/module.ts:1-300"]` and `"b": ["src/module.ts:301-600"]`. The ranges of the parts must cover each line of the file one time.
 - `vitestConfig` names the Vitest config of the package, from `dir`. Without it, Vitest finds its config.
 - `timeoutMS` is the time in milliseconds that the clock adds to the time of the tests for each mutant. The default is 120000. The default of Stryker (5000) is too short on a loaded CI runner.
 - `dryRunTimeoutMinutes` is the time in minutes for the run of the tests without mutants. The default is 15.
@@ -47,7 +48,7 @@ The lane file `mutation.json` is at the root of the repository:
 
 A selection is one Stryker run: a package (`collections`) or a part (`collections.impl`). `rigor-mutation list --runs` gives the selections of a full run: the parts of each package with parts, else the package.
 
-A full run mutates only the files of the parts. Thus a file in no part has no score, and a file in two parts has two scores. `list --runs`, and `config` and `scores` of a part, examine the source files of the package. They fail and name each file that is in no part, in two parts, or in a part but not in `mutate`. In the example, a file `src/util.ts` is in no part, so the lane fails.
+A full run mutates only the files of the parts. Thus a file in no part has no score, and a file in two parts has two scores. `list --runs`, and `config` and `scores` of a part, examine the source files of the package. They fail and name each file that is in no part, in two parts, or in a part but not in `mutate`. For a file in line ranges, they name each gap and each overlap of the ranges, and the lines after the last range. In the example, a file `src/util.ts` is in no part, so the lane fails.
 
 ## A run
 
@@ -63,12 +64,34 @@ Each run starts the tests of `dir` only. A test in another folder, for example a
 
 `rigor-mutation scores` reads `<dir>/reports/mutation/mutation.json` and applies the gate. It exits with 1 when a selection fails. With `--summary "$GITHUB_STEP_SUMMARY"`, it adds a table of the scores to the summary of the job. The shared workflow `reusable-mutation.yml` of the template starts these steps on one runner for each selection.
 
+Each score has one of three outcomes: `pass`, `block` or `no read`. A block is a score under its gate. A no read is a score that does not read the tests. Its cause is a missing report, no mutants that count, no detected mutant, or a run that read only some of the tests. A no read is not a pass.
+
+In GitHub Actions (`GITHUB_ACTIONS` is `true`), `scores` writes a warning annotation for each no read, each block and each planned fall. Thus the line is on the check, also when the workflow only reports. The title of a no read gives the count of the no reads and of the selections:
+
+```text
+::warning title=Mutation gate%3A no read%2C 1 of 6 selections::collections.maps: the report has no mutants that count: Stryker found no files to mutate, or it did not start
+```
+
 A run of mutation tests is long and it uses much memory. Start it in CI, and on a local computer start one part with `--concurrency 2`.
 
 Two options make a run shorter:
 
 - `config --dry-run` gives a config that starts only the tests without mutants. Stryker does not stop at the first failed test. Use it to see if the tests pass under Stryker before a long run.
-- `--changed <file>` reads a file with one changed path on each line, from the folder of the lane file. Make the file with `git diff --name-only`. Then `list --runs` gives only the runs with a changed file, and `config` mutates only the changed files of the selection. `config` fails for a selection with no changed file.
+- `--changed <file>` reads a file with one changed path on each line, from the folder of the lane file. Make the file with `git diff --name-only`. Then `list --runs` gives only the runs with a changed file, and `config` mutates only the changed files of the selection. A changed test file, for example `src/a.test.ts`, selects its source file `src/a.ts` when the selection takes it. `config` fails for a selection with no changed file.
+
+### A run that a time limit stops
+
+The config adds the reporter `rigor-partial` to Stryker. It writes each tested mutant to `partial.jsonl`, next to `mutation.json`, at once.
+
+A time limit can stop Stryker before it writes `mutation.json`. Then `scores` reads `partial.jsonl` and gives a partial score:
+
+```text
+lib.rest: 50.00 % (1 of 2, 1 survived), no gate: FAIL: partial: Stryker stopped after 3.0 minutes and tested 2 of 10 mutants. The score of the mutants that ran is 50.00 %. All the mutants need an estimated 11 minutes.
+```
+
+A partial score is a no read, because it does not read all the mutants. Its field `partial` gives the costs. Use the estimate to divide the package into parts. The estimate does not count the mutants with an early result, because they take no time.
+
+The workflow `stryker-stop.yml` checks the reporter in a real run. It stops Stryker on the fixture lane `test/stryker/mutation.json` and examines the partial score.
 
 ## The score
 
@@ -89,12 +112,24 @@ A selection fails in these conditions:
 
 The gate of a package with parts applies to each part. Each part must have a score at the gate or above it. A part under the gate fails, also when the score of all the parts together is above the gate.
 
+With `"gateOver": "package"`, the gate reads all the parts together. `scores` sums the mutants of the parts of the package, and gives one more line for the package. A part has no gate of its own, but a part that fails for another reason makes the package a no read.
+
+- Give `scores` all the parts in one command, so that the sum reads each part. `--reports <dir>` reads `<dir>/mutation-<selection>/mutation.json` for each selection.
+- A read of some of the parts only makes the package a no read, and its line names the missing parts. A run of the changed files is usually report only, so this does not fail it.
+- `--alone` gives no line for the package. The job of one part uses it, and the part then fails only for a no read.
+
 ## The tests that a run read
 
 A score is a read of the tests only when the run read all of them. A run that read half of the tests gives a score with no meaning. Two options of `scores` find such a run. They need the field `testFiles` of the report, which the Vitest runner gives.
 
 - Each score line gives the count of the tests of the run. `--last <file>` compares it with the last good count of the selection in the file. A fall of more than `maxTestFall` percent fails, also above the gate. The default of `maxTestFall` is 20. `--write-last <file>` writes the counts of the selections that pass.
-- `--test-files` compares the test files on the disk with the test files of the report. A test file on the disk that the report does not read fails.
+- `--test-files` compares the test files that the run starts with the test files of the report. A test file that the run starts and that the report does not read fails.
+  - The Vitest runner of Stryker starts the test files that load a file of the selection, directly or through other files. So a part does not start the test files of the other parts.
+  - The check reads the relative imports of the package, and not its type imports. With `vitest.related` false in the field `stryker`, it expects each test file.
+- With no `--alone`, `--test-files` also examines each package whose selections the command names in full. This is the gate job, which reads all the parts.
+  - A test file on the disk that no report reads fails, unless `notRead` gives its reason. One part does not show such a file, because a part starts only its related test files.
+  - An entry of `notRead` fails when its file is not on the disk, or when a report reads it.
+  - The fault fails the score of the package with `"gateOver": "package"`. Else it fails each selection of the package.
 
 The lane states each exception with its reason:
 
@@ -121,6 +156,21 @@ packages/compiler/src/module-sheet.test.ts:12: "../../testkit/src/fc-timeout.ts"
 
 The check does not read comments, type imports and paths with a template expression.
 
+With `--collect`, the Vitest of each package also loads each test file, as Stryker does. It starts the collect of Vitest in a new process, with `staticParse: false`. Then each file starts, so the check finds a missing package, also through a helper or a computed dynamic import. These are faults:
+
+- a test file that does not load,
+- a test file that holds no test,
+- an error outside a test file,
+- a package with no test file.
+
+On a fault, the check fails with a line that starts with `No read`. A score of that package is not a reading.
+
+`--runner <file>` writes the version and the path of the Vitest of each package to the file, as JSON. Each package uses the Vitest that its folder resolves.
+
+```text
+rigor-mutation load-check --collect --runner reports/runner.json
+```
+
 ## The disabled mutants
 
 A comment `// Stryker disable next-line <Mutator>: <reason>` disables a mutant that is equivalent. The disable raises the score, so each one is also in the list, with its reason. `rigor-mutation disables` compares the comments of the sources of each package with the list. It fails when they are not the same, or when a comment has no reason. After you add or remove a disable, start `rigor-mutation disables --write` and examine the diff of the list.
@@ -137,4 +187,4 @@ const score = scoreReport(parseReport(JSON.parse(reportText)), selection);
 console.log(formatScore(score)); // collections.impl: 91.20 % (456 of 500, 44 survived), gate 80 %: pass
 ```
 
-The package also exports `selectionNames`, `runSelections`, `summaryMarkdown`, `findDisables`, `compareDisables`, `leavingPaths`, `isConfigFile`, `testCount`, `testFall`, `unreadTestFiles`, `failScore` and `runCli`.
+The package also exports `selectionNames`, `runSelections`, `summaryMarkdown`, `findDisables`, `compareDisables`, `leavingPaths`, `relatedTestFiles`, `isConfigFile`, `testCount`, `testFall`, `unreadTestFiles`, `failScore` and `runCli`.
