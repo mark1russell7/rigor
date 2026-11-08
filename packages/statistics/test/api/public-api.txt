@@ -88,6 +88,7 @@ type UStatisticInterval: build/index.d.ts#UStatisticInterval
 type UStatisticMean: build/index.d.ts#UStatisticMean
 type UStatisticMethod: build/index.d.ts#UStatisticMethod
 type UStatisticOptions: build/index.d.ts#UStatisticOptions
+U_STATISTIC_TIGHT_MIN_SAMPLE: build/index.d.ts#U_STATISTIC_TIGHT_MIN_SAMPLE
 Z95: build/index.d.ts#Z95
 bestSmoothLaw: build/index.d.ts#bestSmoothLaw
 binomialInterval: build/index.d.ts#binomialInterval
@@ -705,7 +706,8 @@ interface UStatisticInterval {
   readonly low: number;
   readonly high: number;
   readonly level: number;
-  readonly method: UStatisticMethod;
+  readonly method: "conservative" | "tight";
+  readonly requested: UStatisticMethod;
   readonly mean: UStatisticMean;
   readonly subsets: number;
   readonly standardError?: number;
@@ -720,7 +722,7 @@ interface UStatisticMean {
 }
 
 ### build/index.d.ts#UStatisticMethod
-type UStatisticMethod = "conservative" | "tight";
+type UStatisticMethod = "conservative" | "tight" | "auto";
 
 ### build/index.d.ts#UStatisticOptions
 interface UStatisticOptions {
@@ -730,6 +732,9 @@ interface UStatisticOptions {
   readonly level?: number;
   readonly range?: readonly [low: number, high: number];
 }
+
+### build/index.d.ts#U_STATISTIC_TIGHT_MIN_SAMPLE
+export declare const U_STATISTIC_TIGHT_MIN_SAMPLE: number;
 
 ### build/index.d.ts#Z95
 export declare const Z95 = 1.959963984540054;

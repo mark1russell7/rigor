@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { random } from "@mark1russell7/rigor-generators";
-import { sampleTotalInterval, tQuantile, uStatisticInterval, wilson } from "./index.ts";
+import { U_STATISTIC_TIGHT_MIN_SAMPLE, sampleTotalInterval, tQuantile, uStatisticInterval, wilson } from "./index.ts";
 
 type Kernel = (i: number, j: number) => number;
 type Point = readonly [number, number];
@@ -167,10 +167,15 @@ describe("uStatisticInterval", () => {
           const v = value.get(set.map((j) => sample[j]).join(",")) as number;
           for (const j of set) totals[j] = (totals[j] as number) + v;
         }
-        const i = uStatisticInterval(totals, { order, population: n, method: "tight" });
+        // When all the totals are equal, the jackknife variance is 0 and the method "tight" refuses to start
+        // without a range. The estimate does not depend on the method.
+        const equal = totals.every((t) => t === totals[0]);
+        const i = equal
+          ? uStatisticInterval(totals, { order, population: n, method: "conservative", range: [-1000, 1000] })
+          : uStatisticInterval(totals, { order, population: n, method: "tight" });
         sum += i.estimate;
         squares += i.estimate ** 2;
-        variance += (i.standardError as number) ** 2;
+        variance += equal ? 0 : (i.standardError as number) ** 2;
       }
       const truth = squares / all.length - (sum / all.length) ** 2;
       const estimated = variance / all.length;
@@ -203,63 +208,77 @@ describe("uStatisticInterval", () => {
   const SAMPLES = 200;
 
   /** The hits of each method in one cell. */
-  function coverage(kernelName: string, n: number, m: number): { conservative: number; tight: number } {
+  function coverage(kernelName: string, n: number, m: number): { conservative: number; tight: number; auto: number; fallbacks: number } {
     const kernel = KERNELS[kernelName as keyof typeof KERNELS];
     const { h, total } = table(kernel.make(n, `u-statistic/${kernelName}/${n}`), n);
     const draws = random(`u-statistic/${kernelName}/${n}/${m}`);
     const ids = Array.from({ length: n }, (_, i) => i);
-    const hits = { conservative: 0, tight: 0 };
+    const hits = { conservative: 0, tight: 0, auto: 0, fallbacks: 0 };
     for (let k = 0; k < SAMPLES; k++) {
       const totals = pairTotals(h, draws.sample(ids, m));
-      for (const method of ["conservative", "tight"] as const) {
+      for (const method of ["conservative", "tight", "auto"] as const) {
         const i = uStatisticInterval(totals, { order: 2, population: n, method, range: kernel.range });
+        if (method === "tight" && i.method === "conservative") hits.fallbacks++;
         if (i.low <= total && total <= i.high) hits[method]++;
       }
     }
     return hits;
   }
 
-  // The measured hits of the method "tight", of 200, with the Wilson interval of each count.
+  // The measured hits of the method "tight", of 200, with the Wilson interval of each count. A sample with equal
+  // totals has a jackknife variance of 0, so the method "tight" uses the method "conservative" for it.
   // sparse:
-  //   40/8 76 (0.316 to 0.449), 40/10 106 (0.461 to 0.598), 40/12 133 (0.597 to 0.727),
-  //   40/20 174 (0.816 to 0.910), 40/36 192 (0.923 to 0.980), 60/8 113 (0.496 to 0.632),
-  //   60/10 150 (0.686 to 0.805), 60/12 159 (0.734 to 0.845), 60/20 184 (0.874 to 0.950),
-  //   60/40 186 (0.886 to 0.958), 120/8 102 (0.441 to 0.578), 120/10 135 (0.607 to 0.736),
-  //   120/12 156 (0.718 to 0.832), 120/20 189 (0.904 to 0.969), 120/40 194 (0.936 to 0.986),
+  //   40/8 200 (0.981 to 1.000), 40/10 200 (0.981 to 1.000), 40/12 200 (0.981 to 1.000),
+  //   40/20 180 (0.851 to 0.934), 40/36 192 (0.923 to 0.980), 60/8 200 (0.981 to 1.000),
+  //   60/10 200 (0.981 to 1.000), 60/12 200 (0.981 to 1.000), 60/20 184 (0.874 to 0.950),
+  //   60/40 186 (0.886 to 0.958), 120/8 200 (0.981 to 1.000), 120/10 200 (0.981 to 1.000),
+  //   120/12 200 (0.981 to 1.000), 120/20 191 (0.917 to 0.976), 120/40 194 (0.936 to 0.986),
   //   120/60 195 (0.943 to 0.989), 120/108 187 (0.892 to 0.962).
   // crossings:
-  //   40/8 180 (0.851 to 0.934), 40/10 194 (0.936 to 0.986), 40/12 182 (0.862 to 0.942),
-  //   40/20 183 (0.868 to 0.946), 40/36 189 (0.904 to 0.969), 60/8 183 (0.868 to 0.946),
-  //   60/10 193 (0.930 to 0.983), 60/12 194 (0.936 to 0.986), 60/20 190 (0.910 to 0.973),
-  //   60/40 193 (0.930 to 0.983), 120/8 188 (0.898 to 0.965), 120/10 189 (0.904 to 0.969),
-  //   120/12 188 (0.898 to 0.965), 120/20 193 (0.930 to 0.983), 120/40 192 (0.923 to 0.980),
+  //   40/8 200 (0.981 to 1.000), 40/10 200 (0.981 to 1.000), 40/12 183 (0.868 to 0.946),
+  //   40/20 183 (0.868 to 0.946), 40/36 189 (0.904 to 0.969), 60/8 200 (0.981 to 1.000),
+  //   60/10 200 (0.981 to 1.000), 60/12 195 (0.943 to 0.989), 60/20 190 (0.910 to 0.973),
+  //   60/40 193 (0.930 to 0.983), 120/8 200 (0.981 to 1.000), 120/10 192 (0.923 to 0.980),
+  //   120/12 189 (0.904 to 0.969), 120/20 193 (0.930 to 0.983), 120/40 192 (0.923 to 0.980),
   //   120/60 189 (0.904 to 0.969), 120/108 185 (0.880 to 0.954).
   // skewed:
-  //   40/8 181 (0.856 to 0.938), 40/10 187 (0.892 to 0.962), 40/12 189 (0.904 to 0.969),
+  //   40/8 183 (0.868 to 0.946), 40/10 187 (0.892 to 0.962), 40/12 189 (0.904 to 0.969),
   //   40/20 188 (0.898 to 0.965), 40/36 193 (0.930 to 0.983), 60/8 181 (0.856 to 0.938),
   //   60/10 180 (0.851 to 0.934), 60/12 186 (0.886 to 0.958), 60/20 183 (0.868 to 0.946),
   //   60/40 180 (0.851 to 0.934), 120/8 177 (0.833 to 0.922), 120/10 175 (0.822 to 0.914),
   //   120/12 178 (0.839 to 0.926), 120/20 182 (0.862 to 0.942), 120/40 185 (0.880 to 0.954),
   //   120/60 185 (0.880 to 0.954), 120/108 190 (0.910 to 0.973).
-  // The sparse kernel gives many small samples with no crossing. Then each total is 0, and the interval is the
-  // point 0. At m = 8, no kernel reaches 0.95. The skewed kernel is below 0.95 in each cell with m / n of 2/3 or less.
+  // At m = 8, the skewed kernel gets 177 to 183. Each sample of the sparse kernel at m = 12 or less with no crossing
+  // gets the fallback, so these cells hold 200. The skewed kernel is below 0.95 in each cell with m / n of 2/3 or less.
   // A probe of the correction at the cells 40/36 and 120/108: with no correction, each kernel holds 200 of 200.
   // With the factor (1 - m / n)^2 on the variance, the kernels hold 91 to 107 of 200.
   const TIGHT: Readonly<Record<string, Readonly<Record<string, number>>>> = {
-    sparse: { "40/8": 76, "40/10": 106, "40/12": 133, "40/20": 174, "40/36": 192, "60/8": 113, "60/10": 150, "60/12": 159, "60/20": 184, "60/40": 186, "120/8": 102, "120/10": 135, "120/12": 156, "120/20": 189, "120/40": 194, "120/60": 195, "120/108": 187 },
-    crossings: { "40/8": 180, "40/10": 194, "40/12": 182, "40/20": 183, "40/36": 189, "60/8": 183, "60/10": 193, "60/12": 194, "60/20": 190, "60/40": 193, "120/8": 188, "120/10": 189, "120/12": 188, "120/20": 193, "120/40": 192, "120/60": 189, "120/108": 185 },
-    skewed: { "40/8": 181, "40/10": 187, "40/12": 189, "40/20": 188, "40/36": 193, "60/8": 181, "60/10": 180, "60/12": 186, "60/20": 183, "60/40": 180, "120/8": 177, "120/10": 175, "120/12": 178, "120/20": 182, "120/40": 185, "120/60": 185, "120/108": 190 },
+    sparse: { "40/8": 200, "40/10": 200, "40/12": 200, "40/20": 180, "40/36": 192, "60/8": 200, "60/10": 200, "60/12": 200, "60/20": 184, "60/40": 186, "120/8": 200, "120/10": 200, "120/12": 200, "120/20": 191, "120/40": 194, "120/60": 195, "120/108": 187 },
+    crossings: { "40/8": 200, "40/10": 200, "40/12": 183, "40/20": 183, "40/36": 189, "60/8": 200, "60/10": 200, "60/12": 195, "60/20": 190, "60/40": 193, "120/8": 200, "120/10": 192, "120/12": 189, "120/20": 193, "120/40": 192, "120/60": 189, "120/108": 185 },
+    skewed: { "40/8": 183, "40/10": 187, "40/12": 189, "40/20": 188, "40/36": 193, "60/8": 181, "60/10": 180, "60/12": 186, "60/20": 183, "60/40": 180, "120/8": 177, "120/10": 175, "120/12": 178, "120/20": 182, "120/40": 185, "120/60": 185, "120/108": 190 },
+  };
+  // The samples of the method "tight" that used the fallback, of 200.
+  const FALLBACKS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
+    sparse: { "40/8": 124, "40/10": 94, "40/12": 67, "40/20": 6, "40/36": 0, "60/8": 87, "60/10": 50, "60/12": 41, "60/20": 0, "60/40": 0, "120/8": 98, "120/10": 65, "120/12": 44, "120/20": 2, "120/40": 0, "120/60": 0, "120/108": 0 },
+    crossings: { "40/8": 20, "40/10": 6, "40/12": 1, "40/20": 0, "40/36": 0, "60/8": 17, "60/10": 7, "60/12": 1, "60/20": 0, "60/40": 0, "120/8": 12, "120/10": 3, "120/12": 1, "120/20": 0, "120/40": 0, "120/60": 0, "120/108": 0 },
+    skewed: { "40/8": 2, "40/10": 0, "40/12": 0, "40/20": 0, "40/36": 0, "60/8": 0, "60/10": 0, "60/12": 0, "60/20": 0, "60/40": 0, "120/8": 0, "120/10": 0, "120/12": 0, "120/20": 0, "120/40": 0, "120/60": 0, "120/108": 0 },
   };
   // At m / n = 1/2 and 0.9 with n = 120 or m = 36, the Wilson interval of each kernel holds 0.95.
   const CORRECTION_CELLS = ["120/60", "40/36", "120/108"];
 
   it.each(Object.keys(KERNELS))("covers the total with the two methods, for the kernel %s", (kernelName) => {
     const measured: Record<string, number> = {};
+    const fallbacks: Record<string, number> = {};
+    const auto: Record<string, number> = {};
     for (const [n, m] of CELLS) {
       const hits = coverage(kernelName, n, m);
       // The method "conservative" has a proof. The Wilson lower end of its coverage is at the level or more.
       expect(wilson(hits.conservative, SAMPLES).low, `conservative ${kernelName} ${n}/${m}`).toBeGreaterThanOrEqual(0.95);
       measured[`${n}/${m}`] = hits.tight;
+      fallbacks[`${n}/${m}`] = hits.fallbacks;
+      auto[`${n}/${m}`] = hits.auto;
+      // The method "auto" holds the point coverage 0.95 (190 of 200) or more in each cell.
+      expect(hits.auto, `auto ${kernelName} ${n}/${m}`).toBeGreaterThanOrEqual(190);
       if (CORRECTION_CELLS.includes(`${n}/${m}`)) {
         const share = wilson(hits.tight, SAMPLES);
         expect(share.low, `tight ${kernelName} ${n}/${m}`).toBeLessThanOrEqual(0.95);
@@ -267,6 +286,9 @@ describe("uStatisticInterval", () => {
       }
     }
     expect(measured).toEqual(TIGHT[kernelName]);
+    expect(fallbacks).toEqual(FALLBACKS[kernelName]);
+    // No cell of the grid uses the method "tight" in the method "auto", so each cell holds 200 of 200.
+    expect(Object.values(auto)).toEqual(new Array<number>(CELLS.length).fill(SAMPLES));
   });
 
   it("keeps the interval of the mean in the range of the kernel", () => {
@@ -278,6 +300,33 @@ describe("uStatisticInterval", () => {
     expect(t.mean.low).toBe(0);
     const free = uStatisticInterval([0, 0, 1, 1, 0, 0, 0, 0], { order: 2, population: 40, method: "tight" });
     expect(free.mean.low).toBeLessThan(0);
+  });
+
+  it("uses the method conservative when the jackknife variance is 0, and refuses without a range", () => {
+    const zero = [0, 0, 0, 0, 0, 0, 0, 0];
+    const fallback = uStatisticInterval(zero, { order: 2, population: 40, method: "tight", range: [0, 1] });
+    const conservative = uStatisticInterval(zero, { order: 2, population: 40, method: "conservative", range: [0, 1] });
+    expect(fallback.method).toBe("conservative");
+    expect(fallback.requested).toBe("tight");
+    expect(fallback.high).toBe(conservative.high);
+    expect(fallback.high).toBeGreaterThan(0);
+    expect(fallback.standardError).toBeUndefined();
+    expect(() => uStatisticInterval(zero, { order: 2, population: 40, method: "tight" })).toThrow(/^uStatisticInterval: the jackknife variance is 0/);
+    expect(() => uStatisticInterval([3, 3, 3, 3], { order: 1, population: 9, method: "tight" })).toThrow(/Give the range, or use the method "conservative"/);
+    // A sample of the whole population gives the exact total, so a width of 0 is correct there.
+    expect(uStatisticInterval(zero, { order: 2, population: 8, method: "tight" }).high).toBe(0);
+  });
+
+  it("selects the method in auto from the size of the sample and the variance", () => {
+    expect(U_STATISTIC_TIGHT_MIN_SAMPLE).toBe(Number.POSITIVE_INFINITY);
+    const totals = [0, 0, 1, 1, 0, 2, 1, 1];
+    const auto = uStatisticInterval(totals, { order: 2, population: 40, method: "auto", range: [0, 1] });
+    const conservative = uStatisticInterval(totals, { order: 2, population: 40, method: "conservative", range: [0, 1] });
+    expect(auto.method).toBe("conservative");
+    expect(auto.requested).toBe("auto");
+    expect(auto.low).toBe(conservative.low);
+    expect(auto.high).toBe(conservative.high);
+    expect(uStatisticInterval(totals, { order: 2, population: 40, method: "tight", range: [0, 1] }).method).toBe("tight");
   });
 
   it("refuses a bad input", () => {
@@ -292,6 +341,7 @@ describe("uStatisticInterval", () => {
       { order: 2, population: 10, method: "tight", level: 1 },
       { order: 2, population: 10, method: "tight", level: 0 },
       { order: 2, population: 10, method: "conservative" },
+      { order: 2, population: 10, method: "auto" },
       { order: 2, population: 10, method: "conservative", range: [1, 1] },
       { order: 2, population: 10, method: "conservative", range: [0, Number.NaN] },
       // A total of 2 is more than the 3 other units times the kernel maximum 0.5.

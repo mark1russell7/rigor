@@ -112,6 +112,7 @@ export {
 } from "./compare.ts";
 export { type OptionFloorOptions, optionFloor, tQuantile } from "./power.ts";
 export {
+  U_STATISTIC_TIGHT_MIN_SAMPLE,
   type UStatisticInterval,
   type UStatisticMean,
   type UStatisticMethod,
