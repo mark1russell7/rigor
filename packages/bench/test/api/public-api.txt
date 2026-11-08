@@ -55,6 +55,12 @@ GATE_LOOKS: build/index.d.ts#GATE_LOOKS
 type Gate: build/index.d.ts#Gate
 type GateCaseOutcome: build/index.d.ts#GateCaseOutcome
 type GateJobRead: build/index.d.ts#GateJobRead
+type GateLine: build/index.d.ts#GateLine
+type GateLineCases: build/index.d.ts#GateLineCases
+type GateLineLevel: build/index.d.ts#GateLineLevel
+type GateLineOptions: build/index.d.ts#GateLineOptions
+type GateLineOutputs: build/index.d.ts#GateLineOutputs
+type GateLineWritten: build/index.d.ts#GateLineWritten
 type GateOutcome: build/index.d.ts#GateOutcome
 type GroupCounts: build/index.d.ts#GroupCounts
 type GroupFactor: build/index.d.ts#GroupFactor
@@ -99,11 +105,6 @@ type ModelTestOptions: build/index.d.ts#ModelTestOptions
 NARROW_SPREAD_SHARE: build/index.d.ts#NARROW_SPREAD_SHARE
 type NoControl: build/index.d.ts#NoControl
 type NoFactor: build/index.d.ts#NoFactor
-type NoReadLevel: build/index.d.ts#NoReadLevel
-type NoReadLine: build/index.d.ts#NoReadLine
-type NoReadOptions: build/index.d.ts#NoReadOptions
-type NoReadOutputs: build/index.d.ts#NoReadOutputs
-type NoReadWritten: build/index.d.ts#NoReadWritten
 type NoiseCheck: build/index.d.ts#NoiseCheck
 type NotSlowerOptions: build/index.d.ts#NotSlowerOptions
 type NotSlowerRead: build/index.d.ts#NotSlowerRead
@@ -172,8 +173,10 @@ controlFactor: build/index.d.ts#controlFactor
 familyPower: build/index.d.ts#familyPower
 familyRead: build/index.d.ts#familyRead
 firstArm: build/paired.d.ts#firstArm
+gateLine: build/index.d.ts#gateLine
 gateOf: build/index.d.ts#gateOf
 growthVerdict: build/index.d.ts#growthVerdict
+isBlock: build/index.d.ts#isBlock
 isNoRead: build/index.d.ts#isNoRead
 jointClaim: build/index.d.ts#jointClaim
 ladderVerdict: build/index.d.ts#ladderVerdict
@@ -181,7 +184,6 @@ limitOnModel: build/index.d.ts#limitOnModel
 limitVerdict: build/index.d.ts#limitVerdict
 modelRowText: build/index.d.ts#modelRowText
 modelTest: build/index.d.ts#modelTest
-noReadLine: build/index.d.ts#noReadLine
 notSlowerVerdict: build/index.d.ts#notSlowerVerdict
 orderSize: build/paired.d.ts#orderSize
 pairedChild: build/index.d.ts#pairedChild
@@ -201,7 +203,7 @@ verdictMargin: build/index.d.ts#verdictMargin
 verdictPower: build/index.d.ts#verdictPower
 visibleShift: build/index.d.ts#visibleShift
 winClaim: build/index.d.ts#winClaim
-writeNoRead: build/index.d.ts#writeNoRead
+writeGateLine: build/index.d.ts#writeGateLine
 
 ## ./code-stamp (build/code-stamp.d.ts): names
 
@@ -758,6 +760,49 @@ interface GateJobRead {
   readonly centre: number | undefined;
 }
 
+### build/index.d.ts#GateLine
+interface GateLine {
+  readonly title: string;
+  readonly outcome: Exclude<GateOutcome, "pass">;
+  readonly level: GateLineLevel;
+  readonly total: number;
+  readonly blocks: GateLineCases;
+  readonly noReads: GateLineCases;
+  readonly reason: string | undefined;
+  readonly cpu: string | undefined;
+  readonly mixed: boolean;
+  readonly text: string;
+}
+
+### build/index.d.ts#GateLineCases
+interface GateLineCases {
+  readonly count: number;
+  readonly cases: readonly string[];
+}
+
+### build/index.d.ts#GateLineLevel
+type GateLineLevel = "warning" | "error";
+
+### build/index.d.ts#GateLineOptions
+interface GateLineOptions {
+  readonly title: string;
+  readonly enforced?: boolean;
+  readonly reason?: string;
+  readonly models?: ArmModels | readonly JobModel[];
+}
+
+### build/index.d.ts#GateLineOutputs
+interface GateLineOutputs {
+  readonly log?: (line: string) => void;
+  readonly summary?: string | undefined;
+}
+
+### build/index.d.ts#GateLineWritten
+interface GateLineWritten {
+  readonly annotation: string;
+  readonly summary: string;
+}
+
 ### build/index.d.ts#GateOutcome
 type GateOutcome = "pass" | "block" | "no read";
 
@@ -1092,42 +1137,6 @@ interface NoControl {
 interface NoFactor extends GroupCounts {
   readonly factor: undefined;
   readonly reason: string;
-}
-
-### build/index.d.ts#NoReadLevel
-type NoReadLevel = "warning" | "error";
-
-### build/index.d.ts#NoReadLine
-interface NoReadLine {
-  readonly title: string;
-  readonly count: number;
-  readonly total: number;
-  readonly cases: readonly string[];
-  readonly cpu: string | undefined;
-  readonly reason: string | undefined;
-  readonly mixed: boolean;
-  readonly text: string;
-}
-
-### build/index.d.ts#NoReadOptions
-interface NoReadOptions {
-  readonly title: string;
-  readonly reason?: string;
-  readonly models?: ArmModels | readonly JobModel[];
-}
-
-### build/index.d.ts#NoReadOutputs
-interface NoReadOutputs {
-  readonly level?: NoReadLevel;
-  readonly log?: (line: string) => void;
-  readonly summary?: string | undefined;
-}
-
-### build/index.d.ts#NoReadWritten
-interface NoReadWritten {
-  readonly level: NoReadLevel;
-  readonly annotation: string;
-  readonly summary: string;
 }
 
 ### build/index.d.ts#NoiseCheck
@@ -1555,11 +1564,17 @@ export declare function familyPower(options: FamilyPowerOptions): FamilyPower;
 ### build/index.d.ts#familyRead
 export declare function familyRead(items: readonly FamilyItem[], level?: number): FamilyRead;
 
+### build/index.d.ts#gateLine
+export declare function gateLine(reads: readonly CaseRead[], options: GateLineOptions): GateLine | undefined;
+
 ### build/index.d.ts#gateOf
 export declare function gateOf(cases: readonly GateCaseOutcome[]): Gate;
 
 ### build/index.d.ts#growthVerdict
 export declare function growthVerdict(rounds: readonly GrowthRound[], options: GrowthOptions): GrowthVerdict;
+
+### build/index.d.ts#isBlock
+export declare function isBlock(outcome: string): boolean;
 
 ### build/index.d.ts#isNoRead
 export declare function isNoRead(outcome: string): boolean;
@@ -1581,9 +1596,6 @@ export declare function modelRowText(row: ModelRow, family: number): string;
 
 ### build/index.d.ts#modelTest
 export declare function modelTest(reads: readonly ModelRead[], options?: ModelTestOptions): ModelTest;
-
-### build/index.d.ts#noReadLine
-export declare function noReadLine(reads: readonly CaseRead[], options: NoReadOptions): NoReadLine | undefined;
 
 ### build/index.d.ts#notSlowerVerdict
 export declare function notSlowerVerdict(jobs: readonly JobRecords[], options: NotSlowerOptions): NotSlowerVerdict;
@@ -1639,8 +1651,8 @@ export declare function visibleShift(values: readonly number[], rest: readonly n
 ### build/index.d.ts#winClaim
 export declare function winClaim(check: MeasureChecks, measure: string, entry: string, stratum?: string): WinClaim;
 
-### build/index.d.ts#writeNoRead
-export declare function writeNoRead(line: NoReadLine | undefined, outputs?: NoReadOutputs): NoReadWritten | undefined;
+### build/index.d.ts#writeGateLine
+export declare function writeGateLine(line: GateLine | undefined, outputs?: GateLineOutputs): GateLineWritten | undefined;
 
 ### build/paired.d.ts#Arm
 type Arm = "a" | "b";

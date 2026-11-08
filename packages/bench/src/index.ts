@@ -27,7 +27,7 @@ export {
   gateOf,
   notSlowerVerdict,
 } from "./gate.ts";
-export { type CaseRead, type JobModel, type NoReadLevel, type NoReadLine, type NoReadOptions, type NoReadOutputs, type NoReadWritten, isNoRead, noReadLine, writeNoRead } from "./no-read.ts";
+export { type CaseRead, type GateLine, type GateLineCases, type GateLineLevel, type GateLineOptions, type GateLineOutputs, type GateLineWritten, type JobModel, gateLine, isBlock, isNoRead, writeGateLine } from "./gate-line.ts";
 export { type ControlFactors, type ControlOptions, type ControlRow, type GroupCounts, type GroupFactor, type MeasuredFactor, type NoFactor, controlFactor } from "./control.ts";
 export {
   type BudgetResult,
