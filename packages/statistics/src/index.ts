@@ -111,3 +111,10 @@ export {
   noiseVerdict,
 } from "./compare.ts";
 export { type OptionFloorOptions, optionFloor, tQuantile } from "./power.ts";
+export {
+  type UStatisticInterval,
+  type UStatisticMean,
+  type UStatisticMethod,
+  type UStatisticOptions,
+  uStatisticInterval,
+} from "./u-statistic.ts";

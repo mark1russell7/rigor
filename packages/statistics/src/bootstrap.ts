@@ -273,7 +273,7 @@ export interface SampleTotalOptions extends BootstrapOptions {
  * The interval is narrow for a small sample. The draws give the variance of the sample with the divisor `m`, not
  * `m - 1`, so the width gets the factor `sqrt((m - 1) / m)`. The skew of the values adds to the miss. In the tests,
  * 400 samples of `m = 8` of `n = 40` hold the total 346 times (Wilson 0.828 to 0.895). At `m = 100` of `n = 200`,
- * the coverage agrees with 95%.
+ * the coverage agrees with 95%. For a total over the pairs of the items, use `uStatisticInterval`.
  */
 export function sampleTotalInterval(values: readonly number[], options: SampleTotalOptions): Interval {
   const name = "sampleTotalInterval";
