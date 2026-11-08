@@ -18,6 +18,9 @@ This file lists the items of the roadmap of this repository. The status page of 
 | R3 | next | P1 | The first moves: each repository with a copy of mulberry32 or of a statistics function imports the package, with records that stay equal |
 | R5 | next | P1 | generators: input families with dimensions and ranges, stratified and Latin hypercube designs, Saltelli designs |
 | R6 | next | P2 | gates: the determinism gate (one input gives one hash), the promotion test and the performance evidence |
+| R11 | next | P2 | statistics: the fold rule, next to `sobolIndices`: a model counts when it beats the mean on each held-out fold. highways and packing call it (codeatlas CA5-P29, CA5-P36) |
+| R12 | next | P2 | bench: the k-of-n read of joint non-domination: an entry wins only when no control dominates it on k of n stated measures. Each repository keeps its thresholds (codeatlas CA5-P26) |
+| R13 | next | P3 | The format response-records/1 for an explorer of response surfaces. layout-contract and typeset keep their own builders (codeatlas CA5-P19) |
 
 ## Later
 
