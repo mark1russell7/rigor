@@ -1,6 +1,6 @@
 # @mark1russell7/rigor-statistics
 
-The statistics of measured work. It gives quantiles, bootstrap intervals, the sign test, the paired permutation test, Wilson intervals and the Holm correction. It gives the interval of a median from order statistics, and the central interval of a binomial count. It also gives least squares, rank correlation, the comparison with a baseline beyond the noise, and the Brier score of predictions. It fits response records that a browser can evaluate from plain JSON.
+The statistics of measured work. It gives quantiles, bootstrap intervals, the sign test, the paired permutation test, Wilson intervals and the Holm correction. It gives the interval of a median from order statistics, and the central interval of a binomial count. It also gives least squares, rank correlation, the comparison with a baseline beyond the noise, and the Brier score and the log-loss of predictions. It rates items from pairwise results with Elo, Glicko-2 and a Bradley-Terry fit. It fits response records that a browser can evaluate from plain JSON.
 
 ```sh
 npm install @mark1russell7/rigor-statistics
@@ -100,6 +100,39 @@ A measure with `null` has no value. To tell why, declare the reasons in the fiel
 
 The default expansion has one product for each pair of levels of two dimensions. Two dimensions with 76 and 33 levels thus give 2508 products, and the limit `RESPONSE_MAX_TERMS` refuses them. With the option `interactions: "seen"`, a ridge fit keeps only the terms that are not 0 at one point or more. This choice looks only at the inputs of the points. A term with no point has the weight 0, so the choice does not change a prediction. The limit applies after the choice.
 
+## Rate items from pairwise results
+
+A pairwise result is a comparison of two items: the first item wins, the second item wins, or a tie. Each function of this section is pure, so a log of results gives the same ratings each time.
+
+```ts
+import { bradleyTerry, eloUpdate, glicko2Update, logLoss, pairProbabilities, strengthToRating } from "@mark1russell7/rigor-statistics";
+
+// The fit of a full log: the items are indexes from 0.
+const fit = bradleyTerry(3, [
+  { a: 0, b: 1, outcome: "a" },
+  { a: 1, b: 2, outcome: "tie" },
+  { a: 2, b: 0, outcome: "b", weight: 2 },
+]);
+fit.strengths, fit.se;                           // the log-strength of each item, with its standard error
+fit.tie;                                         // the Davidson tie parameter
+const p = pairProbabilities(fit.strengths[0], fit.strengths[1], fit.tie); // { a, b, tie }
+strengthToRating(fit.strengths[0]);              // 1500 + 400 * log10(e) * strength
+
+// One result at a time.
+eloUpdate(1500, 1500, 1, { k: 32 });             // { a: 1516, b: 1484, expected: 0.5 }
+glicko2Update({ rating: 1500, rd: 200, volatility: 0.06 }, [{ rating: 1400, rd: 30, score: 1 }]);
+logLoss([{ p: p.a, hit: true }]);                // the probability of the observed outcome
+```
+
+`bradleyTerry` gives the maximum a posteriori fit with a normal prior on each log-strength. The prior keeps an item with only wins finite. An item with no comparison gets the prior mean and the prior SD. A constant added to each strength changes no probability. Thus only the differences have a meaning, and the prior mean sets the center.
+
+- The default tie model is the model of Davidson (1970). The probability of a tie is `nu / (exp(d / 2) + exp(-d / 2) + nu)`, with `d` the difference of the strengths.
+- With the option `ties: "half"`, a tie counts as half a win and half a loss of each item, and `tie` is 0.
+- The fit uses Newton steps with a line search. The negative log posterior is convex, so the steps go to its one minimum.
+- The standard errors come from the inverse of the Hessian at the fit. They include the uncertainty of the tie parameter.
+
+`glicko2Update` gives the update of one player after one rating period (Glickman, 2012). A test examines the worked example of the paper: 1500, 200 and 0.06 against three opponents give 1464.06, 151.52 and 0.05999. `glicko2Idle` gives the growth of the RD for a period with no games.
+
 ## The functions
 
 | Function | What it gives |
@@ -136,6 +169,12 @@ The default expansion has one product for each pair of levels of two dimensions.
 | `modeCount(values, { minShare, valleyRatio })` | The count of the modes of a sample, from a kernel density estimate. |
 | `smoothLawScores(values)`, `bestSmoothLaw(values)` | The mean log density of the uniform, normal, exponential, log-normal and Pareto laws at their fits, and the best of them. |
 | `brier`, `calibration` | The Brier score of predictions, and the hit rate of each stated level. |
+| `logLoss(forecasts)` | The mean log-loss of predictions, with the natural log. A p of 0 for a hit gives Infinity. |
+| `eloExpected(ra, rb, { scale, base })`, `eloUpdate(ra, rb, score, { k, scale, base })` | The expected score of the first item, and the ratings of a pair after one result. The defaults are 400, 10 and a `k` of 32. |
+| `glicko2Update(player, games, { tau, tolerance })`, `glicko2Idle(player)` | The Glicko-2 rating, RD and volatility after one rating period, and after a period with no games. The default `tau` is 0.5. |
+| `bradleyTerry(items, comparisons, options)` | The Bradley-Terry fit of pairwise comparisons, with a normal prior and Davidson ties. It gives the strengths, the standard errors, the tie parameter, the log-likelihood, the steps and `converged`. |
+| `pairProbabilities(sa, sb, tie)` | The probabilities of a win of each item and of a tie, from two log-strengths and the tie parameter. |
+| `strengthToRating(strength, { center, scale, base })`, `ratingToStrength(rating, options)` | The rating of a log-strength, `center + scale * strength / ln(base)`, and the inverse. |
 | `fitResponse(data, options)` | A record of the format `response-records/1`, with one model for each measure and held-out folds. |
 | `parseResponseRecord(value)` | The examination of unknown data. It gives the record, or one fault with a path for each error. |
 | `predictResponse(model, inputs)`, `heldOutError(record, measure)` | The value of a model at one set of inputs, and the error of the folds of a measure. |
