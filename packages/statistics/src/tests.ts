@@ -9,25 +9,65 @@ function whole(name: string, value: number): void {
   if (!Number.isSafeInteger(value) || value < 0) throw new RangeError(`${name}: ${value} is not a whole number of 0 or more.`);
 }
 
-/** The log of each binomial term C(n, k) / 2^n, for each k from 0 to n. */
-function halfBinomialLogs(n: number): number[] {
-  const logs: number[] = [];
-  let logChoose = 0;
-  for (let i = 0; i <= n; i++) {
-    if (i > 0) logChoose += Math.log((n - i + 1) / i);
-    logs.push(logChoose - n * Math.LN2);
+const TWO_512 = 2 ** 512;
+
+/** C(n, k) / 2^n, as one product of min(k, n - k) ratios, with the powers of 2 kept apart so that no step overflows. */
+function halfBinomial(k: number, n: number): number {
+  const m = Math.min(k, n - k);
+  let value = 1;
+  let exponent = -n;
+  for (let i = 1; i <= m; i++) {
+    value *= (n - m + i) / i;
+    if (value > TWO_512) {
+      value /= TWO_512;
+      exponent += 512;
+    }
   }
-  return logs;
+  for (; exponent < -512; exponent += 512) value /= TWO_512;
+  return value * 2 ** exponent;
 }
 
-/** P(X >= k) for X ~ Binomial(n, 1/2), summed from the largest term so that a small tail keeps its digits. */
+/** The largest n for which the tail is an exact sum of whole numbers. Above it, the sum is in floating point. */
+const SIGN_TEST_EXACT_LIMIT = 4096;
+
+/** num / 2^n as the nearest double: one rounding, also when num has more than 1024 bits. */
+function overPowerOfTwo(num: bigint, n: number): number {
+  const shift = Math.max(0, num.toString(2).length - 1000);
+  let value = Number(num >> BigInt(shift));
+  let exponent = shift - n;
+  for (; exponent < -512; exponent += 512) value /= TWO_512;
+  return value * 2 ** exponent;
+}
+
+/**
+ * P(X >= k) for X ~ Binomial(n, 1/2). For n up to SIGN_TEST_EXACT_LIMIT it adds C(n, i) as whole numbers (BigInt),
+ * so the only error is the last rounding to a double. Above it, it adds the terms as ratios of term k in linear
+ * space, above the middle; at or below the middle it is 1 - P(X >= n - k + 1), by symmetry. (An earlier form added
+ * logs and called Math.exp, and its error grew with n: up to 2.5e-14 for n <= 80, rigor#158. The floating-point
+ * form above the limit was at most 1.1e-14 relative at n = 4097 and 5000, above 2^-1000.)
+ */
 function upperTail(k: number, n: number): number {
   if (k <= 0) return 1;
   if (k > n) return 0;
-  const logs = halfBinomialLogs(n).slice(k);
-  const top = Math.max(...logs);
-  const sum = logs.reduce((s, l) => s + Math.exp(l - top), 0);
-  return Math.min(1, Math.exp(top) * sum);
+  if (n <= SIGN_TEST_EXACT_LIMIT) {
+    const big = BigInt(n);
+    let term = 1n;
+    for (let i = 1n; i <= BigInt(k); i++) term = (term * (big - i + 1n)) / i;
+    let sum = 0n;
+    for (let i = BigInt(k); i <= big; i++) {
+      sum += term;
+      term = (term * (big - i)) / (i + 1n);
+    }
+    return Math.min(1, overPowerOfTwo(sum, n));
+  }
+  if (2 * k <= n) return 1 - upperTail(n - k + 1, n);
+  let ratio = 1;
+  let sum = 1;
+  for (let i = k; i < n && ratio > 0; i++) {
+    ratio *= (n - i) / (i + 1);
+    sum += ratio;
+  }
+  return Math.min(1, halfBinomial(k, n) * sum);
 }
 
 /**
@@ -50,8 +90,16 @@ export function signTest(better: number, worse: number, sides: 1 | 2 = 1): numbe
  */
 export function signTestPower(n: number, level = 0.05, sides: 1 | 2 = 2): number | undefined {
   whole("signTestPower", n);
-  for (let k = Math.ceil(n / 2); k <= n; k++) if (signTest(k, n - k, sides) < level) return k;
-  return undefined;
+  // The p falls as k grows above the middle, so a binary search finds the first k under the level.
+  if (n === 0 || signTest(n, 0, sides) >= level) return undefined;
+  let low = Math.ceil(n / 2);
+  let high = n;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (signTest(middle, n - middle, sides) < level) high = middle;
+    else low = middle + 1;
+  }
+  return low;
 }
 
 /** The z of a two-sided 95% interval. */
