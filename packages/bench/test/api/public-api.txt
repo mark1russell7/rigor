@@ -30,6 +30,7 @@ type CaseGate: build/index.d.ts#CaseGate
 type CaseInterval: build/index.d.ts#CaseInterval
 type CaseLimit: build/index.d.ts#CaseLimit
 type CaseRatio: build/paired.d.ts#CaseRatio
+type CaseRead: build/index.d.ts#CaseRead
 type CaseResults: build/index.d.ts#CaseResults
 type CaseTail: build/index.d.ts#CaseTail
 type CaseTailLimit: build/index.d.ts#CaseTailLimit
@@ -54,6 +55,12 @@ GATE_LOOKS: build/index.d.ts#GATE_LOOKS
 type Gate: build/index.d.ts#Gate
 type GateCaseOutcome: build/index.d.ts#GateCaseOutcome
 type GateJobRead: build/index.d.ts#GateJobRead
+type GateLine: build/index.d.ts#GateLine
+type GateLineCases: build/index.d.ts#GateLineCases
+type GateLineLevel: build/index.d.ts#GateLineLevel
+type GateLineOptions: build/index.d.ts#GateLineOptions
+type GateLineOutputs: build/index.d.ts#GateLineOutputs
+type GateLineWritten: build/index.d.ts#GateLineWritten
 type GateOutcome: build/index.d.ts#GateOutcome
 type GroupCounts: build/index.d.ts#GroupCounts
 type GroupFactor: build/index.d.ts#GroupFactor
@@ -64,6 +71,7 @@ type GrowthStep: build/index.d.ts#GrowthStep
 type GrowthVerdict: build/index.d.ts#GrowthVerdict
 type GuardRead: build/index.d.ts#GuardRead
 type JobLimitVerdict: build/index.d.ts#JobLimitVerdict
+type JobModel: build/index.d.ts#JobModel
 type JobRecords: build/index.d.ts#JobRecords
 type JobVerdict: build/index.d.ts#JobVerdict
 type JointClaim: build/index.d.ts#JointClaim
@@ -165,8 +173,12 @@ controlFactor: build/index.d.ts#controlFactor
 familyPower: build/index.d.ts#familyPower
 familyRead: build/index.d.ts#familyRead
 firstArm: build/paired.d.ts#firstArm
+gateLine: build/index.d.ts#gateLine
 gateOf: build/index.d.ts#gateOf
 growthVerdict: build/index.d.ts#growthVerdict
+isBlock: build/index.d.ts#isBlock
+isNoRead: build/index.d.ts#isNoRead
+jobModels: build/index.d.ts#jobModels
 jointClaim: build/index.d.ts#jointClaim
 ladderVerdict: build/index.d.ts#ladderVerdict
 limitOnModel: build/index.d.ts#limitOnModel
@@ -192,6 +204,7 @@ verdictMargin: build/index.d.ts#verdictMargin
 verdictPower: build/index.d.ts#verdictPower
 visibleShift: build/index.d.ts#visibleShift
 winClaim: build/index.d.ts#winClaim
+writeGateLine: build/index.d.ts#writeGateLine
 
 ## ./code-stamp (build/code-stamp.d.ts): names
 
@@ -546,6 +559,12 @@ interface CaseLimit extends CaseInterval {
   readonly outcome: LimitOutcome;
 }
 
+### build/index.d.ts#CaseRead
+interface CaseRead {
+  readonly case: string;
+  readonly outcome: string;
+}
+
 ### build/index.d.ts#CaseResults
 interface CaseResults {
   readonly case: string;
@@ -742,6 +761,49 @@ interface GateJobRead {
   readonly centre: number | undefined;
 }
 
+### build/index.d.ts#GateLine
+interface GateLine {
+  readonly title: string;
+  readonly outcome: Exclude<GateOutcome, "pass">;
+  readonly level: GateLineLevel;
+  readonly total: number;
+  readonly blocks: GateLineCases;
+  readonly noReads: GateLineCases;
+  readonly reason: string | undefined;
+  readonly cpu: string | undefined;
+  readonly mixed: boolean;
+  readonly text: string;
+}
+
+### build/index.d.ts#GateLineCases
+interface GateLineCases {
+  readonly count: number;
+  readonly cases: readonly string[];
+}
+
+### build/index.d.ts#GateLineLevel
+type GateLineLevel = "warning" | "error";
+
+### build/index.d.ts#GateLineOptions
+interface GateLineOptions {
+  readonly title: string;
+  readonly enforced?: boolean;
+  readonly reason?: string;
+  readonly models?: ArmModels | readonly JobModel[];
+}
+
+### build/index.d.ts#GateLineOutputs
+interface GateLineOutputs {
+  readonly log?: (line: string) => void;
+  readonly summary?: string | undefined;
+}
+
+### build/index.d.ts#GateLineWritten
+interface GateLineWritten {
+  readonly annotation: string;
+  readonly summary: string;
+}
+
 ### build/index.d.ts#GateOutcome
 type GateOutcome = "pass" | "block" | "no read";
 
@@ -806,6 +868,12 @@ interface GuardRead {
 interface JobLimitVerdict {
   readonly job: string;
   readonly verdict: LimitVerdict;
+}
+
+### build/index.d.ts#JobModel
+interface JobModel {
+  readonly model: string;
+  readonly jobs: number;
 }
 
 ### build/index.d.ts#JobRecords
@@ -1497,11 +1565,25 @@ export declare function familyPower(options: FamilyPowerOptions): FamilyPower;
 ### build/index.d.ts#familyRead
 export declare function familyRead(items: readonly FamilyItem[], level?: number): FamilyRead;
 
+### build/index.d.ts#gateLine
+export declare function gateLine(reads: readonly CaseRead[], options: GateLineOptions): GateLine | undefined;
+
 ### build/index.d.ts#gateOf
 export declare function gateOf(cases: readonly GateCaseOutcome[]): Gate;
 
 ### build/index.d.ts#growthVerdict
 export declare function growthVerdict(rounds: readonly GrowthRound[], options: GrowthOptions): GrowthVerdict;
+
+### build/index.d.ts#isBlock
+export declare function isBlock(outcome: string): boolean;
+
+### build/index.d.ts#isNoRead
+export declare function isNoRead(outcome: string): boolean;
+
+### build/index.d.ts#jobModels
+export declare function jobModels(envs: readonly {
+  readonly cpu: string;
+}[]): JobModel[];
 
 ### build/index.d.ts#jointClaim
 export declare function jointClaim(check: MeasureChecks, measures: readonly string[], entry: string, stratum?: string): JointClaim;
@@ -1574,6 +1656,9 @@ export declare function visibleShift(values: readonly number[], rest: readonly n
 
 ### build/index.d.ts#winClaim
 export declare function winClaim(check: MeasureChecks, measure: string, entry: string, stratum?: string): WinClaim;
+
+### build/index.d.ts#writeGateLine
+export declare function writeGateLine(line: GateLine | undefined, outputs?: GateLineOutputs): GateLineWritten | undefined;
 
 ### build/paired.d.ts#Arm
 type Arm = "a" | "b";

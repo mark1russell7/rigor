@@ -55,6 +55,9 @@ v.comparison;                                     // the cases that gain and dro
 | `armModels(pairs)` | The CPU models of each arm of a set of pairs, and if all the reads come from one known model. |
 | `tailFalseFails(aa, options)` | The cases of an A/A arm that the rule of `tailLimitVerdict` fails, and apart from these the cases with a limit under 1. |
 | `gateOf(cases)` | The gate of a list of case outcomes: `pass`, `block` or `no read`. |
+| `gateLine(cases, options)` | The check line of a read: the blocks and the no-reads with each case, the reason and the CPU models, or undefined when each case passed. |
+| `jobModels(envs)` | The count of the jobs on each CPU model, sorted by model, for the job form of the models of `gateLine`. |
+| `writeGateLine(line, outputs)` | The line as an annotation of GitHub Actions, an error for an enforced gate or a warning, and as a line of the step summary. |
 | `notSlowerVerdict(jobs, options)` | The gate of the claim "not slower by more than the margin", with looks and a family level. |
 | `budgetVerdict(rounds, aa, options)` | The verdict of the claim "the median of each case is at most `limit`", for one build: `within`, `beyond` or `cannot decide`. |
 | `budgetLooksVerdict(rounds, aa, options)` | The budget verdict of a run that adds rounds to the cases with no outcome, up to a stated budget. |
@@ -167,6 +170,29 @@ gate.more;                                        // the next look of each case 
 - `no read` is not a pass. A caller adds the rounds of `more`, then more jobs. A job that it adds after the last look is one more look, and the level does not count it.
 
 The level needs independent rounds. Rounds with a shared cause, for example a slow computer for one job, do not have it.
+
+## Show a gate read on the check
+
+A block or a no-read that shows only in a table of the summary is easy to miss. A no-read is not a pass. `gateLine` gives one line for the check of the run, and `writeGateLine` writes it.
+
+```ts
+const line = gateLine(cases, { title: "evaluator bench", enforced: false, models: armModels(pairs) });
+writeGateLine(line);   // a ::warning annotation (::error when enforced), and a line of the file of GITHUB_STEP_SUMMARY
+```
+
+- The input is a list of `{ case, outcome }`. The cases of `limitVerdict` and `budgetVerdict` have this form. Give one entry for each `timeVerdict`.
+- The outcomes `cannot decide` and `no read` are no-reads, and `isNoRead` tells them. The outcomes `beyond` and `slower` are blocks, and `isBlock` tells them.
+- When each case passed, the line is undefined and `writeGateLine` writes nothing.
+- An empty list gives a line, because `gateOf` gives `no read` for it.
+- One line names the blocks and the no-reads, each with its count and the name of each case.
+- The outcome of the line is `block` when a case blocks, else `no read`, as in `gateOf`.
+- The level is `error` when `enforced` is `true`. The default is `warning`, for a read that only reports. The title of a read that only reports says so.
+- With `reason`, the line tells the reason after the counts, for example "a decision needs 3 jobs, not 2".
+- With `models`, the line names the CPU models. Give one of two forms, not both.
+  - An `ArmModels` of `armModels` names the models of the two arms. The line tells a mixed pair, because a ratio can then compare two computers.
+  - A list of `{ model, jobs }` names each model and its count of jobs, for a time budget with its ratios inside one job. The line makes no claim about the ratios. The line is `mixed` when the jobs are on more than one model.
+  - `jobModels(envs)` gives this list from the computer of each job: the count of the jobs on each CPU model, sorted by model.
+- Write the line also when the run is report only, so its check shows the read.
 
 ## A claim with a budget
 
