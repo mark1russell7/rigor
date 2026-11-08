@@ -14,6 +14,7 @@ export {
   budgetVerdict,
 } from "./budget.ts";
 export { type GrowthOptions, type GrowthOutcome, type GrowthRound, type GrowthStep, type GrowthVerdict, growthVerdict } from "./growth.ts";
+export { type CellBudget, type CostCells, type CostProbe, type JobCost, type ModelCost, type RunCost, type RunCostOptions, runCost } from "./run-cost.ts";
 export {
   type CaseGate,
   GATE_LOOKS,
