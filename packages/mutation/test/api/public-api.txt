@@ -252,7 +252,7 @@ export declare function parseLane(json: unknown): Lane;
 export declare function parseReport(json: unknown): MutationReport;
 
 ### build/index.d.ts#partErrors
-export declare function partErrors(lane: Lane, pkg: string, files: readonly string[]): string[];
+export declare function partErrors(lane: Lane, pkg: string, files: readonly string[], lines?: (file: string) => number): string[];
 
 ### build/index.d.ts#relatedTestFiles
 export declare function relatedTestFiles(files: readonly PackageFile[], selected: (file: string) => boolean): string[];
