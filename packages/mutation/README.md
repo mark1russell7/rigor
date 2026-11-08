@@ -89,7 +89,9 @@ A time limit can stop Stryker before it writes `mutation.json`. Then `scores` re
 lib.rest: 50.00 % (1 of 2, 1 survived), no gate: FAIL: partial: Stryker stopped after 3.0 minutes and tested 2 of 10 mutants. The score of the mutants that ran is 50.00 %. All the mutants need an estimated 11 minutes.
 ```
 
-A partial score is a no read, because it does not read all the mutants. Its field `partial` gives the costs. Use the estimate to divide the package into parts.
+A partial score is a no read, because it does not read all the mutants. Its field `partial` gives the costs. Use the estimate to divide the package into parts. The estimate does not count the mutants with an early result, because they take no time.
+
+The workflow `stryker-stop.yml` checks the reporter in a real run. It stops Stryker on the fixture lane `test/stryker/mutation.json` and examines the partial score.
 
 ## The score
 

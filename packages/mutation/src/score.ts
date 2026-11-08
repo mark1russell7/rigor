@@ -66,7 +66,7 @@ export interface PartialCosts {
   readonly planned: number | undefined;
   /** The minutes from the start of Stryker to the last line of the file. */
   readonly minutes: number;
-  /** The minutes for all the mutants of the plan, at the rate of the mutants that ran. It is undefined with no rate. */
+  /** The minutes for all the mutants of the plan, at the rate of the mutants that ran. Early results do not count. It is undefined with no rate. */
   readonly estimate: number | undefined;
 }
 
@@ -107,12 +107,14 @@ export function parsePartial(text: string): PartialRun {
   const last = at(lines.at(-1));
   const planned = typeof plan?.["mutants"] === "number" ? plan["mutants"] : undefined;
   const run = typeof plan?.["run"] === "number" ? plan["run"] : undefined;
-  // The mutants of the plan with an early result take no time, so the rate reads only the mutants that run.
+  // Stryker reports the mutants with an early result (no coverage, ignored, from the cache) just after the plan, and
+  // they take no time. So the rate reads only the tested mutants that ran: the lines of all the mutants less the early ones.
   const lastMutant = at(mutants.at(-1));
+  const ran = planned === undefined || run === undefined ? 0 : mutants.length - (planned - run);
   const estimate =
-    plan === undefined || run === undefined || mutants.length === 0 || lastMutant <= at(plan)
+    run === undefined || ran <= 0 || lastMutant <= at(plan)
       ? undefined
-      : minutes(at(plan), at(start)) + (minutes(lastMutant, at(plan)) * run) / mutants.length;
+      : minutes(at(plan), at(start)) + (minutes(lastMutant, at(plan)) * run) / ran;
   return { report: { files }, tested: mutants.length, planned, minutes: minutes(last, at(start)), estimate, done: lines.some((l) => l["event"] === "done") };
 }
 

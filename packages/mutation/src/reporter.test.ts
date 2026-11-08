@@ -23,20 +23,38 @@ const mutant = (file: string, status: string, line: number) => ({ fileName: join
 // The MUTATIONREVIEW of Vex, item 2: a time limit that stops Stryker keeps the score of the mutants that ran.
 describe("PartialReporter", () => {
   it("writes the plan and each mutant at once, and parsePartial gives the costs", () => {
-    const r = reporter(0, 60_000, 120_000, 180_000);
+    const r = reporter(0, 60_000, 60_000, 120_000, 180_000);
     expect(r.file).toBe(join(root, "out", PARTIAL_FILE));
     r.onMutationTestingPlanReady({ mutantPlans: [{ plan: "Run" }, { plan: "Run" }, { plan: "Run" }, { plan: "Run" }, { plan: "EarlyResult" }] });
+    // Stryker reports the early result just after the plan.
+    r.onMutantTested(mutant("src/a.ts", "NoCoverage", 1));
     r.onMutantTested(mutant("src/a.ts", "Killed", 3));
     r.onMutantTested(mutant("src/a.ts", "Survived", 7));
     const run = parsePartial(readFileSync(r.file, "utf8"));
     // 1 minute to the plan, then 2 mutants in 2 minutes: the 4 mutants that run need 4 minutes more.
-    expect(run).toMatchObject({ tested: 2, planned: 5, minutes: 3, estimate: 5, done: false });
-    expect(run.report.files["src/a.ts"]?.mutants.map((m) => m.status)).toEqual(["Killed", "Survived"]);
+    expect(run).toMatchObject({ tested: 3, planned: 5, minutes: 3, estimate: 5, done: false });
+    expect(run.report.files["src/a.ts"]?.mutants.map((m) => m.status)).toEqual(["NoCoverage", "Killed", "Survived"]);
     const score = partialScore(run, { name: "lib.core", gate: 80 });
-    expect(score).toMatchObject({ percent: 50, pass: false, outcome: "no read", partial: { tested: 2, planned: 5, minutes: 3, estimate: 5 } });
+    expect(score).toMatchObject({ pass: false, outcome: "no read", partial: { tested: 3, planned: 5, minutes: 3, estimate: 5 } });
     expect(formatScore(score)).toContain(
-      "FAIL: partial: Stryker stopped after 3.0 minutes and tested 2 of 5 mutants. The score of the mutants that ran is 50.00 %. All the mutants need an estimated 5 minutes.",
+      "FAIL: partial: Stryker stopped after 3.0 minutes and tested 3 of 5 mutants. The score of the mutants that ran is 33.33 %. All the mutants need an estimated 5 minutes.",
     );
+  });
+
+  // The example of the review of Vex: 400 early results at the plan, then 100 mutants of 600 in 30 minutes.
+  it("leaves the early results out of the rate", () => {
+    const line = (l: object): string => `${JSON.stringify(l)}\n`;
+    const early = Array.from({ length: 400 }, (_, i) => line({ event: "mutant", at: 0, file: "src/a.ts", status: "NoCoverage", mutatorName: "M", line: i }));
+    const ran = Array.from({ length: 100 }, (_, i) => line({ event: "mutant", at: (i + 1) * 18_000, file: "src/a.ts", status: "Killed", mutatorName: "M", line: i }));
+    const text = line({ event: "start", at: 0 }) + line({ event: "plan", at: 0, mutants: 1000, run: 600 }) + early.join("") + ran.join("");
+    expect(parsePartial(text)).toMatchObject({ tested: 500, planned: 1000, minutes: 30, estimate: 180 });
+  });
+
+  it("gives no estimate while only early results exist", () => {
+    const text = [{ event: "start", at: 0 }, { event: "plan", at: 0, mutants: 3, run: 2 }, { event: "mutant", at: 1, file: "a", status: "Ignored", mutatorName: "M", line: 1 }]
+      .map((l) => JSON.stringify(l))
+      .join("\n");
+    expect(parsePartial(text)).toMatchObject({ tested: 1, estimate: undefined });
   });
 
   it("ignores a cut last line, and marks a run that wrote its last line", () => {
