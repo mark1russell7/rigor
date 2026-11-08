@@ -5,6 +5,7 @@
  */
 import { appendFileSync } from "node:fs";
 import type { GateOutcome } from "./gate.ts";
+import type { BenchEnv } from "./fresh.ts";
 import type { ArmModels } from "./model.ts";
 
 /**
@@ -23,6 +24,18 @@ export interface JobModel {
   readonly model: string;
   /** The count of the jobs on this model. */
   readonly jobs: number;
+}
+
+/**
+ * This function gives the count of the jobs on each CPU model, sorted by the name of the model. The order of the names
+ * is the order of their code units, so it does not change with the locale.
+ *
+ * @param envs - The computer of each job, for example as `benchEnv` gives it.
+ */
+export function jobModels(envs: readonly Pick<BenchEnv, "cpu">[]): JobModel[] {
+  const counts = new Map<string, number>();
+  for (const env of envs) counts.set(env.cpu, (counts.get(env.cpu) ?? 0) + 1);
+  return [...counts.keys()].sort((x, y) => (x < y ? -1 : x > y ? 1 : 0)).map((model) => ({ model, jobs: counts.get(model) ?? 0 }));
 }
 
 /** The options of `gateLine`. */

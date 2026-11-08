@@ -178,6 +178,7 @@ gateOf: build/index.d.ts#gateOf
 growthVerdict: build/index.d.ts#growthVerdict
 isBlock: build/index.d.ts#isBlock
 isNoRead: build/index.d.ts#isNoRead
+jobModels: build/index.d.ts#jobModels
 jointClaim: build/index.d.ts#jointClaim
 ladderVerdict: build/index.d.ts#ladderVerdict
 limitOnModel: build/index.d.ts#limitOnModel
@@ -1578,6 +1579,9 @@ export declare function isBlock(outcome: string): boolean;
 
 ### build/index.d.ts#isNoRead
 export declare function isNoRead(outcome: string): boolean;
+
+### build/index.d.ts#jobModels
+export declare function jobModels(envs: readonly Pick<BenchEnv, "cpu">[]): JobModel[];
 
 ### build/index.d.ts#jointClaim
 export declare function jointClaim(check: MeasureChecks, measures: readonly string[], entry: string, stratum?: string): JointClaim;

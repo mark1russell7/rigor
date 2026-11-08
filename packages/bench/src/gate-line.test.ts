@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { armModels, gateLine, gateOf, isBlock, isNoRead, writeGateLine } from "./index.ts";
+import { armModels, gateLine, gateOf, isBlock, isNoRead, jobModels, writeGateLine } from "./index.ts";
 
 const ONE = armModels([{ a: "AMD EPYC 7763", b: "AMD EPYC 7763" }]);
 const MIXED = armModels([
@@ -111,6 +111,20 @@ describe("gateLine", () => {
     const one = gateLine(reads, { title: "budget", models: [{ model: "AMD EPYC 7763", jobs: 3 }] });
     expect(one).toMatchObject({ cpu: "jobs on 1 CPU model: AMD EPYC 7763 (3 jobs)", mixed: false });
     expect(one?.text).not.toContain("pair");
+  });
+
+  it("counts the jobs on each CPU model, sorted by model", () => {
+    const envs = [{ cpu: "Intel Xeon 8370C" }, { cpu: "AMD EPYC 7763" }, { cpu: "Intel Xeon 8370C" }];
+    expect(jobModels(envs)).toEqual([
+      { model: "AMD EPYC 7763", jobs: 1 },
+      { model: "Intel Xeon 8370C", jobs: 2 },
+    ]);
+    expect(jobModels([{ cpu: "b" }, { cpu: "a" }, { cpu: "a" }])).toEqual([
+      { model: "a", jobs: 2 },
+      { model: "b", jobs: 1 },
+    ]);
+    expect(jobModels([])).toEqual([]);
+    expect(gateLine([{ case: "x", outcome: "cannot decide" }], { title: "t", models: jobModels(envs) })?.cpu).toBe("jobs on 2 CPU models: AMD EPYC 7763 (1 job), Intel Xeon 8370C (2 jobs)");
   });
 
   it("knows the words of a no-read and of a block", () => {
