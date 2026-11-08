@@ -5,7 +5,6 @@
  */
 import { appendFileSync } from "node:fs";
 import type { GateOutcome } from "./gate.ts";
-import type { BenchEnv } from "./fresh.ts";
 import type { ArmModels } from "./model.ts";
 
 /**
@@ -32,7 +31,7 @@ export interface JobModel {
  *
  * @param envs - The computer of each job, for example as `benchEnv` gives it.
  */
-export function jobModels(envs: readonly Pick<BenchEnv, "cpu">[]): JobModel[] {
+export function jobModels(envs: readonly { readonly cpu: string }[]): JobModel[] {
   const counts = new Map<string, number>();
   for (const env of envs) counts.set(env.cpu, (counts.get(env.cpu) ?? 0) + 1);
   return [...counts.keys()].sort((x, y) => (x < y ? -1 : x > y ? 1 : 0)).map((model) => ({ model, jobs: counts.get(model) ?? 0 }));
@@ -110,7 +109,9 @@ function cpuText(models: ArmModels | readonly JobModel[]): { text: string; mixed
 
 /** This function removes the full stop at the end of a part of the line, so the line has one full stop after it. */
 function part(text: string): string {
-  return text.trim().replace(/\.+$/u, "");
+  let end = text.trim();
+  while (end.endsWith(".")) end = end.slice(0, -1);
+  return end;
 }
 
 /**

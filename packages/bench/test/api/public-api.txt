@@ -1581,7 +1581,9 @@ export declare function isBlock(outcome: string): boolean;
 export declare function isNoRead(outcome: string): boolean;
 
 ### build/index.d.ts#jobModels
-export declare function jobModels(envs: readonly Pick<BenchEnv, "cpu">[]): JobModel[];
+export declare function jobModels(envs: readonly {
+  readonly cpu: string;
+}[]): JobModel[];
 
 ### build/index.d.ts#jointClaim
 export declare function jointClaim(check: MeasureChecks, measures: readonly string[], entry: string, stratum?: string): JointClaim;
