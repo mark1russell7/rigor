@@ -37,7 +37,7 @@ export const HELP: string = `rigor-mutation: the mutation tests of a repository,
                                                the score of each selection, with its gate and its count
                                                of tests. --reports reads <dir>/mutation-<selection>/mutation.json.
                                                A package with "gateOver": "package" also gets
-                                               the score of its parts together. With --last, a fall of the count of more than
+                                               the score of its parts together, a no read without all its parts. With --last, a fall of the count of more than
                                                maxTestFall % (default 20) against the file fails. With
                                                --write-last, the counts of the passed selections go in
                                                the file. With --test-files, a test file that the run
@@ -242,9 +242,11 @@ function scores(lane: Lane, laneDir: string, names: readonly string[], o: Scores
   const totals = [...new Set(names.map((n) => select(lane, n)).filter(byPackage).map((s) => s.pkg))].map((pkg) => {
     const p = lane.packages[pkg];
     const parts = results.filter((r) => select(lane, r.name).pkg === pkg && r.name !== pkg);
-    const count = Object.keys(p?.parts ?? {}).length;
-    notes.set(pkg, parts.length < count ? [`  the score reads ${String(parts.length)} of the ${String(count)} parts: ${parts.map((r) => r.name).join(", ")}`] : []);
-    return packageScore(pkg, p?.gate, parts);
+    // A no read is never a pass: a part that the command does not name makes the package a no read.
+    const missing = Object.keys(p?.parts ?? {})
+      .map((part) => `${pkg}.${part}`)
+      .filter((n) => !names.includes(n));
+    return packageScore(pkg, p?.gate, parts, missing);
   });
   const shown = [...results, ...totals];
   for (const s of shown) {

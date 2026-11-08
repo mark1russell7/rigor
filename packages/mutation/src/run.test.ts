@@ -148,8 +148,8 @@ describe("rigor-mutation", () => {
     expect(out).toContain("lib: 75.00 % (15 of 20, 5 survived), gate 80 %: FAIL: the score 75.00 % of all the parts is under the gate 80 %");
     expect(err).toContain("The gate failed for lib.");
     out = "";
-    expect(run("scores", "lib.core", "--reports", "reports")).toBe(0);
-    expect(out).toContain("lib: 100.00 % (10 of 10, 0 survived), gate 80 %: pass\n  the score reads 1 of the 2 parts: lib.core");
+    expect(run("scores", "lib.core", "--reports", "reports")).toBe(1);
+    expect(out).toContain("lib: 100.00 % (10 of 10, 0 survived), gate 80 %: FAIL: the read has no score of the parts lib.rest, so the sum does not count their mutants");
     expect(() => run("scores", "lib.core", "--reports", "reports", "--report", "r.json")).toThrow(/--report or --reports/);
     put("mutation.json", JSON.stringify({ packages: { lib: { ...lib, parts: undefined } } }));
     expect(() => run("list")).toThrow(/"gateOver" is "package", but the package has no parts/);

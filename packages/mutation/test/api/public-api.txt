@@ -248,7 +248,7 @@ export declare const isHitLimit: (m: Mutant) => boolean;
 export declare function leavingPaths(files: readonly PackageFile[], vitestConfig?: string): LeavingPath[];
 
 ### build/index.d.ts#packageScore
-export declare function packageScore(name: string, gate: number | undefined, parts: readonly Score[]): Score;
+export declare function packageScore(name: string, gate: number | undefined, parts: readonly Score[], missing?: readonly string[]): Score;
 
 ### build/index.d.ts#parseLane
 export declare function parseLane(json: unknown): Lane;

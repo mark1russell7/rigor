@@ -101,7 +101,7 @@ The gate of a package with parts applies to each part. Each part must have a sco
 With `"gateOver": "package"`, the gate reads all the parts together. `scores` sums the mutants of the parts of the package, and gives one more line for the package. A part has no gate of its own, but a part that fails for another reason makes the package a no read.
 
 - Give `scores` all the parts in one command, so that the sum reads each part. `--reports <dir>` reads `<dir>/mutation-<selection>/mutation.json` for each selection.
-- A run of the changed files can have some of the parts only. Then the line of the package names the parts that it reads.
+- A read of some of the parts only makes the package a no read, and its line names the missing parts. A run of the changed files is usually report only, so this does not fail it.
 
 ## The tests that a run read
 

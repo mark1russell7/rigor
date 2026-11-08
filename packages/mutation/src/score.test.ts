@@ -91,6 +91,16 @@ describe("packageScore", () => {
     expect(packageScore("p", 50, [part("p.a", 9, 1), none])).toMatchObject({ pass: false, outcome: "no read", reason: "the parts p.b fail, so the sum of the parts has no meaning" });
     expect(packageScore("p", 50, [])).toMatchObject({ pass: false, outcome: "no read" });
   });
+
+  // The review of Vex on rigor#139: the sum of 2 of 3 parts does not count the mutants of the third part.
+  it("is a no read when a part has no score, also when each part read is over the gate", () => {
+    expect(packageScore("p", 90, [part("p.a", 10, 0), part("p.b", 10, 0)], ["p.c"])).toMatchObject({
+      percent: 100,
+      pass: false,
+      outcome: "no read",
+      reason: "the read has no score of the parts p.c, so the sum does not count their mutants",
+    });
+  });
 });
 
 describe("parseReport", () => {

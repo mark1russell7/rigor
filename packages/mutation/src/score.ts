@@ -172,8 +172,11 @@ export function scoreReport(report: MutationReport, selection: { readonly name: 
 /**
  * This function gives the score of a package from the scores of its parts, and applies the gate of the package. It sums
  * the mutants of the parts. A part that fails makes the package a no read: a part has no gate of its own here.
+ * A missing part also makes the package a no read, because the sum does not count its mutants.
+ *
+ * @param missing - the parts of the package that have no score in this read
  */
-export function packageScore(name: string, gate: number | undefined, parts: readonly Score[]): Score {
+export function packageScore(name: string, gate: number | undefined, parts: readonly Score[], missing: readonly string[] = []): Score {
   const sum = (count: (s: Score) => number): number => parts.reduce((total, s) => total + count(s), 0);
   const detected = sum((s) => s.detected);
   const valid = sum((s) => s.valid);
@@ -184,11 +187,13 @@ export function packageScore(name: string, gate: number | undefined, parts: read
   const [outcome, reason]: [ScoreOutcome, string | undefined] =
     parts.length === 0
       ? ["no read", "the package has no scores of its parts"]
-      : failed.length > 0
-        ? ["no read", `the parts ${failed.join(", ")} fail, so the sum of the parts has no meaning`]
-        : gate !== undefined && percent < gate
-          ? ["block", `the score ${percent.toFixed(2)} % of all the parts is under the gate ${String(gate)} %`]
-          : ["pass", undefined];
+      : missing.length > 0
+        ? ["no read", `the read has no score of the parts ${missing.join(", ")}, so the sum does not count their mutants`]
+        : failed.length > 0
+          ? ["no read", `the parts ${failed.join(", ")} fail, so the sum of the parts has no meaning`]
+          : gate !== undefined && percent < gate
+            ? ["block", `the score ${percent.toFixed(2)} % of all the parts is under the gate ${String(gate)} %`]
+            : ["pass", undefined];
   const tests = parts.every((s) => s.tests !== undefined) ? sum((s) => s.tests ?? 0) : undefined;
   return { name, gate, detected, hitLimit: sum((s) => s.hitLimit), clockTimeouts, valid, survived: parts.flatMap((s) => s.survived), percent, percentWithClock, tests, pass: reason === undefined, reason, outcome };
 }
