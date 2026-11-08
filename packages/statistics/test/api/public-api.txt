@@ -22,6 +22,7 @@ type CoverageCell: build/index.d.ts#CoverageCell
 type CoverageMinSample: build/index.d.ts#CoverageMinSample
 type CoverageReason: build/index.d.ts#CoverageReason
 type CoverageStep: build/index.d.ts#CoverageStep
+EMPTY_RUNNING: build/index.d.ts#EMPTY_RUNNING
 type Effect: build/index.d.ts#Effect
 type EloOptions: build/index.d.ts#EloOptions
 type EloUpdate: build/index.d.ts#EloUpdate
@@ -93,10 +94,18 @@ type RidgeOptions: build/index.d.ts#RidgeOptions
 type RidgeRankInput: build/index.d.ts#RidgeRankInput
 type RidgeResponseModel: build/index.d.ts#RidgeResponseModel
 type RidgeTerm: build/index.d.ts#RidgeTerm
+type RunningSummary: build/index.d.ts#RunningSummary
+SIGN_FLIP_EXACT_LIMIT: build/index.d.ts#SIGN_FLIP_EXACT_LIMIT
+SIGN_FLIP_EXACT_MAX: build/index.d.ts#SIGN_FLIP_EXACT_MAX
 type SampleTotalOptions: build/index.d.ts#SampleTotalOptions
 type SideP: build/index.d.ts#SideP
+type SignFlipOptions: build/index.d.ts#SignFlipOptions
+type SignFlipResult: build/index.d.ts#SignFlipResult
 type SmoothLaw: build/index.d.ts#SmoothLaw
 type SmoothLawScore: build/index.d.ts#SmoothLawScore
+type SobolIndex: build/index.d.ts#SobolIndex
+type SobolIndices: build/index.d.ts#SobolIndices
+type SobolOptions: build/index.d.ts#SobolOptions
 type Summary: build/index.d.ts#Summary
 type TableResponseModel: build/index.d.ts#TableResponseModel
 type TieModel: build/index.d.ts#TieModel
@@ -108,6 +117,7 @@ type UStatisticMethod: build/index.d.ts#UStatisticMethod
 type UStatisticOptions: build/index.d.ts#UStatisticOptions
 U_STATISTIC_TIGHT_MIN_SAMPLE: build/index.d.ts#U_STATISTIC_TIGHT_MIN_SAMPLE
 Z95: build/index.d.ts#Z95
+addToRunning: build/index.d.ts#addToRunning
 bestSmoothLaw: build/index.d.ts#bestSmoothLaw
 binomialInterval: build/index.d.ts#binomialInterval
 binomialTest: build/index.d.ts#binomialTest
@@ -116,6 +126,7 @@ bootstrapClusters: build/index.d.ts#bootstrapClusters
 bootstrapLeastSquares: build/index.d.ts#bootstrapLeastSquares
 bootstrapMedian: build/index.d.ts#bootstrapMedian
 bootstrapMedianRatio: build/index.d.ts#bootstrapMedianRatio
+bootstrapStrata: build/index.d.ts#bootstrapStrata
 bootstrapTwo: build/index.d.ts#bootstrapTwo
 bradleyTerry: build/index.d.ts#bradleyTerry
 brier: build/index.d.ts#brier
@@ -137,10 +148,13 @@ logLoss: build/index.d.ts#logLoss
 mean: build/index.d.ts#mean
 median: build/index.d.ts#median
 medianInterval: build/index.d.ts#medianInterval
+mergeRunning: build/index.d.ts#mergeRunning
 modeCount: build/index.d.ts#modeCount
 negativeBinomialInterval: build/index.d.ts#negativeBinomialInterval
 noiseFloor: build/index.d.ts#noiseFloor
 noiseVerdict: build/index.d.ts#noiseVerdict
+normalCdf: build/index.d.ts#normalCdf
+normalQuantile: build/index.d.ts#normalQuantile
 optionFloor: build/index.d.ts#optionFloor
 pairProbabilities: build/index.d.ts#pairProbabilities
 pairedPermutation: build/index.d.ts#pairedPermutation
@@ -155,12 +169,17 @@ ranks: build/index.d.ts#ranks
 ratingToStrength: build/index.d.ts#ratingToStrength
 responseCells: build/index.d.ts#responseCells
 ridgeSolve: build/index.d.ts#ridgeSolve
+runningMean: build/index.d.ts#runningMean
+runningOf: build/index.d.ts#runningOf
+runningSd: build/index.d.ts#runningSd
 sampleTotalInterval: build/index.d.ts#sampleTotalInterval
 sd: build/index.d.ts#sd
+signFlipTest: build/index.d.ts#signFlipTest
 signTest: build/index.d.ts#signTest
 signTestPower: build/index.d.ts#signTestPower
 sliceResponse: build/index.d.ts#sliceResponse
 smoothLawScores: build/index.d.ts#smoothLawScores
+sobolIndices: build/index.d.ts#sobolIndices
 sorted: build/index.d.ts#sorted
 spearman: build/index.d.ts#spearman
 strengthToRating: build/index.d.ts#strengthToRating
@@ -305,6 +324,9 @@ interface CoverageStep {
   readonly qualifies: boolean;
   readonly reason: CoverageReason;
 }
+
+### build/index.d.ts#EMPTY_RUNNING
+export declare const EMPTY_RUNNING: RunningSummary;
 
 ### build/index.d.ts#Effect
 interface Effect {
@@ -792,6 +814,21 @@ interface RidgeTerm {
   readonly weight: number;
 }
 
+### build/index.d.ts#RunningSummary
+interface RunningSummary {
+  readonly n: number;
+  readonly sum: number;
+  readonly min: number;
+  readonly max: number;
+  readonly m2: number;
+}
+
+### build/index.d.ts#SIGN_FLIP_EXACT_LIMIT
+export declare const SIGN_FLIP_EXACT_LIMIT = 24;
+
+### build/index.d.ts#SIGN_FLIP_EXACT_MAX
+export declare const SIGN_FLIP_EXACT_MAX = 16;
+
 ### build/index.d.ts#SampleTotalOptions
 interface SampleTotalOptions extends BootstrapOptions {
   readonly population: number;
@@ -805,6 +842,21 @@ interface SideP {
   readonly pBelow: number;
 }
 
+### build/index.d.ts#SignFlipOptions
+interface SignFlipOptions {
+  readonly exactMax?: number;
+  readonly runs?: number;
+  readonly seed?: number | string;
+}
+
+### build/index.d.ts#SignFlipResult
+interface SignFlipResult {
+  readonly observed: number;
+  readonly p: number;
+  readonly exact: boolean;
+  readonly runs: number;
+}
+
 ### build/index.d.ts#SmoothLaw
 type SmoothLaw = "uniform" | "normal" | "exponential" | "log-normal" | "pareto";
 
@@ -812,6 +864,35 @@ type SmoothLaw = "uniform" | "normal" | "exponential" | "log-normal" | "pareto";
 interface SmoothLawScore {
   readonly law: SmoothLaw;
   readonly meanLogDensity: number;
+}
+
+### build/index.d.ts#SobolIndex
+interface SobolIndex {
+  readonly dimension: string;
+  readonly first: number;
+  readonly total: number;
+  readonly firstInterval?: Interval;
+  readonly totalInterval?: Interval;
+}
+
+### build/index.d.ts#SobolIndices
+interface SobolIndices {
+  readonly measure: string;
+  readonly scale: "measure" | "model";
+  readonly n: number;
+  readonly evaluations: number;
+  readonly seed: number;
+  readonly mean: number;
+  readonly variance: number;
+  readonly indices: readonly SobolIndex[];
+}
+
+### build/index.d.ts#SobolOptions
+interface SobolOptions {
+  readonly n?: number;
+  readonly seed?: number | string;
+  readonly scale?: "measure" | "model";
+  readonly interval?: BootstrapOptions;
 }
 
 ### build/index.d.ts#Summary
@@ -890,6 +971,9 @@ export declare const U_STATISTIC_TIGHT_MIN_SAMPLE: number;
 ### build/index.d.ts#Z95
 export declare const Z95 = 1.959963984540054;
 
+### build/index.d.ts#addToRunning
+export declare function addToRunning(s: RunningSummary, value: number): RunningSummary;
+
 ### build/index.d.ts#bestSmoothLaw
 export declare function bestSmoothLaw(values: readonly number[]): SmoothLaw;
 
@@ -913,6 +997,9 @@ export declare function bootstrapMedian(values: readonly number[], options?: Boo
 
 ### build/index.d.ts#bootstrapMedianRatio
 export declare function bootstrapMedianRatio(numerator: readonly number[], denominator: readonly number[], options?: BootstrapOptions): Interval;
+
+### build/index.d.ts#bootstrapStrata
+export declare function bootstrapStrata<T>(strata: readonly (readonly T[])[], statistic: (samples: readonly (readonly T[])[]) => number, options?: BootstrapOptions): Interval;
 
 ### build/index.d.ts#bootstrapTwo
 export declare function bootstrapTwo<A, B>(a: readonly A[], b: readonly B[], statistic: (a: readonly A[], b: readonly B[]) => number, options?: BootstrapOptions): Interval;
@@ -977,6 +1064,9 @@ export declare function median(values: readonly number[]): number;
 ### build/index.d.ts#medianInterval
 export declare function medianInterval(values: readonly number[], level?: number): MedianInterval;
 
+### build/index.d.ts#mergeRunning
+export declare function mergeRunning(a: RunningSummary, b: RunningSummary): RunningSummary;
+
 ### build/index.d.ts#modeCount
 export declare function modeCount(values: readonly number[], options?: ModeOptions): number;
 
@@ -990,6 +1080,12 @@ export declare function noiseFloor(values: readonly number[], options?: NoiseOpt
 export declare function noiseVerdict(values: readonly number[], options?: NoiseOptions & {
   readonly better?: "higher" | "lower";
 }): NoiseVerdict;
+
+### build/index.d.ts#normalCdf
+export declare function normalCdf(x: number): number;
+
+### build/index.d.ts#normalQuantile
+export declare function normalQuantile(p: number): number;
 
 ### build/index.d.ts#optionFloor
 export declare function optionFloor(options: OptionFloorOptions): number;
@@ -1033,11 +1129,23 @@ export declare function responseCells(record: Pick<ResponseRecord, "dimensions">
 ### build/index.d.ts#ridgeSolve
 export declare function ridgeSolve(gram: ArrayLike<number>, moment: ArrayLike<number>, lambda: number, options?: RidgeOptions): number[];
 
+### build/index.d.ts#runningMean
+export declare function runningMean(s: RunningSummary): number;
+
+### build/index.d.ts#runningOf
+export declare function runningOf(values: Iterable<number>): RunningSummary;
+
+### build/index.d.ts#runningSd
+export declare function runningSd(s: RunningSummary): number;
+
 ### build/index.d.ts#sampleTotalInterval
 export declare function sampleTotalInterval(values: readonly number[], options: SampleTotalOptions): Interval;
 
 ### build/index.d.ts#sd
 export declare function sd(values: readonly number[]): number;
+
+### build/index.d.ts#signFlipTest
+export declare function signFlipTest(terms: readonly number[], options?: SignFlipOptions): SignFlipResult;
 
 ### build/index.d.ts#signTest
 export declare function signTest(better: number, worse: number, sides?: 1 | 2): number;
@@ -1050,6 +1158,9 @@ export declare function sliceResponse(record: ResponseRecord, measure: string, o
 
 ### build/index.d.ts#smoothLawScores
 export declare function smoothLawScores(values: readonly number[]): readonly SmoothLawScore[];
+
+### build/index.d.ts#sobolIndices
+export declare function sobolIndices(record: Pick<ResponseRecord, "dimensions" | "models">, measure: string, options?: SobolOptions): SobolIndices;
 
 ### build/index.d.ts#sorted
 export declare function sorted(values: readonly number[]): number[];

@@ -152,6 +152,18 @@ describe("seeds", () => {
     expect(seedsFrom("17", [1, 2])).toEqual([17]);
     expect(() => seedsFrom("x", [1])).toThrow(/integer/);
   });
+
+  it("reads a list of seeds and ranges, as the seed lists of the algebra benches", () => {
+    expect(seedsFrom("1,3,9-11", [])).toEqual([1, 3, 9, 10, 11]);
+    expect(seedsFrom(" 4 , 2-3 ,-7", [1])).toEqual([4, 2, 3, -7]);
+    expect(seedsFrom("5-5", [])).toEqual([5]);
+    expect(() => seedsFrom("5-2", [])).toThrow(RangeError);
+    expect(() => seedsFrom("x", [])).toThrow(RangeError);
+    expect(() => seedsFrom("1,,2", [])).toThrow(/empty part/);
+    expect(() => seedsFrom("1,", [])).toThrow(/empty part/);
+    expect(() => seedsFrom("0-1000000", [])).toThrow(/at most/);
+    expect(seedsFrom("0-999999", [])).toHaveLength(1_000_000);
+  });
 });
 
 describe("random", () => {
