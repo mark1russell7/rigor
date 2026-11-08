@@ -9,6 +9,7 @@ This file lists the items of the roadmap of this repository. The status page of 
 | R1 | in progress | P1 | generators 0.1.0: the seeded generator and its draws, byte-equal to each copy of mulberry32 |
 | R2 | in progress | P1 | The site: the packages, and the generator and the time verdict to try in the browser |
 | R4 | in progress | P1 | statistics 0.1.0: quantiles, bootstrap intervals, sign and permutation tests, Wilson, Holm, rank correlation, the comparison beyond the noise and Brier, equal to the bit to each copy |
+| R9 | in progress | P2 | Sobol indices and shrinking. statistics 0.1.22 gives `sobolIndices` of a response model. Shrinking is not done |
 
 ## Next
 
@@ -24,5 +25,4 @@ This file lists the items of the roadmap of this repository. The status page of 
 | --- | --- | --- | --- |
 | R7 | later | P2 | testgen: property tests on fast-check, pairwise and covering arrays, metamorphic relations |
 | R8 | later | P2 | chaos: fault injection and schedules of latency and failure, with their measures. Open-loop load profiles are in the package |
-| R9 | later | P2 | Sobol indices and shrinking, from the engines that have them now |
 | R10 | later | P2 | statistics: an optional sum of the squared kernel for `uStatisticInterval`, for an empirical Bernstein bound. Parked until a consumer works at `k > 500`. `docs/CALIBRATION.md` has the read |

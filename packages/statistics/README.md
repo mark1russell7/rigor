@@ -1,6 +1,6 @@
 # @mark1russell7/rigor-statistics
 
-The statistics of measured work. It gives quantiles, bootstrap intervals, the sign test, the paired permutation test, Wilson intervals and the Holm correction. It gives the interval of a median from order statistics, and the central interval of a binomial count. It also gives least squares, rank correlation, the comparison with a baseline beyond the noise, and the Brier score and the log-loss of predictions. It rates items from pairwise results with Elo, Glicko-2 and a Bradley-Terry fit. It fits response records that a browser can evaluate from plain JSON.
+The statistics of measured work. It gives quantiles, bootstrap intervals, the sign test, the paired permutation test, Wilson intervals and the Holm correction. It gives the interval of a median from order statistics, and the central interval of a binomial count. It also gives least squares, rank correlation, the comparison with a baseline beyond the noise, and the Brier score and the log-loss of predictions. It rates items from pairwise results with Elo, Glicko-2 and a Bradley-Terry fit. It fits response records that a browser can evaluate from plain JSON, and it gives the Sobol indices of their models.
 
 ```sh
 npm install @mark1russell7/rigor-statistics
@@ -100,6 +100,28 @@ A measure with `null` has no value. To tell why, declare the reasons in the fiel
 
 The default expansion has one product for each pair of levels of two dimensions. Two dimensions with 76 and 33 levels thus give 2508 products, and the limit `RESPONSE_MAX_TERMS` refuses them. With the option `interactions: "seen"`, a ridge fit keeps only the terms that are not 0 at one point or more. This choice looks only at the inputs of the points. A term with no point has the weight 0, so the choice does not change a prediction. The limit applies after the choice.
 
+### The Sobol indices of a model
+
+`sobolIndices(record, measure, options)` tells how much of the variance of a fitted model comes from each dimension. The first-order index `first` is the share of one dimension alone. The total index `total` also includes its interactions.
+
+```ts
+import { sobolIndices } from "@mark1russell7/rigor-statistics";
+
+const sobol = sobolIndices(record, "ms", { n: 4096, seed: 1 });
+sobol.indices;     // [{ dimension: "size", first: 0.71, total: 0.74 }, ...]
+sobol.variance;    // the variance of the prediction over the input distribution
+sobol.evaluations; // n * (dimensions + 2) evaluations of the model
+```
+
+- Each dimension is independent and uniform over its range or its levels. A dimension with `log` is uniform in log space.
+- A conditional dimension gets an independent draw. The model gets `null` for it where `whenHolds` fails.
+- The method is Monte Carlo with the matrices A, B and AB_i of Saltelli (2010). The first-order index uses the estimator of Saltelli (2010), and the total index uses the estimator of Jansen (1999).
+- A constant model has the variance 0. Then each index is 0, not NaN.
+- The option `scale: "model"` gives the indices on the scale of the model, for example the logarithm of a measure with a log scale.
+- The option `interval` adds a percentile bootstrap interval over the N rows to each index.
+
+A test examines models with known indices. At N = 16384, the root mean square error of an index is approximately 0.01.
+
 ## Rate items from pairwise results
 
 A pairwise result is a comparison of two items: the first item wins, the second item wins, or a tie. Each function of this section is pure, so a log of results gives the same ratings each time.
@@ -179,6 +201,7 @@ logLoss([{ p: p.a, hit: true }]);                // the probability of the obser
 | `parseResponseRecord(value)` | The examination of unknown data. It gives the record, or one fault with a path for each error. |
 | `predictResponse(model, inputs)`, `heldOutError(record, measure)` | The value of a model at one set of inputs, and the error of the folds of a measure. |
 | `heldOutErrorAt(record, measure, ids)` | The held-out error of a chosen set of points, from the predictions of the option `outOfFold`. |
+| `sobolIndices(record, measure, options)` | The first-order and the total Sobol index of each dimension, for the model of a measure. The default N is 4096. |
 | `responseCells(record, vary, steps)` | The number of fitted places of a view, level axes included. It lets a caller bound the time of a view before the view starts. |
 | `whenHolds(dimension, values)` | True when a place has the condition of a dimension. A dimension with no `when` is always present. |
 | `sliceResponse(record, measure, options)`, `surfaceResponse(record, measure, options)` | A fitted curve over one dimension, or a fitted surface over two, with the matching measured points, the matching points with no value, a band and the distance to the nearest measurement. |
