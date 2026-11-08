@@ -14,6 +14,15 @@ const run = (...argv: string[]): number =>
     stdout: (t) => (out += t),
     stderr: (t) => (err += t),
   });
+/** This function starts the CLI as a step of GitHub Actions starts it. */
+const runInActions = (...argv: string[]): number =>
+  runCli(argv, {
+    cwd: root,
+    stdout: (t) => (out += t),
+    stderr: (t) => (err += t),
+    env: { GITHUB_ACTIONS: "true" },
+  });
+const annotationsOf = (text: string): string[] => text.split("\n").filter((line) => line.startsWith("::"));
 const put = (file: string, text: string): void => {
   mkdirSync(dirname(join(root, file)), { recursive: true });
   writeFileSync(join(root, file), text);
@@ -174,6 +183,38 @@ describe("rigor-mutation", () => {
     out = "";
     expect(run("scores", "app", "--last", "none.json")).toBe(0);
     expect(out).toContain("the file none.json does not exist, so no count is compared");
+  });
+
+  // A gate never shows a no read as a pass: each no read is a warning on the check line, also in a run that only reports.
+  it("writes a warning annotation for each no read, each score under the gate and each planned fall in GitHub Actions", () => {
+    put("packages/lib/reports/mutation/mutation.json", JSON.stringify(mutants(1, 9)));
+    expect(runInActions("scores", "lib", "app")).toBe(1);
+    expect(annotationsOf(out)).toEqual([
+      `::warning title=Mutation gate%3A no read%2C 1 of 2 selections::app: the report ${join("packages", "app", "reports", "mutation", "mutation.json")} does not exist`,
+      "::warning title=Mutation gate%3A under the gate::lib: the score 10.00 %25 is under the gate 80 %25",
+    ]);
+
+    out = "";
+    put("packages/app/reports/mutation/mutation.json", JSON.stringify({ files: { "src/b.ts": { mutants: [] } } }));
+    expect(runInActions("scores", "app")).toBe(1);
+    expect(annotationsOf(out)).toEqual([
+      "::warning title=Mutation gate%3A no read%2C 1 of 1 selections::app: the report has no mutants that count: Stryker found no files to mutate, or it did not start",
+    ]);
+
+    out = "";
+    const withTests = (n: number) => ({ ...mutants(9, 1), testFiles: { "src/a.test.ts": { tests: Array.from({ length: n }, (_, i) => ({ name: `t${String(i)}` })) } } });
+    put("packages/app/reports/mutation/mutation.json", JSON.stringify(withTests(10)));
+    put("last.json", JSON.stringify({ app: 20 }));
+    const lane = JSON.parse(readFileSync(join(root, "mutation.json"), "utf8")) as Record<string, unknown>;
+    put("mutation.json", JSON.stringify({ ...lane, plannedFalls: { app: "100 % of the tests\nmoved" } }));
+    expect(runInActions("scores", "app", "--last", "last.json")).toBe(0);
+    expect(annotationsOf(out)).toEqual([
+      "::warning title=Mutation gate%3A a planned fall of the tests::app: the run read 10 tests, 50.0 %25 fewer than the last good count 20 (the limit is 20 %25). The reason: 100 %25 of the tests%0Amoved",
+    ]);
+
+    out = "";
+    expect(run("scores", "app", "--last", "last.json")).toBe(0);
+    expect(annotationsOf(out)).toEqual([]);
   });
 
   // The flip of LANE.FILES: a test file on the disk that the report does not read fails, unless notRead names it.

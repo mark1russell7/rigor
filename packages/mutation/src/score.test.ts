@@ -41,9 +41,9 @@ describe("scoreReport", () => {
   // The flip: the same report passes at the gate 60 and fails at the gate 61, and the failure names the package.
   it("fails a score under the gate, and the line names the package", () => {
     const r = report("Killed", "Killed", "Killed", "Survived", "Survived");
-    expect(scoreReport(r, { name: "collections", gate: 60 }).pass).toBe(true);
+    expect(scoreReport(r, { name: "collections", gate: 60 })).toMatchObject({ pass: true, outcome: "pass" });
     const s = scoreReport(r, { name: "collections", gate: 61 });
-    expect(s.pass).toBe(false);
+    expect(s).toMatchObject({ pass: false, outcome: "block" });
     expect(formatScore(s)).toBe("collections: 60.00 % (3 of 5, 2 survived), gate 61 %: FAIL: the score 60.00 % is under the gate 61 %");
   });
 
@@ -52,14 +52,14 @@ describe("scoreReport", () => {
   });
 
   it("fails a report with no mutants that count, also with no gate", () => {
-    expect(scoreReport({ files: {} }, { name: "a", gate: undefined })).toMatchObject({ pass: false, reason: expect.stringMatching(/no mutants that count/) as unknown });
+    expect(scoreReport({ files: {} }, { name: "a", gate: undefined })).toMatchObject({ pass: false, outcome: "no read", reason: expect.stringMatching(/no mutants that count/) as unknown });
     expect(scoreReport(report("CompileError"), { name: "a", gate: undefined }).pass).toBe(false);
   });
 
   // Stryker 10.0 with Vitest 5 started no test on the mutants, so each covered mutant survived (stryker-js 6210).
   it("fails a report where the tests detected no mutant, also with no gate", () => {
     const s = scoreReport(report("Survived", "Survived", "NoCoverage"), { name: "a", gate: undefined });
-    expect(s).toMatchObject({ pass: false, reason: "the tests detected none of the 3 mutants: the test runner started no test on the mutants" });
+    expect(s).toMatchObject({ pass: false, outcome: "no read", reason: "the tests detected none of the 3 mutants: the test runner started no test on the mutants" });
   });
 
   it("gives a table for the summary of a job", () => {
@@ -114,6 +114,7 @@ describe("the tests of a report (LANE.TESTS and LANE.FILES of Vex)", () => {
 
   it("keeps the first reason of a score that failed already", () => {
     const failed = scoreReport(report("Survived", "Killed"), { name: "lib", gate: 80 });
+    expect(failScore(failed, "the run read no test")).toMatchObject({ outcome: "no read" });
     expect(failScore(failed, "the run read no test").reason).toBe("the score 50.00 % is under the gate 80 %. Also the run read no test");
     expect(failScore(scoreReport(report("Killed"), { name: "lib", gate: 80 }), "x")).toMatchObject({ pass: false, reason: "x" });
   });
