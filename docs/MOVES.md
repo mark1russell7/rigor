@@ -43,7 +43,7 @@ The package README has the function for each copy, and the tests prove the numbe
 | lag | `packages/experiments/src/e8-async-context/runner/stats.ts` (`median`, `quantile`), `packages/site/src/lib/stats.ts` (`percentile`) | next |
 | lag-hud | `packages/hud/src/meter.ts` (`quantile`) | next |
 | layout-contract | `packages/joint/src/analysis.ts` (`bootstrap`, `quantileOf`) | next |
-| layout-contract | `packages/layout-contract/src/verdict.ts` (the stratified bootstrap, the pooled bootstrap, the permutation test, the sign test) | done in layout-contract 0.7.0 (mark1russell7/layout-contract#277) |
+| layout-contract | `packages/layout-contract/src/verdict.ts` (the stratified bootstrap, the pooled bootstrap, the permutation test, the sign test) | done in layout-contract 0.8.0 (mark1russell7/layout-contract#277) |
 | packing | `src/measures.ts` (`quantile`, `medianRatio`), `bench/promote.ts` (`signTestP`, `bootstrapMedian`), `bench/coverage.ts` (`wilson`), `bench/run.ts` (`median`) | next |
 
 Three copies are not equal to the package. Keep the call as it is, or accept the change in a separate commit with the records:
