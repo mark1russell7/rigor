@@ -2,6 +2,7 @@ export { type QuantileMethod, type Summary, mean, median, quantile, quantileSort
 export {
   type BootstrapOptions,
   type Interval,
+  type SampleTotalOptions,
   type SideP,
   bootstrap,
   bootstrapClusters,
@@ -9,6 +10,7 @@ export {
   bootstrapMedian,
   bootstrapMedianRatio,
   bootstrapTwo,
+  sampleTotalInterval,
 } from "./bootstrap.ts";
 export { type ModeOptions, type SmoothLaw, type SmoothLawScore, bestSmoothLaw, modeCount, smoothLawScores } from "./distribution.ts";
 export { type LeastSquaresFit, type LeastSquaresOptions, leastSquares } from "./regression.ts";

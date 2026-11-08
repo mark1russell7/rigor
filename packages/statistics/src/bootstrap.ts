@@ -4,6 +4,8 @@
  * With the same seed, the draws are equal to the draws of the copies in highways, packing and layout-contract.
  * `bootstrapTwo` draws two independent samples in each run: first the items of `a`, then the items of `b`.
  * `bootstrapLeastSquares` draws whole rows, and gives one interval for each coefficient from the same draws.
+ *
+ * `sampleTotalInterval` gives the interval of a population total from a sample without replacement.
  */
 import { type Random, random } from "@mark1russell7/rigor-generators";
 import { type QuantileMethod, median, quantileSorted, sorted } from "./describe.ts";
@@ -250,4 +252,42 @@ export function bootstrapClusters<T>(
   // The estimate of all the rows in their own order, not in the order of the clusters.
   const estimate = statistic(rows);
   return result.finite === 0 ? { ...result, estimate, low: estimate, high: estimate } : { ...result, estimate };
+}
+
+export interface SampleTotalOptions extends BootstrapOptions {
+  /** The number of items in the whole population, `n`. It is a whole number, and it is not less than the sample. */
+  readonly population: number;
+  /** The factor from the sum of the sample to the total of the population. The default is `population / values.length`. */
+  readonly scale?: number;
+}
+
+/**
+ * A bootstrap interval of the total of a population from a uniform sample of `m` of its `n` items, drawn without
+ * replacement. The estimate is `scale * sum(values)`. Each run draws `m` values with replacement, as `bootstrap`
+ * does. The deviation of each run from the sum of the sample gets the factor `scale * sqrt(1 - m / n)`, the finite
+ * population correction. When `m` is `n`, the interval is the estimate.
+ *
+ * The sample has 2 values or more, and each value is finite. With the same seed, the result is equal to the
+ * `bootstrap` of the same statistic, to the bit.
+ */
+export function sampleTotalInterval(values: readonly number[], options: SampleTotalOptions): Interval {
+  const name = "sampleTotalInterval";
+  const m = values.length;
+  const n = options.population;
+  if (m < 2) throw new RangeError(`${name}: the sample has 2 values or more, not ${m}.`);
+  if (!Number.isSafeInteger(n) || n < m) throw new RangeError(`${name}: population is a whole number of ${m} (the sample) or more, not ${n}.`);
+  for (const v of values) if (!Number.isFinite(v)) throw new RangeError(`${name}: each value is a finite number, not ${v}.`);
+  const scale = options.scale ?? n / m;
+  if (!(Number.isFinite(scale) && scale > 0)) throw new RangeError(`${name}: scale is a finite number more than 0, not ${scale}.`);
+  const all = sum(values);
+  const estimate = scale * all;
+  const spread = Math.sqrt(1 - m / n) * scale;
+  return bootstrap(values, (drawn) => estimate + spread * (sum(drawn) - all), options);
+}
+
+/** The sum of the values from the first to the last, as `values.reduce((s, t) => s + t, 0)`. */
+function sum(values: readonly number[]): number {
+  let s = 0;
+  for (const v of values) s += v;
+  return s;
 }

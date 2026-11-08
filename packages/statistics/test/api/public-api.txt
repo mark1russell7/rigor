@@ -76,6 +76,7 @@ type RidgeOptions: build/index.d.ts#RidgeOptions
 type RidgeRankInput: build/index.d.ts#RidgeRankInput
 type RidgeResponseModel: build/index.d.ts#RidgeResponseModel
 type RidgeTerm: build/index.d.ts#RidgeTerm
+type SampleTotalOptions: build/index.d.ts#SampleTotalOptions
 type SideP: build/index.d.ts#SideP
 type SmoothLaw: build/index.d.ts#SmoothLaw
 type SmoothLawScore: build/index.d.ts#SmoothLawScore
@@ -121,6 +122,7 @@ quantileSorted: build/index.d.ts#quantileSorted
 ranks: build/index.d.ts#ranks
 responseCells: build/index.d.ts#responseCells
 ridgeSolve: build/index.d.ts#ridgeSolve
+sampleTotalInterval: build/index.d.ts#sampleTotalInterval
 sd: build/index.d.ts#sd
 signTest: build/index.d.ts#signTest
 signTestPower: build/index.d.ts#signTestPower
@@ -636,6 +638,12 @@ interface RidgeTerm {
   readonly weight: number;
 }
 
+### build/index.d.ts#SampleTotalOptions
+interface SampleTotalOptions extends BootstrapOptions {
+  readonly population: number;
+  readonly scale?: number;
+}
+
 ### build/index.d.ts#SideP
 interface SideP {
   readonly against: number;
@@ -801,6 +809,9 @@ export declare function responseCells(record: Pick<ResponseRecord, "dimensions">
 
 ### build/index.d.ts#ridgeSolve
 export declare function ridgeSolve(gram: ArrayLike<number>, moment: ArrayLike<number>, lambda: number, options?: RidgeOptions): number[];
+
+### build/index.d.ts#sampleTotalInterval
+export declare function sampleTotalInterval(values: readonly number[], options: SampleTotalOptions): Interval;
 
 ### build/index.d.ts#sd
 export declare function sd(values: readonly number[]): number;
