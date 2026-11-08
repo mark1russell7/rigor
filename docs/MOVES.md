@@ -25,7 +25,7 @@ A copy with a different algorithm, or with different constants, is not a move. K
 | ireko | `packages/site/src/playground/fuzz.ts` | next |
 | Jqy | `packages/site/src/playground/fuzz.ts` | next |
 | lag | `packages/load/src/rng.ts` (`createRng`), `packages/site/src/fixtures/sample-results.ts`, `packages/site/build/og-image.ts` | next |
-| layout-contract | `packages/layout-contract/src/random.ts` (`mulberry32`, `fnv1a32`, `stepRandom`: `fork`), `balance.test.ts`, `measures.test.ts`, `text.test.ts`, `scripts/bench-text.mjs` | next |
+| layout-contract | `packages/layout-contract/src/balance.test.ts`, `measures.test.ts`, `text.test.ts`, `text-cache.test.ts`. `src/random.ts` uses `mulberry32` and `fnv1a32` of the package since layout-contract 0.7.0. | next |
 | packing | `packages/packing/src/strategy.ts`, `free.test.ts`, `pack.test.ts`, `shelf.test.ts`, `bench/coverage.ts`, `packages/site/src/model.ts` | next |
 | systems | `packages/service/src/fakes.ts` (`seeded`) | next |
 
@@ -43,8 +43,10 @@ The package README has the function for each copy, and the tests prove the numbe
 | lag | `packages/experiments/src/e8-async-context/runner/stats.ts` (`median`, `quantile`), `packages/site/src/lib/stats.ts` (`percentile`) | next |
 | lag-hud | `packages/hud/src/meter.ts` (`quantile`) | next |
 | layout-contract | `packages/joint/src/analysis.ts` (`bootstrap`, `quantileOf`) | next |
+| layout-contract | `packages/layout-contract/src/verdict.ts` (the stratified bootstrap, the pooled bootstrap, the permutation test, the sign test) | done in layout-contract 0.7.0 (mark1russell7/layout-contract#277) |
 | packing | `src/measures.ts` (`quantile`, `medianRatio`), `bench/promote.ts` (`signTestP`, `bootstrapMedian`), `bench/coverage.ts` (`wilson`), `bench/run.ts` (`median`) | next |
 
-Two copies are not equal to the package. Keep the call as it is, or accept the change in a separate commit with the records:
+Three copies are not equal to the package. Keep the call as it is, or accept the change in a separate commit with the records:
+- The sign test of `verdict` of layout-contract gives a p that is closer to the exact p than `signTest`. For 80 counts or fewer, the error of `signTest` is at most 2.5e-14 of the p (#158). The p is a report only, so layout-contract accepts the change.
 - The backtest `bootstrap` of highways does not skip a run with a NaN statistic. The package skips it.
 - `summarize` of highways gives the 0.5 quantile as the median. The package gives the midpoint, which can differ in the last bit.
