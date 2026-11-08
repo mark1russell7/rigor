@@ -72,6 +72,9 @@ v.comparison;                                     // the cases that gain and dro
 | `childLine(stdout)` | From `/fresh`: the last JSON line of a child, with its time `ms`, its `hash` and the reason of a skip. |
 | `pairOrder(pairs, round, caseIndex)` | From `/fresh`: the order of the pairs of one case in one round, and the first arm of each pair. |
 | `freshRun(options)` | From `/fresh`: the records of each pair, with each arm in its own fresh child process. |
+| `pairedChild(options)` | The samples of one paired child: the base, the candidate and a copy of the base in one process, in turn. |
+| `pairedChildOrder(round, offset, steps)` | The order of the samples of a paired child: a block A B B A for each pair at each step. |
+| `childRecords(case, round, offset, order, times)` | The `PairedTime` of the candidate pair and of the A/A pair of a paired child, from the medians. |
 | `codeStamp(options)` | From `/code-stamp`: the stamp of the code of a run, from the code that its entries reach, the lock closure of its engines and its data files. |
 | `lockClosure(text, importer, names)` | From `/code-stamp`: each package that an engine pulls in, from a pnpm lock file. |
 | `superviseCases(options)` | From `/supervise`: each case in a child process, held to a time budget, with a hard stop and a resume. |
@@ -445,6 +448,32 @@ A run of many jobs sets `roundOffset` to `job * rounds`. Then the merged records
 ### Why pairs, and not a rotation of all arms
 
 A rotation of N arms turns the order of two arms only when they are N/2 apart in the rotation. For 4 arms, two arms 1 apart come in the order 3:1 over 4 rounds. Thus each pair of `freshRun` has its own two children, and the order of each pair turns each round.
+
+## The paired child
+
+Two fresh children of a pair start at different times. A slow period of the runner can fall on one child and not on the other. A paired child is one process that loads the three sources of a pair: the base, the candidate and a second copy of the base. It takes their samples in turn, so a slow period falls on each source of a pair.
+
+```ts
+import { pairedChild } from "@mark1russell7/rigor-bench";
+
+// The caller loads each source. The copy of the base comes from a second folder, so it has its own module state.
+const child = await pairedChild({
+  case: "one-10",
+  round,
+  offset: caseIndex,
+  steps: 4,
+  sample: { base: base.burst, candidate: candidate.burst, copy: copy.burst },
+});
+console.log(JSON.stringify(child.records)); // { candidate: PairedTime, aa: PairedTime }
+```
+
+- Each source gives one warm sample first. The child does not count it.
+- Each step has a block A B B A for the candidate pair and for the A/A pair. `firstArm(round, offset)` gives A.
+- The two blocks change places at each step, and the first block turns each round.
+- The record of each pair is one `PairedTime`, with the median of the samples of each source in that pair.
+- The cost is 3 warm samples and 8 counted samples for each step.
+
+The A/A pair is the base and its copy in the same child. Its spread is the noise of the order alone, so it gives the band of the candidate pair.
 
 ## A result that changes on purpose
 
