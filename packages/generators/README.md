@@ -104,6 +104,27 @@ The option `input` of `fnv1a32` selects the units that the hash reads. Use it to
 
 For a string without a lone surrogate, `"utf8"` and `"wtf8"` give the same hash.
 
+## A content hash
+
+`canonicalHash(value)` gives the SHA-256 digest of the canonical form of a value. Equal values give equal hashes, also when the keys of their objects have another order.
+
+```ts
+import { canonicalHash, canonicalJson, sha256Hex } from "@mark1russell7/rigor-generators";
+
+canonicalJson({ b: [1, undefined], a: "x" }); // '{"a":"x","b":[1,null]}'
+canonicalHash({ b: 1, a: 2 }) === canonicalHash({ a: 2, b: 1 }); // true
+sha256Hex("abc"); // "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+```
+
+The default form of `canonicalJson` is RFC 8785 (JCS). Two options change it:
+
+| Option | The default | The other value |
+| --- | --- | --- |
+| `form` | `"jcs"`: `NaN`, an infinite number and a lone surrogate cause a `RangeError` | `"json"`: the form of `JSON.stringify`, so these values become `null` or an escape |
+| `bigint` | `"error"`: a `bigint` causes a `TypeError` | `"suffix"`: the digits and `n`, for example `12n`. This text is not JSON, so use it only for a key |
+
+The option `input` of `sha256Hex` has the values `"utf8"` and `"wtf8"` of `fnv1a32`. The two functions use no API of Node or of the browser. `sha256Hex` is not for passwords.
+
 ## Move from a copy of mulberry32
 
 Each common form of mulberry32 gives the same numbers as `random(seed).next`: the first published form (`| 0` on the state) and the form with `>>> 0`. These also give the same values:
