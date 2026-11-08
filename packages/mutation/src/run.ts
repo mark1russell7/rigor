@@ -312,12 +312,18 @@ function testFileReasons(lane: Lane, laneDir: string, names: readonly string[], 
     const own = p.parts === undefined ? [pkg] : Object.keys(p.parts).map((part) => `${pkg}.${part}`);
     const read = own.flatMap((n) => reports.get(n) ?? []);
     // A selection that is not named, or that has no full report, is a no read already.
-    if (!own.every((n) => names.includes(n)) || read.length < own.length || read.some((r) => r.testFiles === undefined)) continue;
+    if (!own.every((n) => names.includes(n)) || read.length < own.length) continue;
+    // The notes go under the sum of the package, or else under its last selection.
+    const at = p.parts === undefined || p.gateOver === "package" ? pkg : (own.at(-1) ?? pkg);
+    // A report with no "testFiles" fails its own selection. The note tells that the check over the parts did not run.
+    const blind = own.filter((n) => reports.get(n)?.testFiles === undefined);
+    if (blind.length > 0) {
+      note(at, `  the test files of ${pkg} over all its selections are not known: the reports of ${blind.join(", ")} have no "testFiles"`);
+      continue;
+    }
     const dir = resolve(laneDir, p.dir);
     const onDisk = sourcesOf(dir, dir, true).filter((f) => TEST.test(f) && !f.endsWith(".d.ts"));
     const { unread, stale } = testFileFaults(read, onDisk, p.notRead, dir);
-    // The notes go under the sum of the package, or else under its last selection.
-    const at = p.parts === undefined || p.gateOver === "package" ? pkg : (own.at(-1) ?? pkg);
     for (const f of unread) note(at, `  read by no selection: ${p.dir}/${f}`);
     for (const f of stale) note(at, `  "notRead" is not true: ${p.dir}/${f}`);
     const parts: string[] = [];
