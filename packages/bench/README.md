@@ -55,7 +55,7 @@ v.comparison;                                     // the cases that gain and dro
 | `armModels(pairs)` | The CPU models of each arm of a set of pairs, and if all the reads come from one known model. |
 | `tailFalseFails(aa, options)` | The cases of an A/A arm that the rule of `tailLimitVerdict` fails, and apart from these the cases with a limit under 1. |
 | `gateOf(cases)` | The gate of a list of case outcomes: `pass`, `block` or `no read`. |
-| `noReadLine(cases, options)` | The line of the cases with no read: the count, each case and the CPU pair, or undefined when each case has a read. |
+| `noReadLine(cases, options)` | The line of the cases with no read: the count, each case, the reason and the CPU models, or undefined when each case has a read. |
 | `writeNoRead(line, outputs)` | The line as a warning annotation of GitHub Actions and as a line of the step summary. |
 | `notSlowerVerdict(jobs, options)` | The gate of the claim "not slower by more than the margin", with looks and a family level. |
 | `budgetVerdict(rounds, aa, options)` | The verdict of the claim "the median of each case is at most `limit`", for one build: `within`, `beyond` or `cannot decide`. |
@@ -184,7 +184,10 @@ writeNoRead(line);   // a ::warning annotation, and a line of the file of GITHUB
 - With a read for each case, the line is undefined and `writeNoRead` writes nothing.
 - An empty list gives a line, because `gateOf` gives `no read` for it.
 - The line has the count, the total and the name of each case with no read, not only the first.
-- With `models`, the line names the CPU models of the two arms. It tells when they are a mixed pair.
+- With `models`, the line names the CPU models. Give one of two forms, not both.
+  - An `ArmModels` of `armModels` names the models of the two arms. The line tells a mixed pair, because a ratio can then compare two computers.
+  - A list of `{ model, jobs }` names each model and its count of jobs, for a time budget with its ratios inside one job. The line makes no claim about the ratios. The line is `mixed` when the jobs are on more than one model.
+- With `reason`, the line tells the reason of the no-reads after the counts, for example "a decision needs 3 jobs, not 2".
 - Write the line also when the run is report only, so its check shows the no-read.
 
 ## A claim with a budget

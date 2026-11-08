@@ -53,6 +53,23 @@ describe("noReadLine", () => {
     expect(mixed?.text).toContain("CPU a AMD EPYC 7763 + AMD EPYC 9V74, b AMD EPYC 7763 (a mixed pair");
   });
 
+  it("puts a reason after the counts", () => {
+    const line = noReadLine([{ case: "a", outcome: "cannot decide" }], { title: "t", reason: "a decision needs 3 jobs, not 2.", models: ONE });
+    expect(line?.reason).toBe("a decision needs 3 jobs, not 2");
+    expect(line?.text).toBe("t: no read for 1 of 1 cases: a. a decision needs 3 jobs, not 2. CPU a AMD EPYC 7763, b AMD EPYC 7763. A no read is not a pass.");
+    expect(noReadLine([{ case: "a", outcome: "cannot decide" }], { title: "t", reason: " " })?.reason).toBeUndefined();
+  });
+
+  it("names each model and its jobs in the job form, with no claim about a pair", () => {
+    const reads = [{ case: "a", outcome: "cannot decide" }];
+    const two = noReadLine(reads, { title: "budget", models: [{ model: "AMD EPYC 7763", jobs: 2 }, { model: "AMD EPYC 9V74", jobs: 1 }] });
+    expect(two).toMatchObject({ cpu: "jobs on 2 CPU models: AMD EPYC 7763 (2 jobs), AMD EPYC 9V74 (1 job)", mixed: true });
+    expect(two?.text).not.toContain("pair");
+    const one = noReadLine(reads, { title: "budget", models: [{ model: "AMD EPYC 7763", jobs: 3 }] });
+    expect(one).toMatchObject({ cpu: "jobs on 1 CPU model: AMD EPYC 7763 (3 jobs)", mixed: false });
+    expect(one?.text).not.toContain("pair");
+  });
+
   it("knows the two words of a no-read", () => {
     expect(["cannot decide", "no read", "same", "within", "beyond", "pass"].map(isNoRead)).toEqual([true, true, false, false, false, false]);
   });

@@ -65,6 +65,7 @@ type GrowthStep: build/index.d.ts#GrowthStep
 type GrowthVerdict: build/index.d.ts#GrowthVerdict
 type GuardRead: build/index.d.ts#GuardRead
 type JobLimitVerdict: build/index.d.ts#JobLimitVerdict
+type JobModel: build/index.d.ts#JobModel
 type JobRecords: build/index.d.ts#JobRecords
 type JobVerdict: build/index.d.ts#JobVerdict
 type JointClaim: build/index.d.ts#JointClaim
@@ -822,6 +823,12 @@ interface JobLimitVerdict {
   readonly verdict: LimitVerdict;
 }
 
+### build/index.d.ts#JobModel
+interface JobModel {
+  readonly model: string;
+  readonly jobs: number;
+}
+
 ### build/index.d.ts#JobRecords
 interface JobRecords {
   readonly job: string;
@@ -1093,6 +1100,7 @@ interface NoReadLine {
   readonly total: number;
   readonly cases: readonly string[];
   readonly cpu: string | undefined;
+  readonly reason: string | undefined;
   readonly mixed: boolean;
   readonly text: string;
 }
@@ -1100,7 +1108,8 @@ interface NoReadLine {
 ### build/index.d.ts#NoReadOptions
 interface NoReadOptions {
   readonly title: string;
-  readonly models?: ArmModels;
+  readonly reason?: string;
+  readonly models?: ArmModels | readonly JobModel[];
 }
 
 ### build/index.d.ts#NoReadOutputs

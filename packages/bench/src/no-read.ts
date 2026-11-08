@@ -15,12 +15,25 @@ export interface CaseRead {
   readonly outcome: string;
 }
 
+/** The jobs of a read on one CPU model. A time budget takes its ratios inside one job, so it has this form of the models. */
+export interface JobModel {
+  readonly model: string;
+  /** The count of the jobs on this model. */
+  readonly jobs: number;
+}
+
 /** The options of `noReadLine`. */
 export interface NoReadOptions {
   /** The name of the read in the line, for example the name of the bench or of the gate. */
   readonly title: string;
-  /** The CPU models of the two arms, from `armModels`. The line names them, and it tells when they are a mixed pair. */
-  readonly models?: ArmModels;
+  /** The reason of the no-reads, for example "a decision needs 3 jobs, not 2". The line puts it after the counts. */
+  readonly reason?: string;
+  /**
+   * The CPU models of the read, in one of two forms.
+   * - An `ArmModels` of `armModels` gives the models of the two arms. The line tells a mixed pair, because a ratio can then compare two computers.
+   * - A list of `JobModel` gives the jobs on each model, when each ratio is inside one job. The line makes no claim about the ratios.
+   */
+  readonly models?: ArmModels | readonly JobModel[];
 }
 
 /** The no-read line of a read. */
@@ -34,7 +47,9 @@ export interface NoReadLine {
   readonly cases: readonly string[];
   /** The CPU pair as text, or undefined without `models`. */
   readonly cpu: string | undefined;
-  /** This value is `true` when the models of the two arms are not one known model. */
+  /** The reason, or undefined without `reason`. */
+  readonly reason: string | undefined;
+  /** This value is `true` when the arms are not one known model, or when the jobs are on more than one model. */
   readonly mixed: boolean;
   /** The line: the title, the counts, each case and the CPU pair. */
   readonly text: string;
@@ -45,10 +60,23 @@ export function isNoRead(outcome: string): boolean {
   return outcome === "cannot decide" || outcome === "no read";
 }
 
-function cpuText(models: ArmModels): string {
+function isJobModels(models: ArmModels | readonly JobModel[]): models is readonly JobModel[] {
+  return Array.isArray(models);
+}
+
+function cpuText(models: ArmModels | readonly JobModel[]): { text: string; mixed: boolean } {
+  if (isJobModels(models)) {
+    const each = models.map((m) => `${m.model} (${m.jobs} ${m.jobs === 1 ? "job" : "jobs"})`).join(", ");
+    return { text: `jobs on ${models.length} CPU ${models.length === 1 ? "model" : "models"}: ${each}`, mixed: models.length > 1 };
+  }
   const side = (values: readonly string[]): string => values.join(" + ");
   const pair = `CPU a ${side(models.a)}, b ${side(models.b)}`;
-  return models.one ? pair : `${pair} (a mixed pair: a ratio can compare two computers)`;
+  return { text: models.one ? pair : `${pair} (a mixed pair: a ratio can compare two computers)`, mixed: !models.one };
+}
+
+/** This function removes the full stop at the end of a part of the line, so the line has one full stop after it. */
+function part(text: string): string {
+  return text.trim().replace(/\.+$/u, "");
 }
 
 /**
@@ -63,11 +91,14 @@ function cpuText(models: ArmModels): string {
 export function noReadLine(reads: readonly CaseRead[], options: NoReadOptions): NoReadLine | undefined {
   const cases = reads.filter((r) => isNoRead(r.outcome)).map((r) => r.case);
   if (reads.length > 0 && cases.length === 0) return undefined;
-  const cpu = options.models === undefined ? undefined : cpuText(options.models);
-  const mixed = options.models !== undefined && !options.models.one;
+  const models = options.models === undefined ? undefined : cpuText(options.models);
+  const cpu = models?.text;
+  const mixed = models?.mixed ?? false;
+  const reason = options.reason === undefined || part(options.reason) === "" ? undefined : part(options.reason);
   const counts = reads.length === 0 ? "no read: the read has no cases" : `no read for ${cases.length} of ${reads.length} cases: ${cases.join(", ")}`;
-  const text = `${options.title}: ${counts}.${cpu === undefined ? "" : ` ${cpu}.`} A no read is not a pass.`;
-  return { title: options.title, count: cases.length, total: reads.length, cases, cpu, mixed, text };
+  const parts = [counts, reason, cpu].filter((p): p is string => p !== undefined);
+  const text = `${options.title}: ${parts.map((p) => `${p}.`).join(" ")} A no read is not a pass.`;
+  return { title: options.title, count: cases.length, total: reads.length, cases, cpu, reason, mixed, text };
 }
 
 /** This function escapes the data of a workflow command of GitHub Actions. */
