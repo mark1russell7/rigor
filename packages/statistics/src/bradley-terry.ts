@@ -42,7 +42,7 @@ export interface BradleyTerryOptions {
   readonly tiePriorSd?: number;
   /** The largest number of Newton steps. The default is 100. */
   readonly maxIterations?: number;
-  /** The fit stops when no parameter moves more than this value in one step. The default is 1e-10. */
+  /** The fit stops when the full Newton step moves no parameter more than this value. The default is 1e-10. */
   readonly tolerance?: number;
 }
 
@@ -61,7 +61,7 @@ export interface BradleyTerryFit {
   readonly logLikelihood: number;
   /** The number of Newton steps. */
   readonly iterations: number;
-  /** True when the last step moved no parameter more than the tolerance. */
+  /** True when the last full Newton step moved no parameter more than the tolerance. */
   readonly converged: boolean;
 }
 
@@ -150,8 +150,9 @@ export function bradleyTerry(items: number, comparisons: readonly PairComparison
       next = moved(x, step, t);
       nextValue = objective(model, next);
     }
+    // The full Newton step decides the convergence, so a stalled line search far from the minimum does not count.
     let largest = 0;
-    for (let i = 0; i < k; i++) largest = Math.max(largest, Math.abs((next[i] as number) - (x[i] as number)));
+    for (let i = 0; i < k; i++) largest = Math.max(largest, Math.abs(step[i] as number));
     if (nextValue <= value + slack) {
       x.set(next);
       value = nextValue;
