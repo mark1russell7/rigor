@@ -14,6 +14,6 @@ permissions:
 
 jobs:
   codex:
-    uses: mark1russell7/template/.github/workflows/reusable-codex-review.yml@daa927c7fb562388b56b0d1964b8304e6c769075 # main
+    uses: mark1russell7/template/.github/workflows/reusable-codex-review.yml@b257952f2e42d784884c244d2476924dd4794edd # main
     secrets:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
