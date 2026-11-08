@@ -12,6 +12,11 @@ export interface ConfigOptions {
    */
   readonly dryRun?: boolean;
   /**
+   * When this option is true, Stryker starts the tests without mutants and makes its plan. The reporter `rigor-partial`
+   * writes the plan into `plan.json` and stops Stryker. No mutant runs. `plan-check` reads the plan.
+   */
+  readonly plan?: boolean;
+  /**
    * When this option is false, Stryker does not rewrite the tsconfig of the package in its sandbox. The default is true.
    * The rewrite uses `parseConfigFileTextToJson`, and TypeScript 7 does not have it. Refer to `rewritesTsconfig`.
    */
@@ -36,6 +41,7 @@ export interface StrykerConfig {
   readonly tsconfigFile?: string;
   readonly dryRunOnly?: true;
   readonly disableBail?: true;
+  readonly rigorPartial?: { readonly stopAfterPlan: true };
 }
 
 /**
@@ -97,5 +103,6 @@ export function strykerConfig(selection: Selection, options: ConfigOptions = {})
     ...selection.stryker,
     ...(options.concurrency === undefined ? {} : { concurrency: options.concurrency }),
     ...(options.dryRun === true ? { dryRunOnly: true, disableBail: true } : {}),
+    ...(options.plan === true ? { rigorPartial: { stopAfterPlan: true } } : {}),
   };
 }

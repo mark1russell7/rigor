@@ -14,6 +14,11 @@ describe("parseLane", () => {
     expect(parseLane(LANE)).toBe(LANE);
   });
 
+  it("accepts the limits of the cost plan", () => {
+    const lane = { packages: { a: { dir: "a", mutate: ["x"], staticLimits: { "x.ts": 0, "*": 40 } } }, planPerClock: 7.2, targetMinutes: 90 };
+    expect(parseLane(lane)).toBe(lane);
+  });
+
   it.each([
     [{}, /no object "packages"/],
     [{ packages: {} }, /no packages/],
@@ -31,6 +36,10 @@ describe("parseLane", () => {
     [{ packages: { a: { dir: "a", mutate: ["x"], stryker: [] } } }, /a: "stryker" is not an object/],
     [{ packages: { a: { dir: "a", mutate: ["x"], stryker: { mutate: ["y"] } } } }, /a: "stryker" has "mutate", but the lane owns these keys/],
     [{ packages: { a: { dir: "a", mutate: ["x"], stryker: { thresholds: {}, jsonReporter: {} } } } }, /a: "stryker" has "thresholds", "jsonReporter"/],
+    [{ packages: { a: { dir: "a", mutate: ["x"], staticLimits: { "x.ts": -1 } } } }, /a: "staticLimits" is not an object of files, each with a count/],
+    [{ packages: { a: { dir: "a", mutate: ["x"], staticLimits: [] } } }, /a: "staticLimits" is not an object of files/],
+    [{ packages: { a: { dir: "a", mutate: ["x"] } }, planPerClock: 0 }, /"planPerClock" is not a positive number/],
+    [{ packages: { a: { dir: "a", mutate: ["x"] } }, targetMinutes: "100" }, /"targetMinutes" is not a positive number/],
   ])("refuses %j", (json, message) => {
     expect(() => parseLane(json)).toThrow(message);
   });

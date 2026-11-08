@@ -227,6 +227,31 @@ describe("rigor-mutation", () => {
     expect(JSON.parse(out)).toMatchObject({ dryRunOnly: true, disableBail: true, mutate: ["src/**/*.ts"] });
   });
 
+  it("writes a config that stops after the plan, and refuses --plan with --dry-run", () => {
+    expect(run("config", "app", "--plan")).toBe(0);
+    const config = JSON.parse(out) as Record<string, unknown>;
+    expect(config).toMatchObject({ rigorPartial: { stopAfterPlan: true } });
+    expect(config).not.toHaveProperty("dryRunOnly");
+    expect(() => run("config", "app", "--plan", "--dry-run")).toThrow(/takes --dry-run or --plan, not both/);
+  });
+
+  // LANE.COST and LANE.STATIC of Vex: the estimate of each part against its target, and the static runs of each file.
+  it("reads the plan of each selection, and fails a selection over its target, a file over its static limit and a missing plan", () => {
+    const plan = (netMs: number, isStatic: number) => JSON.stringify({ files: { "src/a.ts": { mutants: 1, runs: 1, static: isStatic, netMs, limitMs: 0, lines: [] } }, tests: [] });
+    put("mutation.json", JSON.stringify({ packages: { lib: { dir: "packages/lib", mutate: ["src/*.ts"], parts: { core: ["src/a.ts"] }, staticLimits: { "*": 4 } } }, targetMinutes: 50 }));
+    put("packages/lib/reports/mutation/plan.json", plan(588_000 * 10, 4));
+    expect(run("plan-check", "lib")).toBe(0);
+    expect(out).toBe("lib: 1 runs, 4 of them static, with a planned net time of 1.6 h. The estimate is 10 minutes of the clock, and the target is 50.\nplan-check: each plan of 1 selections is in its limits\n");
+    out = "";
+    put("plans/mutation-lib.core/plan.json", plan(588_000 * 60, 5));
+    expect(run("plan-check", "lib.core", "lib", "--reports", "plans")).toBe(1);
+    expect(out).toContain("  FAIL: lib.core: the estimate of 60 minutes is over the target of 50. Cut the selection into more parts.\n");
+    expect(out).toContain("  FAIL: src/a.ts: the plan has 5 static runs, and the limit is 4.");
+    expect(out).toContain("lib: FAIL: there is no plan at plans/mutation-lib/plan.json.");
+    expect(out).toContain("plan-check: 2 of 2 selections fail\n");
+    expect(() => run("plan-check")).toThrow(/takes one or more selections/);
+  });
+
   it("refuses a relative path that leaves the folder of a package, and passes a package with none", () => {
     expect(run("load-check")).toBe(0);
     expect(out).toBe("load-check lib: 3 files, no relative path leaves packages/lib\nload-check app: 1 files, no relative path leaves packages/app\n");
