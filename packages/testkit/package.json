@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/rigor-testkit",
-  "version": "0.1.0",
-  "description": "Test helpers: the code blocks of Markdown files as test cases, so each example of a doc runs in a test.",
+  "version": "0.1.1",
+  "description": "Test helpers: the code blocks of Markdown files as test cases, and the propagation gate of one context id over each transport.",
   "keywords": [
     "testing",
     "markdown",
@@ -10,7 +10,10 @@
     "examples",
     "documentation",
     "vitest",
-    "node-test"
+    "node-test",
+    "opentelemetry",
+    "propagation",
+    "baggage"
   ],
   "homepage": "https://github.com/mark1russell7/rigor/tree/main/packages/testkit#readme",
   "bugs": {
@@ -38,6 +41,10 @@
         "types": "./build/index.d.ts",
         "import": "./build/index.js"
       },
+      "./propagation": {
+        "types": "./build/propagation.d.ts",
+        "import": "./build/propagation.js"
+      },
       "./package.json": "./package.json"
     }
   },
@@ -52,9 +59,33 @@
   },
   "devDependencies": {
     "@mark1russell7/cue": "^2.0.0",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/api-logs": "^0.213.0",
+    "@opentelemetry/context-async-hooks": "^2.6.0",
+    "@opentelemetry/core": "^2.6.0",
+    "@opentelemetry/sdk-logs": "^0.213.0",
+    "@opentelemetry/sdk-metrics": "^2.6.0",
+    "@opentelemetry/sdk-trace-base": "^2.6.0",
     "@types/node": "^26.6.5",
+    "tsdown": "^0.23.1",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.3",
-    "tsdown": "^0.23.1"
+    "vitest": "^5.0.3"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./propagation": "./src/propagation.ts",
+    "./package.json": "./package.json"
+  },
+  "peerDependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/api-logs": "^0.213.0"
+  },
+  "peerDependenciesMeta": {
+    "@opentelemetry/api": {
+      "optional": true
+    },
+    "@opentelemetry/api-logs": {
+      "optional": true
+    }
   }
 }
