@@ -258,6 +258,66 @@ describe("rigor-mutation", () => {
     expect(() => run("plan-check")).toThrow(/takes one or more selections/);
   });
 
+  // LANE.CUT of Vex: the cost maps from the plans of a run cut a group into parts of near the same cost.
+  it("writes the cost maps from the plans of a run, cuts a group by them, and fails a part over its target", () => {
+    const lane = (targetMinutes: number) => ({
+      packages: { lib: { dir: "packages/lib", mutate: ["src/**/*.ts", "!src/**/*.test.ts"], cuts: { all: { files: ["src/**/*.ts"], count: 2 } } } },
+      costs: "mutation-costs.json",
+      targetMinutes,
+      stopMinutes: 20,
+    });
+    const minute = 588_000;
+    const planWith = (files: Record<string, [number, number, number, number][]>) =>
+      JSON.stringify({ files: Object.fromEntries(Object.entries(files).map(([file, lines]) => [file, { mutants: 1, runs: 1, static: 0, netMs: 0, limitMs: 0, lines }])), tests: [] });
+    const mutateOf = (name: string): unknown => {
+      out = "";
+      expect(run("config", name)).toBe(0);
+      return (JSON.parse(out) as { mutate: unknown }).mutate;
+    };
+    put("mutation.json", JSON.stringify(lane(10)));
+    put("packages/lib/src/a.ts", "export function a() {\n  return 1;\n}\nexport function b() {\n  return 2;\n}\n");
+    expect(run("list", "--runs")).toBe(0);
+    expect(out).toBe("lib.all.1\nlib.all.2\n");
+    expect(run("minutes")).toBe(0);
+    expect(out).toContain("target=10\nstop=20\n");
+
+    // With no cost map, each line has the weight 1.
+    expect(mutateOf("lib.all.1")).toEqual(["src/a.ts:1-3", "!src/**/*.test.ts"]);
+    expect(mutateOf("lib.all.2")).toEqual(["src/a.ts:4-7", "src/core/c.ts", "!src/**/*.test.ts"]);
+    out = "";
+    expect(run("cost-check", "lib.all.1")).toBe(1);
+    expect(out).toContain("  FAIL: the group lib.all has no cost map.");
+    expect(() => run("cost-check", "lib")).toThrow(/the selection lib is not a numbered part of a group of "cuts"/);
+    expect(() => run("costs", "42")).toThrow(/"costs" takes --reports <dir>/);
+
+    put("plans/mutation-lib.all.1/plan.json", planWith({ "src/a.ts": [[2, 1, 0, minute]] }));
+    put("plans/mutation-lib.all.2/plan.json", planWith({ "src/a.ts": [[5, 1, 0, 6 * minute]], "src/core/c.ts": [[1, 1, 0, 3 * minute]] }));
+    out = "";
+    expect(run("costs", "42", "--reports", "plans")).toBe(0);
+    expect(out).toBe("costs: 2 files from the plans of 2 selections of the run 42, in mutation-costs.json\n");
+    expect(JSON.parse(readFileSync(join(root, "mutation-costs.json"), "utf8"))).toEqual({
+      lib: { "src/a.ts": { run: "42", segments: { a: minute, b: 6 * minute, "@3": 0 } }, "src/core/c.ts": { run: "42", segments: { c: 3 * minute } } },
+    });
+
+    // The cost of the function b moves the end of the first part after b.
+    expect(mutateOf("lib.all.1")).toEqual(["src/a.ts:1-6", "!src/**/*.test.ts"]);
+    expect(mutateOf("lib.all.2")).toEqual(["src/a.ts:7-7", "src/core/c.ts", "!src/**/*.test.ts"]);
+    out = "";
+    expect(run("cost-check")).toBe(0);
+    expect(out).toBe(
+      "lib.all.1: 1 entries, with an estimate of 7 minutes of the clock under the cost maps.\n" +
+        "lib.all.2: 2 entries, with an estimate of 3 minutes of the clock under the cost maps.\n" +
+        "cost-check: each of 2 parts is in its target\n",
+    );
+    put("mutation.json", JSON.stringify(lane(5)));
+    out = "";
+    expect(run("cost-check")).toBe(1);
+    expect(out).toContain("lib.all.1: 1 entries, with an estimate of 7 minutes of the clock under the cost maps.\n  FAIL: the estimate of 7 minutes is over the target of 5. Raise the count of the group lib.all.\n");
+    expect(out).toContain("cost-check: 1 of 2 parts fail\n");
+    put("mutation.json", JSON.stringify({ ...lane(5), costs: undefined }));
+    expect(() => run("costs", "42", "--reports", "plans")).toThrow(/the lane has no field "costs"/);
+  });
+
   it("refuses a relative path that leaves the folder of a package, and passes a package with none", () => {
     expect(run("load-check")).toBe(0);
     expect(out).toBe("load-check lib: 3 files, no relative path leaves packages/lib\nload-check app: 1 files, no relative path leaves packages/app\n");
