@@ -7,6 +7,8 @@
 ## . (build/index.d.ts): names
 
 type CliIo: build/index.d.ts#CliIo
+type Collected: build/index.d.ts#Collected
+type CollectedFile: build/index.d.ts#CollectedFile
 type ConfigOptions: build/index.d.ts#ConfigOptions
 DRY_RUN_TIMEOUT_MINUTES: build/index.d.ts#DRY_RUN_TIMEOUT_MINUTES
 type Disable: build/index.d.ts#Disable
@@ -17,13 +19,13 @@ type LeavingPath: build/index.d.ts#LeavingPath
 type Mutant: build/index.d.ts#Mutant
 type MutationReport: build/index.d.ts#MutationReport
 NO_TSCONFIG: build/index.d.ts#NO_TSCONFIG
-PARTIAL_FILE: build/reporter.d.ts#PARTIAL_FILE
+PARTIAL_FILE: build/reporter.chunk.d.ts#PARTIAL_FILE
 PARTIAL_PLUGIN: build/index.d.ts#PARTIAL_PLUGIN
 type PackageFile: build/index.d.ts#PackageFile
 type PackageLane: build/index.d.ts#PackageLane
 type PartialCosts: build/index.d.ts#PartialCosts
-type PartialLine: build/reporter.d.ts#PartialLine
-PartialReporter: build/reporter.d.ts#PartialReporter
+type PartialLine: build/reporter.chunk.d.ts#PartialLine
+PartialReporter: build/reporter.chunk.d.ts#PartialReporter
 type PartialRun: build/index.d.ts#PartialRun
 REPORT_DIR: build/index.d.ts#REPORT_DIR
 STRYKER_OWNED: build/index.d.ts#STRYKER_OWNED
@@ -33,6 +35,7 @@ type Selection: build/index.d.ts#Selection
 type StrykerConfig: build/index.d.ts#StrykerConfig
 TIMEOUT_MS: build/index.d.ts#TIMEOUT_MS
 changedFiles: build/index.d.ts#changedFiles
+collectFaults: build/index.d.ts#collectFaults
 compareDisables: build/index.d.ts#compareDisables
 findDisables: build/index.d.ts#findDisables
 formatScore: build/index.d.ts#formatScore
@@ -67,6 +70,21 @@ interface CliIo {
   readonly stdout: (text: string) => void;
   readonly stderr: (text: string) => void;
   readonly env?: Readonly<Record<string, string | undefined>>;
+}
+
+### build/index.d.ts#Collected
+interface Collected {
+  readonly version: string;
+  readonly path: string;
+  readonly files: readonly CollectedFile[];
+  readonly unhandled: readonly string[];
+}
+
+### build/index.d.ts#CollectedFile
+interface CollectedFile {
+  readonly file: string;
+  readonly errors: readonly string[];
+  readonly children: number;
 }
 
 ### build/index.d.ts#ConfigOptions
@@ -252,6 +270,9 @@ export declare const TIMEOUT_MS = 12e4;
 ### build/index.d.ts#changedFiles
 export declare function changedFiles(selection: Selection, changed: readonly string[], exists?: (file: string) => boolean): string[];
 
+### build/index.d.ts#collectFaults
+export declare function collectFaults(collected: Collected): string[];
+
 ### build/index.d.ts#compareDisables
 export declare function compareDisables(found: readonly Disable[], listed: readonly Disable[]): DisableCheck;
 
@@ -324,11 +345,11 @@ export declare function strykerConfig(selection: Selection, options?: ConfigOpti
 ### build/index.d.ts#summaryMarkdown
 export declare function summaryMarkdown(scores: readonly Score[]): string;
 
-### build/reporter.d.ts#PARTIAL_FILE
-export declare const PARTIAL_FILE = "partial.jsonl";
+### build/reporter.chunk.d.ts#PARTIAL_FILE
+declare const PARTIAL_FILE = "partial.jsonl";
 
-### build/reporter.d.ts#PartialLine
-export type PartialLine = {
+### build/reporter.chunk.d.ts#PartialLine
+type PartialLine = {
   readonly event: "start";
   readonly at: number;
 } | {
@@ -349,8 +370,8 @@ export type PartialLine = {
   readonly at: number;
 };
 
-### build/reporter.d.ts#PartialReporter
-export declare class PartialReporter {
+### build/reporter.chunk.d.ts#PartialReporter
+declare class PartialReporter {
   static readonly inject: readonly ["options"];
   readonly file: string;
   constructor(options: {
