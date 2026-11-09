@@ -153,6 +153,41 @@ For each transport, the gate sets the value of `key` on the client side and make
 - `localTransport(internalCall)` sends the context through a carrier in the same process. `internalCall` marks the call as internal, for a propagator that sends the baggage only on internal calls.
 - `formatPropagationReport(report)` gives a Markdown table for the summary of a CI job.
 
+## The capture of the OpenTelemetry SDK
+
+The entry `@mark1russell7/rigor-testkit/otel` gives the spans, the log records and the metric points of a test. Install `@opentelemetry/api`, `@opentelemetry/api-logs`, `@opentelemetry/sdk-trace-base`, `@opentelemetry/sdk-logs` and `@opentelemetry/sdk-metrics` to use it. The other entries do not load the SDK.
+
+```ts no-run
+import { captureTelemetry } from "@mark1russell7/rigor-testkit/otel";
+
+const capture = captureTelemetry({ spanProcessors: [createContextSpanProcessor()] });
+const unregister = capture.register();
+trace.getTracer("test").startActiveSpan("work", (span) => span.end());
+expect((await capture.spans()).map((span) => span.name)).toEqual(["work"]);
+await capture.reset();
+```
+
+When the program under test starts the SDK, give it the exporters and the reader of the capture:
+
+```ts no-run
+const capture = captureTelemetry({ sdk: "external" });
+const telemetry = startNodeTelemetry({
+  traceExporter: capture.spanExporter,
+  logExporter: capture.logExporter,
+  metricReaders: [capture.metricReader],
+});
+const report = await propagationGate({ key: "request.id", capture, transports });
+```
+
+### The rules
+
+- With `sdk: "own"` (the default), the capture makes a tracer provider, a logger provider and a meter provider. `register()` sets them as the global providers, and `shutdown()` stops them.
+- The options `spanProcessors` and `logProcessors` give the processors of the program. They run before the processor of the capture. The option `views` gives the metric views.
+- With `sdk: "external"`, the program starts the SDK. `spans()` and `logRecords()` flush the global providers before they read.
+- The metric reader collects only when the test asks, with the delta temporality. Thus `metricPoints()` gives the points after the last collection.
+- `reset()` removes all spans, log records and metric points.
+- The capture is also a `PropagationCapture` of the propagation gate.
+
 ## License
 
 MIT

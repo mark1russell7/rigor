@@ -24,6 +24,7 @@ r.weighted([1, 2, 3]); // an index: 2 has the probability 3/6
 r.shuffle([1, 2, 3, 4]); // a new list in a random order
 r.sample([1, 2, 3, 4], 2); // 2 different items
 r.normal(10, 2); // a normal value with the mean 10 and the standard deviation 2
+r.gumbel(0, 1); // a Gumbel value: add it to the log of each weight, and sort, for a weighted random order
 r.fork("lanes"); // an independent generator for one part of the work
 r.seed; // the 32-bit seed: write it in each failure message
 
@@ -91,6 +92,43 @@ Each table is a sample, and it does not show a general law:
 - `GIT_BLOB_BYTES` reads each file of one tree, also the binary files. It leaves out 34 empty files. One repository is one project, so a table of another repository has other values.
 
 The npm package holds the notice of the Ptolemy II license, because the field `notice` is part of the build.
+
+## Input families and designs
+
+An input family has named dimensions. Each dimension has a range from `min` to `max`. It can also have one of these:
+
+- a `distribution`, cut to the range,
+- the `scale` `log`, so the logarithm of the value is uniform,
+- `integer: true`, so each value is an integer from `min` to `max`.
+
+A design gives points of the unit cube. `familyMap` takes coordinate `i` of a point to a value of dimension `i`.
+
+| Design | Points | Property |
+| --- | --- | --- |
+| `randomDesign(n, d, r)` | `n` | independent uniform points |
+| `latinHypercube(n, d, r)` | `n` | each column has one point in each of the `n` strata |
+| `stratifiedDesign(strata, d, r)` | `strata^d` | one point in each cell of the grid |
+| `saltelliDesign(n, d, r)` | `n * (d + 2)` | the matrices `a`, `b` and `ab[i]` of the Sobol indices |
+
+```ts
+import { familyPoints, latinHypercube, random } from "@mark1russell7/rigor-generators";
+
+const family = {
+  name: "boxes",
+  dimensions: [
+    { name: "count", min: 1, max: 6, integer: true },
+    { name: "width", min: 10, max: 1000, scale: "log" },
+    { name: "area", min: 1, max: 50, distribution: { family: "lognormal", mu: 2, sigma: 1 } },
+  ],
+} as const;
+const points = familyPoints(family, latinHypercube(200, 3, random("design")), random("family"));
+```
+
+A distribution of a dimension uses its `cdf` and its `quantile`, from `distributionOf`. The value of a coordinate `u` is the quantile of `u` in the probability of the range. Thus a Latin hypercube also gives one value in each stratum of the probability.
+
+The parameters of a dimension come from `r.fork("dimension:" + name)`. The same seed gives the same points, and a new dimension does not change the values of the others.
+
+For the mean of a sum of 3 inputs from 50 points, the Latin hypercube gives 0.00042 of the variance of the random design. A test holds the ratio below 1/1000.
 
 ## The input of `fnv1a32`
 
