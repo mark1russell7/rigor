@@ -29,6 +29,15 @@ localTransport: build/propagation.d.ts#localTransport
 losingContext: build/propagation.d.ts#losingContext
 propagationGate: build/propagation.d.ts#propagationGate
 
+## ./otel (build/otel.d.ts): names
+
+ExternalSdkCaptureOptions: build/otel.d.ts#ExternalSdkCaptureOptions
+OtelMetricPoint: build/otel.d.ts#OtelMetricPoint
+OwnSdkCaptureOptions: build/otel.d.ts#OwnSdkCaptureOptions
+OwnSdkTelemetryCapture: build/otel.d.ts#OwnSdkTelemetryCapture
+TelemetryCapture: build/otel.d.ts#TelemetryCapture
+captureTelemetry: build/otel.d.ts#captureTelemetry
+
 ## Declarations
 
 ### build/markdown-examples.d.ts#FencedBlock
@@ -65,6 +74,49 @@ export declare function mapImports(code: string, imports: Readonly<Record<string
 
 ### build/markdown-examples.d.ts#markdownExamples
 export declare function markdownExamples(files: readonly string[], options?: MarkdownExampleOptions): MarkdownExample[];
+
+### build/otel.d.ts#ExternalSdkCaptureOptions
+export interface ExternalSdkCaptureOptions {
+  readonly sdk: "external";
+}
+
+### build/otel.d.ts#OtelMetricPoint
+export interface OtelMetricPoint {
+  readonly name: string;
+  readonly attributes: Readonly<Record<string, unknown>>;
+}
+
+### build/otel.d.ts#OwnSdkCaptureOptions
+export interface OwnSdkCaptureOptions {
+  readonly sdk?: "own";
+  readonly spanProcessors?: readonly SpanProcessor[];
+  readonly logProcessors?: readonly LogRecordProcessor[];
+  readonly views?: readonly ViewOptions[];
+}
+
+### build/otel.d.ts#OwnSdkTelemetryCapture
+export interface OwnSdkTelemetryCapture extends TelemetryCapture {
+  readonly tracerProvider: BasicTracerProvider;
+  readonly loggerProvider: LoggerProvider;
+  readonly meterProvider: MeterProvider;
+  register(): () => void;
+  shutdown(): Promise<void>;
+}
+
+### build/otel.d.ts#TelemetryCapture
+export interface TelemetryCapture {
+  readonly spanExporter: InMemorySpanExporter;
+  readonly logExporter: InMemoryLogRecordExporter;
+  readonly metricReader: MetricReader;
+  spans(): Promise<readonly ReadableSpan[]>;
+  logRecords(): Promise<readonly ReadableLogRecord[]>;
+  metricPoints(): Promise<readonly OtelMetricPoint[]>;
+  reset(): Promise<void>;
+}
+
+### build/otel.d.ts#captureTelemetry
+export declare function captureTelemetry(options?: OwnSdkCaptureOptions): OwnSdkTelemetryCapture;
+export declare function captureTelemetry(options: ExternalSdkCaptureOptions): TelemetryCapture;
 
 ### build/propagation.d.ts#GATE_NAMES
 export declare const GATE_NAMES: {

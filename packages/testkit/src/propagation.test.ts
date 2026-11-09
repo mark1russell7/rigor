@@ -64,7 +64,7 @@ const logRecords = new InMemoryLogRecordExporter();
 const metricExporter = new InMemoryMetricExporter(AggregationTemporality.DELTA);
 const reader = new PeriodicExportingMetricReader({ exporter: metricExporter, exportIntervalMillis: 3_600_000 });
 const tracerProvider = new BasicTracerProvider({ spanProcessors: [spanProcessor, new SimpleSpanProcessor(spans)] });
-const loggerProvider = new LoggerProvider({ processors: [logProcessor, new SimpleLogRecordProcessor(logRecords)] });
+const loggerProvider = new LoggerProvider({ processors: [logProcessor, new SimpleLogRecordProcessor({ exporter: logRecords })] });
 const meterProvider = new MeterProvider({
   readers: [reader],
   views: [{ instrumentName: "*", attributesProcessors: [{ process: ({ [KEY]: _removed, ...rest }) => rest }] }],
