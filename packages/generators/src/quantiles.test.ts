@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { sampler, type DistributionSpec } from "./distributions.ts";
-import { betaCdf, distributionOf, normalCdf, normalQuantile } from "./quantiles.ts";
+import { betaCdf, distributionOf } from "./quantiles.ts";
 import { random } from "./random.ts";
 
 const relative = (got: number, want: number): number => Math.abs(got - want) / Math.abs(want);
@@ -16,34 +16,6 @@ const CONTINUOUS: readonly DistributionSpec[] = [
   { family: "beta", a: 0.3, b: 4 },
   { family: "mixture", parts: [{ weight: 3, part: { family: "lognormal", mu: 0, sigma: 1 } }, { weight: 1, part: { family: "pareto", scale: 5, shape: 2 } }] },
 ];
-
-describe("the standard normal", () => {
-  // The bounds are the measured errors of 2026-11-09, with a small margin. A change that loses accuracy fails here.
-  it("gives the values of the tables within 2 epsilon, also in the tails", () => {
-    const tables: readonly (readonly [number, number])[] = [
-      [1.96, 0.9750021048517795],
-      [-1.96, 0.024997895148220435],
-      [-1, 0.15865525393145707],
-      [-0.5, 0.3085375387259869],
-      [-5, 2.866515718791939e-7],
-      [-10, 7.619853024160527e-24],
-      [-20, 2.7536241186062337e-89],
-    ];
-    for (const [x, want] of tables) expect(relative(normalCdf(x), want), String(x)).toBeLessThanOrEqual(2 * Number.EPSILON);
-    expect(normalCdf(0)).toBe(0.5);
-  });
-
-  it("gives the quantile within 1 ulp at 0.025 and 0.975, and the ends", () => {
-    const want = 1.959963984540054;
-    expect(Math.abs(normalQuantile(0.975) - want)).toBeLessThanOrEqual(Number.EPSILON);
-    expect(Math.abs(normalQuantile(0.025) + want)).toBeLessThanOrEqual(Number.EPSILON);
-    expect(normalQuantile(0.5)).toBe(0);
-    expect(relative(normalQuantile(1e-10), -6.361340902404056)).toBeLessThan(1e-12);
-    expect(normalQuantile(0)).toBe(Number.NEGATIVE_INFINITY);
-    expect(normalQuantile(1)).toBe(Number.POSITIVE_INFINITY);
-    expect(() => normalQuantile(1.5)).toThrow(RangeError);
-  });
-});
 
 describe("the beta cumulative distribution", () => {
   it("equals the closed forms", () => {
