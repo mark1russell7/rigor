@@ -6,3 +6,4 @@ export {
   type MarkdownExample,
   type MarkdownExampleOptions,
 } from "./markdown-examples.ts";
+export { rejects } from "./rejects.ts";

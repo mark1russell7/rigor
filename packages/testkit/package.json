@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/rigor-testkit",
-  "version": "0.1.3",
-  "description": "Test helpers: the code blocks of Markdown files as test cases, model-based tests on fast-check, the propagation gate of one context id over each transport, and the capture of the OpenTelemetry SDK.",
+  "version": "0.1.4",
+  "description": "Test helpers: the code blocks of Markdown files as test cases, model-based tests on fast-check, the propagation gate of one context id over each transport, the capture of the OpenTelemetry SDK, and a check of an operation that must give a rejected promise.",
   "keywords": [
     "testing",
     "markdown",
