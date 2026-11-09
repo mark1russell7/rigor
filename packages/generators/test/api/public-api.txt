@@ -8,6 +8,7 @@
 
 type CanonicalOptions: build/hash.d.ts#CanonicalOptions
 DIAGRAM_BOX_AREA: build/recorded.d.ts#DIAGRAM_BOX_AREA
+type Distribution: build/quantiles.d.ts#Distribution
 type DistributionSpec: build/distributions.d.ts#DistributionSpec
 GIT_BLOB_BYTES: build/recorded.d.ts#GIT_BLOB_BYTES
 type Param: build/distributions.d.ts#Param
@@ -16,12 +17,16 @@ type Random: build/random.d.ts#Random
 type RecordedTable: build/recorded.d.ts#RecordedTable
 type Sha256Options: build/hash.d.ts#Sha256Options
 type Source: build/random.d.ts#Source
+betaCdf: build/quantiles.d.ts#betaCdf
 canonicalHash: build/hash.d.ts#canonicalHash
 canonicalJson: build/hash.d.ts#canonicalJson
 dependsOnLibm: build/distributions.d.ts#dependsOnLibm
 deriveSeed: build/random.d.ts#deriveSeed
+distributionOf: build/quantiles.d.ts#distributionOf
 fnv1a32: build/random.d.ts#fnv1a32
 mulberry32: build/random.d.ts#mulberry32
+normalCdf: build/quantiles.d.ts#normalCdf
+normalQuantile: build/quantiles.d.ts#normalQuantile
 random: build/random.d.ts#random
 randomOf: build/random.d.ts#randomOf
 recordedSpec: build/recorded.d.ts#recordedSpec
@@ -89,6 +94,26 @@ export declare function canonicalJson(value: unknown, options?: CanonicalOptions
 
 ### build/hash.d.ts#sha256Hex
 export declare function sha256Hex(text: string, options?: Sha256Options): string;
+
+### build/quantiles.d.ts#Distribution
+export interface Distribution {
+  readonly family: DistributionSpec["family"];
+  readonly discrete: boolean;
+  cdf(x: number): number;
+  quantile(u: number): number;
+}
+
+### build/quantiles.d.ts#betaCdf
+export declare function betaCdf(x: number, a: number, b: number): number;
+
+### build/quantiles.d.ts#distributionOf
+export declare function distributionOf(spec: DistributionSpec, r: Random): Distribution;
+
+### build/quantiles.d.ts#normalCdf
+export declare function normalCdf(x: number): number;
+
+### build/quantiles.d.ts#normalQuantile
+export declare function normalQuantile(p: number): number;
 
 ### build/random.d.ts#Random
 export interface Random {
