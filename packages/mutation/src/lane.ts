@@ -57,6 +57,17 @@ export interface PackageLane {
    * file. A static run starts each test. `plan-check` fails a file over its limit.
    */
   readonly staticLimits?: Readonly<Record<string, number>>;
+  /**
+   * Each group of this field has its globs and a count of parts. The cost maps of the lane cut the files of the group
+   * into the parts `<group>.1` to `<group>.<count>`. A group is a part for `partErrors`. Its globs have no line range.
+   */
+  readonly cuts?: Readonly<Record<string, CutGroup>>;
+}
+
+/** A group of files that the cost maps cut into `count` parts of near the same planned net time. */
+export interface CutGroup {
+  readonly files: readonly string[];
+  readonly count: number;
 }
 
 /** The keys of the Stryker config that the lane owns. The field `stryker` of a package cannot have them. */
@@ -80,6 +91,8 @@ export interface Lane {
   readonly targetMinutes?: number;
   /** This field gives the stop of the estimate of a selection, in minutes. `plan-check` fails a selection over it. The default is 140. */
   readonly stopMinutes?: number;
+  /** This field gives the file of the cost maps, from the folder of the lane file. Without it, each line of a group has the weight 1. */
+  readonly costs?: string;
 }
 
 /** The default of `maxTestFall` of the lane, in percent. */
@@ -96,9 +109,27 @@ export interface Selection {
   readonly timeoutMS: number | undefined;
   readonly dryRunTimeoutMinutes: number | undefined;
   readonly stryker: Readonly<Record<string, unknown>> | undefined;
+  /** A numbered part of a group of `cuts` has its group, the count of parts and its index from 0. */
+  readonly cut?: CutPart;
 }
 
+/** The place of a numbered part in its group of `cuts`. */
+export interface CutPart {
+  readonly group: string;
+  readonly count: number;
+  readonly index: number;
+}
+
+/**
+ * This function gives the entries of `mutate` of a numbered part of a group, from the cut of the group by cost. The
+ * CLI reads the files and the cost maps. The globs are the globs of the group, with the `!` globs of the package.
+ */
+export type CutOf = (pkg: string, cut: CutPart, globs: readonly string[]) => readonly string[];
+
 const NAME = /^[\w-]+$/;
+
+/** A `mutate` entry with a range, as Stryker reads it: `src/a.ts:1-300`, or `src/a.ts:1:4-300:2` with columns. */
+const RANGE = /^(.+?):(\d+)(?::(\d+))?-(\d+)(?::(\d+))?$/;
 
 const isRecord = (x: unknown): x is Record<string, unknown> => typeof x === "object" && x !== null && !Array.isArray(x);
 
@@ -118,7 +149,7 @@ function packageErrors(name: string, p: unknown): string[] {
   const gate = p["gate"];
   const gateOver = p["gateOver"];
   if (gateOver !== undefined && gateOver !== "part" && gateOver !== "package") errors.push(`${name}: "gateOver" is not "part" or "package"`);
-  else if (gateOver === "package" && p["parts"] === undefined) errors.push(`${name}: "gateOver" is "package", but the package has no parts`);
+  else if (gateOver === "package" && p["parts"] === undefined && p["cuts"] === undefined) errors.push(`${name}: "gateOver" is "package", but the package has no parts`);
   if (gate !== undefined && (typeof gate !== "number" || !(gate >= 0 && gate <= 100))) errors.push(`${name}: "gate" is not a percent from 0 to 100`);
   if (p["vitestConfig"] !== undefined && typeof p["vitestConfig"] !== "string") errors.push(`${name}: "vitestConfig" is not a file name`);
   for (const field of ["timeoutMS", "dryRunTimeoutMinutes"]) {
@@ -135,11 +166,25 @@ function packageErrors(name: string, p: unknown): string[] {
   }
   if (p["notRead"] !== undefined && !isReasons(p["notRead"])) errors.push(`${name}: "notRead" is not an object of files, each with a reason`);
   if (p["computedImports"] !== undefined && !isReasons(p["computedImports"])) errors.push(`${name}: "computedImports" is not an object of files, each with a reason`);
+  const parts = p["parts"];
   const limits = p["staticLimits"];
   if (limits !== undefined && !(isRecord(limits) && Object.values(limits).every((n) => typeof n === "number" && Number.isInteger(n) && n >= 0))) {
     errors.push(`${name}: "staticLimits" is not an object of files, each with a count of 0 or more`);
   }
-  const parts = p["parts"];
+  const cuts = p["cuts"];
+  if (cuts !== undefined) {
+    if (!isRecord(cuts) || Object.keys(cuts).length === 0) errors.push(`${name}: "cuts" is not an object with groups`);
+    else {
+      for (const [group, cut] of Object.entries(cuts)) {
+        if (!NAME.test(group)) errors.push(`${name}: the group name "${group}" has a character that is not a letter, a digit, "_" or "-"`);
+        if (isRecord(parts) && parts[group] !== undefined) errors.push(`${name}: "${group}" is a part and a group of "cuts"`);
+        const files = isRecord(cut) ? cut["files"] : undefined;
+        const count = isRecord(cut) ? cut["count"] : undefined;
+        if (!isGlobs(files) || files.some((g) => g.startsWith("!") || RANGE.test(g))) errors.push(`${name}.${group}: "files" is not a list of globs without "!" and without a line range`);
+        if (!(typeof count === "number" && Number.isInteger(count) && count >= 1)) errors.push(`${name}.${group}: "count" is not a positive integer`);
+      }
+    }
+  }
   if (parts !== undefined) {
     if (!isRecord(parts) || Object.keys(parts).length === 0) errors.push(`${name}: "parts" is not an object with parts`);
     else {
@@ -166,6 +211,7 @@ export function parseLane(json: unknown): Lane {
   if (fall !== undefined && (typeof fall !== "number" || !(fall >= 0 && fall <= 100))) errors.push(`"maxTestFall" is not a percent from 0 to 100`);
   const planned = json["plannedFalls"];
   if (planned !== undefined && !isReasons(planned)) errors.push(`"plannedFalls" is not an object of selections, each with a reason`);
+  if (json["costs"] !== undefined && (typeof json["costs"] !== "string" || json["costs"] === "")) errors.push(`"costs" is not a file name`);
   const positive = (v: unknown): v is number => typeof v === "number" && v > 0 && Number.isFinite(v);
   for (const field of ["planPerClock", "targetMinutes", "stopMinutes"]) {
     if (json[field] !== undefined && !positive(json[field])) errors.push(`"${field}" is not a positive number`);
@@ -181,35 +227,64 @@ export function parseLane(json: unknown): Lane {
   return lane;
 }
 
-/** This function gives the names of all the selections of a lane: each package, then each part of the package. */
-export function selectionNames(lane: Lane): string[] {
-  return Object.entries(lane.packages).flatMap(([name, p]) => [name, ...Object.keys(p.parts ?? {}).map((part) => `${name}.${part}`)]);
-}
+/** This function gives the numbered parts of a group: the group itself for a count of 1. */
+const numberedParts = (name: string, count: number): string[] => (count === 1 ? [name] : Array.from({ length: count }, (_unused, i) => `${name}.${String(i + 1)}`));
 
-/** This function gives the selections of a full run: the parts of each package with parts, else the package. Each file is in one run. */
-export function runSelections(lane: Lane): string[] {
-  return Object.entries(lane.packages).flatMap(([name, p]) => (p.parts === undefined ? [name] : Object.keys(p.parts).map((part) => `${name}.${part}`)));
+/** This function tells if a package has parts or groups of `cuts`. */
+const hasParts = (p: PackageLane): boolean => p.parts !== undefined || p.cuts !== undefined;
+
+/**
+ * This function gives the names of all the selections of a lane. These are each package, each part of the package,
+ * and each group of `cuts` of the package with its numbered parts.
+ */
+export function selectionNames(lane: Lane): string[] {
+  return Object.entries(lane.packages).flatMap(([name, p]) => [
+    name,
+    ...Object.keys(p.parts ?? {}).map((part) => `${name}.${part}`),
+    ...Object.entries(p.cuts ?? {}).flatMap(([group, cut]) => [...new Set([`${name}.${group}`, ...numberedParts(`${name}.${group}`, cut.count)])]),
+  ]);
 }
 
 /**
- * This function gives the selection of a name: a package, or a part of a package.
- *
- * @throws Error when the lane has no package or part of that name
+ * This function gives the selections of a full run. These are the parts and the numbered parts of each package with
+ * parts or groups, else the package. Each file is in one run.
  */
-export function select(lane: Lane, name: string): Selection {
-  const [pkg = "", part, ...rest] = name.split(".");
-  const p = lane.packages[pkg];
-  const globs = part === undefined ? undefined : p?.parts?.[part];
-  if (p === undefined || rest.length > 0 || (part !== undefined && globs === undefined)) {
-    throw new Error(`the lane has no package or part "${name}". It has: ${selectionNames(lane).join(", ")}`);
-  }
-  // Stryker applies a "!" glob to the globs before it, so the "!" globs of the package go after the globs of the part.
-  const mutate = globs === undefined ? p.mutate : [...globs, ...p.mutate.filter((g) => g.startsWith("!"))];
-  return { name, pkg, dir: p.dir, mutate, gate: p.gate, vitestConfig: p.vitestConfig, timeoutMS: p.timeoutMS, dryRunTimeoutMinutes: p.dryRunTimeoutMinutes, stryker: p.stryker };
+export function runSelections(lane: Lane): string[] {
+  return Object.entries(lane.packages).flatMap(([name, p]) =>
+    !hasParts(p)
+      ? [name]
+      : [...Object.keys(p.parts ?? {}).map((part) => `${name}.${part}`), ...Object.entries(p.cuts ?? {}).flatMap(([group, cut]) => numberedParts(`${name}.${group}`, cut.count))],
+  );
 }
 
-/** A `mutate` entry with a range, as Stryker reads it: `src/a.ts:1-300`, or `src/a.ts:1:4-300:2` with columns. */
-const RANGE = /^(.+?):(\d+)(?::(\d+))?-(\d+)(?::(\d+))?$/;
+/** This function gives the selections of a full run of one package: its parts and numbered parts, else the package. */
+export function packageRuns(lane: Lane, pkg: string): string[] {
+  return runSelections({ packages: Object.fromEntries(Object.entries(lane.packages).filter(([name]) => name === pkg)) });
+}
+
+/**
+ * This function gives the selection of a name. The name is a package, a part, a group of `cuts` or a numbered part of a
+ * group. A numbered part mutates the entries that `cutOf` gives. Without `cutOf`, it mutates its full group.
+ *
+ * @throws Error when the lane has no selection of that name
+ */
+export function select(lane: Lane, name: string, cutOf?: CutOf): Selection {
+  const [pkg = "", part, number, ...rest] = name.split(".");
+  const p = lane.packages[pkg];
+  const group = part === undefined ? undefined : p?.cuts?.[part];
+  const globs = part === undefined ? undefined : (p?.parts?.[part] ?? group?.files);
+  const index = Number(number) - 1;
+  const cut = group !== undefined && part !== undefined && group.count > 1 && number === String(index + 1) && index >= 0 && index < group.count ? { group: part, count: group.count, index } : undefined;
+  if (p === undefined || rest.length > 0 || (part !== undefined && globs === undefined) || (number !== undefined && cut === undefined)) {
+    throw new Error(`the lane has no selection "${name}". It has: ${selectionNames(lane).join(", ")}`);
+  }
+  // Stryker applies a "!" glob to the globs before it, so the "!" globs of the package go after the globs of the part.
+  const not = p.mutate.filter((g) => g.startsWith("!"));
+  const own = globs === undefined ? p.mutate : [...(cut === undefined || cutOf === undefined ? globs : cutOf(pkg, cut, [...globs, ...not])), ...not];
+  const base = { name, pkg, dir: p.dir, mutate: own, gate: p.gate, vitestConfig: p.vitestConfig, timeoutMS: p.timeoutMS, dryRunTimeoutMinutes: p.dryRunTimeoutMinutes, stryker: p.stryker };
+  return cut === undefined ? base : { ...base, cut };
+}
+
 
 /** This type is a `mutate` entry with a range of lines. */
 interface LineRange {
@@ -316,8 +391,8 @@ function rangeErrors(pkg: string, file: string, ranges: readonly { part: string;
  */
 export function partErrors(lane: Lane, pkg: string, files: readonly string[], lines?: (file: string) => number): string[] {
   const p = lane.packages[pkg];
-  if (p?.parts === undefined) return [];
-  const parts = Object.keys(p.parts).map((part) => ({ part, mutate: select(lane, `${pkg}.${part}`).mutate }));
+  if (p === undefined || !hasParts(p)) return [];
+  const parts = [...Object.keys(p.parts ?? {}), ...Object.keys(p.cuts ?? {})].map((part) => ({ part, mutate: select(lane, `${pkg}.${part}`).mutate }));
   const errors: string[] = [];
   for (const file of files) {
     const inMutate = globsSelect(p.mutate, file);

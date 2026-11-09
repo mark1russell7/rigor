@@ -49,8 +49,10 @@ The lane file `mutation.json` is at the root of the repository:
 - `targetMinutes` (at the root of the lane) is the target of the estimate of each selection, in minutes. The default is 100.
 - `stopMinutes` (at the root of the lane) is the stop of the estimate of each selection, in minutes. The default is 140. It is not less than `targetMinutes`.
 - `planPerClock` (at the root of the lane) is the planned net time of one minute of the clock. The default is 9.8, from a nightly run of Vex.
+- `cuts` gives groups of files that the cost maps cut into numbered parts. A group has its globs in `files` and its count of parts in `count`. The globs have no line range.
+- `costs` (at the root of the lane) names the file of the cost maps, from the folder of the lane file.
 
-A selection is one Stryker run: a package (`collections`) or a part (`collections.impl`). `rigor-mutation list --runs` gives the selections of a full run: the parts of each package with parts, else the package.
+A selection is one Stryker run: a package (`collections`), a part (`collections.impl`) or a numbered part of a group (`collections.base.2`). `rigor-mutation list --runs` gives the selections of a full run: the parts of each package with parts, else the package.
 
 A full run mutates only the files of the parts. Thus a file in no part has no score, and a file in two parts has two scores. `list --runs`, and `config` and `scores` of a part, examine the source files of the package. They fail and name each file that is in no part, in two parts, or in a part but not in `mutate`. For a file in line ranges, they name each gap and each overlap of the ranges, and the lines after the last range. In the example, a file `src/util.ts` is in no part, so the lane fails.
 
@@ -121,6 +123,34 @@ plan-check: each plan of 1 selections is in its limits
 ```
 
 `--report <file>` reads the plan of one selection from a file. `--reports <dir>` reads `<dir>/mutation-<selection>/plan.json`. The workflow `stryker-stop.yml` checks the plan in a real run.
+
+### The cut by cost
+
+A group of `cuts` gives the numbered parts `<group>.1` to `<group>.<count>`. A full run reads these parts. The selection `<group>` mutates the full group. A group with the count 1 is one part. For the cover of the files, a group is a part.
+
+```json
+{
+  "packages": { "vex": { "dir": "packages/core", "mutate": ["src/**/*.ts", "!src/**/*.test.ts"], "cuts": { "base": { "files": ["src/**/*.ts"], "count": 4 } } } },
+  "costs": "mutation-costs.json"
+}
+```
+
+The cut follows the cost maps of the lane:
+
+- The files of a group follow one another in the order of their paths.
+- A segment of a file ends on a closing line: a `}` with an indent of 0 to 2 spaces. Its key is the name of its first declaration.
+- A cost map gives the planned net time of each segment of a file. A segment spreads its cost over its lines.
+- A new segment has the mean cost of a line of its file. A file with no map has the mean cost of a line of its group. With no map, each line has the weight 1.
+- A part ends on a closing line or at the end of a file. Thus a mutant of the body of a method stays in one part.
+- Of all cuts, the cut has the smallest largest part. Of these cuts, it has the smallest sum of squares.
+
+The cut reads only the files on the disk and the cost maps. Thus each job of a run gets the same parts.
+
+`rigor-mutation costs <run> --reports <dir>` writes the cost maps from the plans of the run `<run>`. It reads `<dir>/mutation-<selection>/plan.json` of each selection. It adds the plan lines of a file over the parts, and a file with no plan line gets a map of 0. The maps of the other files stay. Write the maps again after a large change of a file or of its tests, and commit them.
+
+`rigor-mutation cost-check [<selection>...]` gives the estimate of the clock of each numbered part under the committed maps. A part over `targetMinutes` fails, and so does a group with no map. The check reads no plan, so each commit gives one result. Thus a check of the pull request can hold each part under its target.
+
+`rigor-mutation minutes` gives `target=<minutes>` and `stop=<minutes>` for `GITHUB_OUTPUT`. Thus a workflow can stop Stryker at `stopMinutes` of the lane, and the lane is the one source of the stop.
 
 ## The score
 
@@ -225,4 +255,4 @@ const score = scoreReport(parseReport(JSON.parse(reportText)), selection);
 console.log(formatScore(score)); // collections.impl: 91.20 % (456 of 500, 44 survived), gate 80 %: pass
 ```
 
-The package also exports `selectionNames`, `runSelections`, `summaryMarkdown`, `findDisables`, `compareDisables`, `leavingPaths`, `relatedTestFiles`, `isConfigFile`, `testCount`, `testFall`, `unreadTestFiles`, `failScore` and `runCli`.
+The package also exports `selectionNames`, `runSelections`, `packageRuns`, `summaryMarkdown`, `findDisables`, `compareDisables`, `leavingPaths`, `relatedTestFiles`, `isConfigFile`, `testCount`, `testFall`, `unreadTestFiles`, `failScore` and `runCli`. The cut by cost has the exports `cutByCost`, `costMapOf`, `segmentsOf`, `lineWeights`, `weightedFiles`, `plannedMs` and `parseCostMaps`.

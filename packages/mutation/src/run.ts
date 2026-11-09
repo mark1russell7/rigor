@@ -11,8 +11,9 @@ import { parseArgs } from "node:util";
 import { REPORT_DIR, rewritesTsconfig, strykerConfig } from "./config.ts";
 import { compareDisables, findDisables, type Disable } from "./disables.ts";
 import { collectFaults, computedImports, leavingPaths, relatedTestFiles, type Collected, type CollectRequest, type PackageFile } from "./load.ts";
-import { changedFiles, globsSelect, MAX_TEST_FALL, parseLane, partErrors, runSelections, select, selectionNames, type Lane, type Selection } from "./lane.ts";
-import { parsePlan, PLAN_FILE, readPlan } from "./plan.ts";
+import { costMapOf, cutByCost, parseCostMaps, plannedMs, weightedFiles, type CostMap, type CostMaps, type WeightedFile } from "./cut.ts";
+import { changedFiles, globsSelect, MAX_TEST_FALL, packageRuns, parseLane, partErrors, runSelections, select, selectionNames, type CutOf, type Lane, type Selection } from "./lane.ts";
+import { clockMinutes, parsePlan, PLAN_FILE, readPlan, STOP_MINUTES, TARGET_MINUTES, type LinePlan } from "./plan.ts";
 import { PARTIAL_FILE } from "./reporter.ts";
 import { copyOfFolder, ignoreRules, minimatchOf, removeCopy, sandboxFiles, tempDirOf } from "./sandbox.ts";
 import { failScore, formatScore, packageScore, parsePartial, parseReport, readFaults, partialScore, scoreReport, summaryMarkdown, testFall, testFileFaults, unreadTestFiles, type MutationReport, type Score } from "./score.ts";
@@ -61,6 +62,15 @@ export const HELP: string = `rigor-mutation: the mutation tests of a repository,
                                                target gives a warning. A selection over the stop fails, and so
                                                does a file over its count of "staticLimits". --reports reads
                                                <dir>/mutation-<selection>/plan.json.
+  rigor-mutation costs <run> --reports <dir>   write the cost maps of the lane into the file of "costs", from
+                                               <dir>/mutation-<selection>/plan.json of each selection of the
+                                               run <run>. A file of the plans with no line gets a map of 0.
+                                               The maps of the other files stay.
+  rigor-mutation cost-check [<selection>...]   the estimate of the clock of each numbered part of a group of
+                                               "cuts" under the cost maps. A part over "targetMinutes" fails.
+                                               No selection checks each numbered part of the lane.
+  rigor-mutation minutes                       the target and the stop of the lane, as the lines
+                                               target=<minutes> and stop=<minutes> for GITHUB_OUTPUT.
   rigor-mutation disables [--write]            compare the disable comments with their list
   rigor-mutation load-check [<selection>...] [--collect] [--runner <file>]
                                                refuse each relative path of a package that leaves its folder.
@@ -78,8 +88,10 @@ export const HELP: string = `rigor-mutation: the mutation tests of a repository,
                      for example the output of git diff --name-only. A changed test file selects
                      its source file of the same name.
 
-A selection is a package ("collections") or a part of a package ("collections.impl").
-Each file of a package with parts must be in exactly one part. list --runs, and config and scores
+A selection is a package ("collections"), a part of a package ("collections.impl"), a group of
+"cuts" ("collections.base") or a numbered part of a group ("collections.base.2"). The cost maps
+cut a group into numbered parts of near the same cost. A part ends on a closing line or at the end
+of a file. Each file of a package with parts must be in exactly one part or group. list --runs, and config and scores
 of a part, fail when it is not.
 The score of a selection reads <dir>/${REPORT_DIR}/mutation.json, or the file of --report.
 `;
@@ -153,7 +165,7 @@ interface LoadCheckOptions {
 function collectCheck(lane: Lane, laneDir: string, pkg: string, files: readonly PackageFile[]): { readonly faults: string[]; readonly collected: Collected | undefined } {
   const p = lane.packages[pkg];
   if (p === undefined) return { faults: [], collected: undefined };
-  const own = runSelections(lane).map((n) => select(lane, n)).filter((s) => s.pkg === pkg);
+  const own = packageRuns(lane, pkg).map((n) => selectIn(lane, laneDir, n));
   const sources = files.map((f) => f.file).filter((f) => !TEST.test(f));
   const mutated = Object.fromEntries(own.map((s) => [s.name, sources.filter((f) => globsSelect(s.mutate, f))]));
   const config = own[0] === undefined ? {} : strykerConfig(own[0]);
@@ -250,10 +262,45 @@ const existsIn =
   (file: string): boolean =>
     existsSync(resolve(laneDir, s.dir, file));
 
+/** This function gives the cost maps of the lane, or none when the lane has no file of maps or the file does not exist. */
+function costMapsOf(lane: Lane, laneDir: string): CostMaps {
+  const file = lane.costs === undefined ? undefined : resolve(laneDir, lane.costs);
+  return file === undefined || !existsSync(file) ? {} : parseCostMaps(readJson(file));
+}
+
+/** This function gives the files of a group of a package, in the order of their paths, with the weight of each line. */
+function groupFiles(lane: Lane, laneDir: string, pkg: string, globs: readonly string[], maps: CostMaps): WeightedFile[] {
+  const dir = resolve(laneDir, lane.packages[pkg]?.dir ?? ".");
+  const texts = sourcesOf(dir, dir)
+    .filter((file) => globsSelect(globs, file))
+    .map((path) => ({ path, text: readFileSync(resolve(dir, path), "utf8") }));
+  return weightedFiles(texts, maps[pkg] ?? {});
+}
+
+/** The cut of each lane, so that each command reads the files of a group one time. */
+const cuts = new WeakMap<Lane, CutOf>();
+
+/** This function gives the selection of a name, with the cut by cost of a numbered part of a group. */
+function selectIn(lane: Lane, laneDir: string, name: string): Selection {
+  let cutOf = cuts.get(lane);
+  if (cutOf === undefined) {
+    const maps = costMapsOf(lane, laneDir);
+    const parts = new Map<string, string[][]>();
+    cutOf = (pkg, cut, globs) => {
+      const key = `${pkg}.${cut.group}`;
+      const cutParts = parts.get(key) ?? cutByCost(groupFiles(lane, laneDir, pkg, globs, maps), cut.count);
+      parts.set(key, cutParts);
+      return cutParts[cut.index] ?? [];
+    };
+    cuts.set(lane, cutOf);
+  }
+  return select(lane, name, cutOf);
+}
+
 function checkParts(lane: Lane, laneDir: string, pkgs: readonly string[]): void {
   const errors = pkgs.flatMap((pkg) => {
     const p = lane.packages[pkg];
-    if (p?.parts === undefined) return [];
+    if (p === undefined || (p.parts === undefined && p.cuts === undefined)) return [];
     const dir = resolve(laneDir, p.dir);
     if (!existsSync(dir)) return [`${pkg}: the folder ${p.dir} does not exist`];
     return partErrors(lane, pkg, sourcesOf(dir, dir), (file) => lineCount(readFileSync(resolve(dir, file), "utf8")));
@@ -327,7 +374,7 @@ function scores(lane: Lane, laneDir: string, names: readonly string[], o: Scores
   // The gate of a package with "gateOver": "package" reads the sum of its parts, so a part has no gate of its own.
   const byPackage = (s: Selection): boolean => s.name !== s.pkg && lane.packages[s.pkg]?.gateOver === "package";
   const results: Score[] = names.map((name) => {
-    const all = select(lane, name);
+    const all = selectIn(lane, laneDir, name);
     const s = byPackage(all) ? { ...all, gate: undefined } : all;
     if (s !== all) note(name, `  the gate of ${s.pkg} reads all its parts together`);
     const file =
@@ -369,9 +416,7 @@ function scores(lane: Lane, laneDir: string, names: readonly string[], o: Scores
     const p = lane.packages[pkg];
     const parts = results.filter((r) => select(lane, r.name).pkg === pkg && r.name !== pkg);
     // A no read is never a pass: a part that the command does not name makes the package a no read.
-    const missing = Object.keys(p?.parts ?? {})
-      .map((part) => `${pkg}.${part}`)
-      .filter((n) => !names.includes(n));
+    const missing = packageRuns(lane, pkg).filter((n) => n !== pkg && !names.includes(n));
     return packageScore(pkg, p?.gate, parts, missing);
   });
   // A fault of the test files of a package fails its sum, or each of its selections when it has no sum.
@@ -420,12 +465,12 @@ ${summaryMarkdown(shown)}
 function testFileReasons(lane: Lane, laneDir: string, names: readonly string[], reports: ReadonlyMap<string, MutationReport>, note: (name: string, line: string) => void): Map<string, string> {
   const reasons = new Map<string, string>();
   for (const [pkg, p] of Object.entries(lane.packages)) {
-    const own = p.parts === undefined ? [pkg] : Object.keys(p.parts).map((part) => `${pkg}.${part}`);
+    const own = packageRuns(lane, pkg);
     const read = own.flatMap((n) => reports.get(n) ?? []);
     // A selection that is not named, or that has no full report, is a no read already.
     if (!own.every((n) => names.includes(n)) || read.length < own.length) continue;
     // The notes go under the sum of the package, or else under its last selection.
-    const at = p.parts === undefined || p.gateOver === "package" ? pkg : (own.at(-1) ?? pkg);
+    const at = own[0] === pkg || p.gateOver === "package" ? pkg : (own.at(-1) ?? pkg);
     // A report with no "testFiles" fails its own selection. The note tells that the check over the parts did not run.
     const blind = own.filter((n) => reports.get(n)?.testFiles === undefined);
     if (blind.length > 0) {
@@ -521,6 +566,80 @@ function planCheck(lane: Lane, laneDir: string, names: readonly string[], o: Pla
   return failed === 0 ? 0 : 1;
 }
 
+/**
+ * This function writes the cost maps of the lane from the plans of a run (`costs`). It adds the plan lines of each file
+ * over the selections, so a file in two parts gets one map. A file that a selection mutates with no plan gets a map of
+ * 0. The maps of the files of the other selections stay.
+ */
+function writeCosts(lane: Lane, laneDir: string, run: string, reports: string | undefined, io: CliIo): number {
+  if (lane.costs === undefined) throw new Error(`the lane has no field "costs" for the file of the cost maps`);
+  if (reports === undefined) throw new Error(`"costs" takes --reports <dir>`);
+  const lines = new Map<string, Map<string, LinePlan[]>>();
+  const read: string[] = [];
+  for (const name of selectionNames(lane)) {
+    const file = resolve(io.cwd, reports, `mutation-${name}`, PLAN_FILE);
+    if (!existsSync(file)) continue;
+    read.push(name);
+    const s = selectIn(lane, laneDir, name);
+    const dir = resolve(laneDir, s.dir);
+    const files = lines.get(s.pkg) ?? new Map<string, LinePlan[]>();
+    lines.set(s.pkg, files);
+    for (const source of sourcesOf(dir, dir).filter((f) => globsSelect(s.mutate, f))) files.set(source, files.get(source) ?? []);
+    for (const [source, plan] of Object.entries(parsePlan(readJson(file)).files)) files.set(source, [...(files.get(source) ?? []), ...plan.lines]);
+  }
+  if (read.length === 0) throw new Error(`there is no plan of a selection of the lane in ${reports}`);
+  const maps: Record<string, Record<string, CostMap>> = Object.fromEntries(Object.entries(costMapsOf(lane, laneDir)).map(([pkg, files]) => [pkg, { ...files }]));
+  let count = 0;
+  for (const [pkg, files] of lines) {
+    const dir = resolve(laneDir, lane.packages[pkg]?.dir ?? ".");
+    const own = maps[pkg] ?? {};
+    maps[pkg] = own;
+    for (const [source, plan] of files) {
+      if (!existsSync(resolve(dir, source))) continue;
+      own[source] = costMapOf(readFileSync(resolve(dir, source), "utf8"), run, plan);
+      count += 1;
+    }
+  }
+  const sorted = (x: Readonly<Record<string, unknown>>): Record<string, unknown> => Object.fromEntries(Object.entries(x).toSorted(([a], [b]) => a.localeCompare(b)));
+  const out = resolve(laneDir, lane.costs);
+  mkdirSync(dirname(out), { recursive: true });
+  writeFileSync(out, `${JSON.stringify(sorted(Object.fromEntries(Object.entries(maps).map(([pkg, files]) => [pkg, sorted(files)]))), null, 2)}\n`);
+  io.stdout(`costs: ${String(count)} files from the plans of ${String(read.length)} selections of the run ${run}, in ${relative(io.cwd, out).replaceAll("\\", "/")}\n`);
+  return 0;
+}
+
+/**
+ * This function gives the estimate of the clock of each numbered part of a group under the cost maps (`cost-check`).
+ * A part over the target fails, and so does a group with no cost map. The check reads only the files on the disk, so
+ * each commit gives one result.
+ */
+function costCheck(lane: Lane, laneDir: string, names: readonly string[], io: CliIo): number {
+  const all = runSelections(lane).filter((n) => select(lane, n).cut !== undefined);
+  const named = names.length === 0 ? all : names;
+  const maps = costMapsOf(lane, laneDir);
+  const target = lane.targetMinutes ?? TARGET_MINUTES;
+  let failed = 0;
+  for (const name of named) {
+    const s = selectIn(lane, laneDir, name);
+    if (s.cut === undefined) throw new Error(`the selection ${name} is not a numbered part of a group of "cuts"`);
+    const group = lane.packages[s.pkg]?.cuts?.[s.cut.group];
+    const not = (lane.packages[s.pkg]?.mutate ?? []).filter((g) => g.startsWith("!"));
+    const files = groupFiles(lane, laneDir, s.pkg, [...(group?.files ?? []), ...not], maps);
+    const entries = s.mutate.filter((g) => !g.startsWith("!"));
+    const minutes = clockMinutes(plannedMs(entries, files), lane.planPerClock);
+    const mapped = files.some((f) => maps[s.pkg]?.[f.path] !== undefined);
+    const fault = !mapped
+      ? `the group ${s.pkg}.${s.cut.group} has no cost map. Write the maps with "costs" from the plans of a run.`
+      : minutes > target
+        ? `the estimate of ${minutes.toFixed(0)} minutes is over the target of ${String(target)}. Raise the count of the group ${s.pkg}.${s.cut.group}.`
+        : undefined;
+    io.stdout(`${name}: ${String(entries.length)} entries, with an estimate of ${minutes.toFixed(0)} minutes of the clock under the cost maps.${fault === undefined ? "" : `\n  FAIL: ${fault}`}\n`);
+    if (fault !== undefined) failed += 1;
+  }
+  io.stdout(failed === 0 ? `cost-check: each of ${String(named.length)} parts is in its target\n` : `cost-check: ${String(failed)} of ${String(named.length)} parts fail\n`);
+  return failed === 0 ? 0 : 1;
+}
+
 /** This function reads a file of test counts: an object from each selection to its count. */
 function readCounts(file: string): Record<string, number> {
   const json = readJson(file);
@@ -609,7 +728,7 @@ export function runCli(argv: readonly string[], io: CliIo): number {
       if (values.runs) checkParts(lane, laneDir, Object.keys(lane.packages));
       if (changed !== undefined && !values.runs) throw new Error(`--changed of "list" takes --runs`);
       const runs = values.runs ? runSelections(lane) : selectionNames(lane);
-      const shown = changed === undefined ? runs : runs.filter((n) => changedFiles(select(lane, n), changed, existsIn(laneDir, select(lane, n))).length > 0);
+      const shown = changed === undefined ? runs : runs.filter((n) => changedFiles(selectIn(lane, laneDir, n), changed, existsIn(laneDir, select(lane, n))).length > 0);
       io.stdout(shown.length === 0 ? "" : `${shown.join("\n")}\n`);
       return 0;
     }
@@ -621,7 +740,7 @@ export function runCli(argv: readonly string[], io: CliIo): number {
       if (concurrency !== undefined && !(Number.isInteger(concurrency) && concurrency > 0)) throw new Error(`--concurrency is not a positive integer`);
       if (values["dry-run"] && values.plan) throw new Error(`"config" takes --dry-run or --plan, not both`);
       checkPartsOf(lane, laneDir, [one()]);
-      const all = select(lane, one());
+      const all = selectIn(lane, laneDir, one());
       const files = changed === undefined ? undefined : changedFiles(all, changed, existsIn(laneDir, all));
       if (files?.length === 0) throw new Error(`the selection ${all.name} has no changed file`);
       const selection = files === undefined ? all : { ...all, mutate: files };
@@ -639,6 +758,13 @@ export function runCli(argv: readonly string[], io: CliIo): number {
       return scores(lane, laneDir, names, { report: values.report, reports: values.reports, summary: values.summary, last: values.last, writeLast: values["write-last"], testFiles: values["test-files"], alone: values.alone }, io);
     case "plan-check":
       return planCheck(lane, laneDir, names, { report: values.report, reports: values.reports }, io);
+    case "costs":
+      return writeCosts(lane, laneDir, one(), values.reports, io);
+    case "cost-check":
+      return costCheck(lane, laneDir, names, io);
+    case "minutes":
+      io.stdout(`target=${String(lane.targetMinutes ?? TARGET_MINUTES)}\nstop=${String(lane.stopMinutes ?? STOP_MINUTES)}\n`);
+      return 0;
     case "disables":
       return disables(lane, laneDir, values.write, io);
     case "load-check":

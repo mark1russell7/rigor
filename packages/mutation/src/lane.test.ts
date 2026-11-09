@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { NO_TSCONFIG, PARTIAL_PLUGIN, rewritesTsconfig, strykerConfig } from "./config.ts";
-import { changedFiles, globsSelect, parseLane, partErrors, runSelections, select, selectionNames } from "./lane.ts";
+import { changedFiles, globsSelect, packageRuns, parseLane, partErrors, runSelections, select, selectionNames } from "./lane.ts";
 
 const LANE = {
   packages: {
@@ -43,6 +43,14 @@ describe("parseLane", () => {
     [{ packages: { a: { dir: "a", mutate: ["x"] } }, stopMinutes: -1 }, /"stopMinutes" is not a positive number/],
     [{ packages: { a: { dir: "a", mutate: ["x"] } }, stopMinutes: 90 }, /"stopMinutes" \(90\) is less than "targetMinutes" \(100\)/],
     [{ packages: { a: { dir: "a", mutate: ["x"] } }, targetMinutes: 150 }, /"stopMinutes" \(140\) is less than "targetMinutes" \(150\)/],
+    [{ packages: { a: { dir: "a", mutate: ["x"], cuts: {} } } }, /a: "cuts" is not an object with groups/],
+    [{ packages: { a: { dir: "a", mutate: ["x"], cuts: { "g.1": { files: ["x"], count: 2 } } } } }, /a: the group name "g\.1"/],
+    [{ packages: { a: { dir: "a", mutate: ["x"], parts: { g: ["x"] }, cuts: { g: { files: ["y"], count: 2 } } } } }, /a: "g" is a part and a group of "cuts"/],
+    [{ packages: { a: { dir: "a", mutate: ["x"], cuts: { g: { files: ["x:1-9"], count: 2 } } } } }, /a\.g: "files" is not a list of globs without "!" and without a line range/],
+    [{ packages: { a: { dir: "a", mutate: ["x"], cuts: { g: { files: ["!x"], count: 2 } } } } }, /a\.g: "files" is not a list of globs/],
+    [{ packages: { a: { dir: "a", mutate: ["x"], cuts: { g: { files: ["x"], count: 0 } } } } }, /a\.g: "count" is not a positive integer/],
+    [{ packages: { a: { dir: "a", mutate: ["x"], cuts: { g: { files: ["x"], count: 1.5 } } } } }, /a\.g: "count" is not a positive integer/],
+    [{ packages: { a: { dir: "a", mutate: ["x"] } }, costs: "" }, /"costs" is not a file name/],
   ])("refuses %j", (json, message) => {
     expect(() => parseLane(json)).toThrow(message);
   });
@@ -69,6 +77,44 @@ describe("select", () => {
 
   it.each(["nope", "collections.nope", "small.part", "collections.impl.x"])("refuses %s and names the selections", (name) => {
     expect(() => select(lane, name)).toThrow(/It has: collections, collections\.impl, collections\.core, small/);
+  });
+});
+
+describe("the groups of cuts", () => {
+  const lane = parseLane({
+    packages: {
+      lib: { dir: "lib", mutate: ["src/**/*.ts", "!src/**/*.test.ts"], gateOver: "package", parts: { core: ["src/core/*.ts"] }, cuts: { base: { files: ["src/base/*.ts"], count: 3 }, one: { files: ["src/one.ts"], count: 1 } } },
+    },
+    costs: "costs.json",
+  });
+
+  it("names each group and its numbered parts, and a full run reads the numbered parts", () => {
+    expect(selectionNames(lane)).toEqual(["lib", "lib.core", "lib.base", "lib.base.1", "lib.base.2", "lib.base.3", "lib.one"]);
+    expect(runSelections(lane)).toEqual(["lib.core", "lib.base.1", "lib.base.2", "lib.base.3", "lib.one"]);
+    expect(packageRuns(lane, "lib")).toEqual(runSelections(lane));
+    expect(packageRuns(lane, "nope")).toEqual([]);
+  });
+
+  it("gives a numbered part the entries of its cut, and its full group without a cut", () => {
+    const seen: unknown[] = [];
+    const cutOf = (pkg: string, cut: unknown, globs: readonly string[]): string[] => {
+      seen.push([pkg, cut, globs]);
+      return ["src/base/a.ts:10-20"];
+    };
+    expect(select(lane, "lib.base.2", cutOf)).toMatchObject({ name: "lib.base.2", pkg: "lib", mutate: ["src/base/a.ts:10-20", "!src/**/*.test.ts"], cut: { group: "base", count: 3, index: 1 } });
+    expect(seen).toEqual([["lib", { group: "base", count: 3, index: 1 }, ["src/base/*.ts", "!src/**/*.test.ts"]]]);
+    expect(select(lane, "lib.base.2").mutate).toEqual(["src/base/*.ts", "!src/**/*.test.ts"]);
+    expect(select(lane, "lib.base", cutOf)).not.toHaveProperty("cut");
+    expect(select(lane, "lib.base").mutate).toEqual(["src/base/*.ts", "!src/**/*.test.ts"]);
+  });
+
+  it.each(["lib.base.0", "lib.base.4", "lib.base.02", "lib.one.1", "lib.core.1", "lib.base.1.1"])("refuses %s", (name) => {
+    expect(() => select(lane, name)).toThrow(/the lane has no selection/);
+  });
+
+  it("reads a group as a part for the cover of the files", () => {
+    expect(partErrors(lane, "lib", ["src/core/c.ts", "src/base/a.ts", "src/base/b.ts", "src/one.ts"])).toEqual([]);
+    expect(partErrors(lane, "lib", ["src/two.ts"])).toEqual(["lib: the file src/two.ts is in no part, so a full run does not mutate it"]);
   });
 });
 
