@@ -18,19 +18,25 @@ const CONTINUOUS: readonly DistributionSpec[] = [
 ];
 
 describe("the standard normal", () => {
-  it("gives the values of the tables, also in the tails", () => {
-    expect(relative(normalCdf(1.96), 0.9750021048517795)).toBeLessThan(1e-14);
-    expect(relative(normalCdf(-1), 0.15865525393145707)).toBeLessThan(1e-14);
-    expect(relative(normalCdf(-5), 2.866515718791939e-7)).toBeLessThan(1e-13);
-    expect(relative(normalCdf(-10), 7.619853024160527e-24)).toBeLessThan(1e-12);
+  // The bounds are the measured errors of 2026-11-09, with a small margin. A change that loses accuracy fails here.
+  it("gives the values of the tables within 2 epsilon, also in the tails", () => {
+    const tables: readonly (readonly [number, number])[] = [
+      [1.96, 0.9750021048517795],
+      [-1.96, 0.024997895148220435],
+      [-1, 0.15865525393145707],
+      [-0.5, 0.3085375387259869],
+      [-5, 2.866515718791939e-7],
+      [-10, 7.619853024160527e-24],
+      [-20, 2.7536241186062337e-89],
+    ];
+    for (const [x, want] of tables) expect(relative(normalCdf(x), want), String(x)).toBeLessThanOrEqual(2 * Number.EPSILON);
     expect(normalCdf(0)).toBe(0.5);
   });
 
-  it("gives the quantile within 2 ulp at 0.975, and the ends", () => {
+  it("gives the quantile within 1 ulp at 0.025 and 0.975, and the ends", () => {
     const want = 1.959963984540054;
-    expect(Math.abs(normalQuantile(0.975) - want)).toBeLessThanOrEqual(2 * Number.EPSILON * want);
-    expect(Math.abs(normalQuantile(0.025) + want)).toBeLessThanOrEqual(2 * Number.EPSILON * want);
-    expect(relative(normalCdf(-1.96), 0.024997895148220435)).toBeLessThan(1e-15);
+    expect(Math.abs(normalQuantile(0.975) - want)).toBeLessThanOrEqual(Number.EPSILON);
+    expect(Math.abs(normalQuantile(0.025) + want)).toBeLessThanOrEqual(Number.EPSILON);
     expect(normalQuantile(0.5)).toBe(0);
     expect(relative(normalQuantile(1e-10), -6.361340902404056)).toBeLessThan(1e-12);
     expect(normalQuantile(0)).toBe(Number.NEGATIVE_INFINITY);
