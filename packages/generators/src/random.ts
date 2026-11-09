@@ -205,13 +205,31 @@ export function randomOf(next: Source, seed: number, source: (seed: number) => S
   };
 }
 
+/** The largest count of seeds that one range gives. A larger range is an error, not a long run. */
+const MAX_RANGE = 1_000_000;
+
 /**
- * The seeds of a run: the seed in `given` (the text of an environment variable, for example
+ * The seeds of a run: the seeds in `given` (the text of an environment variable, for example
  * `process.env.SEED`), else the default seeds. An empty text gives the defaults.
+ *
+ * The text is one seed (`17`) or a list of seeds and ranges with commas (`1,3,9-11` gives 1, 3, 9, 10
+ * and 11), in the order of the list. A range has two whole numbers, the low one first. An empty part, a
+ * part that is not an integer and a range with the low end last are each a `RangeError`.
  */
 export function seedsFrom(given: string | undefined, defaults: readonly number[]): number[] {
   if (given === undefined || given.trim() === "") return [...defaults];
-  const seed = Number(given);
-  if (!Number.isSafeInteger(seed)) throw new RangeError(`seedsFrom: a seed is an integer, not ${given}.`);
-  return [seed];
+  return given.split(",").flatMap((raw) => {
+    const part = raw.trim();
+    const range = /^(\d+)\s*-\s*(\d+)$/u.exec(part);
+    if (range !== null) {
+      const [low, high] = [Number(range[1]), Number(range[2])];
+      if (!Number.isSafeInteger(high) || high < low || high - low >= MAX_RANGE) {
+        throw new RangeError(`seedsFrom: the range ${part} is not low-high with at most ${MAX_RANGE} seeds.`);
+      }
+      return Array.from({ length: high - low + 1 }, (_, i) => low + i);
+    }
+    const seed = part === "" ? Number.NaN : Number(part);
+    if (!Number.isSafeInteger(seed)) throw new RangeError(`seedsFrom: a seed is an integer, not ${part === "" ? "an empty part" : part}.`);
+    return [seed];
+  });
 }

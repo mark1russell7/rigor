@@ -4,6 +4,8 @@
  * With the same seed, the draws are equal to the draws of the copies in highways, packing and layout-contract.
  * `bootstrapTwo` draws two independent samples in each run: first the items of `a`, then the items of `b`.
  * `bootstrapLeastSquares` draws whole rows, and gives one interval for each coefficient from the same draws.
+ *
+ * `sampleTotalInterval` gives the interval of a population total from a sample without replacement.
  */
 import { type Random, random } from "@mark1russell7/rigor-generators";
 import { type QuantileMethod, median, quantileSorted, sorted } from "./describe.ts";
@@ -24,9 +26,24 @@ export interface BootstrapOptions {
    * not 0.025, so a copy that writes 0.025 needs this option to give the same numbers.
    */
   readonly ends?: readonly [number, number];
+  /**
+   * The value of a claim to test, for example 0 for "no difference". With this option, the interval also gives `pAbove`
+   * and `pBelow` from the same draws, so the ends do not change. The default is no value and no p.
+   */
+  readonly against?: number;
 }
 
-export interface Interval {
+/** The two bootstrap p of the option `against`. The smallest p is 1 / (finite + 1), so a family correction needs enough runs. */
+export interface SideP {
+  /** The value of the option `against`. */
+  readonly against: number;
+  /** The p of the claim "the statistic is above `against`": (1 + the finite runs at or below `against`) / (finite + 1). */
+  readonly pAbove: number;
+  /** The p of the claim "the statistic is below `against`": (1 + the finite runs at or above `against`) / (finite + 1). */
+  readonly pBelow: number;
+}
+
+export interface Interval extends Partial<SideP> {
   /** The statistic of all the data. */
   readonly estimate: number;
   readonly low: number;
@@ -136,6 +153,7 @@ interface Settings {
   readonly highEnd: number;
   readonly level: number;
   readonly method: QuantileMethod;
+  readonly against: number | undefined;
 }
 
 /** This function examines the options of a bootstrap, and gives the defaults. It throws a RangeError for each fault. */
@@ -147,15 +165,31 @@ function settings(name: string, options: BootstrapOptions): Settings {
   if (!(lowEnd >= 0 && lowEnd < highEnd && highEnd <= 1)) throw new RangeError(`${name}: the ends are 0 <= low < high <= 1, not ${lowEnd} and ${highEnd}.`);
   const level = options.ends ? highEnd - lowEnd : (options.level ?? 0.95);
   if (!(level > 0 && level < 1)) throw new RangeError(`${name}: level is more than 0 and less than 1, not ${level}.`);
-  return { runs, lowEnd, highEnd, level, method: options.method ?? "linear" };
+  const against = options.against;
+  if (against !== undefined && !Number.isFinite(against)) throw new RangeError(`${name}: against is a finite number, not ${against}.`);
+  return { runs, lowEnd, highEnd, level, method: options.method ?? "linear", against };
+}
+
+/** This function gives the two p of the option `against`, or nothing without the option. With no finite run, each p is 1. */
+function sides(values: readonly number[], against: number | undefined): SideP | Record<string, never> {
+  if (against === undefined) return {};
+  let atOrBelow = 0;
+  let atOrAbove = 0;
+  for (const v of values) {
+    if (v <= against) atOrBelow++;
+    if (v >= against) atOrAbove++;
+  }
+  const n = values.length + 1;
+  return { against, pAbove: (1 + atOrBelow) / n, pBelow: (1 + atOrAbove) / n };
 }
 
 /** The interval of the finite statistics of the runs. When no run is finite, low and high are equal to the estimate. */
 function ends(values: number[], estimate: number, s: Settings, seed: number): Interval {
   const { runs, level } = s;
-  if (values.length === 0) return { estimate, low: estimate, high: estimate, level, runs, finite: 0, seed };
+  const p = sides(values, s.against);
+  if (values.length === 0) return { estimate, low: estimate, high: estimate, level, runs, finite: 0, seed, ...p };
   const v = sorted(values);
-  return { estimate, low: quantileSorted(v, s.lowEnd, s.method), high: quantileSorted(v, s.highEnd, s.method), level, runs, finite: v.length, seed };
+  return { estimate, low: quantileSorted(v, s.lowEnd, s.method), high: quantileSorted(v, s.highEnd, s.method), level, runs, finite: v.length, seed, ...p };
 }
 
 /**
@@ -178,7 +212,7 @@ function percentile(name: string, options: BootstrapOptions, run: (r: Random) =>
  * The percentile bootstrap of `k` statistics from the same draws. Each run gives `k` statistics. Each statistic
  * has its own count of finite runs.
  */
-function percentiles(name: string, options: BootstrapOptions, k: number, run: (r: Random) => readonly number[], all: () => readonly number[]): Interval[] {
+export function percentiles(name: string, options: BootstrapOptions, k: number, run: (r: Random) => readonly number[], all: () => readonly number[]): Interval[] {
   const s = settings(name, options);
   const r = random(options.seed ?? 1);
   const values = Array.from({ length: k }, (): number[] => []);
@@ -218,4 +252,77 @@ export function bootstrapClusters<T>(
   // The estimate of all the rows in their own order, not in the order of the clusters.
   const estimate = statistic(rows);
   return result.finite === 0 ? { ...result, estimate, low: estimate, high: estimate } : { ...result, estimate };
+}
+
+/**
+ * A stratified bootstrap: each run draws, inside each stratum, as many items as the stratum has, with replacement.
+ * So each sample keeps the size of each stratum. Use it when the strata are fixed by the design, for example the
+ * families of the inputs of a benchmark. The draws of one run go through the strata in the order of the list. With one
+ * stratum, the draws are equal to the draws of `bootstrap` with the same seed. The estimate is the statistic of all
+ * the strata. A run whose statistic is not finite does not count.
+ */
+export function bootstrapStrata<T>(
+  strata: readonly (readonly T[])[],
+  statistic: (samples: readonly (readonly T[])[]) => number,
+  options: BootstrapOptions = {},
+): Interval {
+  if (strata.length === 0) throw new RangeError("bootstrapStrata: there is no stratum.");
+  for (const [i, stratum] of strata.entries()) if (stratum.length === 0) throw new RangeError(`bootstrapStrata: the stratum ${i} is empty.`);
+  const samples = strata.map((stratum) => new Array<T>(stratum.length));
+  return percentile(
+    "bootstrapStrata",
+    options,
+    (r) => {
+      for (const [k, stratum] of strata.entries()) {
+        const sample = samples[k] as T[];
+        const n = stratum.length;
+        for (let i = 0; i < n; i++) sample[i] = stratum[r.below(n)] as T;
+      }
+      return statistic(samples);
+    },
+    () => statistic(strata),
+  );
+}
+
+export interface SampleTotalOptions extends BootstrapOptions {
+  /** The number of items in the whole population, `n`. It is a whole number, and it is not less than the sample. */
+  readonly population: number;
+  /** The factor from the sum of the sample to the total of the population. The default is `population / values.length`. */
+  readonly scale?: number;
+}
+
+/**
+ * A bootstrap interval of the total of a population from a uniform sample of `m` of its `n` items, drawn without
+ * replacement. The estimate is `scale * sum(values)`. Each run draws `m` values with replacement, as `bootstrap`
+ * does. The deviation of each run from the sum of the sample gets the factor `scale * sqrt(1 - m / n)`, the finite
+ * population correction. When `m` is `n`, the interval is the estimate.
+ *
+ * The sample has 2 values or more, and each value is finite. With the same seed, the result is equal to the
+ * `bootstrap` of the same statistic, to the bit.
+ *
+ * The interval is narrow for a small sample. The draws give the variance of the sample with the divisor `m`, not
+ * `m - 1`, so the width gets the factor `sqrt((m - 1) / m)`. The skew of the values adds to the miss. In the tests,
+ * 400 samples of `m = 8` of `n = 40` hold the total 346 times (Wilson 0.828 to 0.895). At `m = 100` of `n = 200`,
+ * the coverage agrees with 95%. For a total over the pairs of the items, use `uStatisticInterval`.
+ */
+export function sampleTotalInterval(values: readonly number[], options: SampleTotalOptions): Interval {
+  const name = "sampleTotalInterval";
+  const m = values.length;
+  const n = options.population;
+  if (m < 2) throw new RangeError(`${name}: the sample has 2 values or more, not ${m}.`);
+  if (!Number.isSafeInteger(n) || n < m) throw new RangeError(`${name}: population is a whole number of ${m} (the sample) or more, not ${n}.`);
+  for (const v of values) if (!Number.isFinite(v)) throw new RangeError(`${name}: each value is a finite number, not ${v}.`);
+  const scale = options.scale ?? n / m;
+  if (!(Number.isFinite(scale) && scale > 0)) throw new RangeError(`${name}: scale is a finite number more than 0, not ${scale}.`);
+  const all = sum(values);
+  const estimate = scale * all;
+  const spread = Math.sqrt(1 - m / n) * scale;
+  return bootstrap(values, (drawn) => estimate + spread * (sum(drawn) - all), options);
+}
+
+/** The sum of the values from the first to the last, as `values.reduce((s, t) => s + t, 0)`. */
+function sum(values: readonly number[]): number {
+  let s = 0;
+  for (const v of values) s += v;
+  return s;
 }

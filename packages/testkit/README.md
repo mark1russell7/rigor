@@ -4,6 +4,7 @@ Test helpers:
 
 - `markdownExamples` makes each code block of a Markdown file into a test case. Then the doc and the code cannot drift.
 - `runModel` runs model-based tests on `fast-check`, from the entry `@mark1russell7/rigor-testkit/model`.
+- `propagationGate` examines one context id over each transport, from the entry `@mark1russell7/rigor-testkit/propagation`.
 
 ```sh
 npm install --save-dev @mark1russell7/rigor-testkit
@@ -119,6 +120,38 @@ The options:
 A spy that keeps each call of each run uses memory for all the runs. Clear it with `clear`. For a property that does not use `runModel`, use the plugin of `fast-check` 4.10: `fc.assert(property, { plugins: [fc.beforeEach(() => spy.mockClear())] })`.
 
 A global plugin of `fast-check` also operates on `runModel`. Before each run, the `beforeEach` plugins run first, then `clear`, then `create`. Thus, with a global plugin that clears the spies, for example `fc.installGlobalPlugin(fc.beforeEach(() => vi.clearAllMocks()))`, `runModel` does not need `clear`.
+
+## The propagation gate
+
+The entry `@mark1russell7/rigor-testkit/propagation` examines one claim: one context id goes from a client to a server. From there, it goes to the spans, the log records and the metrics. It uses the OpenTelemetry API only. Install `@opentelemetry/api` and `@opentelemetry/api-logs` to use it.
+
+```ts no-run
+import { localTransport, propagationGate, formatPropagationReport } from "@mark1russell7/rigor-testkit/propagation";
+
+const report = await propagationGate({
+  key: "request.id",
+  capture,
+  transports: [localTransport(withInternalCall), httpTransport, { name: "port", noRead: "no worker in this test" }],
+});
+console.log(formatPropagationReport(report));
+expect(report.ok).toBe(true);
+```
+
+For each transport, the gate sets the value of `key` on the client side and makes one call. The handler on the server side writes a span, a log record and a metric. It also injects the context into the headers of a call to a third party. The gate then examines these claims:
+
+- The handler reads the same value.
+- The span and the log record of the handler are in the trace of the client, and have the value as an attribute.
+- No metric point has the key as an attribute. For a key of low cardinality, give `cardinality: "low"`.
+- The call to the third party has no `baggage` header.
+
+### The rules
+
+- The program under test registers the context manager, the propagator and the processors. The option `capture` gives its records, for example from the in-memory exporters of the SDK.
+- A transport with `noRead` gets a "no read" line. That line is not a failure, but it is not a pass.
+- The flip: the gate also runs a broken copy of each transport that passes, and the copy must fail. The default copy, `losingContext`, runs the handler in the root context. Give your own function in `flip`, for example a copy that removes a header.
+- `withValue` and `readValue` set and read the value. The default uses the baggage. Give `withContext` and `contextValue` of the program when it keeps the value in a different way.
+- `localTransport(internalCall)` sends the context through a carrier in the same process. `internalCall` marks the call as internal, for a propagator that sends the baggage only on internal calls.
+- `formatPropagationReport(report)` gives a Markdown table for the summary of a CI job.
 
 ## License
 

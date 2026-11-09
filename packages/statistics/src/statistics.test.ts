@@ -327,10 +327,43 @@ describe("the bootstrap", () => {
 });
 
 describe("the tests", () => {
-  it("gives the one-sided sign test of packing, to the bit", () => {
-    for (let n = 0; n <= 300; n += 7) for (let b = 0; b <= n; b += 3) expect(signTest(b, n - b)).toBe(packingSignTestP(b, n - b));
+  it("gives the one-sided sign test of packing, within the error of its log sum (rigor#158)", () => {
+    for (let n = 0; n <= 300; n += 7) {
+      for (let b = 0; b <= n; b += 3) {
+        const p = packingSignTestP(b, n - b);
+        expect(Math.abs(signTest(b, n - b) - p)).toBeLessThanOrEqual(1e-12 * p);
+      }
+    }
     expect(signTest(9, 1)).toBeCloseTo(11 / 1024, 15);
     expect(signTest(112, 40)).toBeLessThan(1e-8);
+  });
+
+  it("gives the nearest double of the exact sign test, for each w + l up to 80 and both sides (rigor#158)", () => {
+    // Pascal's triangle in BigInt, and the exact p as num / 2^n.
+    const rows: bigint[][] = [[1n]];
+    for (let n = 1; n <= 80; n++) rows.push([1n, ...rows[n - 1]!.slice(1).map((c, i) => c + rows[n - 1]![i]!), 1n]);
+    const fraction = (x: number): [bigint, bigint] => {
+      let shift = 0n;
+      while (!Number.isInteger(x)) {
+        x *= 2;
+        shift++;
+      }
+      return [BigInt(x), shift];
+    };
+    for (let n = 1; n <= 80; n++) {
+      for (let w = 0; w <= n; w++) {
+        for (const sides of [1, 2] as const) {
+          const k = sides === 1 ? w : Math.max(w, n - w);
+          let num = rows[n]!.slice(k).reduce((a, b) => a + b, 0n) * (sides === 1 ? 1n : 2n);
+          const den = 1n << BigInt(n);
+          if (num > den) num = den;
+          const [m, shift] = fraction(signTest(w, n - w, sides));
+          const diff = m * den - num * (1n << shift);
+          // Half a unit in the last place: |got - exact| <= 2^-53 * exact.
+          expect((diff < 0n ? -diff : diff) * (1n << 53n) <= num * (1n << shift), `n ${n} w ${w} sides ${sides}`).toBe(true);
+        }
+      }
+    }
   });
 
   it("gives the sign test power of highways", () => {

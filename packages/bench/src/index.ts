@@ -13,6 +13,8 @@ export {
   budgetLooksVerdict,
   budgetVerdict,
 } from "./budget.ts";
+export { type GrowthOptions, type GrowthOutcome, type GrowthRound, type GrowthStep, type GrowthVerdict, growthVerdict } from "./growth.ts";
+export { type CellBudget, type CostCells, type CostProbe, type JobCost, type ModelCost, type RunCost, type RunCostOptions, runCost } from "./run-cost.ts";
 export {
   type CaseGate,
   GATE_LOOKS,
@@ -26,6 +28,26 @@ export {
   gateOf,
   notSlowerVerdict,
 } from "./gate.ts";
+export {
+  type CaseRead,
+  GATE_LINE_LIMIT,
+  GATE_LINE_NAMES,
+  type GateLine,
+  type GateLineCases,
+  type GateLineLevel,
+  type GateLineOptions,
+  type GateLineOutputs,
+  type GateLineWritten,
+  type JobEnv,
+  type JobModel,
+  type JobModelsOptions,
+  gateLine,
+  isBlock,
+  isNoRead,
+  jobModels,
+  writeGateLine,
+} from "./gate-line.ts";
+export { GATE_LINE_HELP, type GateLineCliIo, gateLineCli } from "./gate-line-cli.ts";
 export { type ControlFactors, type ControlOptions, type ControlRow, type GroupCounts, type GroupFactor, type MeasuredFactor, type NoFactor, controlFactor } from "./control.ts";
 export {
   type BudgetResult,
@@ -47,6 +69,7 @@ export {
   ladderVerdict,
   rungVerdict,
 } from "./ladder.ts";
+export { type FamilyCase, type FamilyCount, type FamilyItem, type FamilyPower, type FamilyPowerOptions, type FamilyRead, type FamilyShares, familyPower, familyRead } from "./family.ts";
 export { type CaseInterval, type CaseLimit, type LimitOptions, type LimitOutcome, type LimitVerdict, caseIntervals, limitVerdict } from "./limit.ts";
 export { type ArmModels, type ArmPair, type LimitOnModel, type ModelLimits, type ModelRead, type ModelRow, type ModelStatus, type ModelTest, type VisibleShift, type ModelTestOptions, CEILING_ONLY, UNKNOWN_MODEL, armModels, limitOnModel, modelRowText, modelTest, visibleShift } from "./model.ts";
 export { type CaseTail, type CaseTailLimit, type TailLimit, type TailLimitOptions, type TailFalseFails, type TailGainCase, type TailLimitVerdict, type TailRuleOptions, caseTails, tailFalseFails, tailLimitVerdict } from "./tail.ts";
@@ -86,11 +109,25 @@ export {
   type PartnerRead,
   type SpreadRead,
   type WinClaim,
+  NARROW_SPREAD_SHARE,
   checkMeasures,
   jointClaim,
   winClaim,
 } from "./measures.ts";
 export { type Arm, type CaseRatio, type OrderSize, type PairedTime, armOrder, caseRatios, checkPairedTime, firstArm, orderSize } from "./paired.ts";
+export {
+  CHILD_SOURCES,
+  type ChildPair,
+  type ChildRecords,
+  type ChildSource,
+  type ChildStep,
+  type PairedChild,
+  type PairedChildOptions,
+  childRecords,
+  childTimes,
+  pairedChild,
+  pairedChildOrder,
+} from "./paired-child.ts";
 export { type Power, type PowerOptions, verdictPower } from "./power.ts";
 export { type CaseResults, type ResultRead, type ResultRow, type ResultRows, type ResultVerdict, type RowRead, resultRows, resultVerdict } from "./results.ts";
 export { type Rounds, type RoundsOptions, timeRounds } from "./rounds.ts";

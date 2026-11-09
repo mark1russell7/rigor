@@ -1,0 +1,8 @@
+{
+  "packages": {
+    "slow": {
+      "dir": "pkg",
+      "mutate": ["src/count.ts"]
+    }
+  }
+}

@@ -141,6 +141,20 @@ describe("rungVerdict", () => {
     expect(rungVerdict(rung(1), of([]), { now }).budgets[2]?.outcome).toBe("cannot decide");
   });
 
+  it("cannot decide on a NaN drill, and names its index, also when another drill is beyond", () => {
+    const of = (values: readonly number[]) => rungVerdict(rung(1), record(1, { evidence: [{ kind: "worst", measure: "lost writes", values }] }), { now }).budgets[2];
+    expect(of([0, Number.NaN, 0])).toMatchObject({ outcome: "cannot decide", reason: expect.stringContaining("the drill 1 is NaN") });
+    expect(of([5, 0, Number.NaN])?.outcome).toBe("cannot decide");
+  });
+
+  it("cannot decide on counts of a rate that are not whole, negative, or with failures above trials", () => {
+    const of = (failures: number, trials: number) => rungVerdict(rung(1), record(1, { evidence: [{ kind: "rate", measure: "failed requests", failures, trials }] }), { now }).budgets[1];
+    for (const [failures, trials] of [[Number.NaN, 10], [0, Number.NaN], [1.5, 10], [-1, 10], [11, 10], [0, Number.POSITIVE_INFINITY]] as const) {
+      expect(of(failures, trials)).toMatchObject({ outcome: "cannot decide", reason: expect.stringContaining(`not ${failures} failures of ${trials} trials`) });
+    }
+    expect(of(0, 10_000)?.outcome).toBe("within");
+  });
+
   it("cannot decide on an old record when a largest age is set, and on a time that does not parse", () => {
     expect(rungVerdict(rung(1), record(1, { at: "2026-10-01T00:00:00Z" }), { now, maxAgeDays: 7 }).reason).toContain("older than 7 days");
     expect(rungVerdict(rung(1), record(1), { now, maxAgeDays: 7 }).outcome).toBe("within");
@@ -224,7 +238,7 @@ describe("a quantile budget", () => {
 
   it("cannot decide with no values or with a NaN", () => {
     expect(verdictOf([])?.outcome).toBe("cannot decide");
-    expect(verdictOf([1, Number.NaN])?.outcome).toBe("cannot decide");
+    expect(verdictOf([1, Number.NaN])).toMatchObject({ outcome: "cannot decide", reason: expect.stringContaining("the value 1 is NaN") });
   });
 
   it("gives a problem for a quantile or a level out of range", () => {
