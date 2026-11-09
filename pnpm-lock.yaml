@@ -285,6 +285,9 @@ importers:
 
   packages/mutation:
     dependencies:
+      '@mark1russell7/rigor-statistics':
+        specifier: workspace:^
+        version: link:../statistics
       '@mark1russell7/text':
         specifier: ^0.0.2
         version: 0.0.2

@@ -110,6 +110,7 @@ describe("PartialReporter", () => {
         ["adds", "src/a.test.ts", 10, 2, 20],
         ["signs", "", 2, 1, 2],
       ],
+      dryRun: { tests: 2, netMs: 12 },
     });
     r.onMutantTested({ ...mutant("src/a.ts", "Timeout", 3, "2"), statusReason: "Hit limit" });
     r.onMutantTested(mutant("src/a.ts", "NoCoverage", 8, "3"));
