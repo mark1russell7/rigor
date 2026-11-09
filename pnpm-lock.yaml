@@ -167,14 +167,14 @@ importers:
   .:
     devDependencies:
       '@mark1russell7/api-report':
-        specifier: ^0.4.1
-        version: 0.4.2
+        specifier: ^0.5.0
+        version: 0.5.0
       '@mark1russell7/boundaries':
         specifier: ^0.2.0
         version: 0.2.1(@swc/core@1.16.20)(dependency-cruiser@18.7.0)
       '@mark1russell7/conventions':
         specifier: ^0.38.4
-        version: 0.38.4
+        version: 0.38.5
       '@mark1russell7/cue':
         specifier: ^2.0.0
         version: 2.1.2
@@ -183,7 +183,7 @@ importers:
         version: 0.3.0
       '@mark1russell7/template-cli':
         specifier: ^0.1.3
-        version: 0.1.6
+        version: 0.1.7
       '@swc/core':
         specifier: ^1.15.0
         version: 1.16.20
@@ -323,8 +323,8 @@ importers:
         specifier: ^2.0.0
         version: 2.1.2
       '@mark1russell7/site-pages':
-        specifier: ^0.3.4
-        version: 0.3.4
+        specifier: ^0.4.3
+        version: 0.4.3
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.6
@@ -913,8 +913,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@mark1russell7/api-report@0.4.2':
-    resolution: {integrity: sha512-D+NZYQysYxV+1xGtgI92xDC5nQqaM7LLZmpPv3isaJluE61xTYEzyQitoiq30ZNvoLm37TY1tywCb+0kdlMTug==}
+  '@mark1russell7/api-report@0.5.0':
+    resolution: {integrity: sha512-1mbJ614xQr+qQ5uLWOubNP1n9CEY/ytfwC2p9eLt5PIH+xWt2yAKBWm2kuIm5A2xiBldZAJ7QEuyoa4+jJLKpQ==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -935,6 +935,11 @@ packages:
     engines: {node: '>=22'}
     hasBin: true
 
+  '@mark1russell7/conventions@0.38.5':
+    resolution: {integrity: sha512-nzPyMDJPvcL886YOj9S7nUg0/uorOpAl45zIaZA88K020nipvzf2mao2bZrhXRsyTluXlnxog/I1aj+UFeI//Q==}
+    engines: {node: '>=22'}
+    hasBin: true
+
   '@mark1russell7/cue@2.1.2':
     resolution: {integrity: sha512-PjEWeyq353cz3gZyNmYkv/rUChybd3h9BWRW3UWP+fs0s7/CwGeVRzCpYLnvLR4gyHC367G/PS3kqWJO9GEAkg==}
     engines: {node: '>=22'}
@@ -948,8 +953,8 @@ packages:
     resolution: {integrity: sha512-dxr3UiAs64JXV3trXCaTRTesHqXEMUoVvDGIyrz0BWsAZERA/lrIQNUATFAuqnAWzdmbHUyi/5nzA4uPXTSTJw==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/site-pages@0.3.4':
-    resolution: {integrity: sha512-xxYaeElE6/HvADgO+2yu00c7svWw0ICQ99iD/2rYQVTLEvRqn40MDzi0gnCk37/LakH443xwYVvRw/YeZhj4PQ==}
+  '@mark1russell7/site-pages@0.4.3':
+    resolution: {integrity: sha512-6RVlKnaXyVAwcZwrKugTcm32strh0D5Dz+ZSSz6zlLXtWtX31C23ue88bPh7PujLw6r90PywY00uSkNafOCKfg==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -958,8 +963,8 @@ packages:
     engines: {node: '>=22'}
     hasBin: true
 
-  '@mark1russell7/template-cli@0.1.6':
-    resolution: {integrity: sha512-aKHaoDxg8zutGQIlJ6H10TO0lCHFReNkGxBrZNS1O77TArms62FXA43wIc9wU29zra6uMgNIlUKpfN3rZJtWqA==}
+  '@mark1russell7/template-cli@0.1.7':
+    resolution: {integrity: sha512-Wy4xa6OgNXyMunSyXOArxmrspLSCuyw1pf1P5X45Uiwe1aWHzn0LJptUYVGUSwT3GTp9FGVDhFMeOnKlapD3Xw==}
     engines: {node: '>=22.12'}
     hasBin: true
 
@@ -2881,7 +2886,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  '@mark1russell7/api-report@0.4.2':
+  '@mark1russell7/api-report@0.5.0':
     dependencies:
       '@mark1russell7/conventions': 0.38.4
 
@@ -2894,6 +2899,10 @@ snapshots:
     dependencies:
       yaml: 2.9.1
 
+  '@mark1russell7/conventions@0.38.5':
+    dependencies:
+      yaml: 2.9.1
+
   '@mark1russell7/cue@2.1.2': {}
 
   '@mark1russell7/rigor-generators@0.1.6': {}
@@ -2902,7 +2911,7 @@ snapshots:
     dependencies:
       '@mark1russell7/rigor-generators': 0.1.6
 
-  '@mark1russell7/site-pages@0.3.4':
+  '@mark1russell7/site-pages@0.4.3':
     dependencies:
       '@mark1russell7/rigor-statistics': 0.1.15
 
@@ -2910,7 +2919,7 @@ snapshots:
     dependencies:
       typescript: 6.0.3
 
-  '@mark1russell7/template-cli@0.1.6':
+  '@mark1russell7/template-cli@0.1.7':
     dependencies:
       '@clack/prompts': 1.8.1
 
