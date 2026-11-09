@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { escapeWorkflowData, escapeWorkflowProperty } from "@mark1russell7/text";
 import { REPORT_DIR, rewritesTsconfig, strykerConfig } from "./config.ts";
 import { compareDisables, findDisables, type Disable } from "./disables.ts";
 import { collectFaults, computedImports, leavingPaths, relatedTestFiles, type Collected, type CollectRequest, type PackageFile } from "./load.ts";
@@ -496,12 +497,6 @@ interface PlannedFall {
   readonly text: string;
 }
 
-/** This function escapes the text of a workflow command of GitHub Actions. A property escapes also `:` and `,`. */
-const escapeCommand = (text: string, property = false): string => {
-  const data = text.replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A");
-  return property ? data.replaceAll(":", "%3A").replaceAll(",", "%2C") : data;
-};
-
 /**
  * This function gives a warning annotation for each score that does not pass and each planned fall. The annotation is on
  * the check line, so a no read is not a green check with the reason only in the log. This is true also for a run that
@@ -509,7 +504,7 @@ const escapeCommand = (text: string, property = false): string => {
  */
 function annotations(results: readonly Score[], falls: readonly PlannedFall[]): string[] {
   const noReads = results.filter((s) => !s.pass && s.outcome !== "block");
-  const line = (title: string, message: string): string => `::warning title=${escapeCommand(title, true)}::${escapeCommand(message)}`;
+  const line = (title: string, message: string): string => `::warning title=${escapeWorkflowProperty(title)}::${escapeWorkflowData(message)}`;
   return [
     ...noReads.map((s) => line(`Mutation gate: no read, ${String(noReads.length)} of ${String(results.length)} selections`, `${s.name}: ${s.reason ?? ""}`)),
     ...results.filter((s) => !s.pass && s.outcome === "block").map((s) => line("Mutation gate: under the gate", `${s.name}: ${s.reason ?? ""}`)),
@@ -557,7 +552,7 @@ function planCheck(lane: Lane, laneDir: string, names: readonly string[], o: Pla
     });
     io.stdout(`${read.line}\n${read.warnings.map((w) => `  WARN: ${w}\n`).join("")}${read.faults.map((f) => `  FAIL: ${f}\n`).join("")}`);
     // The estimate has an error of 28 minutes in the mean, so a selection over its target gives a warning with a mark.
-    if (actions) for (const w of read.warnings) io.stdout(`::warning title=${escapeCommand("Mutation plan: over the target", true)}::${escapeCommand(w)}\n`);
+    if (actions) for (const w of read.warnings) io.stdout(`::warning title=${escapeWorkflowProperty("Mutation plan: over the target")}::${escapeWorkflowData(w)}\n`);
     if (read.warnings.length > 0) warned += 1;
     if (read.faults.length > 0) failed += 1;
   }

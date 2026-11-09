@@ -59,6 +59,6 @@ describe("the build", () => {
     expect(html).toContain('href="status/"');
     expect(html).toContain('href="releases/"');
     expect(html).toContain('src="page.js"');
-    expect(pageHtml([{ name: "<x>", state: "planned", gives: "a & b" }], "d")).toContain("&#60;x&#62;");
+    expect(pageHtml([{ name: "<x>", state: "planned", gives: "a & b" }], "d")).toContain("&lt;x&gt;");
   });
 });
