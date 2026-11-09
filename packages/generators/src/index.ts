@@ -1,5 +1,6 @@
 export { dependsOnLibm, sampler, type DistributionSpec, type Param } from "./distributions.ts";
-export { betaCdf, distributionOf, normalCdf, normalQuantile, type Distribution } from "./quantiles.ts";
+export { normalCdf, normalQuantile } from "./normal.ts";
+export { betaCdf, distributionOf, type Distribution } from "./quantiles.ts";
 export {
   familyMap,
   familyPoints,
