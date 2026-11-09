@@ -106,6 +106,16 @@ describe("fnv1a32", () => {
     expect(fnv1a32("\uD800")).toBe(55024714);
   });
 
+  it("gives the hash of the bytes of TextEncoder for utf8, with no API of the platform", () => {
+    const encoder = new TextEncoder();
+    const bytes = (s: string): number => {
+      let h = 0x811c9dc5;
+      for (const b of encoder.encode(s)) h = Math.imul(h ^ b, 0x01000193);
+      return h >>> 0;
+    };
+    for (const s of strings()) expect(fnv1a32(s)).toBe(bytes(s));
+  });
+
   it("gives the hash of the UTF-16 code units, equal to the copy of highways", () => {
     for (const s of strings()) expect(fnv1a32(s, { input: "utf16" })).toBe(units(s));
     expect(fnv1a32("", { input: "utf16" })).toBe(0x811c9dc5);

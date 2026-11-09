@@ -21,16 +21,15 @@ export function mulberry32(seed: number): Source {
   };
 }
 
-const UTF8 = new TextEncoder();
-
 /**
  * The FNV-1a hash of 32 bits of a string. The option `input` selects the units that the hash reads:
  *
- * - `"utf8"` (the default): the UTF-8 bytes from `TextEncoder`. A lone surrogate becomes the bytes of U+FFFD.
+ * - `"utf8"` (the default): the UTF-8 bytes, equal to the bytes of `TextEncoder`. A lone surrogate becomes the bytes of U+FFFD.
  * - `"utf16"`: the UTF-16 code units of the string, one unit for each step, from `charCodeAt`.
  * - `"wtf8"`: the UTF-8 bytes of each code point. A lone surrogate becomes its own 3 bytes (WTF-8).
  *
- * For a string without a lone surrogate, `"utf8"` and `"wtf8"` give the same hash.
+ * For a string without a lone surrogate, `"utf8"` and `"wtf8"` give the same hash. The function uses no API of Node or
+ * of the browser, so the hash is the same on each platform.
  */
 export function fnv1a32(text: string, options?: { readonly input?: "utf8" | "utf16" | "wtf8" }): number {
   const input = options?.input ?? "utf8";
@@ -39,29 +38,27 @@ export function fnv1a32(text: string, options?: { readonly input?: "utf8" | "utf
     for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
     return h >>> 0;
   }
-  if (input === "wtf8") {
-    for (const ch of text) {
-      const c = ch.codePointAt(0) as number;
-      if (c < 0x80) h = Math.imul(h ^ c, 0x01000193);
-      else if (c < 0x800) {
-        h = Math.imul(h ^ (0xc0 | (c >> 6)), 0x01000193);
-        h = Math.imul(h ^ (0x80 | (c & 63)), 0x01000193);
-      } else if (c < 0x10000) {
-        h = Math.imul(h ^ (0xe0 | (c >> 12)), 0x01000193);
-        h = Math.imul(h ^ (0x80 | ((c >> 6) & 63)), 0x01000193);
-        h = Math.imul(h ^ (0x80 | (c & 63)), 0x01000193);
-      } else {
-        h = Math.imul(h ^ (0xf0 | (c >> 18)), 0x01000193);
-        h = Math.imul(h ^ (0x80 | ((c >> 12) & 63)), 0x01000193);
-        h = Math.imul(h ^ (0x80 | ((c >> 6) & 63)), 0x01000193);
-        h = Math.imul(h ^ (0x80 | (c & 63)), 0x01000193);
-      }
+  if (input !== "utf8" && input !== "wtf8") throw new RangeError(`fnv1a32: input is "utf8", "utf16" or "wtf8", not ${String(input)}.`);
+  for (const ch of text) {
+    let c = ch.codePointAt(0) as number;
+    // A string iterator gives a lone surrogate as one code point. UTF-8 writes U+FFFD in its place, as TextEncoder does.
+    if (input === "utf8" && c >= 0xd800 && c <= 0xdfff) c = 0xfffd;
+    if (c < 0x80) h = Math.imul(h ^ c, 0x01000193);
+    else if (c < 0x800) {
+      h = Math.imul(h ^ (0xc0 | (c >> 6)), 0x01000193);
+      h = Math.imul(h ^ (0x80 | (c & 63)), 0x01000193);
+    } else if (c < 0x10000) {
+      h = Math.imul(h ^ (0xe0 | (c >> 12)), 0x01000193);
+      h = Math.imul(h ^ (0x80 | ((c >> 6) & 63)), 0x01000193);
+      h = Math.imul(h ^ (0x80 | (c & 63)), 0x01000193);
+    } else {
+      h = Math.imul(h ^ (0xf0 | (c >> 18)), 0x01000193);
+      h = Math.imul(h ^ (0x80 | ((c >> 12) & 63)), 0x01000193);
+      h = Math.imul(h ^ (0x80 | ((c >> 6) & 63)), 0x01000193);
+      h = Math.imul(h ^ (0x80 | (c & 63)), 0x01000193);
     }
-    return h >>> 0;
   }
-  if (input !== "utf8") throw new RangeError(`fnv1a32: input is "utf8", "utf16" or "wtf8", not ${String(input)}.`);
-  for (const b of UTF8.encode(text)) h = Math.imul(h ^ b, 0x01000193) >>> 0;
-  return h;
+  return h >>> 0;
 }
 
 /** The 32-bit seed of a number (its low 32 bits, unsigned) or of a string (its FNV-1a hash). */
