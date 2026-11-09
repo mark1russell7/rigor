@@ -7,6 +7,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { NOISE_RANGE, RATIO_RANGE, START } from "./explorer.ts";
+import { escapeAttribute as escape } from "@mark1russell7/text";
 
 /** The packages of rigor: the name, the state and what each one gives. */
 export interface PackageRow {
@@ -40,8 +41,6 @@ export function packageRows(versions: Versions): PackageRow[] {
 export function scrollCueCss(): string {
   return readFileSync(fileURLToPath(import.meta.resolve("@mark1russell7/site-pages/scroll-cue.css")), "utf8");
 }
-
-const escape = (s: string): string => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 /** The section of the time-verdict explorer. The script of the page fills the presets, the rounds, the verdict and the diagram. */
 export function verdictSection(): string {
