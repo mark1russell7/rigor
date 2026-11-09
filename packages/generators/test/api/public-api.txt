@@ -6,27 +6,91 @@
 
 ## . (build/index.d.ts): names
 
+type CanonicalOptions: build/hash.d.ts#CanonicalOptions
 DIAGRAM_BOX_AREA: build/recorded.d.ts#DIAGRAM_BOX_AREA
+type Dimension: build/designs.d.ts#Dimension
+type Distribution: build/quantiles.d.ts#Distribution
 type DistributionSpec: build/distributions.d.ts#DistributionSpec
 GIT_BLOB_BYTES: build/recorded.d.ts#GIT_BLOB_BYTES
+type InputFamily: build/designs.d.ts#InputFamily
 type Param: build/distributions.d.ts#Param
+type Point: build/designs.d.ts#Point
 RECORDED_TABLES: build/recorded.d.ts#RECORDED_TABLES
 type Random: build/random.d.ts#Random
 type RecordedTable: build/recorded.d.ts#RecordedTable
+type SaltelliDesign: build/designs.d.ts#SaltelliDesign
+type Sha256Options: build/hash.d.ts#Sha256Options
 type Source: build/random.d.ts#Source
+betaCdf: build/quantiles.d.ts#betaCdf
+canonicalHash: build/hash.d.ts#canonicalHash
+canonicalJson: build/hash.d.ts#canonicalJson
 dependsOnLibm: build/distributions.d.ts#dependsOnLibm
 deriveSeed: build/random.d.ts#deriveSeed
+distributionOf: build/quantiles.d.ts#distributionOf
+familyMap: build/designs.d.ts#familyMap
+familyPoints: build/designs.d.ts#familyPoints
 fnv1a32: build/random.d.ts#fnv1a32
+latinHypercube: build/designs.d.ts#latinHypercube
 mulberry32: build/random.d.ts#mulberry32
+normalCdf: build/normal.d.ts#normalCdf
+normalQuantile: build/normal.d.ts#normalQuantile
 random: build/random.d.ts#random
+randomDesign: build/designs.d.ts#randomDesign
 randomOf: build/random.d.ts#randomOf
 recordedSpec: build/recorded.d.ts#recordedSpec
+saltelliDesign: build/designs.d.ts#saltelliDesign
 sampler: build/distributions.d.ts#sampler
 seedOf: build/random.d.ts#seedOf
 seedsFrom: build/random.d.ts#seedsFrom
+sha256Hex: build/hash.d.ts#sha256Hex
 stablePick: build/random.d.ts#stablePick
+stratifiedDesign: build/designs.d.ts#stratifiedDesign
 
 ## Declarations
+
+### build/designs.d.ts#Dimension
+export interface Dimension {
+  readonly name: string;
+  readonly min: number;
+  readonly max: number;
+  readonly distribution?: DistributionSpec;
+  readonly scale?: "linear" | "log";
+  readonly integer?: boolean;
+}
+
+### build/designs.d.ts#InputFamily
+export interface InputFamily {
+  readonly name: string;
+  readonly dimensions: readonly Dimension[];
+}
+
+### build/designs.d.ts#Point
+export type Point = Readonly<Record<string, number>>;
+
+### build/designs.d.ts#SaltelliDesign
+export interface SaltelliDesign {
+  readonly a: number[][];
+  readonly b: number[][];
+  readonly ab: number[][][];
+}
+
+### build/designs.d.ts#familyMap
+export declare function familyMap(family: InputFamily, r: Random): (unit: readonly number[]) => Point;
+
+### build/designs.d.ts#familyPoints
+export declare function familyPoints(family: InputFamily, unit: readonly (readonly number[])[], r: Random): Point[];
+
+### build/designs.d.ts#latinHypercube
+export declare function latinHypercube(n: number, d: number, r: Random): number[][];
+
+### build/designs.d.ts#randomDesign
+export declare function randomDesign(n: number, d: number, r: Random): number[][];
+
+### build/designs.d.ts#saltelliDesign
+export declare function saltelliDesign(n: number, d: number, r: Random, base?: "random" | "latin"): SaltelliDesign;
+
+### build/designs.d.ts#stratifiedDesign
+export declare function stratifiedDesign(strata: number, d: number, r: Random, limit?: number): number[][];
 
 ### build/distributions.d.ts#DistributionSpec
 export type DistributionSpec = {
@@ -65,6 +129,46 @@ export declare function dependsOnLibm(spec: DistributionSpec): boolean;
 ### build/distributions.d.ts#sampler
 export declare function sampler(spec: DistributionSpec, r: Random): () => number;
 
+### build/hash.d.ts#CanonicalOptions
+export interface CanonicalOptions {
+  readonly form?: "jcs" | "json";
+  readonly bigint?: "error" | "suffix";
+}
+
+### build/hash.d.ts#Sha256Options
+export interface Sha256Options {
+  readonly input?: "utf8" | "wtf8";
+}
+
+### build/hash.d.ts#canonicalHash
+export declare function canonicalHash(value: unknown, options?: CanonicalOptions): string;
+
+### build/hash.d.ts#canonicalJson
+export declare function canonicalJson(value: unknown, options?: CanonicalOptions): string;
+
+### build/hash.d.ts#sha256Hex
+export declare function sha256Hex(text: string, options?: Sha256Options): string;
+
+### build/normal.d.ts#normalCdf
+export declare function normalCdf(x: number): number;
+
+### build/normal.d.ts#normalQuantile
+export declare function normalQuantile(p: number): number;
+
+### build/quantiles.d.ts#Distribution
+export interface Distribution {
+  readonly family: DistributionSpec["family"];
+  readonly discrete: boolean;
+  cdf(x: number): number;
+  quantile(u: number): number;
+}
+
+### build/quantiles.d.ts#betaCdf
+export declare function betaCdf(x: number, a: number, b: number): number;
+
+### build/quantiles.d.ts#distributionOf
+export declare function distributionOf(spec: DistributionSpec, r: Random): Distribution;
+
 ### build/random.d.ts#Random
 export interface Random {
   readonly seed: number;
@@ -78,6 +182,7 @@ export interface Random {
   shuffle<T>(items: readonly T[]): T[];
   sample<T>(items: readonly T[], k: number): T[];
   normal(mean?: number, sd?: number): number;
+  gumbel(location?: number, scale?: number): number;
   fork(label: string): Random;
 }
 

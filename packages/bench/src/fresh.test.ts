@@ -173,6 +173,27 @@ describe("freshRun", () => {
     await expect(run({ start })).rejects.toThrow(/arm "next".*case "y", round 2 skipped the case after the first round/);
   });
 
+  it("skips a case whose child takes too long in the first round, with overLimit skip", async () => {
+    const { start, calls } = fake((program, caseId) => (program === "next" && caseId === "y" ? { code: null, timedOut: true } : undefined));
+    const result = await run({ start, timeoutMs: 5000, overLimit: "skip" });
+    expect(result.skipped).toEqual([{ arm: "next", case: "y", round: 0, reason: "took more than 5000 ms" }]);
+    for (const records of Object.values(result.pairs)) {
+      expect(records.some((r) => r.case === "y")).toBe(false);
+      expect(records.filter((r) => r.case === "x").length).toBe(4);
+    }
+    expect(calls.filter((c) => c.case === "y" && c.program === "next").length).toBe(1);
+  });
+
+  it("refuses a child over the limit after the first round, with overLimit skip", async () => {
+    const { start } = fake((program, caseId, k) => (program === "next" && caseId === "y" && k > 16 ? { code: null, timedOut: true } : undefined));
+    await expect(run({ start, timeoutMs: 5000, overLimit: "skip" })).rejects.toThrow(/case "y", round 2 skipped the case after the first round of the job \("took more than 5000 ms"\)/);
+  });
+
+  it("refuses an overLimit that is not error or skip", async () => {
+    const { start } = fake();
+    await expect(run({ start, overLimit: "drop" as never })).rejects.toThrow(/overLimit is "error" or "skip", not "drop"/);
+  });
+
   it("refuses a crash, a timeout and a child with no JSON line, with the arm, the case, the round and the tail of stderr", async () => {
     const at = (end: Partial<ChildExit>) => fake((program, caseId) => (program === "next" && caseId === "y" ? end : undefined)).start;
     const where = /the arm "next" \(pair "next", arm b\) on the case "y", round 0/;
@@ -244,6 +265,15 @@ describe("freshRun", () => {
     const node = { id: "node", command: [process.execPath, "-e", `process.on("SIGTERM", () => {}); ${grandchild} setInterval(() => {}, 1000);`, "--"] };
     const t0 = performance.now();
     await expect(freshRun({ base: node, candidates: [], cases: ["x"], rounds: 1, timeoutMs: 300, env: ENV })).rejects.toThrow(/took more than 300 ms/);
+    expect(performance.now() - t0).toBeLessThan(6000);
+  }, 15000);
+
+  it("stops a child that does not end at the time limit, and skips its case, with overLimit skip", async () => {
+    const node = { id: "node", command: [process.execPath, "-e", "setInterval(() => {}, 1000);", "--"] };
+    const t0 = performance.now();
+    const result = await freshRun({ base: node, candidates: [], cases: ["x"], rounds: 2, timeoutMs: 300, overLimit: "skip", env: ENV });
+    expect(result.skipped).toEqual([{ arm: "node", case: "x", round: 0, reason: "took more than 300 ms" }]);
+    expect(result.pairs["node~aa"]).toEqual([]);
     expect(performance.now() - t0).toBeLessThan(6000);
   }, 15000);
 });

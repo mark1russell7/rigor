@@ -188,6 +188,18 @@ export function brier(forecasts: readonly Forecast[]): number {
   return sum / forecasts.length;
 }
 
+/**
+ * The log-loss of predictions: the mean of `-ln(p)` for a hit and `-ln(1 - p)` for a miss. 0 is perfect, and
+ * `ln(2)` is a constant 0.5. Lower is better. A p of 0 for a hit gives Infinity. For an outcome of three values,
+ * give the probability of the observed outcome as `p`, with `hit` true.
+ */
+export function logLoss(forecasts: readonly Forecast[]): number {
+  checkedForecasts("logLoss", forecasts);
+  let sum = 0;
+  for (const f of forecasts) sum -= Math.log(f.hit ? f.p : 1 - f.p);
+  return sum / forecasts.length;
+}
+
 /** The predictions of one stated level. */
 export interface CalibrationLevel {
   readonly stated: number;

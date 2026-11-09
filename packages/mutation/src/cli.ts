@@ -7,6 +7,7 @@ try {
     cwd: process.cwd(),
     stdout: (text) => process.stdout.write(text),
     stderr: (text) => process.stderr.write(text),
+    env: process.env,
   });
 } catch (error) {
   process.stderr.write(`rigor-mutation: ${error instanceof Error ? error.message : String(error)}\n`);

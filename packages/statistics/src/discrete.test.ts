@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { random } from "@mark1russell7/rigor-generators";
-import { binomialInterval, medianInterval, negativeBinomialInterval, quantileInterval, quantileSamples } from "./index.ts";
+import { binomialInterval, binomialTest, medianInterval, negativeBinomialInterval, quantileInterval, quantileSamples, signTest } from "./index.ts";
 
 /* ---------- The copies in the engines, word for word, as the references of the moves ---------- */
 
@@ -252,5 +252,76 @@ describe("quantileSamples", () => {
     expect(() => quantileSamples(1)).toThrow(RangeError);
     expect(() => quantileSamples(0)).toThrow(RangeError);
     expect(() => quantileSamples(0.5, 0)).toThrow(RangeError);
+  });
+});
+
+/** The exact tail of Binomial(n, num / den) from k = from to k = to, as a ratio of big integers, to 30 digits. */
+function exactTail(n: number, num: bigint, den: bigint, from: number, to: number): number {
+  let choose = 1n;
+  let sum = 0n;
+  for (let i = 0; i <= to; i++) {
+    if (i > 0) choose = (choose * BigInt(n - i + 1)) / BigInt(i);
+    if (i >= from) sum += choose * num ** BigInt(i) * (den - num) ** BigInt(n - i);
+  }
+  const scale = 10n ** 30n;
+  return Number((sum * scale) / den ** BigInt(n)) / 1e30;
+}
+
+describe("binomialTest", () => {
+  it("gives the exact one-sided tail of a small case", () => {
+    // P(X <= 1) for n = 5 and p = 0.3: 0.7^5 + 5 * 0.3 * 0.7^4.
+    expect(binomialTest(1, 5, 0.3, "less")).toBeCloseTo(0.52822, 12);
+    expect(binomialTest(0, 10, 0.5, "less")).toBeCloseTo(1 / 1024, 15);
+    expect(binomialTest(10, 10, 0.5, "greater")).toBeCloseTo(1 / 1024, 15);
+  });
+
+  it("agrees with the exact sum in big integers at n = 1000 and p = 0.95, in each tail", () => {
+    for (const k of [880, 900, 925, 940, 950, 960, 990]) {
+      const less = exactTail(1000, 19n, 20n, 0, k);
+      const greater = exactTail(1000, 19n, 20n, k, 1000);
+      expect(binomialTest(k, 1000, 0.95, "less") / less, `less ${k}`).toBeCloseTo(1, 9);
+      expect(binomialTest(k, 1000, 0.95, "greater") / greater, `greater ${k}`).toBeCloseTo(1, 9);
+    }
+  });
+
+  it("is equal to the one-sided sign test at p = 1/2", () => {
+    for (const [k, n] of [
+      [0, 0],
+      [3, 7],
+      [15, 20],
+      [60, 100],
+      [100, 100],
+    ] as const) {
+      expect(binomialTest(k, n, 0.5, "greater")).toBeCloseTo(signTest(k, n - k), 12);
+    }
+  });
+
+  it("gives tails that add to 1 with the term at k counted once", () => {
+    const r = random("binomial-test");
+    for (let t = 0; t < 50; t++) {
+      const n = r.int(1, 300);
+      const k = r.int(0, n - 1);
+      const p = r.next();
+      expect(binomialTest(k, n, p, "less") + binomialTest(k + 1, n, p, "greater")).toBeCloseTo(1, 10);
+    }
+  });
+
+  it("gives the ends at p = 0, p = 1 and the full range", () => {
+    expect(binomialTest(0, 10, 0, "less")).toBe(1);
+    expect(binomialTest(1, 10, 0, "greater")).toBe(0);
+    expect(binomialTest(9, 10, 1, "less")).toBe(0);
+    expect(binomialTest(10, 10, 1, "less")).toBe(1);
+    expect(binomialTest(0, 10, 0.4, "greater")).toBe(1);
+    expect(binomialTest(10, 10, 0.4, "less")).toBe(1);
+    expect(binomialTest(0, 0, 0.4, "less")).toBe(1);
+  });
+
+  it("throws for a bad input", () => {
+    expect(() => binomialTest(-1, 10, 0.5, "less")).toThrow(RangeError);
+    expect(() => binomialTest(1.5, 10, 0.5, "less")).toThrow(RangeError);
+    expect(() => binomialTest(11, 10, 0.5, "less")).toThrow(/more than n/);
+    expect(() => binomialTest(1, 10, 1.5, "less")).toThrow(/p is from 0 to 1/);
+    expect(() => binomialTest(1, 10, Number.NaN, "less")).toThrow(/p is from 0 to 1/);
+    expect(() => binomialTest(1, 10, 0.5, "two" as "less")).toThrow(/side is/);
   });
 });

@@ -1,0 +1,75 @@
+name: Stryker stop
+
+# One real run of Stryker on a fixture lane, which a TERM stops. It checks that Stryker loads the reporter
+# rigor-partial from the build, and that `rigor-mutation scores` gives a partial score after the stop. A run with the
+# config of `config --plan` stops after the plan, and plan-check reads it (plan.ts). Then two full
+# runs on the two parts of a second fixture check that the test files of the reports match the disk (files.ts).
+# Last, load-check --collect passes that fixture and fails each fault of a test file (collect.ts).
+on:
+  # Each pull request starts this workflow, so its summary check is always there. The job changes skips the
+  # work when the pull request changes no file of the gate (CI.md of the template, "A gate with paths").
+  pull_request:
+  push:
+    branches: [main]
+    paths:
+      - "packages/mutation/**"
+      - ".github/workflows/stryker-stop.yml"
+  # A person starts a run on a branch with no pull request: gh workflow run stryker-stop.yml --ref <branch>
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stryker-stop-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      match: ${{ steps.changes.outputs.match }}
+    steps:
+      - id: changes
+        uses: mark1russell7/template/.github/actions/changes@e5528b40a615db0f2e0f341c5ec0fa860ca47cc0 # main
+        with:
+          paths: |
+            packages/mutation/**
+            .github/workflows/stryker-stop.yml
+
+  stop:
+    needs: changes
+    if: needs.changes.outputs.match == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @mark1russell7/rigor-mutation build
+      - run: node packages/mutation/test/stryker/stop.ts
+      - run: node packages/mutation/test/stryker/plan.ts
+      - run: node packages/mutation/test/stryker/files.ts
+      - run: node packages/mutation/test/stryker/collect.ts
+
+  stryker-stop-ok:
+    name: Stryker stop OK
+    if: ${{ !cancelled() }}
+    needs: [changes, stop]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - uses: mark1russell7/template/.github/actions/gate-summary@e5528b40a615db0f2e0f341c5ec0fa860ca47cc0 # main
+        with:
+          needs: ${{ toJSON(needs) }}

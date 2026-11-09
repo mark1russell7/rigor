@@ -9,25 +9,65 @@ function whole(name: string, value: number): void {
   if (!Number.isSafeInteger(value) || value < 0) throw new RangeError(`${name}: ${value} is not a whole number of 0 or more.`);
 }
 
-/** The log of each binomial term C(n, k) / 2^n, for each k from 0 to n. */
-function halfBinomialLogs(n: number): number[] {
-  const logs: number[] = [];
-  let logChoose = 0;
-  for (let i = 0; i <= n; i++) {
-    if (i > 0) logChoose += Math.log((n - i + 1) / i);
-    logs.push(logChoose - n * Math.LN2);
+const TWO_512 = 2 ** 512;
+
+/** C(n, k) / 2^n, as one product of min(k, n - k) ratios, with the powers of 2 kept apart so that no step overflows. */
+function halfBinomial(k: number, n: number): number {
+  const m = Math.min(k, n - k);
+  let value = 1;
+  let exponent = -n;
+  for (let i = 1; i <= m; i++) {
+    value *= (n - m + i) / i;
+    if (value > TWO_512) {
+      value /= TWO_512;
+      exponent += 512;
+    }
   }
-  return logs;
+  for (; exponent < -512; exponent += 512) value /= TWO_512;
+  return value * 2 ** exponent;
 }
 
-/** P(X >= k) for X ~ Binomial(n, 1/2), summed from the largest term so that a small tail keeps its digits. */
+/** The largest n for which the tail is an exact sum of whole numbers. Above it, the sum is in floating point. */
+const SIGN_TEST_EXACT_LIMIT = 4096;
+
+/** num / 2^n as the nearest double: one rounding, also when num has more than 1024 bits. */
+function overPowerOfTwo(num: bigint, n: number): number {
+  const shift = Math.max(0, num.toString(2).length - 1000);
+  let value = Number(num >> BigInt(shift));
+  let exponent = shift - n;
+  for (; exponent < -512; exponent += 512) value /= TWO_512;
+  return value * 2 ** exponent;
+}
+
+/**
+ * P(X >= k) for X ~ Binomial(n, 1/2). For n up to SIGN_TEST_EXACT_LIMIT it adds C(n, i) as whole numbers (BigInt),
+ * so the only error is the last rounding to a double. Above the limit and above the middle, it adds the terms as
+ * ratios of term k in linear space. At or below the middle, it gives 1 - P(X >= n - k + 1), by symmetry. (An earlier form added
+ * logs and called Math.exp, and its error grew with n: up to 2.5e-14 for n <= 80, rigor#158. The floating-point
+ * form above the limit was at most 1.1e-14 relative at n = 4097 and 5000, above 2^-1000.)
+ */
 function upperTail(k: number, n: number): number {
   if (k <= 0) return 1;
   if (k > n) return 0;
-  const logs = halfBinomialLogs(n).slice(k);
-  const top = Math.max(...logs);
-  const sum = logs.reduce((s, l) => s + Math.exp(l - top), 0);
-  return Math.min(1, Math.exp(top) * sum);
+  if (n <= SIGN_TEST_EXACT_LIMIT) {
+    const big = BigInt(n);
+    let term = 1n;
+    for (let i = 1n; i <= BigInt(k); i++) term = (term * (big - i + 1n)) / i;
+    let sum = 0n;
+    for (let i = BigInt(k); i <= big; i++) {
+      sum += term;
+      term = (term * (big - i)) / (i + 1n);
+    }
+    return Math.min(1, overPowerOfTwo(sum, n));
+  }
+  if (2 * k <= n) return 1 - upperTail(n - k + 1, n);
+  let ratio = 1;
+  let sum = 1;
+  for (let i = k; i < n && ratio > 0; i++) {
+    ratio *= (n - i) / (i + 1);
+    sum += ratio;
+  }
+  return Math.min(1, halfBinomial(k, n) * sum);
 }
 
 /**
@@ -50,8 +90,16 @@ export function signTest(better: number, worse: number, sides: 1 | 2 = 1): numbe
  */
 export function signTestPower(n: number, level = 0.05, sides: 1 | 2 = 2): number | undefined {
   whole("signTestPower", n);
-  for (let k = Math.ceil(n / 2); k <= n; k++) if (signTest(k, n - k, sides) < level) return k;
-  return undefined;
+  // The p falls as k grows above the middle, so a binary search finds the first k under the level.
+  if (n === 0 || signTest(n, 0, sides) >= level) return undefined;
+  let low = Math.ceil(n / 2);
+  let high = n;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (signTest(middle, n - middle, sides) < level) high = middle;
+    else low = middle + 1;
+  }
+  return low;
 }
 
 /** The z of a two-sided 95% interval. */
@@ -161,6 +209,74 @@ export function pairedPermutation(candidate: readonly number[], baseline: readon
   return { observed, p: (1 + extreme) / (1 + runs), runs };
 }
 
+/** The default of the option `exactMax` of `signFlipTest`. */
+export const SIGN_FLIP_EXACT_MAX = 16;
+
+/** The largest value of the option `exactMax` of `signFlipTest`: 2^24 sign sets. */
+export const SIGN_FLIP_EXACT_LIMIT = 24;
+
+/** The options of `signFlipTest`. */
+export interface SignFlipOptions {
+  /** The largest count of terms for which the test reads each of the `2^n` sign sets. The default is 16. The most is 24. */
+  readonly exactMax?: number;
+  /** The count of random sign sets above `exactMax`. The default is 10 000. */
+  readonly runs?: number;
+  /** The default is 1. */
+  readonly seed?: number | string;
+}
+
+/** The result of `signFlipTest`. */
+export interface SignFlipResult {
+  /** The absolute value of the sum of the terms. */
+  readonly observed: number;
+  /** The two-sided p. */
+  readonly p: number;
+  /** This field is true when the test read each sign set, so the p has no noise from the draws. */
+  readonly exact: boolean;
+  /** The count of the sign sets that the test read: `2^n` when it is exact, otherwise the count of the draws. */
+  readonly runs: number;
+}
+
+/**
+ * The sign-flip test of a sum of terms. Under the null, each term has the sign + or - with equal chance. The statistic
+ * is the absolute value of the sum. A weighted mean of paired differences is such a sum: give the terms `w[i] * d[i]`.
+ *
+ * Up to `exactMax` terms, the test reads each sign set. The p is the share of the sets that are as far from 0 or
+ * farther. The observed set is one of them. Above `exactMax`, the test draws `runs` sets, and the p is (1 + the extreme
+ * draws) / (1 + runs). A sum within `1e-12` of the sum of the absolute terms counts as extreme, so rounding does not
+ * hide a tie.
+ */
+export function signFlipTest(terms: readonly number[], options: SignFlipOptions = {}): SignFlipResult {
+  const exactMax = options.exactMax ?? SIGN_FLIP_EXACT_MAX;
+  if (!Number.isInteger(exactMax) || exactMax < 0 || exactMax > SIGN_FLIP_EXACT_LIMIT) {
+    throw new RangeError(`signFlipTest: exactMax is a whole number from 0 to ${SIGN_FLIP_EXACT_LIMIT}, not ${exactMax}.`);
+  }
+  for (const [i, t] of terms.entries()) if (!Number.isFinite(t)) throw new RangeError(`signFlipTest: the term ${i} is ${t}, not a finite number.`);
+  const n = terms.length;
+  const observed = Math.abs(terms.reduce((sum, t) => sum + t, 0));
+  const slack = 1e-12 * terms.reduce((sum, t) => sum + Math.abs(t), 0);
+  if (n <= exactMax) {
+    const total = 2 ** n;
+    let hits = 0;
+    for (let mask = 0; mask < total; mask++) {
+      let sum = 0;
+      for (let i = 0; i < n; i++) sum += mask & (1 << i) ? -(terms[i] as number) : (terms[i] as number);
+      if (Math.abs(sum) >= observed - slack) hits++;
+    }
+    return { observed, p: hits / total, exact: true, runs: total };
+  }
+  const runs = options.runs ?? 10_000;
+  if (!Number.isSafeInteger(runs) || runs < 1) throw new RangeError(`signFlipTest: runs is a whole number of 1 or more, not ${runs}.`);
+  const r = random(options.seed ?? 1);
+  let hits = 0;
+  for (let run = 0; run < runs; run++) {
+    let sum = 0;
+    for (let i = 0; i < n; i++) sum += r.next() < 0.5 ? -(terms[i] as number) : (terms[i] as number);
+    if (Math.abs(sum) >= observed - slack) hits++;
+  }
+  return { observed, p: (1 + hits) / (1 + runs), exact: false, runs };
+}
+
 /** The options of `twoSamplePermutation`. */
 export interface TwoSamplePermutationOptions {
   /** The largest number of splits that the test reads. The default is 10 000. */
@@ -237,4 +353,17 @@ export function twoSamplePermutation(a: readonly number[], b: readonly number[],
     if (isExtreme(pool.slice(0, a.length), pool.slice(a.length))) extreme++;
   }
   return { observed, p: (1 + extreme) / (1 + runs), runs, exact: false };
+}
+
+/**
+ * The smallest number of trials `n` at which the Wilson lower end reaches `target`, when the true proportion is
+ * `expected`. Each `n` takes `round(expected × n)` successes. The function gives `undefined` when `expected` is not
+ * above `target`, or when no `n` up to `max` reaches it. An audit of an agreement uses it to fix its size.
+ */
+export function wilsonSampleSize(target: number, expected: number, z: number = Z95, max = 1_000_000): number | undefined {
+  if (!(target >= 0 && target <= 1 && expected >= 0 && expected <= 1)) throw new RangeError(`wilsonSampleSize: target ${target} and expected ${expected} must be from 0 to 1.`);
+  whole("wilsonSampleSize", max);
+  if (expected <= target) return undefined;
+  for (let n = 1; n <= max; n++) if (wilson(Math.round(expected * n), n, z).low >= target) return n;
+  return undefined;
 }

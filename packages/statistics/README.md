@@ -1,6 +1,6 @@
 # @mark1russell7/rigor-statistics
 
-The statistics of measured work. It gives quantiles, bootstrap intervals, the sign test, the paired permutation test, Wilson intervals and the Holm correction. It gives the interval of a median from order statistics, and the central interval of a binomial count. It also gives least squares, rank correlation, the comparison with a baseline beyond the noise, and the Brier score of predictions. It fits response records that a browser can evaluate from plain JSON.
+The statistics of measured work. It gives quantiles, bootstrap intervals, the sign test, the paired permutation test, Wilson intervals and the Holm correction. It gives the interval of a median from order statistics, and the central interval of a binomial count. It also gives least squares, rank correlation, the comparison with a baseline beyond the noise, and the Brier score and the log-loss of predictions. It rates items from pairwise results with Elo, Glicko-2 and a Bradley-Terry fit. It fits response records that a browser can evaluate from plain JSON, and it gives the Sobol indices of their models.
 
 ```sh
 npm install @mark1russell7/rigor-statistics
@@ -100,39 +100,112 @@ A measure with `null` has no value. To tell why, declare the reasons in the fiel
 
 The default expansion has one product for each pair of levels of two dimensions. Two dimensions with 76 and 33 levels thus give 2508 products, and the limit `RESPONSE_MAX_TERMS` refuses them. With the option `interactions: "seen"`, a ridge fit keeps only the terms that are not 0 at one point or more. This choice looks only at the inputs of the points. A term with no point has the weight 0, so the choice does not change a prediction. The limit applies after the choice.
 
+### The Sobol indices of a model
+
+`sobolIndices(record, measure, options)` tells how much of the variance of a fitted model comes from each dimension. The first-order index `first` is the share of one dimension alone. The total index `total` also includes its interactions.
+
+```ts
+import { sobolIndices } from "@mark1russell7/rigor-statistics";
+
+const sobol = sobolIndices(record, "ms", { n: 4096, seed: 1 });
+sobol.indices;     // [{ dimension: "size", first: 0.71, total: 0.74 }, ...]
+sobol.variance;    // the variance of the prediction over the input distribution
+sobol.evaluations; // n * (dimensions + 2) evaluations of the model
+```
+
+- Each dimension is independent and uniform over its range or its levels. A dimension with `log` is uniform in log space.
+- A conditional dimension gets an independent draw. The model gets `null` for it where `whenHolds` fails.
+- The method is Monte Carlo with the matrices A, B and AB_i of Saltelli (2010). The first-order index uses the estimator of Saltelli (2010), and the total index uses the estimator of Jansen (1999).
+- A constant model has the variance 0. Then each index is 0, not NaN.
+- The option `scale: "model"` gives the indices on the scale of the model, for example the logarithm of a measure with a log scale.
+- The option `interval` adds a percentile bootstrap interval over the N rows to each index.
+
+A test examines models with known indices. At N = 16384, the root mean square error of an index is approximately 0.01.
+
+## Rate items from pairwise results
+
+A pairwise result is a comparison of two items: the first item wins, the second item wins, or a tie. Each function of this section is pure, so a log of results gives the same ratings each time.
+
+```ts
+import { bradleyTerry, eloUpdate, glicko2Update, logLoss, pairProbabilities, strengthToRating } from "@mark1russell7/rigor-statistics";
+
+// The fit of a full log: the items are indexes from 0.
+const fit = bradleyTerry(3, [
+  { a: 0, b: 1, outcome: "a" },
+  { a: 1, b: 2, outcome: "tie" },
+  { a: 2, b: 0, outcome: "b", weight: 2 },
+]);
+fit.strengths, fit.se;                           // the log-strength of each item, with its standard error
+fit.tie;                                         // the Davidson tie parameter
+const p = pairProbabilities(fit.strengths[0], fit.strengths[1], fit.tie); // { a, b, tie }
+strengthToRating(fit.strengths[0]);              // 1500 + 400 * log10(e) * strength
+
+// One result at a time.
+eloUpdate(1500, 1500, 1, { k: 32 });             // { a: 1516, b: 1484, expected: 0.5 }
+glicko2Update({ rating: 1500, rd: 200, volatility: 0.06 }, [{ rating: 1400, rd: 30, score: 1 }]);
+logLoss([{ p: p.a, hit: true }]);                // the probability of the observed outcome
+```
+
+`bradleyTerry` gives the maximum a posteriori fit with a normal prior on each log-strength. The prior keeps an item with only wins finite. An item with no comparison gets the prior mean and the prior SD. A constant added to each strength changes no probability. Thus only the differences have a meaning, and the prior mean sets the center.
+
+- The default tie model is the model of Davidson (1970). The probability of a tie is `nu / (exp(d / 2) + exp(-d / 2) + nu)`, with `d` the difference of the strengths.
+- With the option `ties: "half"`, a tie counts as half a win and half a loss of each item, and `tie` is 0.
+- The fit uses Newton steps with a line search. The negative log posterior is convex, so the steps go to its one minimum.
+- The standard errors come from the inverse of the Hessian at the fit. They include the uncertainty of the tie parameter.
+
+`glicko2Update` gives the update of one player after one rating period (Glickman, 2012). A test examines the worked example of the paper: 1500, 200 and 0.06 against three opponents give 1464.06, 151.52 and 0.05999. `glicko2Idle` gives the growth of the RD for a period with no games.
+
 ## The functions
 
 | Function | What it gives |
 | --- | --- |
 | `mean`, `sd`, `median`, `summarize` | The descriptive statistics. `sd` is the sample standard deviation. |
+| `runningOf`, `addToRunning`, `mergeRunning`, `runningMean`, `runningSd` | A running summary of a stream: the count, the sum, the extremes and the spread, one value at a time. `mergeRunning` joins the summaries of two parts. `runningMean` gives exactly `mean` of the values. |
 | `quantile(values, p, method)`, `quantileSorted` | The `p` quantile, with the `"linear"` method (type 7, the default), the `"nearest-rank"` method (type 1) or the `"higher"` method (`sorted[Math.ceil(p * (n - 1))]`, as NumPy). |
-| `bootstrap(data, statistic, options)` | A percentile bootstrap interval of any statistic. The options are `runs`, `level` or `ends`, `seed` and `method`. |
+| `bootstrap(data, statistic, options)` | A percentile bootstrap interval of any statistic. The options are `runs`, `level` or `ends`, `seed`, `method` and `against`. |
+| The option `against` | The interval also gives `pAbove` and `pBelow`, the bootstrap p of each side of the value, from the same draws. The smallest p is 1 / (`finite` + 1). Give `holm` enough runs: with m tests at level a, `runs` is more than m / a. |
 | `bootstrapMedian`, `bootstrapClusters` | The interval of the median, and a bootstrap that draws whole clusters (boards, seeds, sites). |
+| `bootstrapStrata(strata, statistic, options)` | A stratified bootstrap. Each run draws inside each stratum, so each sample keeps the size of each stratum. |
 | `bootstrapTwo(a, b, statistic, options)` | A bootstrap interval of a statistic of two independent samples, for example two arms of a benchmark. Each run draws all of `a`, then all of `b`. |
 | `bootstrapMedianRatio(numerator, denominator, options)` | The interval of `median(numerator) / median(denominator)`. It is the uncertainty of the ratio, not the spread of the samples. |
+| `sampleTotalInterval(values, { population, scale })` | The interval of the total of a population from a uniform sample of `m` of its `n` items without replacement. The deviations get the finite population correction `sqrt(1 - m / n)`. `scale` is `n / m` by default. When `m` is `n`, the interval is the estimate. For a small `m`, the interval is too narrow: at `m = 8` of `n = 40`, the coverage is 0.865. For a total over pairs, use `uStatisticInterval`. |
+| `uStatisticInterval(totals, { order, population, method, level, range })` | The interval of a total over all sets of `r` units of a population, for example the crossings of all pairs. The input is the total of each unit of a sample without replacement. The estimate is `S * C(n, r) / C(m, r)`. The method `"conservative"` uses the Hoeffding bound of a U-statistic with `floor(m / r)` draws and the `range` of the kernel. It holds at each `m`. The method `"tight"` uses the jackknife variance times `1 - m / n`, and the t quantile with `m - 1` degrees of freedom. This variance is exact for a linear kernel and larger for others. When all the totals are equal, the method `"tight"` uses the method `"conservative"`, or it throws without `range`. The result gives the `method` that it used. At `m = 8`, the coverage of `"tight"` is 0.885 to 0.915 for a skewed kernel. The method `"auto"` needs `range`. It uses `"tight"` from `m = U_STATISTIC_TIGHT_MIN_SAMPLE`. The calibration study `u-statistic-interval` sets this constant with `coverageMinSample`. Until a run of the study gives a value, it is infinite. |
 | `leastSquares(x, y, { intercept })` | The ordinary least-squares fit of `y` on the rows of `x`, with a QR decomposition. It gives the coefficients, `residualSd`, `r2`, `n` and `k`. A singular design gives NaN coefficients. |
 | `bootstrapLeastSquares(x, y, options)` | One bootstrap interval for each coefficient of `leastSquares`, from the same draws of whole rows. A singular draw does not count. |
 | `ridgeSolve(gram, moment, lambda, { free })` | The ridge coefficients from the normal equations `X'X` and `X'y`, with a Cholesky factorization. The `free` coefficients have no penalty. A matrix that is not positive definite gives NaN coefficients. |
 | `signTest(better, worse, sides)`, `signTestPower(n, level)` | The sign test, and the fewest wins out of `n` that the test calls significant. |
 | `pairedPermutation(candidate, baseline, options)` | The paired permutation test (random sign flips). It uses the size of each difference. |
+| `signFlipTest(terms, options)` | The sign-flip test of a sum of terms, for example a weighted mean of differences. Up to `exactMax` terms (16), it reads each sign set, so the p is exact. |
 | `twoSamplePermutation(a, b, options)` | The two-sample permutation test (a split of the pooled values). It reads each split when their count is `runs` or less, so the p is exact. It compares groups of different sizes, and its default statistic is the difference of the medians. |
 | `wilson(k, n, z)` | The Wilson interval of a proportion. |
+| `wilsonSampleSize(target, expected, z, max)` | The smallest number of trials at which the Wilson lower end reaches the target, at the expected proportion. |
+| `cohenKappa(a, b)` | The agreement of two raters beyond chance (Cohen's kappa), with the observed and the chance agreement. |
 | `medianInterval(values, level)` | The distribution-free interval of a median, from two order statistics. It gives `low`, `high`, the `rank` of `low` and the `coverage`. |
 | `quantileInterval(values, p, level)` | The distribution-free interval of a quantile, from two order statistics. A side with no rank is infinite. The values must be independent draws. |
 | `quantileSamples(p, level)` | The fewest independent values that give a quantile an upper bound. At the level 0.95: 72 values for p95, 368 for p99 and 3,688 for p99.9. |
 | `binomialInterval(n, p, level)`, `negativeBinomialInterval(successes, p, level)` | The central interval of a binomial count, and of a count of failures before `successes` successes. Each tail outside holds `(1 - level) / 2` or less. |
 | `holm(pValues, level)` | The Holm correction of a family of tests. |
+| `binomialTest(k, n, p, side)` | The p of the exact one-sided binomial test of `k` successes in `n` trials. The side `"less"` gives `P(X <= k)`, and `"greater"` gives `P(X >= k)`. |
+| `coverageMinSample(cells, { level, alpha, pooledLow })` | The smallest sample size `m` from which an interval method keeps its level, from the hits of seeded cells. A size qualifies when the cells with a sample of that size or more pass two tests. No cell rejects `level` in `binomialTest` after `holm` at `alpha`, and the `wilson` lower end of the pooled hits is `pooledLow` or more. The set is closed upward: the result is the smallest `m` such that each size of `m` or more qualifies. `blocking` gives the largest size that fails. When the largest size fails, the result is `Infinity`. Fix the bar before the run. |
 | `partialConjunction(pValues, need)` | The p of the claim that at least `need` of these tests have a real effect. |
 | `spearman`, `kendallTau`, `ranks` | The rank correlations, with mean ranks for ties. |
 | `compareRatios`, `noiseFloor`, `noiseVerdict` | The comparison with a baseline, the noise floor of the 5-seed rule with a margin of practical effect, and the state of a difference over the seeds. |
 | `optionFloor({ sigma, delta, tests, alpha, power })`, `tQuantile(p, df)` | The fewest values for each of two options, so that one test of a Bonferroni family finds a difference of `delta` with the stated power, from the Student t law. It assumes unpaired groups of equal size and equal `sigma`. The quantile of the Student t law. |
+| `normalCdf(x)`, `normalQuantile(p)` | The distribution function of the standard normal law and its quantile (AS 241 of Wichura). They come from `rigor-generators`. Both keep their relative digits in the lower tail, to `p = 1e-300`. |
 | `modeCount(values, { minShare, valleyRatio })` | The count of the modes of a sample, from a kernel density estimate. |
 | `smoothLawScores(values)`, `bestSmoothLaw(values)` | The mean log density of the uniform, normal, exponential, log-normal and Pareto laws at their fits, and the best of them. |
 | `brier`, `calibration` | The Brier score of predictions, and the hit rate of each stated level. |
+| `logLoss(forecasts)` | The mean log-loss of predictions, with the natural log. A p of 0 for a hit gives Infinity. |
+| `eloExpected(ra, rb, { scale, base })`, `eloUpdate(ra, rb, score, { k, scale, base })` | The expected score of the first item, and the ratings of a pair after one result. The defaults are 400, 10 and a `k` of 32. |
+| `glicko2Update(player, games, { tau, tolerance })`, `glicko2Idle(player)` | The Glicko-2 rating, RD and volatility after one rating period, and after a period with no games. The default `tau` is 0.5. |
+| `bradleyTerry(items, comparisons, options)` | The Bradley-Terry fit of pairwise comparisons, with a normal prior and Davidson ties. It gives the strengths, the standard errors, the tie parameter, the log-likelihood, the steps and `converged`. |
+| `pairProbabilities(sa, sb, tie)` | The probabilities of a win of each item and of a tie, from two log-strengths and the tie parameter. |
+| `strengthToRating(strength, { center, scale, base })`, `ratingToStrength(rating, options)` | The rating of a log-strength, `center + scale * strength / ln(base)`, and the inverse. |
 | `fitResponse(data, options)` | A record of the format `response-records/1`, with one model for each measure and held-out folds. |
 | `parseResponseRecord(value)` | The examination of unknown data. It gives the record, or one fault with a path for each error. |
 | `predictResponse(model, inputs)`, `heldOutError(record, measure)` | The value of a model at one set of inputs, and the error of the folds of a measure. |
 | `heldOutErrorAt(record, measure, ids)` | The held-out error of a chosen set of points, from the predictions of the option `outOfFold`. |
+| `sobolIndices(record, measure, options)` | The first-order and the total Sobol index of each dimension, for the model of a measure. The default N is 4096. |
 | `responseCells(record, vary, steps)` | The number of fitted places of a view, level axes included. It lets a caller bound the time of a view before the view starts. |
 | `whenHolds(dimension, values)` | True when a place has the condition of a dimension. A dimension with no `when` is always present. |
 | `sliceResponse(record, measure, options)`, `surfaceResponse(record, measure, options)` | A fitted curve over one dimension, or a fitted surface over two, with the matching measured points, the matching points with no value, a band and the distance to the nearest measurement. |
@@ -218,12 +291,14 @@ The tests prove that these functions give the same numbers as the copies in the 
 | `bootstrapMedian` of packing | `bootstrapMedian(sortedValues, { runs, level, seed })`. Give the values sorted, because packing draws from the sorted list. |
 | `bootstrapMedian` of highways | `bootstrap(values, (s) => quantile(s, 0.5), { runs, level, seed })` |
 | `bootstrap` of layout-contract | `bootstrapClusters(rows, (r) => r.cluster, statistic, { runs, seed, ends: [0.025, 0.975] })` |
+| `normalQuantile` of lag (Acklam, relative error below 1.2e-9) | `normalQuantile(p)`. The values change by 1.2e-9 or less, because the new function is more exact. A `p` out of 0 to 1 throws. |
 | `signTestP` of packing | `signTest(better, worse)` |
 | `signTestPower` of highways | `signTestPower(n, level)` |
 | `wilson` of packing | `wilson(k, n, z)`. packing rounds the ends to 4 places at the call. |
 | `spearman` of the highways backtest, `kendallTau` of highways | `spearman`, `kendallTau` |
 | `medianInterval` of the harness and kind of systems | `medianInterval(sortedValues)`, with `low` and `high` |
 | The binomial band of `targetConnections` and `negativeBinomial` of the cells of systems | `binomialInterval(n, p, cover)` and `negativeBinomialInterval(successes, p, cover)` |
+| `summarizingNumber` of collections (`count`, `sum`, `min`, `max`, `average`) | `addToRunning` in the accumulator, then `n`, `sum`, `min`, `max` and `runningMean`. The average was `sum / count`, so the bits stay. |
 
 A copy that gives NaN, 0 or `undefined` for an empty list must test the list at the call, because these functions throw.
 

@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/rigor-statistics",
-  "version": "0.1.15",
-  "description": "The statistics of measured work: quantiles, bootstrap intervals, the sign test, the paired permutation test, Wilson intervals, the Holm correction, rank correlation, the comparison with a baseline beyond the noise, the Brier score, and fitted response records.",
+  "version": "0.1.27",
+  "description": "The statistics of measured work: quantiles, bootstrap intervals, the sign test, the paired permutation test, the sign-flip test of a weighted sum, the stratified bootstrap, the quantile and the distribution function of the standard normal law, Wilson intervals, the Holm correction, rank correlation, the comparison with a baseline beyond the noise, the Brier score and the log-loss, pairwise ratings (Elo, Glicko-2 and a Bradley-Terry fit with Davidson ties), fitted response records, and the Sobol indices of their models.",
   "keywords": [
     "statistics",
     "bootstrap",
@@ -15,6 +15,13 @@
     "spearman",
     "kendall",
     "brier",
+    "log-loss",
+    "elo",
+    "glicko-2",
+    "bradley-terry",
+    "pairwise-comparison",
+    "sobol",
+    "sensitivity-analysis",
     "calibration",
     "benchmark",
     "effect-size"

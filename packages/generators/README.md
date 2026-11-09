@@ -24,10 +24,11 @@ r.weighted([1, 2, 3]); // an index: 2 has the probability 3/6
 r.shuffle([1, 2, 3, 4]); // a new list in a random order
 r.sample([1, 2, 3, 4], 2); // 2 different items
 r.normal(10, 2); // a normal value with the mean 10 and the standard deviation 2
+r.gumbel(0, 1); // a Gumbel value: add it to the log of each weight, and sort, for a weighted random order
 r.fork("lanes"); // an independent generator for one part of the work
 r.seed; // the 32-bit seed: write it in each failure message
 
-// The seeds of a run: the seed of the environment variable SEED, else the defaults.
+// The seeds of a run: the seeds of the environment variable SEED (for example "7" or "1,3,9-11"), else the defaults.
 for (const seed of seedsFrom(process.env.SEED, [1, 2, 3, 4, 5])) {
   // ...
 }
@@ -92,6 +93,43 @@ Each table is a sample, and it does not show a general law:
 
 The npm package holds the notice of the Ptolemy II license, because the field `notice` is part of the build.
 
+## Input families and designs
+
+An input family has named dimensions. Each dimension has a range from `min` to `max`. It can also have one of these:
+
+- a `distribution`, cut to the range,
+- the `scale` `log`, so the logarithm of the value is uniform,
+- `integer: true`, so each value is an integer from `min` to `max`.
+
+A design gives points of the unit cube. `familyMap` takes coordinate `i` of a point to a value of dimension `i`.
+
+| Design | Points | Property |
+| --- | --- | --- |
+| `randomDesign(n, d, r)` | `n` | independent uniform points |
+| `latinHypercube(n, d, r)` | `n` | each column has one point in each of the `n` strata |
+| `stratifiedDesign(strata, d, r)` | `strata^d` | one point in each cell of the grid |
+| `saltelliDesign(n, d, r)` | `n * (d + 2)` | the matrices `a`, `b` and `ab[i]` of the Sobol indices |
+
+```ts
+import { familyPoints, latinHypercube, random } from "@mark1russell7/rigor-generators";
+
+const family = {
+  name: "boxes",
+  dimensions: [
+    { name: "count", min: 1, max: 6, integer: true },
+    { name: "width", min: 10, max: 1000, scale: "log" },
+    { name: "area", min: 1, max: 50, distribution: { family: "lognormal", mu: 2, sigma: 1 } },
+  ],
+} as const;
+const points = familyPoints(family, latinHypercube(200, 3, random("design")), random("family"));
+```
+
+A distribution of a dimension uses its `cdf` and its `quantile`, from `distributionOf`. The value of a coordinate `u` is the quantile of `u` in the probability of the range. Thus a Latin hypercube also gives one value in each stratum of the probability.
+
+The parameters of a dimension come from `r.fork("dimension:" + name)`. The same seed gives the same points, and a new dimension does not change the values of the others.
+
+For the mean of a sum of 3 inputs from 50 points, the Latin hypercube gives 0.00042 of the variance of the random design. A test holds the ratio below 1/1000.
+
 ## The input of `fnv1a32`
 
 The option `input` of `fnv1a32` selects the units that the hash reads. Use it to replace a local copy of FNV-1a with the same hashes.
@@ -103,6 +141,27 @@ The option `input` of `fnv1a32` selects the units that the hash reads. Use it to
 | `"wtf8"` | The UTF-8 bytes of each code point. A lone surrogate becomes its own 3 bytes. | A UTF-8 encoder over `for (const ch of text)` |
 
 For a string without a lone surrogate, `"utf8"` and `"wtf8"` give the same hash.
+
+## A content hash
+
+`canonicalHash(value)` gives the SHA-256 digest of the canonical form of a value. Equal values give equal hashes, also when the keys of their objects have another order.
+
+```ts
+import { canonicalHash, canonicalJson, sha256Hex } from "@mark1russell7/rigor-generators";
+
+canonicalJson({ b: [1, undefined], a: "x" }); // '{"a":"x","b":[1,null]}'
+canonicalHash({ b: 1, a: 2 }) === canonicalHash({ a: 2, b: 1 }); // true
+sha256Hex("abc"); // "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+```
+
+The default form of `canonicalJson` is RFC 8785 (JCS). Two options change it:
+
+| Option | The default | The other value |
+| --- | --- | --- |
+| `form` | `"jcs"`: `NaN`, an infinite number and a lone surrogate cause a `RangeError` | `"json"`: the form of `JSON.stringify`, so these values become `null` or an escape |
+| `bigint` | `"error"`: a `bigint` causes a `TypeError` | `"suffix"`: the digits and `n`, for example `12n`. This text is not JSON, so use it only for a key |
+
+The option `input` of `sha256Hex` has the values `"utf8"` and `"wtf8"` of `fnv1a32`. The two functions use no API of Node or of the browser. `sha256Hex` is not for passwords.
 
 ## Move from a copy of mulberry32
 

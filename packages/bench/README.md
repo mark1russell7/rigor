@@ -33,6 +33,8 @@ v.comparison;                                     // the cases that gain and dro
 
 | Function | What it gives |
 | --- | --- |
+| `growthVerdict(rounds, options)` | The growth of a cost for each step of size, from a ratio inside each job, against a limit, for example 15 times for each 10 times. |
+| `runCost(cells, probes, options)` | The minutes of a bench run before it starts, on each CPU model: the cells times the calls times the time of one call. |
 | `firstArm(round, offset)` | The arm that runs first. The order turns each round, and an odd offset starts with arm `b`. |
 | `armOrder(arms, round)` | The order of any count of arms in a round. Each pair of arms has each order within 1 after each count of rounds. A report that keeps no `first` for each pair states the order that it used, so that a reader can make `first` again. |
 | `checkPairedTime(record)` | The record, or a `RangeError` for a time that is not a finite number above 0. |
@@ -54,12 +56,18 @@ v.comparison;                                     // the cases that gain and dro
 | `armModels(pairs)` | The CPU models of each arm of a set of pairs, and if all the reads come from one known model. |
 | `tailFalseFails(aa, options)` | The cases of an A/A arm that the rule of `tailLimitVerdict` fails, and apart from these the cases with a limit under 1. |
 | `gateOf(cases)` | The gate of a list of case outcomes: `pass`, `block` or `no read`. |
+| `gateLine(cases, options)` | The check line of a read: the blocks and the no-reads with each case, the reason and the CPU models, or undefined when each case passed. |
+| `jobModels(envs, options)` | The count of the jobs on each CPU model, sorted by model, for the job form of the models of `gateLine`. The option `cores` keeps the cores. |
+| `writeGateLine(line, outputs)` | The line as an annotation of GitHub Actions, an error for an enforced gate or a warning, and as a line of the step summary. |
+| `gateLineCli(argv, io)` | The command of the bin `rigor-gate-line`: a gate line from a JSON document of a shell step. |
 | `notSlowerVerdict(jobs, options)` | The gate of the claim "not slower by more than the margin", with looks and a family level. |
 | `budgetVerdict(rounds, aa, options)` | The verdict of the claim "the median of each case is at most `limit`", for one build: `within`, `beyond` or `cannot decide`. |
 | `budgetLooksVerdict(rounds, aa, options)` | The budget verdict of a run that adds rounds to the cases with no outcome, up to a stated budget. |
 | `budgetLookSpend(looks)` | The chance of error that a list of looks spends. |
 | `timeRounds(arms, options)` | The timed rounds of one case in one process: a warm-up, a batch of at least the target time, and the order of `firstArm`. |
 | `verdictPower(options)` | The share of each outcome over seeded benches with a known ratio: the power test of a rule. |
+| `familyRead(items, level)` | The reads of a family of cases as a report: Holm over the cases, each job alone, and both. Each read changes only `slower` and `faster`. |
+| `familyPower(options)` | The false-slower share of a family and the share of a slow case read, for each read, over seeded families. |
 | `balanceOrders(records)` | The records of each case with a turned order. It removes the extra records of the larger order, with the highest rounds first. |
 | `poolRecords(jobs)` | The pool of the jobs: the merged and balanced records, the records of each job, and the skipped cases. |
 | `pooledVerdict(jobs, options)` | The verdict of the merged records of all jobs, with the verdict of each job alone as a guard. |
@@ -69,6 +77,9 @@ v.comparison;                                     // the cases that gain and dro
 | `childLine(stdout)` | From `/fresh`: the last JSON line of a child, with its time `ms`, its `hash` and the reason of a skip. |
 | `pairOrder(pairs, round, caseIndex)` | From `/fresh`: the order of the pairs of one case in one round, and the first arm of each pair. |
 | `freshRun(options)` | From `/fresh`: the records of each pair, with each arm in its own fresh child process. |
+| `pairedChild(options)` | The samples of one paired child: the base, the candidate and a copy of the base in one process, in turn. |
+| `pairedChildOrder(round, offset, steps)` | The order of the samples of a paired child: a block A B B A for each pair at each step. |
+| `childRecords(case, round, offset, order, times)` | The `PairedTime` of the candidate pair and of the A/A pair of a paired child, from the medians. |
 | `codeStamp(options)` | From `/code-stamp`: the stamp of the code of a run, from the code that its entries reach, the lock closure of its engines and its data files. |
 | `lockClosure(text, importer, names)` | From `/code-stamp`: each package that an engine pulls in, from a pnpm lock file. |
 | `superviseCases(options)` | From `/supervise`: each case in a child process, held to a time budget, with a hard stop and a resume. |
@@ -161,6 +172,62 @@ gate.more;                                        // the next look of each case 
 - `no read` is not a pass. A caller adds the rounds of `more`, then more jobs. A job that it adds after the last look is one more look, and the level does not count it.
 
 The level needs independent rounds. Rounds with a shared cause, for example a slow computer for one job, do not have it.
+
+## Show a gate read on the check
+
+A block or a no-read that shows only in a table of the summary is easy to miss. A no-read is not a pass. `gateLine` gives one line for the check of the run, and `writeGateLine` writes it.
+
+```ts
+const line = gateLine(cases, { title: "evaluator bench", enforced: false, models: armModels(pairs) });
+writeGateLine(line);   // a ::warning annotation (::error when enforced), and a line of the file of GITHUB_STEP_SUMMARY
+```
+
+- The input is a list of `{ case, outcome }`. The cases of `limitVerdict` and `budgetVerdict` have this form. Give one entry for each `timeVerdict`.
+- The outcomes `cannot decide` and `no read` are no-reads, and `isNoRead` tells them. The outcomes `beyond` and `slower` are blocks, and `isBlock` tells them.
+- When each case passed, the line is undefined and `writeGateLine` writes nothing.
+- An empty list gives a line, because `gateOf` gives `no read` for it.
+- One line names the blocks and the no-reads, each with its count and the names of its cases.
+  - The line names at most `GATE_LINE_NAMES` (10) cases of each kind, then "and 15 more". The counts are exact.
+  - `blocks.cases` and `noReads.cases` keep each case. Only the text names fewer cases.
+  - The text has at most `GATE_LINE_LIMIT` (4096) characters. A case name of more than 120 characters ends with an ellipsis in the text.
+  - The Checks API of GitHub limits the message of an annotation to 64 KB and its title to 255 characters. The documents of the workflow commands give no limit. Thus 4096 is a conservative limit.
+- The outcome of the line is `block` when a case blocks, else `no read`, as in `gateOf`.
+- The level is `error` when `enforced` is `true`. The default is `warning`, for a read that only reports. The title of a read that only reports says so.
+- With `reason`, the line tells the reason after the counts, for example "a decision needs 3 jobs, not 2".
+- With `models`, the line names the CPU models. Give one of two forms, not both.
+  - An `ArmModels` of `armModels` names the models of the two arms. The line tells a mixed pair, because a ratio can then compare two computers.
+  - A list of `{ model, jobs }` names each model and its count of jobs, for a time budget with its ratios inside one job. The line makes no claim about the ratios. The line is `mixed` when the jobs are on more than one model.
+  - `jobModels(envs)` gives this list from the computer of each job: the count of the jobs on each CPU model, sorted by model.
+  - `jobModels(envs, { cores: true })` also keeps the count of the cores. Each model and count of cores has an entry, and the line names the cores: "AMD EPYC 7763 with 4 cores (2 jobs)".
+  - Without the option `cores`, the entries and the text do not change.
+  - An empty list gives the sentence "The jobs have no CPU model".
+- Write the line also when the run is report only, so its check shows the read.
+- `writeGateLine` writes the annotation to the standard output. With `stream: "stderr"`, it writes to the standard error. GitHub Actions reads the annotation from the two streams.
+
+### A gate line from a shell step
+
+The bin `rigor-gate-line` writes a gate line from a JSON document. A shell step uses it when the reads are in a file.
+
+```sh
+rigor-gate-line --from gate.json                  # the annotation on stdout, and a line of GITHUB_STEP_SUMMARY
+rigor-gate-line --stream stderr < gate.json        # the document from stdin, the annotation on stderr
+rigor-gate-line --from gate.json --summary own.md  # a summary file that is not GITHUB_STEP_SUMMARY
+```
+
+```json
+{
+  "reads": [{ "case": "read-1", "outcome": "beyond" }, { "case": "read-10", "outcome": "cannot decide" }],
+  "options": { "title": "store gate", "enforced": false, "reason": "too few rounds" },
+  "jobs": [{ "cpu": "AMD EPYC 7763", "cores": 4 }],
+  "cores": true
+}
+```
+
+- `reads` and `options` are the two arguments of `gateLine`. `options.models` takes the two forms of `models`.
+- `jobs` gives the models with `jobModels` when `options` has no `models`. With `"cores": true`, the line names the cores.
+- The exit code is 0 for a line and for no line. The line informs, and the step decides its own exit.
+- A bad argument or a bad document gives the exit code 2, with the reason on stderr.
+- `gateLineCli(argv, io)` is the same command as a function, for a test or a script of its own.
 
 ## A claim with a budget
 
@@ -257,6 +324,63 @@ There are four kinds of budget:
 - A record states what was real and what was synthetic. A record with no entry in `real` gives `cannot decide`.
 - `checkLadder` gives each problem of a ladder as data. `ladderVerdict` throws a `RangeError` for a ladder with problems.
 
+## A claim on the growth of a cost
+
+A ladder holds each size to a limit. A growth claim holds the step between sizes, for example "the time of one publish grows less than 15 times for each 10 times more subscribers". A cost that grows as n x n grows 100 times for each 10 times. A linear cost grows 10 times.
+
+```ts
+const v = growthVerdict(
+  [
+    { job: "job-1", size: 1_000, value: 9.0 },
+    { job: "job-1", size: 10_000, value: 51.8 },
+    { job: "job-1", size: 100_000, value: 590 },
+    // ... the same sizes for each other job
+  ],
+  { maxGrowth: 15 },
+);
+
+v.outcome;                  // "within", "beyond" or "cannot decide"
+v.steps[0].median;          // the median growth of the jobs from 1,000 to 10,000, for a step of 10 times
+v.steps[0].exponent;        // the cost grows as the size to this power
+```
+
+- The verdict reads a ratio inside each job: the cost at the larger size over the cost at the smaller size. Each job runs on one runner, so a slow runner changes both values and the ratio keeps its value. The verdict needs no A/A arm.
+- A step that is not `per` times in size is scaled to `per` times, with the exponent of the step. The default of `per` is 10.
+- The interval of each step is the distribution-free interval of the median of the jobs. With 5 jobs it is the full range, with the coverage 0.94. A step is `within` when the high end is less than `maxGrowth`.
+- A job that gives more than one value at a size gives their median.
+- The flip test of a growth gate is the old code: it must give `beyond`.
+
+## The cost of a run before it starts
+
+A run with a time budget stops a case when the budget ends. A plan of a run needs its cost before the start. `runCost` gives this cost from the cells that the run measures and from probes of one call.
+
+```ts
+const cost = runCost(
+  [
+    { job: "shelf", size: 100, cells: 40 },   // only the cells that the run measures
+    { job: "shelf", size: 1_000, cells: 40 },
+  ],
+  [
+    { job: "shelf", size: 100, model: "cpu-a", ms: 2 },     // probes of the same inputs
+    { job: "shelf", size: 1_000, model: "cpu-a", ms: 30 },
+  ],
+  { calls: 7, overhead: 1.45, budgets: [{ upTo: 10_000, ms: 60_000 }] },
+);
+
+cost.models[0].minutes;              // the minutes of the bench step on cpu-a
+cost.models[0].jobs[0].stopsAt;      // the size where the job stops on its overruns, or undefined
+cost.low; cost.high;                 // the range over the CPU models
+```
+
+- Give only the cells that the run measures. A cell that a job does not support at its size is not a cell. A count of all the cells of a corpus can be 4 times too large.
+- Probe the same inputs that the run measures, on each CPU model. Times of other inputs can be 1.6 to 28 times off, also on one model.
+- A size between two probe sizes gets a time on the line of the log scales. `extrapolated` names each size outside the probe sizes.
+- More probes of one size give their mean, because a sum over cells follows the mean. The size 0 is not on the line.
+- `calls` is the count of the warmup starts and the timed starts of one cell. `slow` gives a slow cell its own count.
+- The probes of the nearest probe size give the spread of the times at a size. A cell over its budget costs the budget.
+- When the expected count of the cells over budget at a size gets to `overruns`, the job stops. The counts of cells are expected counts.
+- `overhead` is the bench step minutes over the call minutes of an earlier run. `jobMinutes` adds the fixed minutes of each job.
+
 ## Time the rounds
 
 `timeRounds` times one case in one process. Start a fresh process for each case and each pair, and give the index of the case as `offset`:
@@ -345,6 +469,21 @@ Each finding fails a gate, and each one carries its tests with `n`, `ties`, `p` 
 | `no-control` | A rule has no control and no `noControl`. |
 | `control-late` | The date of `noControl` is before `asOf`. |
 
+### A narrow spread
+
+The finding `no-spread` reads "no pair separates". One entry far from the others stops that finding, but the measure does not separate the others. Each row of `spread` in a `MeasureCheck` thus has a report of how many entries carry the separated pairs.
+
+| Field | Meaning |
+| --- | --- |
+| `entries` | The real entries with at least one pair that has a read. |
+| `share` | The median, over these entries, of the share of the other entries that a test separates from the entry. A pair with no read does not count. |
+| `apart` | The entries that a test separates from more than half of the others that they have a read with. |
+| `narrow` | Some pair separates and `share` is under `NARROW_SPREAD_SHARE`. |
+
+- `narrow` is a report. It gives no finding, and it fails no gate.
+- `NARROW_SPREAD_SHARE` is 0.1. This value is a fitted default from a gap in the rows of one project, and it is not a gate limit.
+- One Holm family holds all pairs of all strata. Thus more strata in one call give fewer separated pairs and a lower `share`. Compare a `share` only with a `share` from the same strata.
+
 `winClaim(check, measure, entry, stratum)` gives `alone`, `show`, `likeControl`, `censored` and `open`. The fields are about this entry. The field `likeControl` is true when this entry does not beat a control on the measure and beats it on no partner. A win by another entry clears nothing. The field `alone` is true only when this entry itself beats each control on the measure, so a measure with no control is not `alone`.
 
 `jointClaim(check, measures, entry, stratum)` reads a set of measures together, because one measure cannot call a win when each control wins a measure and loses a partner:
@@ -389,7 +528,8 @@ run.pairs["old~aa"];                              // the records of the A/A pair
 - `pairOrder` gives the order. Pair `p` starts with `firstArm(round, caseIndex + p)`, and the pair that starts first turns each second round.
 - The arguments of a case come after the command. The default is `--case <id>`.
 - A child that exits with an error, takes too long or prints no JSON line stops the run with an error. The error names the arm, the case, the round and the tail of `stderr`.
-- Only a line with `skipped` skips a case. A skip line does not need a time.
+- A line with `skipped` skips a case. A skip line does not need a time.
+- With `overLimit: "skip"`, a child over `timeoutMs` in the first round skips its case with the reason `took more than <timeoutMs> ms`. A case that does not end is then a result with a reason, and the job ends in time. The gate of the run decides what such a skip means. For a gate on a cost, it is a block.
 - A skip in the first round of the job removes the case from each pair, and the run starts no more children for it. A skip after the first round stops the run with an error, because the child is not deterministic.
 - A child that does not stop at the time limit gets SIGTERM, and SIGKILL after 1 second. The signals go to its process group. On Windows, `taskkill /T /F` stops its tree.
 - A child must stop each process that it starts before it exits. On Windows, the runner cannot find a process that a child leaves after a normal exit.
@@ -401,6 +541,32 @@ A run of many jobs sets `roundOffset` to `job * rounds`. Then the merged records
 ### Why pairs, and not a rotation of all arms
 
 A rotation of N arms turns the order of two arms only when they are N/2 apart in the rotation. For 4 arms, two arms 1 apart come in the order 3:1 over 4 rounds. Thus each pair of `freshRun` has its own two children, and the order of each pair turns each round.
+
+## The paired child
+
+Two fresh children of a pair start at different times. A slow period of the runner can fall on one child and not on the other. A paired child is one process that loads the three sources of a pair: the base, the candidate and a second copy of the base. It takes their samples in turn, so a slow period falls on each source of a pair.
+
+```ts
+import { pairedChild } from "@mark1russell7/rigor-bench";
+
+// The caller loads each source. The copy of the base comes from a second folder, so it has its own module state.
+const child = await pairedChild({
+  case: "one-10",
+  round,
+  offset: caseIndex,
+  steps: 4,
+  sample: { base: base.burst, candidate: candidate.burst, copy: copy.burst },
+});
+console.log(JSON.stringify(child.records)); // { candidate: PairedTime, aa: PairedTime }
+```
+
+- Each source gives one warm sample first. The child does not count it.
+- Each step has a block A B B A for the candidate pair and for the A/A pair. `firstArm(round, offset)` gives A.
+- The two blocks change places at each step, and the first block turns each round.
+- The record of each pair is one `PairedTime`, with the median of the samples of each source in that pair.
+- The cost is 3 warm samples and 8 counted samples for each step.
+
+The A/A pair is the base and its copy in the same child. Its spread is the noise of the order alone, so it gives the band of the candidate pair.
 
 ## A result that changes on purpose
 
@@ -613,3 +779,50 @@ Since 0.2.0, the rule `difference` examines the margin before 1. An interval in 
 The rule `band` compares an interval with a band of the same noise, so it needs a change of approximately twice that noise. With the kind `case`, it also calls a real speedup `same`. Thus `difference` is the default. Its false rate is near the 5% of a two-sided interval of level 0.95. A change of 7% needs approximately 20 cases for a power of 0.7.
 
 Since 0.2.0, `verdictPower` takes `same` as the true outcome of a ratio in the margin of the rule `difference`. The cells of the table stay, because the ratio 0.93 is out of the margin 0.05.
+
+## A family of cases
+
+A run reads many cases, and each case has its own interval. With no correction, the chance of one false `slower` case grows with the count of cases. At 16 cases and 0.025 for each side, this chance can be 1 - 0.975^16, approximately 0.33. With the option `pValues`, a time verdict of the rule `difference` gives `pSlower` and `pFaster` from the draws of its interval. Its outcome does not change, and the option is off by default. `familyRead` reads a family as a report:
+
+- **Holm** (Holm, 1979) keeps a `slower` case only when the Holm correction over the cases rejects its side at `level` (default 0.025).
+- **Each job** keeps a `slower` case of a pooled verdict only when each job gives `slower` alone.
+- **Each job and Holm** keeps a case only when both reads keep it.
+
+The smallest p of a bootstrap is 1 / (finite + 1). The first step of Holm is `level` over the count of cases. With too few runs, no case can pass that step, and `familyRead` prints a line that says so. At 16 cases, the first step is approximately 0.0016, so give the bootstrap more than 640 runs. The default is 10 000.
+
+`familyPower` drew 100 seeded families for each row. Each family had 16 cases, with 12 rounds in each of 2 jobs. The log time of each arm had a normal noise of 0.01. The margin was log(1.015), and the bootstrap had 2000 runs. The first case had the ratio of the row, and the other cases had the ratio 1.
+
+| Ratio of the first case | Read | Families with a false `slower` | First case read `slower` |
+| --- | --- | --- | --- |
+| 1 | no correction | 0.28 | 0.02 |
+| 1 | Holm | 0.01 | 0 |
+| 1 | each job | 0 | 0 |
+| 1 | each job and Holm | 0 | 0 |
+| 1.015 | no correction | 0.26 | 0.8 |
+| 1.015 | Holm | 0.01 | 0.34 |
+| 1.015 | each job | 0 | 0.28 |
+| 1.015 | each job and Holm | 0 | 0.23 |
+| 1.025 | no correction | 0.26 | 1 |
+| 1.025 | Holm | 0.01 | 0.95 |
+| 1.025 | each job | 0 | 0.87 |
+| 1.025 | each job and Holm | 0 | 0.87 |
+
+The smallest slowdown read in 80 % or more of the families is 1.5 % with no correction, and 2.5 % with each other read. At 2 %, the shares are 0.97, 0.77, 0.59 and 0.56.
+
+This model has no shift between the jobs, so the read of each job has its best case. The option `jobShift` adds a shift to the candidate of each job. The rows below use the shift 0.0066 for each job, with the other settings of the table above.
+
+| Ratio of the first case | Read | Families with a false `slower` | First case read `slower` |
+| --- | --- | --- | --- |
+| 1 | no correction | 0.48 | 0.04 |
+| 1 | Holm | 0.1 | 0.01 |
+| 1 | each job | 0.04 | 0 |
+| 1 | each job and Holm | 0.02 | 0 |
+| 1.025 | no correction | 0.46 | 0.98 |
+| 1.025 | Holm | 0.09 | 0.93 |
+| 1.025 | each job | 0.04 | 0.74 |
+| 1.025 | each job and Holm | 0.02 | 0.74 |
+| 1.03 | each job | 0.04 | 0.9 |
+
+With this shift, the smallest slowdown read at 80 % is 2 % with no correction, 2.5 % with Holm, and 3 % with each job. A shift also adds false `slower` cases, because the candidate of a job is then not equal to its baseline.
+
+A slowdown below the smallest slowdown at 80 % often reads `same` or `cannot decide`. Give this number beside the margin of a bench, because together they set what the bench can find.

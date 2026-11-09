@@ -21,16 +21,15 @@ export function mulberry32(seed: number): Source {
   };
 }
 
-const UTF8 = new TextEncoder();
-
 /**
  * The FNV-1a hash of 32 bits of a string. The option `input` selects the units that the hash reads:
  *
- * - `"utf8"` (the default): the UTF-8 bytes from `TextEncoder`. A lone surrogate becomes the bytes of U+FFFD.
+ * - `"utf8"` (the default): the UTF-8 bytes, equal to the bytes of `TextEncoder`. A lone surrogate becomes the bytes of U+FFFD.
  * - `"utf16"`: the UTF-16 code units of the string, one unit for each step, from `charCodeAt`.
  * - `"wtf8"`: the UTF-8 bytes of each code point. A lone surrogate becomes its own 3 bytes (WTF-8).
  *
- * For a string without a lone surrogate, `"utf8"` and `"wtf8"` give the same hash.
+ * For a string without a lone surrogate, `"utf8"` and `"wtf8"` give the same hash. The function uses no API of Node or
+ * of the browser, so the hash is the same on each platform.
  */
 export function fnv1a32(text: string, options?: { readonly input?: "utf8" | "utf16" | "wtf8" }): number {
   const input = options?.input ?? "utf8";
@@ -39,29 +38,27 @@ export function fnv1a32(text: string, options?: { readonly input?: "utf8" | "utf
     for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
     return h >>> 0;
   }
-  if (input === "wtf8") {
-    for (const ch of text) {
-      const c = ch.codePointAt(0) as number;
-      if (c < 0x80) h = Math.imul(h ^ c, 0x01000193);
-      else if (c < 0x800) {
-        h = Math.imul(h ^ (0xc0 | (c >> 6)), 0x01000193);
-        h = Math.imul(h ^ (0x80 | (c & 63)), 0x01000193);
-      } else if (c < 0x10000) {
-        h = Math.imul(h ^ (0xe0 | (c >> 12)), 0x01000193);
-        h = Math.imul(h ^ (0x80 | ((c >> 6) & 63)), 0x01000193);
-        h = Math.imul(h ^ (0x80 | (c & 63)), 0x01000193);
-      } else {
-        h = Math.imul(h ^ (0xf0 | (c >> 18)), 0x01000193);
-        h = Math.imul(h ^ (0x80 | ((c >> 12) & 63)), 0x01000193);
-        h = Math.imul(h ^ (0x80 | ((c >> 6) & 63)), 0x01000193);
-        h = Math.imul(h ^ (0x80 | (c & 63)), 0x01000193);
-      }
+  if (input !== "utf8" && input !== "wtf8") throw new RangeError(`fnv1a32: input is "utf8", "utf16" or "wtf8", not ${String(input)}.`);
+  for (const ch of text) {
+    let c = ch.codePointAt(0) as number;
+    // A string iterator gives a lone surrogate as one code point. UTF-8 writes U+FFFD in its place, as TextEncoder does.
+    if (input === "utf8" && c >= 0xd800 && c <= 0xdfff) c = 0xfffd;
+    if (c < 0x80) h = Math.imul(h ^ c, 0x01000193);
+    else if (c < 0x800) {
+      h = Math.imul(h ^ (0xc0 | (c >> 6)), 0x01000193);
+      h = Math.imul(h ^ (0x80 | (c & 63)), 0x01000193);
+    } else if (c < 0x10000) {
+      h = Math.imul(h ^ (0xe0 | (c >> 12)), 0x01000193);
+      h = Math.imul(h ^ (0x80 | ((c >> 6) & 63)), 0x01000193);
+      h = Math.imul(h ^ (0x80 | (c & 63)), 0x01000193);
+    } else {
+      h = Math.imul(h ^ (0xf0 | (c >> 18)), 0x01000193);
+      h = Math.imul(h ^ (0x80 | ((c >> 12) & 63)), 0x01000193);
+      h = Math.imul(h ^ (0x80 | ((c >> 6) & 63)), 0x01000193);
+      h = Math.imul(h ^ (0x80 | (c & 63)), 0x01000193);
     }
-    return h >>> 0;
   }
-  if (input !== "utf8") throw new RangeError(`fnv1a32: input is "utf8", "utf16" or "wtf8", not ${String(input)}.`);
-  for (const b of UTF8.encode(text)) h = Math.imul(h ^ b, 0x01000193) >>> 0;
-  return h;
+  return h >>> 0;
 }
 
 /** The 32-bit seed of a number (its low 32 bits, unsigned) or of a string (its FNV-1a hash). */
@@ -123,6 +120,13 @@ export interface Random {
   sample<T>(items: readonly T[], k: number): T[];
   /** A normal sample (Box–Muller, two draws). */
   normal(mean?: number, sd?: number): number;
+  /**
+   * A Gumbel sample with the mode `location` and the scale `scale` (the inverse of the CDF, one draw).
+   * The mean is `location + 0.5772 * scale`.
+   * Add a Gumbel draw with the scale 1 to the log of each weight, and sort by the sums.
+   * The order then has the Plackett-Luce law of the weights (the Gumbel-max method).
+   */
+  gumbel(location?: number, scale?: number): number;
   /** An independent generator for the part of the work with the name `label`. The same labels give the same streams. */
   fork(label: string): Random;
 }
@@ -198,6 +202,12 @@ export function randomOf(next: Source, seed: number, source: (seed: number) => S
       const u2 = next();
       return mean + sd * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
     },
+    gumbel(location = 0, scale = 1) {
+      if (!(Number.isFinite(scale) && scale > 0)) throw new RangeError(`gumbel: the scale is finite and more than 0, not ${scale}.`);
+      // The same floor as normal: a draw of 0 gives a finite value, not minus infinity.
+      const u = Math.max(next(), 1e-12);
+      return location - scale * Math.log(-Math.log(u));
+    },
     fork(label) {
       const child = deriveSeed(seed, label);
       return randomOf(source(child), child, source);
@@ -205,13 +215,31 @@ export function randomOf(next: Source, seed: number, source: (seed: number) => S
   };
 }
 
+/** The largest count of seeds that one range gives. A larger range is an error, not a long run. */
+const MAX_RANGE = 1_000_000;
+
 /**
- * The seeds of a run: the seed in `given` (the text of an environment variable, for example
+ * The seeds of a run: the seeds in `given` (the text of an environment variable, for example
  * `process.env.SEED`), else the default seeds. An empty text gives the defaults.
+ *
+ * The text is one seed (`17`) or a list of seeds and ranges with commas (`1,3,9-11` gives 1, 3, 9, 10
+ * and 11), in the order of the list. A range has two whole numbers, the low one first. An empty part, a
+ * part that is not an integer and a range with the low end last are each a `RangeError`.
  */
 export function seedsFrom(given: string | undefined, defaults: readonly number[]): number[] {
   if (given === undefined || given.trim() === "") return [...defaults];
-  const seed = Number(given);
-  if (!Number.isSafeInteger(seed)) throw new RangeError(`seedsFrom: a seed is an integer, not ${given}.`);
-  return [seed];
+  return given.split(",").flatMap((raw) => {
+    const part = raw.trim();
+    const range = /^(\d+)\s*-\s*(\d+)$/u.exec(part);
+    if (range !== null) {
+      const [low, high] = [Number(range[1]), Number(range[2])];
+      if (!Number.isSafeInteger(high) || high < low || high - low >= MAX_RANGE) {
+        throw new RangeError(`seedsFrom: the range ${part} is not low-high with at most ${MAX_RANGE} seeds.`);
+      }
+      return Array.from({ length: high - low + 1 }, (_, i) => low + i);
+    }
+    const seed = part === "" ? Number.NaN : Number(part);
+    if (!Number.isSafeInteger(seed)) throw new RangeError(`seedsFrom: a seed is an integer, not ${part === "" ? "an empty part" : part}.`);
+    return [seed];
+  });
 }

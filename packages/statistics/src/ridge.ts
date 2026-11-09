@@ -68,7 +68,7 @@ export function ridgeSolve(gram: ArrayLike<number>, moment: ArrayLike<number>, l
  * This function writes the Cholesky factor `L` of `a` into its lower triangle, with `a = L L'`. It returns false when
  * a pivot is not more than the tolerance times the diagonal value of its column.
  */
-function factor(a: Float64Array, k: number): boolean {
+export function factor(a: Float64Array, k: number): boolean {
   for (let j = 0; j < k; j++) {
     const diagonal = a[j * k + j] as number;
     let d = diagonal;
