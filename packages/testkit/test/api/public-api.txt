@@ -13,6 +13,13 @@ fencedBlocks: build/markdown-examples.d.ts#fencedBlocks
 mapImports: build/markdown-examples.d.ts#mapImports
 markdownExamples: build/markdown-examples.d.ts#markdownExamples
 
+## ./model (build/model.d.ts): names
+
+RunModelOptions: build/model.d.ts#RunModelOptions
+Step: build/model.d.ts#Step
+runModel: build/model.d.ts#runModel
+step: build/model.d.ts#step
+
 ## ./propagation (build/propagation.d.ts): names
 
 GATE_NAMES: build/propagation.d.ts#GATE_NAMES
@@ -74,6 +81,33 @@ export declare function mapImports(code: string, imports: Readonly<Record<string
 
 ### build/markdown-examples.d.ts#markdownExamples
 export declare function markdownExamples(files: readonly string[], options?: MarkdownExampleOptions): MarkdownExample[];
+
+### build/model.d.ts#RunModelOptions
+export interface RunModelOptions<S, M> {
+  create: () => {
+    sut: S;
+    model: M;
+  };
+  steps: fc.Arbitrary<Step<S, M>>;
+  check: (sut: S, model: M) => void;
+  maxSteps?: number;
+  numRuns?: number;
+  dispose?: (sut: S) => void;
+  clear?: () => void;
+  parameters?: fc.Parameters<[Step<S, M>[]]>;
+}
+
+### build/model.d.ts#Step
+export interface Step<S, M> {
+  readonly label: string;
+  run(sut: S, model: M): void;
+}
+
+### build/model.d.ts#runModel
+export declare function runModel<S, M>(options: RunModelOptions<S, M>): void;
+
+### build/model.d.ts#step
+export declare function step<S, M>(label: string, run: (sut: S, model: M) => void): Step<S, M>;
 
 ### build/otel.d.ts#ExternalSdkCaptureOptions
 export interface ExternalSdkCaptureOptions {
