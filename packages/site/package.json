@@ -14,7 +14,8 @@
   "dependencies": {
     "@mark1russell7/rigor-bench": "workspace:*",
     "@mark1russell7/rigor-generators": "workspace:*",
-    "@mark1russell7/rigor-statistics": "workspace:*"
+    "@mark1russell7/rigor-statistics": "workspace:*",
+    "@mark1russell7/text": "^0.0.2"
   },
   "devDependencies": {
     "@mark1russell7/cue": "^2.0.0",

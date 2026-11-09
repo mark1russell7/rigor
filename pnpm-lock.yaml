@@ -211,6 +211,9 @@ importers:
       '@mark1russell7/rigor-statistics':
         specifier: workspace:^
         version: link:../statistics
+      '@mark1russell7/text':
+        specifier: ^0.0.2
+        version: 0.0.2
     devDependencies:
       '@mark1russell7/cue':
         specifier: ^2.0.0
@@ -281,6 +284,10 @@ importers:
         version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/mutation:
+    dependencies:
+      '@mark1russell7/text':
+        specifier: ^0.0.2
+        version: 0.0.2
     devDependencies:
       '@mark1russell7/cue':
         specifier: ^2.0.0
@@ -318,6 +325,9 @@ importers:
       '@mark1russell7/rigor-statistics':
         specifier: workspace:*
         version: link:../statistics
+      '@mark1russell7/text':
+        specifier: ^0.0.2
+        version: 0.0.2
     devDependencies:
       '@mark1russell7/cue':
         specifier: ^2.0.0
@@ -967,6 +977,10 @@ packages:
     resolution: {integrity: sha512-Wy4xa6OgNXyMunSyXOArxmrspLSCuyw1pf1P5X45Uiwe1aWHzn0LJptUYVGUSwT3GTp9FGVDhFMeOnKlapD3Xw==}
     engines: {node: '>=22.12'}
     hasBin: true
+
+  '@mark1russell7/text@0.0.2':
+    resolution: {integrity: sha512-m1aIB8X+PDekktzr1fYOp1/7gvlh9iL/2M7ktj/GnmPmVrWin0rTADgTm00dKFdWFRzXraCUYkjyCl3jQZHEVg==}
+    engines: {node: '>=22.12'}
 
   '@opentelemetry/api-logs@0.223.0':
     resolution: {integrity: sha512-Oepm6etVPFCn0VWB1t833iOTgz1eYBDUPxcrOR/XvwzD1+Ag9VzSPSrrKAFNJ/haatj+8CXbG47pZXvdNQKDJw==}
@@ -2910,6 +2924,8 @@ snapshots:
   '@mark1russell7/template-cli@0.1.7':
     dependencies:
       '@clack/prompts': 1.8.1
+
+  '@mark1russell7/text@0.0.2': {}
 
   '@opentelemetry/api-logs@0.223.0':
     dependencies:
