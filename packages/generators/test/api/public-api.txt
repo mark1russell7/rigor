@@ -182,6 +182,7 @@ export interface Random {
   shuffle<T>(items: readonly T[]): T[];
   sample<T>(items: readonly T[], k: number): T[];
   normal(mean?: number, sd?: number): number;
+  gumbel(location?: number, scale?: number): number;
   fork(label: string): Random;
 }
 

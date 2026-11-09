@@ -123,6 +123,13 @@ export interface Random {
   sample<T>(items: readonly T[], k: number): T[];
   /** A normal sample (Box–Muller, two draws). */
   normal(mean?: number, sd?: number): number;
+  /**
+   * A Gumbel sample with the mode `location` and the scale `scale` (the inverse of the CDF, one draw).
+   * The mean is `location + 0.5772 * scale`.
+   * Add a Gumbel draw with the scale 1 to the log of each weight, and sort by the sums.
+   * The order then has the Plackett-Luce law of the weights (the Gumbel-max method).
+   */
+  gumbel(location?: number, scale?: number): number;
   /** An independent generator for the part of the work with the name `label`. The same labels give the same streams. */
   fork(label: string): Random;
 }
@@ -197,6 +204,12 @@ export function randomOf(next: Source, seed: number, source: (seed: number) => S
       const u1 = Math.max(next(), 1e-12);
       const u2 = next();
       return mean + sd * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    },
+    gumbel(location = 0, scale = 1) {
+      if (!(Number.isFinite(scale) && scale > 0)) throw new RangeError(`gumbel: the scale is finite and more than 0, not ${scale}.`);
+      // The same floor as normal: a draw of 0 gives a finite value, not minus infinity.
+      const u = Math.max(next(), 1e-12);
+      return location - scale * Math.log(-Math.log(u));
     },
     fork(label) {
       const child = deriveSeed(seed, label);

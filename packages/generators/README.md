@@ -24,6 +24,7 @@ r.weighted([1, 2, 3]); // an index: 2 has the probability 3/6
 r.shuffle([1, 2, 3, 4]); // a new list in a random order
 r.sample([1, 2, 3, 4], 2); // 2 different items
 r.normal(10, 2); // a normal value with the mean 10 and the standard deviation 2
+r.gumbel(0, 1); // a Gumbel value: add it to the log of each weight, and sort, for a weighted random order
 r.fork("lanes"); // an independent generator for one part of the work
 r.seed; // the 32-bit seed: write it in each failure message
 
