@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "extends": "@mark1russell7/cue/ts/config/node.json",
+  "extends": "@mark1russell7/cue/ts/config/ts.json",
   "compilerOptions": {
     "noEmit": false,
     "emitDeclarationOnly": true,

@@ -89,7 +89,7 @@ export interface DryRun {
 export interface SelectionPlan {
   readonly files: Readonly<Record<string, FilePlan>>;
   readonly tests: readonly TestPlan[];
-  /** The run of the tests without mutants. A plan of a version before 0.2.5 has no `dryRun`. */
+  /** The run of the tests without mutants. A plan of a version before 0.2.6 has no `dryRun`. */
   readonly dryRun?: DryRun;
 }
 

@@ -105,7 +105,7 @@ After the run of the tests without mutants, Stryker makes a plan of the mutants.
 
 - `files` gives the plan of each file: its mutants, the runs, the static runs, the planned net time and the time limits in milliseconds. `lines` gives the runs, the static runs and the net time of each line.
 - `tests` gives the 40 tests of the largest cost. The cost of a test is its time, times the runs that start it.
-- `dryRun` gives the run of the tests without mutants: the count of its tests and the sum of their times. A plan before 0.2.5 has no `dryRun`.
+- `dryRun` gives the run of the tests without mutants: the count of its tests and the sum of their times. A plan before 0.2.6 has no `dryRun`.
 
 Each line of a mutant in `partial.jsonl` also gives its planned net time and its time limit.
 

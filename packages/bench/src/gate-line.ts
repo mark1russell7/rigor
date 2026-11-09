@@ -4,6 +4,7 @@
  * models. It writes the line where the check of the run shows it: an annotation of GitHub Actions and the step summary.
  */
 import { appendFileSync } from "node:fs";
+import { escapeWorkflowData as escapeData, escapeWorkflowProperty as escapeProperty } from "@mark1russell7/text";
 import type { GateOutcome } from "./gate.ts";
 import type { ArmModels } from "./model.ts";
 
@@ -232,16 +233,6 @@ export function gateLine(reads: readonly CaseRead[], options: GateLineOptions): 
     mixed: models?.mixed ?? false,
     text: `${cut(body, GATE_LINE_LIMIT - close.length)}${close}`,
   };
-}
-
-/** This function escapes the data of a workflow command of GitHub Actions. */
-function escapeData(text: string): string {
-  return text.replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A");
-}
-
-/** This function escapes a property of a workflow command of GitHub Actions. */
-function escapeProperty(text: string): string {
-  return escapeData(text).replaceAll(":", "%3A").replaceAll(",", "%2C");
 }
 
 /** The outputs of `writeGateLine`. The defaults are the standard output and the file of `GITHUB_STEP_SUMMARY`. */

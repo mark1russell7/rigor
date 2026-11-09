@@ -146,6 +146,13 @@ export interface FreshOptions {
   readonly args?: (caseId: string) => readonly string[];
   /** The longest time of one child in milliseconds. The default is 600000 (10 minutes). */
   readonly timeoutMs?: number;
+  /**
+   * The result of a child that takes more time than `timeoutMs`. The default `"error"` stops the run with an error.
+   * With `"skip"`, a child over the limit in the first round of the job skips its case, with the reason
+   * `took more than <timeoutMs> ms`. Thus a case that does not end is a result with a reason, and the job ends in time.
+   * A child over the limit in a later round is an error, as each skip after the first round is.
+   */
+  readonly overLimit?: "error" | "skip";
   /** The most bytes of the output of one child. The default is 16 MiB. */
   readonly maxBuffer?: number;
   /** The label of the job. The default is `"0"`. */
@@ -190,7 +197,8 @@ const TAIL = 2000;
  * This function starts each arm of each pair, case and round in a fresh child, and gives the records of each pair.
  * - Each candidate is a pair (base, candidate) with its own base child. The A/A pair is (base, base).
  * - In each round and case, the pairs come in the order of `pairOrder`. The first arm of a pair starts first.
- * - A child that exits with an error, takes too long or prints no JSON line is an error. Only a skip line skips a case.
+ * - A child that exits with an error, takes too long or prints no JSON line is an error. A skip line skips a case.
+ *   With `overLimit: "skip"`, a child that takes too long in the first round skips its case too.
  * - A case that an arm skips in the first round of the job leaves each pair, and the runner starts no more children for it.
  * - A skip after the first round is an error. It shows a child that is not deterministic, and it drops paid data.
  * - Two different hashes of one arm on one case are an error.
@@ -200,12 +208,14 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
   const roundOffset = options.roundOffset ?? 0;
   const job = options.job ?? "0";
   const timeoutMs = options.timeoutMs ?? 600_000;
+  const overLimit = options.overLimit ?? "error";
   const maxBuffer = options.maxBuffer ?? 1 << 24;
   const args = options.args ?? ((id: string) => ["--case", id]);
   const start = options.start ?? startProcess;
   if (!Number.isSafeInteger(rounds) || rounds < 1) throw new RangeError(`freshRun: the rounds are a whole number of 1 or more, not ${rounds}.`);
   if (!Number.isSafeInteger(roundOffset) || roundOffset < 0) throw new RangeError(`freshRun: the round offset is a whole number of 0 or more, not ${roundOffset}.`);
   if (!(timeoutMs > 0) || !(maxBuffer > 0)) throw new RangeError("freshRun: the time limit and the output limit are above 0.");
+  if (overLimit !== "error" && overLimit !== "skip") throw new RangeError(`freshRun: overLimit is "error" or "skip", not ${JSON.stringify(overLimit)}.`);
   if (cases.length === 0 || new Set(cases).size !== cases.length || cases.some((c) => typeof c !== "string" || c === "")) {
     throw new RangeError("freshRun: the cases are 1 or more different strings that are not empty.");
   }
@@ -241,7 +251,7 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
         for (const arm of [slot.first, slot.first === "a" ? "b" : "a"] as const) {
           const who = pair[arm];
           const where = `the arm ${JSON.stringify(who.id)} (pair ${JSON.stringify(pair.id)}, arm ${arm}) on the case ${JSON.stringify(id)}, round ${round}`;
-          const line = await child(start, [...who.command, ...args(id)], { timeoutMs, maxBuffer }, where);
+          const line = await child(start, [...who.command, ...args(id)], { timeoutMs, maxBuffer }, where, overLimit);
           if (line.skipped !== undefined) {
             if (r > 0) throw new Error(`freshRun: ${where} skipped the case after the first round of the job (${JSON.stringify(line.skipped)}). A child that skips only in a later round is not deterministic.`);
             skip = { arm: who.id, case: id, round, reason: line.skipped };
@@ -270,7 +280,7 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
 }
 
 /** This function starts one child and reads its JSON line. A fault gives an error that names the arm, the case, the round and the tail of `stderr`. */
-async function child(start: StartChild, argv: readonly string[], limits: StartOptions, where: string): Promise<ChildLine> {
+async function child(start: StartChild, argv: readonly string[], limits: StartOptions, where: string, overLimit: "error" | "skip"): Promise<ChildLine> {
   let exit: ChildExit;
   try {
     exit = await start(argv, limits);
@@ -282,7 +292,10 @@ async function child(start: StartChild, argv: readonly string[], limits: StartOp
     return new Error(`freshRun: ${where} ${why}. The tail of stderr: ${tail.trim() === "" ? "(empty)" : tail.trimEnd()}`);
   };
   if (exit.error !== undefined) throw fail(`failed: ${exit.error}`);
-  if (exit.timedOut === true) throw fail(`took more than ${limits.timeoutMs} ms`);
+  if (exit.timedOut === true) {
+    if (overLimit === "skip") return { skipped: `took more than ${limits.timeoutMs} ms` };
+    throw fail(`took more than ${limits.timeoutMs} ms`);
+  }
   if (exit.code !== 0) throw fail(exit.code === null ? "stopped on a signal" : `exited with the code ${exit.code}`);
   try {
     return childLine(exit.stdout);

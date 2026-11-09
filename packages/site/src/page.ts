@@ -3,7 +3,7 @@
  * `start`, runs only in a browser: it reads the controls, draws, and shows the first values and a histogram.
  * The time-verdict explorer has its own files: `explorer.ts` and `explorer-view.ts`.
  */
-import { random, type Random } from "@mark1russell7/rigor-generators";
+import { normalCdf, random, type Random } from "@mark1russell7/rigor-generators";
 import { startExplorer } from "./explorer-view.ts";
 import { seedFrom } from "./seed.ts";
 
@@ -103,14 +103,6 @@ export function chiSquarePerDf(counts: readonly number[], probabilities: readonl
     k++;
   }
   return k > 1 ? chi / (k - 1) : Number.NaN;
-}
-
-/** The standard normal distribution function, from erf (Abramowitz and Stegun 7.1.26, error under 1.5e-7). */
-export function normalCdf(x: number): number {
-  const z = Math.abs(x) / Math.SQRT2;
-  const t = 1 / (1 + 0.3275911 * z);
-  const erf = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-z * z);
-  return x >= 0 ? 0.5 * (1 + erf) : 0.5 * (1 - erf);
 }
 
 /** The first values and the histogram data of one method, for one seed and label. */
