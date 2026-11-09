@@ -294,7 +294,7 @@ describe("rigor-mutation", () => {
     put("plans/mutation-lib.all.2/plan.json", planWith({ "src/a.ts": [[5, 1, 0, 6 * minute]], "src/core/c.ts": [[1, 1, 0, 3 * minute]] }));
     out = "";
     expect(run("costs", "42", "--reports", "plans")).toBe(0);
-    expect(out).toBe("costs: 2 files from the plans of 2 selections of the run 42, in mutation-costs.json\n");
+    expect(out).toBe("costs: 2 files from the plans of 2 selections of the run 42, in mutation-costs.json\ncosts: the speed factors of the runners: lib.all.1 1.00, lib.all.2 1.00\n");
     expect(JSON.parse(readFileSync(join(root, "mutation-costs.json"), "utf8"))).toEqual({
       lib: { "src/a.ts": { run: "42", segments: { a: minute, b: 6 * minute, "@3": 0 } }, "src/core/c.ts": { run: "42", segments: { c: 3 * minute } } },
     });
@@ -316,6 +316,22 @@ describe("rigor-mutation", () => {
     expect(out).toContain("cost-check: 1 of 2 parts fail\n");
     put("mutation.json", JSON.stringify({ ...lane(5), costs: undefined }));
     expect(() => run("costs", "42", "--reports", "plans")).toThrow(/the lane has no field "costs"/);
+  });
+
+  // LANE.SPEED of Vex: the net time of each part is divided by the speed factor of its runner.
+  it("divides the net time of each part by the speed of its runner before it writes the cost maps", () => {
+    put("mutation.json", JSON.stringify({ packages: { lib: { dir: "packages/lib", mutate: ["src/**/*.ts", "!src/**/*.test.ts"], cuts: { all: { files: ["src/**/*.ts"], count: 2 } } } }, costs: "mutation-costs.json" }));
+    put("packages/lib/src/a.ts", "export function a() {\n  return 1;\n}\nexport function b() {\n  return 2;\n}\n");
+    const planOf = (lines: [number, number, number, number][], netMs: number) =>
+      JSON.stringify({ files: { "src/a.ts": { mutants: 1, runs: 1, static: 0, netMs: 0, limitMs: 0, lines } }, tests: [], dryRun: { tests: 40, netMs } });
+    // The runner of the first part is 1.5 times slower than the median, and the runner of the second part is 2 times faster.
+    put("plans/mutation-lib.all.1/plan.json", planOf([[2, 1, 0, 9000]], 150_000));
+    put("plans/mutation-lib.all.2/plan.json", planOf([[5, 1, 0, 2000]], 50_000));
+    expect(run("costs", "7", "--reports", "plans")).toBe(0);
+    expect(out).toBe("costs: 2 files from the plans of 2 selections of the run 7, in mutation-costs.json\ncosts: the speed factors of the runners: lib.all.1 1.50, lib.all.2 0.50\n");
+    expect(JSON.parse(readFileSync(join(root, "mutation-costs.json"), "utf8"))).toEqual({ lib: { "src/a.ts": { run: "7", segments: { a: 6000, b: 4000, "@3": 0 } }, "src/core/c.ts": { run: "7", segments: { c: 0 } } } });
+    put("plans/mutation-lib.all.2/plan.json", JSON.stringify({ files: {}, tests: [], dryRun: { tests: "40" } }));
+    expect(() => run("costs", "7", "--reports", "plans")).toThrow(/the field "dryRun" of the plan has no numbers/);
   });
 
   it("refuses a relative path that leaves the folder of a package, and passes a package with none", () => {

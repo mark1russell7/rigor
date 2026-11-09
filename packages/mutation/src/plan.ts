@@ -5,6 +5,7 @@
  * its stop, and a file over its limit of static runs. The cut of the parts can then follow the cost of the lines, and
  * not the size of the files.
  */
+import { median } from "@mark1russell7/rigor-statistics";
 
 /** The name of the file of the plan, in the folder of the JSON report. */
 export const PLAN_FILE = "plan.json";
@@ -78,10 +79,71 @@ export interface FilePlan {
 /** The plan of one test: its name, its file, its time without mutants, the runs that start it, and their product. */
 export type TestPlan = readonly [name: string, file: string, ms: number, runs: number, costMs: number];
 
+/** The run of the tests without mutants: the count of its tests and the sum of their times in milliseconds. */
+export interface DryRun {
+  readonly tests: number;
+  readonly netMs: number;
+}
+
 /** The content of `plan.json`. The paths of the files are from the folder where Stryker starts. */
 export interface SelectionPlan {
   readonly files: Readonly<Record<string, FilePlan>>;
   readonly tests: readonly TestPlan[];
+  /** The run of the tests without mutants. A plan of a version before 0.2.6 has no `dryRun`. */
+  readonly dryRun?: DryRun;
+}
+
+/** This function gives the run of the tests without mutants: the count of the tests and the sum of their times. */
+export function dryRunOf(tests: readonly TestOfDryRun[]): DryRun {
+  return { tests: tests.length, netMs: Math.round(tests.reduce((sum, test) => sum + test.timeSpentMs, 0)) };
+}
+
+/** A test of a plan counts for the speed of a runner only from this time in milliseconds. A short time is mostly noise. */
+export const SPEED_MIN_MS = 200;
+
+/** The plan of one selection for the speed of its runner. */
+export interface RunnerPlan {
+  readonly name: string;
+  /** The selections of one group run the same tests. A selection that is not a part of a group is a group of its own. */
+  readonly group: string;
+  readonly plan: SelectionPlan;
+}
+
+/**
+ * This function gives the speed of the runner of each selection, relative to the other selections of its group. Each part
+ * runs on its own runner, and in Vex the same tests took from 83 s to 149 s on the runners of one group.
+ *
+ * - When each plan of a group has a `dryRun` with the same count of tests, the factor uses the dry runs. It is the
+ *   net time of the dry run over the median of the group.
+ * - Otherwise the factor is the median of the ratios of the shared tests. The ratio of a test is its time over its
+ *   median time in the group. A shared test takes `SPEED_MIN_MS` or more. At least half of the plans of the group
+ *   name it, and at least 2 plans.
+ * - A selection with no shared test, or alone in its group, has the factor 1. A factor over 1 is a slow runner.
+ */
+export function speedFactors(plans: readonly RunnerPlan[]): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const group of new Set(plans.map((p) => p.group))) {
+    const members = plans.filter((p) => p.group === group);
+    const runs = members.map((p) => p.plan.dryRun);
+    const counts = new Set(runs.map((r) => r?.tests));
+    if (members.length > 1 && counts.size === 1 && runs.every((r) => r !== undefined && r.tests > 0 && r.netMs > 0)) {
+      const middle = median(runs.map((r) => r?.netMs ?? 0));
+      for (const p of members) out.set(p.name, (p.plan.dryRun?.netMs ?? middle) / middle);
+      continue;
+    }
+    const times = members.map((p) => new Map(p.plan.tests.filter((t) => t[2] >= SPEED_MIN_MS).map((t) => [`${t[1]}|${t[0]}`, t[2]])));
+    const need = Math.max(2, Math.ceil(members.length / 2));
+    const shared = [...new Set(times.flatMap((m) => [...m.keys()]))].filter((key) => times.filter((m) => m.has(key)).length >= need);
+    const middles = new Map(shared.map((key) => [key, median(times.flatMap((m) => m.get(key) ?? []))]));
+    members.forEach((p, i) => {
+      const ratios = shared.flatMap((key) => {
+        const ms = times[i]?.get(key);
+        return ms === undefined ? [] : [ms / (middles.get(key) ?? ms)];
+      });
+      out.set(p.name, ratios.length === 0 ? 1 : median(ratios));
+    });
+  }
+  return out;
 }
 
 /** This function gives the planned times of each mutant that Stryker starts, by the id of the mutant. */
@@ -199,12 +261,16 @@ export function readPlan(name: string, plan: SelectionPlan, limits: PlanLimits =
 /**
  * This function reads the JSON of `plan.json`.
  *
- * @throws Error when the JSON has no object `files` or no list `tests`
+ * @throws Error when the JSON has no object `files` or no list `tests`, or a `dryRun` with no numbers
  */
 export function parsePlan(json: unknown): SelectionPlan {
   const plan = json as Partial<SelectionPlan> | null;
   if (typeof plan !== "object" || plan === null || typeof plan.files !== "object" || plan.files === null || !Array.isArray(plan.tests)) {
     throw new Error(`the plan has no object "files" or no list "tests"`);
+  }
+  const run = plan.dryRun as Partial<DryRun> | null | undefined;
+  if (run !== undefined && (typeof run !== "object" || run === null || !Number.isFinite(run.tests) || !Number.isFinite(run.netMs))) {
+    throw new Error(`the field "dryRun" of the plan has no numbers "tests" and "netMs"`);
   }
   return plan as SelectionPlan;
 }

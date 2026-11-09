@@ -5,7 +5,7 @@
  */
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
-import { filePlans, PLAN_FILE, plannedRuns, testPlans, type PlannedRun, type PlanOfMutant, type TestOfDryRun } from "./plan.ts";
+import { dryRunOf, filePlans, PLAN_FILE, plannedRuns, testPlans, type PlannedRun, type PlanOfMutant, type TestOfDryRun } from "./plan.ts";
 
 /** The name of the file of the reporter, in the folder of the JSON report. */
 export const PARTIAL_FILE = "partial.jsonl";
@@ -81,7 +81,7 @@ export class PartialReporter {
     const plans = event.mutantPlans;
     this.write({ event: "plan", at: this.now(), mutants: plans.length, run: plans.filter((p) => p.plan === "Run").length });
     this.runs = plannedRuns(plans, this.path);
-    writeFileSync(this.planFile, `${JSON.stringify({ files: filePlans(plans, this.path), tests: testPlans(plans, this.tests, this.path) }, null, 2)}\n`);
+    writeFileSync(this.planFile, `${JSON.stringify({ files: filePlans(plans, this.path), tests: testPlans(plans, this.tests, this.path), dryRun: dryRunOf(this.tests) }, null, 2)}\n`);
     // The test processes of Stryker stop with this process.
     if (this.stopAfterPlan) this.exit(0);
   }
