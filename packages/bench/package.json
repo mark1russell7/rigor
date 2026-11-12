@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/rigor-bench",
-  "version": "0.2.35",
+  "version": "0.2.36",
   "description": "The paired-time records of a bench: the order that turns each round, the ratio of each case, and the time verdict against the band of an A/A arm.",
   "keywords": [
     "benchmark",
@@ -46,19 +46,23 @@
     "exports": {
       ".": {
         "types": "./build/index.d.ts",
-        "import": "./build/index.js"
+        "import": "./build/index.js",
+        "default": "./build/index.js"
       },
       "./code-stamp": {
         "types": "./build/code-stamp.d.ts",
-        "import": "./build/code-stamp.js"
+        "import": "./build/code-stamp.js",
+        "default": "./build/code-stamp.js"
       },
       "./fresh": {
         "types": "./build/fresh.d.ts",
-        "import": "./build/fresh.js"
+        "import": "./build/fresh.js",
+        "default": "./build/fresh.js"
       },
       "./supervise": {
         "types": "./build/supervise.d.ts",
-        "import": "./build/supervise.js"
+        "import": "./build/supervise.js",
+        "default": "./build/supervise.js"
       },
       "./package.json": "./package.json"
     },
