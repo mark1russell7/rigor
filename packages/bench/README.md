@@ -54,6 +54,11 @@ v.comparison;                                     // the cases that gain and dro
 | `modelRowText(row, family)` | The words of one row. No word says that a model is the same as the rest. |
 | `limitOnModel(limits, model)` | The limit of a gain on one CPU model: the gain limit, or the ceiling with its words. |
 | `armModels(pairs)` | The CPU models of each arm of a set of pairs, and if all the reads come from one known model. |
+| `candidateLimits(reads, rule)` | The candidate limit of each case on each CPU model: the mean plus k standard deviations, from 5 reads or more. |
+| `freezeLimits(measure, candidates, stamp, rule)` | A file of frozen limits, with the values, the commit and the date of each limit. |
+| `checkModelLimits(file)` | The faults of a file of frozen limits. The function computes each limit again from its values. |
+| `modelLimitRead(file, read)` | The read of one value against the frozen limit of its CPU model: `within`, `beyond` or `no read`. |
+| `limitChanges(before, after)` | The change of each limit between two files, and each looser limit that has no new reason. |
 | `tailFalseFails(aa, options)` | The cases of an A/A arm that the rule of `tailLimitVerdict` fails, and apart from these the cases with a limit under 1. |
 | `gateOf(cases)` | The gate of a list of case outcomes: `pass`, `block` or `no read`. |
 | `gateLine(cases, options)` | The check line of a read: the blocks and the no-reads with each case, the reason and the CPU models, or undefined when each case passed. |
@@ -147,6 +152,17 @@ A read of `differs` tells where to look. It does not name a cause, because the r
 `limitOnModel` gives the limit of a gain that reads on some models only. A model with no earlier reads gets the ceiling, and its read carries the words of `CEILING_ONLY`. A pass at the ceiling stops a loss, and it does not hold the gain.
 
 `armModels` reads the models of the two arms of a set of pairs. When the arms come from different computers, a ratio compares the computers. A record with no model reads as `unknown`, and `unknown` is not one known model.
+
+## A frozen limit on each CPU model
+
+A measure, for example a p99 time, has no base arm in a PR job. So its gate compares the read with a limit from earlier reads on the same CPU model.
+
+- `candidateLimits` gives the mean of the reads of each model plus `noiseFloor` of `@mark1russell7/rigor-statistics`. The default rule `MODEL_LIMIT_RULE` is 3 standard deviations from 5 reads or more.
+- A model with too few reads, with equal reads or with no known model gets no limit.
+- `freezeLimits` writes the limits as data, with their values, the commit and the date. `checkModelLimits` computes each limit again, so the next reader can verify it.
+- `modelLimitRead` gives `no read` for a model with no frozen limit. A `no read` is not a pass.
+
+A limit does not move by itself. When new reads go straight into the limit, a slow regression raises its own limit. So a nightly run gives only a candidate, and a change of the file goes through a pull request. `limitChanges` accepts a tighter limit, a new model and a removed model. It refuses a looser limit that has no new `reason`, for example a change of the runner image. It also refuses a change of the rule or of the measure with no new `ruleReason`.
 
 ## A gate that can fail
 
