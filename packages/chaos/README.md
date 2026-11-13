@@ -39,7 +39,7 @@ A fault plan tells a proxy which faults to put into which connections, and at wh
 
 | Kind | What the proxy does |
 |---|---|
-| `delay` | Each frame that it reads in the next `forMs` goes out `ms` later. It keeps reading. |
+| `delay` | Each frame that it reads in the next `forMs` goes out `ms` later. It does not stop its reads. |
 | `stall` | It stops reading the direction for `ms`. The sender sees back pressure. |
 | `cut` | It ends both directions with a FIN. |
 | `reset` | It destroys both directions with a TCP reset. |

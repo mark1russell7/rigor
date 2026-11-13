@@ -66,7 +66,7 @@ describe("a fault plan from a spec", () => {
 
   it("states each problem of a spec, and throws a RangeError for it", () => {
     expect(checkFaultSpec(every)).toEqual([]);
-    const bad = checkFaultSpec({ connections: 0, perConnection: -1, kinds: { cut: 0, jam: 1 } as FaultSpec["kinds"], within: { byte: 0 }, directions: [], ranges: { stallMs: [5, 1], loud: [1, 2] } as FaultSpec["ranges"] });
+    const bad = checkFaultSpec({ connections: 0, perConnection: -1, kinds: { cut: 0, jam: 1 }, within: { byte: 0 }, directions: [], ranges: { stallMs: [5, 1], loud: [1, 2] } } as unknown as FaultSpec);
     expect(bad.join("\n")).toMatch(/connections/);
     expect(bad.join("\n")).toMatch(/faults of each connection/);
     expect(bad.join("\n")).toMatch(/jam is not a kind/);
@@ -77,6 +77,7 @@ describe("a fault plan from a spec", () => {
     expect(bad.join("\n")).toMatch(/range loud is not/);
     expect(checkFaultSpec({ ...every, ranges: { splitPieces: [1, 4] } }).join("")).toMatch(/splitPieces .* 2 or more/);
     expect(() => faultPlan({ ...every, connections: 0 }, 1)).toThrow(RangeError);
+    expect(() => faultPlan({ ...every, kinds: { jam: 1 } as unknown as FaultSpec["kinds"] }, 1)).toThrow(/weight more than 0/);
   });
 });
 

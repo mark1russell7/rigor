@@ -10,6 +10,17 @@ type Arrivals: build/schedule.d.ts#Arrivals
 type ClosedLoopOptions: build/closed.d.ts#ClosedLoopOptions
 type ClosedLoopRun: build/closed.d.ts#ClosedLoopRun
 type Completion: build/measure.d.ts#Completion
+DEFAULT_FAULT_RANGES: build/faults.d.ts#DEFAULT_FAULT_RANGES
+type Direction: build/faults.d.ts#Direction
+FAULT_KINDS: build/faults.d.ts#FAULT_KINDS
+FAULT_PLAN_FORMAT: build/faults.d.ts#FAULT_PLAN_FORMAT
+type Fault: build/faults.d.ts#Fault
+type FaultKind: build/faults.d.ts#FaultKind
+type FaultPlan: build/faults.d.ts#FaultPlan
+type FaultPoint: build/faults.d.ts#FaultPoint
+type FaultRanges: build/faults.d.ts#FaultRanges
+type FaultSpec: build/faults.d.ts#FaultSpec
+type Interval: build/faults.d.ts#Interval
 type LoadMeasure: build/measure.d.ts#LoadMeasure
 type LoopRequest: build/closed.d.ts#LoopRequest
 type Phase: build/schedule.d.ts#Phase
@@ -19,10 +30,17 @@ type Schedule: build/schedule.d.ts#Schedule
 type ScheduleCheck: build/measure.d.ts#ScheduleCheck
 type ScheduleOptions: build/schedule.d.ts#ScheduleOptions
 type SecondSample: build/measure.d.ts#SecondSample
+type Trigger: build/faults.d.ts#Trigger
+checkFault: build/faults.d.ts#checkFault
+checkFaultPlan: build/faults.d.ts#checkFaultPlan
+checkFaultSpec: build/faults.d.ts#checkFaultSpec
 checkProfile: build/schedule.d.ts#checkProfile
 closedLoopPlan: build/closed.d.ts#closedLoopPlan
 constant: build/schedule.d.ts#constant
 expectedArrivals: build/schedule.d.ts#expectedArrivals
+faultPlan: build/faults.d.ts#faultPlan
+faultPlanOf: build/faults.d.ts#faultPlanOf
+faultsOf: build/faults.d.ts#faultsOf
 latencyQuantile: build/measure.d.ts#latencyQuantile
 measureLoad: build/measure.d.ts#measureLoad
 ramp: build/schedule.d.ts#ramp
@@ -30,6 +48,7 @@ schedule: build/schedule.d.ts#schedule
 scheduleHeld: build/measure.d.ts#scheduleHeld
 spike: build/schedule.d.ts#spike
 steps: build/schedule.d.ts#steps
+triggerOf: build/faults.d.ts#triggerOf
 
 ## Declarations
 
@@ -58,6 +77,118 @@ export interface LoopRequest {
 
 ### build/closed.d.ts#closedLoopPlan
 export declare function closedLoopPlan(requests: readonly LoopRequest[], options: ClosedLoopOptions): ClosedLoopRun;
+
+### build/faults.d.ts#DEFAULT_FAULT_RANGES
+export declare const DEFAULT_FAULT_RANGES: FaultRanges;
+
+### build/faults.d.ts#Direction
+export type Direction = "up" | "down";
+
+### build/faults.d.ts#FAULT_KINDS
+export declare const FAULT_KINDS: readonly ["delay", "stall", "cut", "reset", "split", "reorder", "duplicate"];
+
+### build/faults.d.ts#FAULT_PLAN_FORMAT
+export declare const FAULT_PLAN_FORMAT = "rigor-faults/1";
+
+### build/faults.d.ts#Fault
+export type Fault = FaultPoint & ({
+  readonly kind: "delay";
+  readonly ms: number;
+  readonly forMs: number;
+} | {
+  readonly kind: "stall";
+  readonly ms: number;
+} | {
+  readonly kind: "cut";
+} | {
+  readonly kind: "reset";
+} | {
+  readonly kind: "split";
+  readonly pieces: number;
+  readonly gapMs: number;
+} | {
+  readonly kind: "reorder";
+  readonly count: number;
+  readonly holdMs: number;
+} | {
+  readonly kind: "duplicate";
+  readonly copies: number;
+});
+
+### build/faults.d.ts#FaultKind
+export type FaultKind = (typeof FAULT_KINDS)[number];
+
+### build/faults.d.ts#FaultPlan
+export interface FaultPlan {
+  readonly format: typeof FAULT_PLAN_FORMAT;
+  readonly seed: number | string | null;
+  readonly faults: readonly Fault[];
+}
+
+### build/faults.d.ts#FaultPoint
+export interface FaultPoint {
+  readonly connection: number;
+  readonly direction: Direction;
+  readonly at: Trigger;
+}
+
+### build/faults.d.ts#FaultRanges
+export interface FaultRanges {
+  readonly delayMs: Interval;
+  readonly delayForMs: Interval;
+  readonly stallMs: Interval;
+  readonly splitPieces: Interval;
+  readonly splitGapMs: Interval;
+  readonly reorderCount: Interval;
+  readonly reorderHoldMs: Interval;
+  readonly duplicateCopies: Interval;
+}
+
+### build/faults.d.ts#FaultSpec
+export interface FaultSpec {
+  readonly connections: number;
+  readonly perConnection: number;
+  readonly kinds: Partial<Readonly<Record<FaultKind, number>>>;
+  readonly within: Trigger;
+  readonly directions?: readonly Direction[];
+  readonly ranges?: Partial<FaultRanges>;
+}
+
+### build/faults.d.ts#Interval
+export type Interval = readonly [number, number];
+
+### build/faults.d.ts#Trigger
+export type Trigger = {
+  readonly ms: number;
+} | {
+  readonly byte: number;
+} | {
+  readonly frame: number;
+};
+
+### build/faults.d.ts#checkFault
+export declare function checkFault(fault: Fault): readonly string[];
+
+### build/faults.d.ts#checkFaultPlan
+export declare function checkFaultPlan(plan: FaultPlan): readonly string[];
+
+### build/faults.d.ts#checkFaultSpec
+export declare function checkFaultSpec(spec: FaultSpec): readonly string[];
+
+### build/faults.d.ts#faultPlan
+export declare function faultPlan(spec: FaultSpec, seed: number | string): FaultPlan;
+
+### build/faults.d.ts#faultPlanOf
+export declare function faultPlanOf(faults: readonly Fault[]): FaultPlan;
+
+### build/faults.d.ts#faultsOf
+export declare function faultsOf(plan: FaultPlan, connection: number): readonly Fault[];
+
+### build/faults.d.ts#triggerOf
+export declare function triggerOf(at: Trigger): {
+  readonly measure: "ms" | "byte" | "frame";
+  readonly value: number;
+} | undefined;
 
 ### build/measure.d.ts#Completion
 export interface Completion {

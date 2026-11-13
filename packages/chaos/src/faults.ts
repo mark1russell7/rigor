@@ -23,7 +23,7 @@ export type Direction = "up" | "down";
 /**
  * The point of a fault in the stream of its direction. `ms` counts from the start of the connection. `byte` counts the
  * bytes of the direction before the fault. `frame` counts the frames of the direction before the fault. The framer of
- * the proxy sets what a frame is: a WebSocket frame, a part of an HTTP message, or a chunk of a TCP stream.
+ * the proxy sets what a frame is: a WebSocket frame, a part of an HTTP message or a TCP read.
  */
 export type Trigger = { readonly ms: number } | { readonly byte: number } | { readonly frame: number };
 
@@ -37,7 +37,7 @@ export interface FaultPoint {
 /**
  * One fault of a plan.
  *
- * - `delay`: each frame that the proxy reads in the next `forMs` goes out `ms` later. The proxy keeps reading.
+ * - `delay`: each frame that the proxy reads in the next `forMs` goes out `ms` later. The proxy does not stop its reads.
  * - `stall`: the proxy stops reading the direction for `ms`. Thus the sender sees back pressure.
  * - `cut`: the proxy ends both directions with a FIN, as a clean close of TCP.
  * - `reset`: the proxy destroys both directions with a TCP reset (RST).
@@ -209,7 +209,8 @@ export function checkFaultSpec(spec: FaultSpec): readonly string[] {
     if (!(FAULT_KINDS as readonly string[]).includes(kind)) out.push(`The kind ${kind} is not a kind of fault.`);
     else if (!isTime(weight, 0)) out.push(`The weight of ${kind} is a number of 0 or more, not ${String(weight)}.`);
   }
-  if (!weights.some(([, weight]) => typeof weight === "number" && weight > 0)) out.push("At least one kind has a weight more than 0.");
+  const known = weights.filter(([kind]) => (FAULT_KINDS as readonly string[]).includes(kind));
+  if (!known.some(([, weight]) => typeof weight === "number" && weight > 0)) out.push("At least one kind of fault has a weight more than 0.");
   const within = triggerOf(spec.within);
   if (within === undefined || !Number.isSafeInteger(within.value) || within.value < 1) {
     out.push(`The limit of the points has one key of ms, byte or frame, with a whole value of 1 or more, not ${JSON.stringify(spec.within)}.`);
