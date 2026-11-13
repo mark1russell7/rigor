@@ -34,6 +34,7 @@ latinHypercube: build/designs.d.ts#latinHypercube
 mulberry32: build/random.d.ts#mulberry32
 normalCdf: build/normal.d.ts#normalCdf
 normalQuantile: build/normal.d.ts#normalQuantile
+plackettLuceOrder: build/random.d.ts#plackettLuceOrder
 random: build/random.d.ts#random
 randomDesign: build/designs.d.ts#randomDesign
 randomOf: build/random.d.ts#randomOf
@@ -199,6 +200,9 @@ export declare function fnv1a32(text: string, options?: {
 
 ### build/random.d.ts#mulberry32
 export declare function mulberry32(seed: number): Source;
+
+### build/random.d.ts#plackettLuceOrder
+export declare function plackettLuceOrder<T>(seed: number | string, items: readonly T[], logWeightOf: (item: T) => number, keyOf?: (item: T) => string): T[];
 
 ### build/random.d.ts#random
 export declare function random(seed: number | string, source?: (seed: number) => Source): Random;

@@ -97,6 +97,35 @@ export function stablePick<T>(seed: number, items: readonly T[], keyOf: (item: T
   return (best as { item: T }).item;
 }
 
+/**
+ * A random order of a list with the Plackett-Luce law of the weights (the Gumbel-max method). Each item gets the sum of
+ * its log-weight and a Gumbel draw. The order goes from the largest sum to the smallest.
+ *
+ * - The first item is item `i` with the probability `w_i / sum(w)`. Each next item has the same law over the items that remain.
+ * - The draw of an item comes from the stream `random(seed).fork(key)`. Thus a new item or a lost item does not change the order of the other items.
+ * - Items with equal sums keep the order of the list. Thus the items with the log-weight `-Infinity` come last, in the order of the list.
+ *
+ * The function reads one draw for each item, and it does not change its inputs. Each key occurs once. A log-weight is
+ * finite or `-Infinity`.
+ */
+export function plackettLuceOrder<T>(seed: number | string, items: readonly T[], logWeightOf: (item: T) => number, keyOf: (item: T) => string = String): T[] {
+  const root = random(seed);
+  const seen = new Set<string>();
+  const sums = items.map((item) => {
+    const key = keyOf(item);
+    if (seen.has(key)) throw new RangeError(`plackettLuceOrder: the key ${JSON.stringify(key)} occurs twice.`);
+    seen.add(key);
+    const logWeight = logWeightOf(item);
+    if (Number.isNaN(logWeight) || logWeight === Number.POSITIVE_INFINITY) {
+      throw new RangeError(`plackettLuceOrder: the log-weight of the key ${JSON.stringify(key)} is ${logWeight}, and a log-weight is finite or -Infinity.`);
+    }
+    return logWeight + root.fork(key).gumbel();
+  });
+  // Two sums of -Infinity give NaN, which is false, so the order of the list decides.
+  const order = items.map((_, index) => index).sort((x, y) => (sums[y] as number) - (sums[x] as number) || x - y);
+  return order.map((index) => items[index] as T);
+}
+
 export interface Random {
   /** The 32-bit seed that the generator started with. Write it in each failure message, so a run can replay. */
   readonly seed: number;
