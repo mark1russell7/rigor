@@ -6,10 +6,13 @@
 
 ## . (build/index.d.ts): names
 
+BRADLEY_TERRY_DENSE_LIMIT: build/index.d.ts#BRADLEY_TERRY_DENSE_LIMIT
 type BinomialSide: build/index.d.ts#BinomialSide
 type BootstrapOptions: build/index.d.ts#BootstrapOptions
 type BradleyTerryFit: build/index.d.ts#BradleyTerryFit
 type BradleyTerryOptions: build/index.d.ts#BradleyTerryOptions
+type BradleyTerrySparseFit: build/index.d.ts#BradleyTerrySparseFit
+type BradleyTerrySparseOptions: build/index.d.ts#BradleyTerrySparseOptions
 type CalibrationLevel: build/index.d.ts#CalibrationLevel
 type CategoricalDimension: build/index.d.ts#CategoricalDimension
 type CompareOptions: build/index.d.ts#CompareOptions
@@ -25,11 +28,13 @@ type CoverageStep: build/index.d.ts#CoverageStep
 EMPTY_RUNNING: build/index.d.ts#EMPTY_RUNNING
 type Effect: build/index.d.ts#Effect
 type EloOptions: build/index.d.ts#EloOptions
+type EloReplayOptions: build/index.d.ts#EloReplayOptions
 type EloUpdate: build/index.d.ts#EloUpdate
 type Forecast: build/index.d.ts#Forecast
 type Glicko2Game: build/index.d.ts#Glicko2Game
 type Glicko2Options: build/index.d.ts#Glicko2Options
 type Glicko2Rating: build/index.d.ts#Glicko2Rating
+type Glicko2ReplayOptions: build/index.d.ts#Glicko2ReplayOptions
 type Interval: build/index.d.ts#Interval
 KENDALL_EXACT: build/index.d.ts#KENDALL_EXACT
 type Kappa: build/index.d.ts#Kappa
@@ -42,6 +47,9 @@ type NoiseState: build/index.d.ts#NoiseState
 type NoiseVerdict: build/index.d.ts#NoiseVerdict
 type OptionFloorOptions: build/index.d.ts#OptionFloorOptions
 type OrdinalDimension: build/index.d.ts#OrdinalDimension
+PAIR_FULL_SEARCH: build/index.d.ts#PAIR_FULL_SEARCH
+type PairChoice: build/index.d.ts#PairChoice
+type PairChoiceOptions: build/index.d.ts#PairChoiceOptions
 type PairComparison: build/index.d.ts#PairComparison
 type PairOutcome: build/index.d.ts#PairOutcome
 type PairProbabilities: build/index.d.ts#PairProbabilities
@@ -51,10 +59,18 @@ type PermutationResult: build/index.d.ts#PermutationResult
 type Proportion: build/index.d.ts#Proportion
 type QuantileInterval: build/index.d.ts#QuantileInterval
 type QuantileMethod: build/index.d.ts#QuantileMethod
+RATING_START_UNCERTAINTY: build/index.d.ts#RATING_START_UNCERTAINTY
 RESPONSE_LAMBDAS: build/index.d.ts#RESPONSE_LAMBDAS
 RESPONSE_MAX_POWER: build/index.d.ts#RESPONSE_MAX_POWER
 RESPONSE_MAX_TERMS: build/index.d.ts#RESPONSE_MAX_TERMS
 RESPONSE_RECORDS_SCHEMA: build/index.d.ts#RESPONSE_RECORDS_SCHEMA
+type RatedItem: build/index.d.ts#RatedItem
+type RatingFit: build/index.d.ts#RatingFit
+type RatingFitOptions: build/index.d.ts#RatingFitOptions
+type RatingModel: build/index.d.ts#RatingModel
+type RatingModelChoice: build/index.d.ts#RatingModelChoice
+type RatingModelOptions: build/index.d.ts#RatingModelOptions
+type RatingModelScore: build/index.d.ts#RatingModelScore
 type RatingScale: build/index.d.ts#RatingScale
 type ResponseAbsentPoint: build/index.d.ts#ResponseAbsentPoint
 type ResponseBand: build/index.d.ts#ResponseBand
@@ -129,15 +145,20 @@ bootstrapMedianRatio: build/index.d.ts#bootstrapMedianRatio
 bootstrapStrata: build/index.d.ts#bootstrapStrata
 bootstrapTwo: build/index.d.ts#bootstrapTwo
 bradleyTerry: build/index.d.ts#bradleyTerry
+bradleyTerrySparse: build/index.d.ts#bradleyTerrySparse
 brier: build/index.d.ts#brier
 calibration: build/index.d.ts#calibration
+choosePair: build/index.d.ts#choosePair
 cohenKappa: build/index.d.ts#cohenKappa
 compareRatios: build/index.d.ts#compareRatios
 coverageMinSample: build/index.d.ts#coverageMinSample
 eloExpected: build/index.d.ts#eloExpected
+eloReplay: build/index.d.ts#eloReplay
 eloUpdate: build/index.d.ts#eloUpdate
+fitRatings: build/index.d.ts#fitRatings
 fitResponse: build/index.d.ts#fitResponse
 glicko2Idle: build/index.d.ts#glicko2Idle
+glicko2Replay: build/index.d.ts#glicko2Replay
 glicko2Update: build/index.d.ts#glicko2Update
 heldOutError: build/index.d.ts#heldOutError
 heldOutErrorAt: build/index.d.ts#heldOutErrorAt
@@ -156,6 +177,7 @@ noiseVerdict: build/index.d.ts#noiseVerdict
 normalCdf: @mark1russell7/rigor-generators#normalCdf (external)
 normalQuantile: @mark1russell7/rigor-generators#normalQuantile (external)
 optionFloor: build/index.d.ts#optionFloor
+pairInformation: build/index.d.ts#pairInformation
 pairProbabilities: build/index.d.ts#pairProbabilities
 pairedPermutation: build/index.d.ts#pairedPermutation
 parseResponseRecord: build/index.d.ts#parseResponseRecord
@@ -167,6 +189,7 @@ quantileSamples: build/index.d.ts#quantileSamples
 quantileSorted: build/index.d.ts#quantileSorted
 ranks: build/index.d.ts#ranks
 ratingToStrength: build/index.d.ts#ratingToStrength
+ratingUncertainty: build/index.d.ts#ratingUncertainty
 responseCells: build/index.d.ts#responseCells
 ridgeSolve: build/index.d.ts#ridgeSolve
 runningMean: build/index.d.ts#runningMean
@@ -174,6 +197,7 @@ runningOf: build/index.d.ts#runningOf
 runningSd: build/index.d.ts#runningSd
 sampleTotalInterval: build/index.d.ts#sampleTotalInterval
 sd: build/index.d.ts#sd
+selectRatingModel: build/index.d.ts#selectRatingModel
 signFlipTest: build/index.d.ts#signFlipTest
 signTest: build/index.d.ts#signTest
 signTestPower: build/index.d.ts#signTestPower
@@ -193,6 +217,9 @@ wilson: build/index.d.ts#wilson
 wilsonSampleSize: build/index.d.ts#wilsonSampleSize
 
 ## Declarations
+
+### build/index.d.ts#BRADLEY_TERRY_DENSE_LIMIT
+export declare const BRADLEY_TERRY_DENSE_LIMIT = 200;
 
 ### build/index.d.ts#BinomialSide
 type BinomialSide = "less" | "greater";
@@ -223,6 +250,21 @@ interface BradleyTerryOptions {
   readonly priorSd?: number;
   readonly ties?: TieModel;
   readonly tiePriorSd?: number;
+  readonly maxIterations?: number;
+  readonly tolerance?: number;
+}
+
+### build/index.d.ts#BradleyTerrySparseFit
+interface BradleyTerrySparseFit extends BradleyTerryFit {
+  readonly se: number[];
+  readonly iterations: number;
+  readonly converged: boolean;
+  readonly bound: number;
+  readonly pairs: number;
+}
+
+### build/index.d.ts#BradleyTerrySparseOptions
+interface BradleyTerrySparseOptions extends BradleyTerryOptions {
   readonly maxIterations?: number;
   readonly tolerance?: number;
 }
@@ -341,6 +383,11 @@ interface EloOptions extends RatingScale {
   readonly k?: number;
 }
 
+### build/index.d.ts#EloReplayOptions
+interface EloReplayOptions extends EloOptions {
+  readonly start?: number;
+}
+
 ### build/index.d.ts#EloUpdate
 interface EloUpdate {
   readonly a: number;
@@ -372,6 +419,11 @@ interface Glicko2Rating {
   readonly rating: number;
   readonly rd: number;
   readonly volatility: number;
+}
+
+### build/index.d.ts#Glicko2ReplayOptions
+interface Glicko2ReplayOptions extends Glicko2Options {
+  readonly start?: Glicko2Rating;
 }
 
 ### build/index.d.ts#Interval
@@ -461,6 +513,24 @@ interface OrdinalDimension extends ResponseDimensionBase {
   readonly log?: boolean;
 }
 
+### build/index.d.ts#PAIR_FULL_SEARCH
+export declare const PAIR_FULL_SEARCH = 64;
+
+### build/index.d.ts#PairChoice
+interface PairChoice {
+  readonly a: string;
+  readonly b: string;
+  readonly information: number;
+}
+
+### build/index.d.ts#PairChoiceOptions
+interface PairChoiceOptions<T extends RatedItem = RatedItem> {
+  readonly seed: number | string;
+  readonly recent?: readonly (readonly [string, string])[];
+  readonly candidates?: number;
+  readonly information?: (a: T, b: T) => number | undefined;
+}
+
 ### build/index.d.ts#PairComparison
 interface PairComparison {
   readonly a: number;
@@ -520,6 +590,9 @@ interface QuantileInterval {
 ### build/index.d.ts#QuantileMethod
 type QuantileMethod = "linear" | "nearest-rank" | "higher";
 
+### build/index.d.ts#RATING_START_UNCERTAINTY
+export declare const RATING_START_UNCERTAINTY = 350;
+
 ### build/index.d.ts#RESPONSE_LAMBDAS
 export declare const RESPONSE_LAMBDAS: readonly number[];
 
@@ -531,6 +604,53 @@ export declare const RESPONSE_MAX_TERMS = 1024;
 
 ### build/index.d.ts#RESPONSE_RECORDS_SCHEMA
 export declare const RESPONSE_RECORDS_SCHEMA = "response-records/1";
+
+### build/index.d.ts#RatedItem
+interface RatedItem {
+  readonly id: string;
+  readonly rating: number;
+  readonly se?: number | undefined;
+  readonly picks: number;
+}
+
+### build/index.d.ts#RatingFit
+interface RatingFit {
+  readonly strengths: number[];
+  readonly se: (number | undefined)[];
+  readonly tie: number;
+}
+
+### build/index.d.ts#RatingFitOptions
+interface RatingFitOptions {
+  readonly bradleyTerry?: BradleyTerryOptions;
+  readonly denseLimit?: number;
+  readonly elo?: EloReplayOptions;
+  readonly glicko2?: Glicko2ReplayOptions;
+}
+
+### build/index.d.ts#RatingModel
+type RatingModel = "bradley-terry" | "elo" | "glicko2";
+
+### build/index.d.ts#RatingModelChoice
+interface RatingModelChoice {
+  readonly model: RatingModel;
+  readonly scores: RatingModelScore[];
+  readonly trained: number;
+  readonly tested: number;
+}
+
+### build/index.d.ts#RatingModelOptions
+interface RatingModelOptions extends RatingFitOptions {
+  readonly holdout?: number;
+  readonly minimum?: number;
+  readonly models?: readonly RatingModel[];
+}
+
+### build/index.d.ts#RatingModelScore
+interface RatingModelScore {
+  readonly model: RatingModel;
+  readonly logLoss: number;
+}
 
 ### build/index.d.ts#RatingScale
 interface RatingScale {
@@ -1007,11 +1127,17 @@ export declare function bootstrapTwo<A, B>(a: readonly A[], b: readonly B[], sta
 ### build/index.d.ts#bradleyTerry
 export declare function bradleyTerry(items: number, comparisons: readonly PairComparison[], options?: BradleyTerryOptions): BradleyTerryFit;
 
+### build/index.d.ts#bradleyTerrySparse
+export declare function bradleyTerrySparse(items: number, comparisons: readonly PairComparison[], options?: BradleyTerrySparseOptions): BradleyTerrySparseFit;
+
 ### build/index.d.ts#brier
 export declare function brier(forecasts: readonly Forecast[]): number;
 
 ### build/index.d.ts#calibration
 export declare function calibration(forecasts: readonly Forecast[]): CalibrationLevel[];
+
+### build/index.d.ts#choosePair
+export declare function choosePair<T extends RatedItem>(items: readonly T[], options: PairChoiceOptions<T>): PairChoice | undefined;
 
 ### build/index.d.ts#cohenKappa
 export declare function cohenKappa<T>(a: readonly T[], b: readonly T[]): Kappa;
@@ -1025,14 +1151,23 @@ export declare function coverageMinSample(cells: readonly CoverageCell[], bar: C
 ### build/index.d.ts#eloExpected
 export declare function eloExpected(ra: number, rb: number, options?: RatingScale): number;
 
+### build/index.d.ts#eloReplay
+export declare function eloReplay(items: number, comparisons: readonly PairComparison[], options?: EloReplayOptions): number[];
+
 ### build/index.d.ts#eloUpdate
 export declare function eloUpdate(ra: number, rb: number, score: number, options?: EloOptions): EloUpdate;
+
+### build/index.d.ts#fitRatings
+export declare function fitRatings(model: RatingModel, items: number, comparisons: readonly PairComparison[], options?: RatingFitOptions): RatingFit;
 
 ### build/index.d.ts#fitResponse
 export declare function fitResponse(data: ResponseData, options?: ResponseFitOptions): ResponseRecord;
 
 ### build/index.d.ts#glicko2Idle
 export declare function glicko2Idle(player: Glicko2Rating): Glicko2Rating;
+
+### build/index.d.ts#glicko2Replay
+export declare function glicko2Replay(items: number, comparisons: readonly PairComparison[], options?: Glicko2ReplayOptions): Glicko2Rating[];
 
 ### build/index.d.ts#glicko2Update
 export declare function glicko2Update(player: Glicko2Rating, games: readonly Glicko2Game[], options?: Glicko2Options): Glicko2Rating;
@@ -1084,6 +1219,9 @@ export declare function noiseVerdict(values: readonly number[], options?: NoiseO
 ### build/index.d.ts#optionFloor
 export declare function optionFloor(options: OptionFloorOptions): number;
 
+### build/index.d.ts#pairInformation
+export declare function pairInformation(a: RatedItem, b: RatedItem, options?: RatingScale): number;
+
 ### build/index.d.ts#pairProbabilities
 export declare function pairProbabilities(sa: number, sb: number, tie?: number): PairProbabilities;
 
@@ -1117,6 +1255,9 @@ export declare function ranks(values: readonly number[]): number[];
 ### build/index.d.ts#ratingToStrength
 export declare function ratingToStrength(rating: number, options?: RatingScale): number;
 
+### build/index.d.ts#ratingUncertainty
+export declare function ratingUncertainty(item: Pick<RatedItem, "se" | "picks">): number;
+
 ### build/index.d.ts#responseCells
 export declare function responseCells(record: Pick<ResponseRecord, "dimensions">, vary: string | readonly [string, string], steps?: number): number;
 
@@ -1137,6 +1278,9 @@ export declare function sampleTotalInterval(values: readonly number[], options: 
 
 ### build/index.d.ts#sd
 export declare function sd(values: readonly number[]): number;
+
+### build/index.d.ts#selectRatingModel
+export declare function selectRatingModel(items: number, comparisons: readonly PairComparison[], options?: RatingModelOptions): RatingModelChoice;
 
 ### build/index.d.ts#signFlipTest
 export declare function signFlipTest(terms: readonly number[], options?: SignFlipOptions): SignFlipResult;

@@ -163,3 +163,29 @@ export {
   type TieModel,
   bradleyTerry,
 } from "./bradley-terry.ts";
+export { type BradleyTerrySparseFit, type BradleyTerrySparseOptions, bradleyTerrySparse } from "./bradley-terry-sparse.ts";
+export {
+  BRADLEY_TERRY_DENSE_LIMIT,
+  type EloReplayOptions,
+  type Glicko2ReplayOptions,
+  type RatingFit,
+  type RatingFitOptions,
+  type RatingModel,
+  type RatingModelChoice,
+  type RatingModelOptions,
+  type RatingModelScore,
+  eloReplay,
+  fitRatings,
+  glicko2Replay,
+  selectRatingModel,
+} from "./rating-models.ts";
+export {
+  PAIR_FULL_SEARCH,
+  RATING_START_UNCERTAINTY,
+  type PairChoice,
+  type PairChoiceOptions,
+  type RatedItem,
+  choosePair,
+  pairInformation,
+  ratingUncertainty,
+} from "./pair-choice.ts";
