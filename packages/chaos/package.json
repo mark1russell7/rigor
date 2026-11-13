@@ -1,14 +1,16 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/rigor-chaos",
-  "version": "0.1.5",
-  "description": "Open-loop load schedules with planned arrival times from a rate profile, and a measure of latency from the planned time with no coordinated omission.",
+  "version": "0.1.6",
+  "description": "Open-loop load schedules, seeded fault plans for a proxy, and a measure of latency from the planned time with no coordinated omission.",
   "keywords": [
     "load",
     "open-loop",
     "schedule",
     "poisson",
     "chaos",
+    "fault-injection",
+    "fault-plan",
     "coordinated-omission",
     "latency",
     "testing",
