@@ -67,6 +67,13 @@ jobs:
     permissions:
       contents: read
 
+  # The socket tests of rigor-proxy measure time, so they run only in CI. They run when the proxy, the fault plans,
+  # the lock file or their workflow changes.
+  proxy-net:
+    uses: ./.github/workflows/proxy-net.yml
+    permissions:
+      contents: read
+
   # The one check of the ruleset of main (CI.md of mark1russell7/template, "The check of the ruleset").
   # It passes only when each job of needs passed, or was skipped by its own if and ALLOW_SKIP names it.
   # A new job of this file goes in needs, so the ruleset never has to change, and gh pr merge --auto
@@ -74,7 +81,7 @@ jobs:
   ci-ok:
     name: CI OK
     if: ${{ !cancelled() }}
-    needs: [ci, presets, stamp-check]
+    needs: [ci, presets, stamp-check, proxy-net]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     permissions: {}

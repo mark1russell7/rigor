@@ -1,0 +1,165 @@
+# The public API of @mark1russell7/rigor-proxy
+#
+# The names of each entry of the exports field, and the declaration of each name, without comments
+# and private members. The command `api-report check` compares this file with the built .d.ts files.
+# To accept a change of the API, start the build, then `api-report update`, and review the diff.
+
+## . (build/index.d.ts): names
+
+type Applier: build/applier.d.ts#Applier
+type ConnectionEnd: build/proxy.d.ts#ConnectionEnd
+type ConnectionSummary: build/proxy.d.ts#ConnectionSummary
+type FaultProxy: build/proxy.d.ts#FaultProxy
+type FaultRecord: build/applier.d.ts#FaultRecord
+type Framer: build/framers.d.ts#Framer
+type FramerPair: build/framers.d.ts#FramerPair
+type HttpHead: build/framers.d.ts#HttpHead
+type Protocol: build/proxy.d.ts#Protocol
+type ProxyOptions: build/proxy.d.ts#ProxyOptions
+type Send: build/applier.d.ts#Send
+type Step: build/applier.d.ts#Step
+applierOf: build/applier.d.ts#applierOf
+chunkFramer: build/framers.d.ts#chunkFramer
+httpFramers: build/framers.d.ts#httpFramers
+readHttpHead: build/framers.d.ts#readHttpHead
+splitBytes: build/applier.d.ts#splitBytes
+startFaultProxy: build/proxy.d.ts#startFaultProxy
+tcpFramers: build/framers.d.ts#tcpFramers
+webSocketFrameLength: build/framers.d.ts#webSocketFrameLength
+webSocketFramer: build/framers.d.ts#webSocketFramer
+
+## Declarations
+
+### build/applier.d.ts#Applier
+export interface Applier {
+  push(frame: Uint8Array, now: number): Step;
+  tick(now: number): Step;
+  end(now: number): Step;
+  readonly wake: number | undefined;
+  pending(): readonly {
+    readonly index: number;
+    readonly fault: Fault;
+  }[];
+}
+
+### build/applier.d.ts#FaultRecord
+export interface FaultRecord {
+  readonly index: number;
+  readonly connection: number;
+  readonly direction: Direction;
+  readonly kind: FaultKind;
+  readonly at: number;
+  readonly byte: number;
+  readonly frame: number;
+  readonly bytes: number;
+}
+
+### build/applier.d.ts#Send
+export interface Send {
+  readonly bytes: Uint8Array;
+  readonly at: number;
+}
+
+### build/applier.d.ts#Step
+export interface Step {
+  readonly sends: readonly Send[];
+  readonly records: readonly FaultRecord[];
+  readonly pauseUntil?: number;
+  readonly close?: {
+    readonly kind: "cut" | "reset";
+    readonly at: number;
+  };
+}
+
+### build/applier.d.ts#applierOf
+export declare function applierOf(plan: FaultPlan, connection: number, direction: Direction): Applier;
+
+### build/applier.d.ts#splitBytes
+export declare function splitBytes(bytes: Uint8Array, pieces: number): Uint8Array[];
+
+### build/framers.d.ts#Framer
+export interface Framer {
+  push(bytes: Uint8Array): Uint8Array[];
+  end(): Uint8Array[];
+}
+
+### build/framers.d.ts#FramerPair
+export interface FramerPair {
+  readonly up: Framer;
+  readonly down: Framer;
+}
+
+### build/framers.d.ts#HttpHead
+export interface HttpHead {
+  readonly method: string | null;
+  readonly status: number | null;
+  readonly fields: ReadonlyMap<string, string>;
+}
+
+### build/framers.d.ts#chunkFramer
+export declare function chunkFramer(): Framer;
+
+### build/framers.d.ts#httpFramers
+export declare function httpFramers(): FramerPair;
+
+### build/framers.d.ts#readHttpHead
+export declare function readHttpHead(head: Uint8Array): HttpHead | undefined;
+
+### build/framers.d.ts#tcpFramers
+export declare function tcpFramers(): FramerPair;
+
+### build/framers.d.ts#webSocketFrameLength
+export declare function webSocketFrameLength(bytes: Uint8Array): number | undefined | null;
+
+### build/framers.d.ts#webSocketFramer
+export declare function webSocketFramer(): Framer;
+
+### build/proxy.d.ts#ConnectionEnd
+export type ConnectionEnd = "close" | "cut" | "reset" | "error";
+
+### build/proxy.d.ts#ConnectionSummary
+export interface ConnectionSummary {
+  readonly connection: number;
+  readonly end: ConnectionEnd;
+  readonly bytes: {
+    readonly up: number;
+    readonly down: number;
+  };
+  readonly missed: readonly {
+    readonly index: number;
+    readonly fault: Fault;
+  }[];
+}
+
+### build/proxy.d.ts#FaultProxy
+export interface FaultProxy {
+  readonly host: string;
+  readonly port: number;
+  readonly records: readonly FaultRecord[];
+  readonly connections: readonly ConnectionSummary[];
+  close(): Promise<void>;
+}
+
+### build/proxy.d.ts#Protocol
+export type Protocol = "tcp" | "http" | "websocket";
+
+### build/proxy.d.ts#ProxyOptions
+export interface ProxyOptions {
+  readonly target: {
+    readonly host?: string;
+    readonly port: number;
+  };
+  readonly plan: FaultPlan;
+  readonly protocol?: Protocol;
+  readonly framers?: () => FramerPair;
+  readonly listen?: {
+    readonly host?: string;
+    readonly port?: number;
+  };
+  readonly clock?: Clock;
+  readonly onFault?: (record: FaultRecord) => void;
+  readonly onClose?: (summary: ConnectionSummary) => void;
+}
+
+### build/proxy.d.ts#startFaultProxy
+export declare function startFaultProxy(options: ProxyOptions): Promise<FaultProxy>;
