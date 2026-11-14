@@ -36,9 +36,23 @@ A fault with a `frame` point counts frames, and `split`, `reorder` and `duplicat
 - The proxy works on TCP. It cannot read a TLS stream, thus a TLS stream has only `tcp` frames.
 - `framers` replaces the framers of `protocol` with your framers.
 
+## An answer
+
+An `answer` puts an HTTP/1.1 response from the plan in place of the server. The proxy writes it to the client, and ends the connection with a FIN.
+
+| Point | What the client and the server see |
+|---|---|
+| `up`, `{ frame: 0 }` | The server does not get the request. The client gets the answer. |
+| `down`, `{ frame: 0 }` | The server gets the request. The client gets the answer in place of the response of the server. |
+| `down`, a later frame | The client gets a part of the response of the server, then the answer. This stream is not valid HTTP. |
+
+- The proxy writes the fields in their order, then `content-length` and `connection: close`. A 204 or a 304 has no `content-length`.
+- After an answer, no byte of the server goes to the client. The summary of the connection says `cut`.
+- `answerBytes` gives the bytes of an answer.
+
 ## The pure parts
 
-The framers (`tcpFramers`, `httpFramers`, `webSocketFramer`) and the applier (`applierOf`) read no clock and write no socket. A test gives them bytes and times, and it examines the writes that they give back.
+The framers (`tcpFramers`, `httpFramers`, `webSocketFramer`), the applier (`applierOf`) and `answerBytes` read no clock and write no socket. A test gives them bytes and times, and it examines the writes that they give back.
 
 ## Tests
 

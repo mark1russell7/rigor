@@ -46,6 +46,7 @@ A fault plan tells a proxy which faults to put into which connections, and at wh
 | `split` | The frame goes out in `pieces` writes, with `gapMs` between two writes. |
 | `reorder` | The next `count` frames go out in the reverse order. After `holdMs`, it sends the frames that it holds. |
 | `duplicate` | The frame goes out `1 + copies` times. |
+| `answer` | It writes an HTTP/1.1 response with `status`, `fields` and `body` to the client, and ends both directions with a FIN. |
 
 Each fault names its connection (the number of the connection, from 0), its direction (`up` to the server, `down` to the client) and its point. A point is a time in ms from the start of the connection, a count of bytes, or a count of frames.
 
@@ -59,6 +60,14 @@ const plan = faultPlan({ connections: 20, perConnection: 3, kinds: { split: 2, d
 - Each draw is an integer, thus the same seed gives the same plan on each platform.
 - `ranges` sets the interval of each parameter. `DEFAULT_FAULT_RANGES` gives the intervals that a spec does not set.
 - `faultPlanOf` makes a plan from faults that a person wrote. `checkFaultPlan` gives each problem of a plan from a record.
+- A spec does not draw an `answer`, because a person chooses its status and its fields. Write each answer in a plan with `faultPlanOf`.
+
+```ts
+import { faultPlanOf } from "@mark1russell7/rigor-chaos";
+
+// The client gets a 429 in place of the response of the server.
+const plan = faultPlanOf([{ connection: 0, direction: "down", at: { frame: 0 }, kind: "answer", status: 429, fields: { "retry-after": "120" } }]);
+```
 
 ## A closed-loop record
 

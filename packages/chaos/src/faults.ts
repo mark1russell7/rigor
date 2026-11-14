@@ -11,11 +11,17 @@ import { random } from "@mark1russell7/rigor-generators";
 /** This value is the format of a fault plan. */
 export const FAULT_PLAN_FORMAT = "rigor-faults/1";
 
-/** These are the kinds of faults, in the order that a weight list of a spec uses. */
+/**
+ * These are the kinds of faults that a spec draws, in the order that a weight list of a spec uses. The kind `answer` is
+ * not in this list, because its parameters are the decision of a person. Only a written plan has it.
+ */
 export const FAULT_KINDS = ["delay", "stall", "cut", "reset", "split", "reorder", "duplicate"] as const;
 
-/** A kind of fault. */
+/** A kind of fault that a spec draws. */
 export type FaultKind = (typeof FAULT_KINDS)[number];
+
+/** These field names are not fields of an `answer`, because the proxy writes them. */
+export const ANSWER_RESERVED_FIELDS = ["connection", "content-length", "transfer-encoding"] as const;
 
 /** The direction of a stream. `up` goes from the client to the server, and `down` goes from the server to the client. */
 export type Direction = "up" | "down";
@@ -44,6 +50,9 @@ export interface FaultPoint {
  * - `split`: the frame goes out in `pieces` writes, with `gapMs` between two writes.
  * - `reorder`: the next `count` frames go out in the reverse order. After `holdMs`, the proxy sends the frames that it holds.
  * - `duplicate`: the frame goes out `1 + copies` times.
+ * - `answer`: the proxy writes an HTTP/1.1 response to the client, and ends both directions with a FIN, as a `cut`.
+ *   The bytes of both directions after the point do not go through. On `up` at frame 0, the server does not get the
+ *   request. On `down` at frame 0, the answer replaces the response of the server. A spec does not draw an answer.
  */
 export type Fault = FaultPoint &
   (
@@ -54,7 +63,22 @@ export type Fault = FaultPoint &
     | { readonly kind: "split"; readonly pieces: number; readonly gapMs: number }
     | { readonly kind: "reorder"; readonly count: number; readonly holdMs: number }
     | { readonly kind: "duplicate"; readonly copies: number }
+    | AnswerFault
   );
+
+/**
+ * The parameters of an `answer`. The proxy writes the status line, the fields in their order, `content-length` and
+ * `connection: close`. A response with the status 204 or 304 has no body and no `content-length`.
+ */
+export interface AnswerFault {
+  readonly kind: "answer";
+  /** The status of the response, from 200 to 599. */
+  readonly status: number;
+  /** The fields of the response, for example `retry-after` or `etag`. The names of `ANSWER_RESERVED_FIELDS` are not fields. */
+  readonly fields?: Readonly<Record<string, string>>;
+  /** The body of the response, as text. The proxy writes it in UTF-8. */
+  readonly body?: string;
+}
 
 /** A fault plan is data, thus a record can keep the plan that a proxy applied. */
 export interface FaultPlan {
@@ -142,14 +166,38 @@ const PARAMETERS: Readonly<Record<FaultKind, readonly (readonly [string, "time" 
   duplicate: [["copies", "whole", 1]],
 };
 
+/** A token of HTTP: the characters of a field name. */
+const TOKEN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
+/** The value of a field: visible ASCII characters, spaces and tabs, with no space or tab at the ends. */
+const FIELD_VALUE = /^(?:[\x21-\x7e](?:[\x20\x09\x21-\x7e]*[\x21-\x7e])?)?$/;
+
+/** This function gives each problem of the parameters of an `answer`. */
+function answerProblems(fault: FaultPoint & AnswerFault): string[] {
+  const out: string[] = [];
+  if (!isWhole(fault.status, 200) || fault.status > 599) out.push(`The answer field status is a whole number from 200 to 599, not ${String(fault.status)}.`);
+  const fields: unknown = fault.fields ?? {};
+  if (typeof fields !== "object" || fields === null || Array.isArray(fields)) out.push("The answer field fields is an object of names and values.");
+  else {
+    for (const [name, value] of Object.entries(fields)) {
+      if (!TOKEN.test(name)) out.push(`The answer field name ${JSON.stringify(name)} is not a token of HTTP.`);
+      else if ((ANSWER_RESERVED_FIELDS as readonly string[]).includes(name.toLowerCase())) out.push(`The answer does not set the field ${name}, because the proxy writes it.`);
+      if (typeof value !== "string" || !FIELD_VALUE.test(value)) out.push(`The value of the answer field ${name} is text with no line end and no space at the ends, not ${JSON.stringify(value)}.`);
+    }
+  }
+  if (fault.body !== undefined && typeof fault.body !== "string") out.push("The answer field body is text.");
+  else if ((fault.status === 204 || fault.status === 304) && (fault.body ?? "") !== "") out.push(`A response with the status ${fault.status} has no body.`);
+  return out;
+}
+
 /** This function gives each problem of one fault. An empty list means that the fault is valid. */
 export function checkFault(fault: Fault): readonly string[] {
   const out: string[] = [];
   if (!isWhole(fault.connection, 0)) out.push(`The connection is a whole number of 0 or more, not ${String(fault.connection)}.`);
   if (fault.direction !== "up" && fault.direction !== "down") out.push(`The direction is up or down, not ${String(fault.direction)}.`);
   if (triggerOf(fault.at) === undefined) out.push(`The point has one key of ms, byte or frame, with a value of 0 or more, not ${JSON.stringify(fault.at)}.`);
+  if (fault.kind === "answer") return [...out, ...answerProblems(fault)];
   if (!(FAULT_KINDS as readonly string[]).includes(fault.kind)) {
-    out.push(`The kind is one of ${FAULT_KINDS.join(", ")}, not ${String(fault.kind)}.`);
+    out.push(`The kind is one of ${FAULT_KINDS.join(", ")} or answer, not ${String(fault.kind)}.`);
     return out;
   }
   for (const [name, type, least] of PARAMETERS[fault.kind]) {
@@ -206,7 +254,8 @@ export function checkFaultSpec(spec: FaultSpec): readonly string[] {
   if (!isWhole(spec.perConnection, 0)) out.push(`The faults of each connection are a whole number of 0 or more, not ${String(spec.perConnection)}.`);
   const weights = Object.entries(spec.kinds ?? {});
   for (const [kind, weight] of weights) {
-    if (!(FAULT_KINDS as readonly string[]).includes(kind)) out.push(`The kind ${kind} is not a kind of fault.`);
+    if (kind === "answer") out.push("A spec does not draw an answer. Write each answer in a plan with faultPlanOf.");
+    else if (!(FAULT_KINDS as readonly string[]).includes(kind)) out.push(`The kind ${kind} is not a kind of fault.`);
     else if (!isTime(weight, 0)) out.push(`The weight of ${kind} is a number of 0 or more, not ${String(weight)}.`);
   }
   const known = weights.filter(([kind]) => (FAULT_KINDS as readonly string[]).includes(kind));

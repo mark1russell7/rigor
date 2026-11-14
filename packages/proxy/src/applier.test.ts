@@ -162,3 +162,46 @@ describe("an applier", () => {
     expect(sorted).toEqual([...stream].sort((a, b) => a - b));
   });
 });
+
+describe("an answer", () => {
+  const down = (fault: Loose): Fault => ({ connection: 0, direction: "down", ...fault }) as Fault;
+  const answer = { kind: "answer", status: 429, fields: { "retry-after": "120" } } as const;
+
+  it("on down at frame 0, replaces the response of the server and closes with a cut", () => {
+    const applier = applierOf(faultPlanOf([down({ at: { frame: 0 }, ...answer })]), 0, "down");
+    const step = applier.push(text("HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n"), 15);
+    expect(step.sends).toEqual([]);
+    expect(new TextDecoder().decode(step.answer?.bytes)).toBe("HTTP/1.1 429 Too Many Requests\r\nretry-after: 120\r\ncontent-length: 0\r\nconnection: close\r\n\r\n");
+    expect(step.answer?.at).toBe(15);
+    expect(step.close).toEqual({ kind: "cut", at: 15 });
+    expect(step.records).toEqual([{ index: 0, connection: 0, direction: "down", kind: "answer", at: 15, byte: 0, frame: 0, bytes: step.answer?.bytes.length }]);
+    expect(applier.push(text("ok"), 16).sends).toEqual([]);
+    expect(applier.wake).toBeUndefined();
+  });
+
+  it("on up at frame 0, keeps the request from the server", () => {
+    const applier = one(up({ at: { frame: 0 }, ...answer }));
+    const step = applier.push(text("GET /alerts HTTP/1.1\r\nhost: a\r\n\r\n"), 4);
+    expect(step.sends).toEqual([]);
+    expect(step.answer?.at).toBe(4);
+    expect(step.close?.kind).toBe("cut");
+  });
+
+  it("comes after the frames that a reorder holds, and after the writes of a delay", () => {
+    const applier = applierOf(
+      faultPlanOf([down({ at: { frame: 0 }, kind: "delay", ms: 50, forMs: 1000 }), down({ at: { frame: 1 }, kind: "reorder", count: 3, holdMs: 500 }), down({ at: { frame: 3 }, ...answer })]),
+      0,
+      "down",
+    );
+    expect(show(applier.push(text("a"), 0).sends)).toEqual([["a", 50]]);
+    expect(applier.push(text("b"), 10).sends).toEqual([]);
+    expect(applier.push(text("c"), 20).sends).toEqual([]);
+    const step = applier.push(text("d"), 30);
+    expect(show(step.sends)).toEqual([
+      ["c", 70],
+      ["b", 70],
+    ]);
+    expect(step.answer?.at).toBe(70);
+    expect(step.records.map((record) => record.kind)).toEqual(["reorder", "answer"]);
+  });
+});

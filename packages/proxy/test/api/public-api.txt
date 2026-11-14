@@ -18,6 +18,7 @@ type Protocol: build/proxy.d.ts#Protocol
 type ProxyOptions: build/proxy.d.ts#ProxyOptions
 type Send: build/applier.d.ts#Send
 type Step: build/applier.d.ts#Step
+answerBytes: build/answer.d.ts#answerBytes
 applierOf: build/applier.d.ts#applierOf
 chunkFramer: build/framers.d.ts#chunkFramer
 httpFramers: build/framers.d.ts#httpFramers
@@ -29,6 +30,9 @@ webSocketFrameLength: build/framers.d.ts#webSocketFrameLength
 webSocketFramer: build/framers.d.ts#webSocketFramer
 
 ## Declarations
+
+### build/answer.d.ts#answerBytes
+export declare function answerBytes(answer: Omit<AnswerFault, "kind">): Uint8Array;
 
 ### build/applier.d.ts#Applier
 export interface Applier {
@@ -47,7 +51,7 @@ export interface FaultRecord {
   readonly index: number;
   readonly connection: number;
   readonly direction: Direction;
-  readonly kind: FaultKind;
+  readonly kind: Fault["kind"];
   readonly at: number;
   readonly byte: number;
   readonly frame: number;
@@ -69,6 +73,7 @@ export interface Step {
     readonly kind: "cut" | "reset";
     readonly at: number;
   };
+  readonly answer?: Send;
 }
 
 ### build/applier.d.ts#applierOf
