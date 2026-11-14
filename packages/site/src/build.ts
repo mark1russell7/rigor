@@ -23,6 +23,7 @@ export interface Versions {
   readonly bench: string;
   readonly chaos: string;
   readonly mutation: string;
+  readonly proxy: string;
 }
 
 export function packageRows(versions: Versions): PackageRow[] {
@@ -32,7 +33,8 @@ export function packageRows(versions: Versions): PackageRow[] {
     { name: "@mark1russell7/rigor-bench", state: versions.bench, gives: "The paired-time records of a bench: the order that turns each round, the ratio of each case, and the time verdict against the band of an A/A arm. Next: a fresh process for each case, the CPU model, speed gates." },
     { name: "rigor-gates", state: "planned", gives: "The determinism gate (one input gives one hash), the promotion test and the performance evidence of a release." },
     { name: "rigor-testgen", state: "planned", gives: "Property tests on fast-check, pairwise and covering arrays, and metamorphic relations." },
-    { name: "@mark1russell7/rigor-chaos", state: versions.chaos, gives: "Open-loop load schedules from a rate profile, and a measure of latency from the planned time, with no coordinated omission. Next: fault injection, schedules of latency and failure." },
+    { name: "@mark1russell7/rigor-chaos", state: versions.chaos, gives: "Open-loop load schedules from a rate profile, seeded fault plans for a proxy (delay, stall, cut, reset, split, reorder, duplicate), and a measure of latency from the planned time, with no coordinated omission." },
+    { name: "@mark1russell7/rigor-proxy", state: versions.proxy, gives: "A TCP proxy that applies a fault plan to TCP, HTTP and WebSocket streams, and records each fault: its time, its connection, its kind and its bytes." },
     { name: "@mark1russell7/rigor-mutation", state: versions.mutation, gives: "Mutation tests with Stryker for each package: the Stryker config of each package or part, a score with a gate for each package, and a check of the disabled mutants." },
   ];
 }
@@ -307,7 +309,7 @@ async function main(argv: readonly string[]): Promise<number> {
     return 1;
   }
   const version = (name: string): string => (JSON.parse(readFileSync(join(here, `../${name}/package.json`), "utf8")) as { version: string }).version;
-  const rows = packageRows({ generators: version("generators"), statistics: version("statistics"), bench: version("bench"), chaos: version("chaos"), mutation: version("mutation") });
+  const rows = packageRows({ generators: version("generators"), statistics: version("statistics"), bench: version("bench"), chaos: version("chaos"), mutation: version("mutation"), proxy: version("proxy") });
   writeFileSync(join(out, "index.html"), pageHtml(rows, new Date().toISOString().slice(0, 10), scrollCueCss()));
   console.error(`wrote ${join(out, "index.html")} and page.js`);
   return 0;

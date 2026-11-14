@@ -49,6 +49,19 @@ stablePick(deriveSeed(7, "origin"), ["tall-row", "ladder", "half-wide"]);
 - When a list loses an item, only the draws of that item change.
 - A choice reads one hash for each item, so it costs O(n). `r.pick` costs O(1).
 
+## A weighted random order
+
+`plackettLuceOrder(seed, items, logWeightOf, keyOf)` gives a random order of a list with the Plackett-Luce law of the weights. It adds a Gumbel draw to the log-weight of each item, and it sorts from the largest sum (the Gumbel-max method):
+
+```ts
+plackettLuceOrder("feed-7", posts, (post) => Math.log(post.score), (post) => post.id);
+```
+
+- The first item is item `i` with the probability `w_i / sum(w)`. Each next item has the same law over the items that remain.
+- The draw of an item comes from the stream `random(seed).fork(key)`. Thus a new item or a lost item does not change the order of the other items.
+- An item with the log-weight `-Infinity` (the weight 0) comes last. Items with equal sums keep the order of the list.
+- Each key occurs once. A log-weight of NaN or `+Infinity` is a `RangeError`.
+
 ## Open families of distributions
 
 A closed list of size names cannot grow without a change to each corpus. A `DistributionSpec` names a family and its parameters, so a corpus can name any point of the family.

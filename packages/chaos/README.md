@@ -1,6 +1,6 @@
 # @mark1russell7/rigor-chaos
 
-This package holds open-loop load schedules, and the measure of latency that goes with them.
+This package holds open-loop load schedules, the measure of latency that goes with them, and seeded fault plans for a proxy.
 
 A closed-loop driver waits for each reply before its next request. A stall of the target thus stops the load, and the measure shows one slow request. This is coordinated omission. An open-loop schedule fixes each arrival time before the run, and a measure counts each latency from its planned time.
 
@@ -32,6 +32,33 @@ A schedule is data. A driver reads `times`, and it sends each arrival at its tim
 `latencyQuantile` reads the latency and the censored values together, by the nearest rank. Thus an arrival with no reply does not leave the measure.
 
 `scheduleHeld` tells if the driver kept the schedule. A run that fails this check measures its driver, not its target. An A/A run with no fault examines this first. When a run fails this check, `seconds` tells if a full processor or a held event loop made the sends late.
+
+## A fault plan
+
+A fault plan tells a proxy which faults to put into which connections, and at which points. A seed fixes the plan before the run. The proxy that applies a plan is `@mark1russell7/rigor-proxy`.
+
+| Kind | What the proxy does |
+|---|---|
+| `delay` | Each frame that it reads in the next `forMs` goes out `ms` later. It does not stop its reads. |
+| `stall` | It stops reading the direction for `ms`. The sender sees back pressure. |
+| `cut` | It ends both directions with a FIN. |
+| `reset` | It destroys both directions with a TCP reset. |
+| `split` | The frame goes out in `pieces` writes, with `gapMs` between two writes. |
+| `reorder` | The next `count` frames go out in the reverse order. After `holdMs`, it sends the frames that it holds. |
+| `duplicate` | The frame goes out `1 + copies` times. |
+
+Each fault names its connection (the number of the connection, from 0), its direction (`up` to the server, `down` to the client) and its point. A point is a time in ms from the start of the connection, a count of bytes, or a count of frames.
+
+```ts
+import { faultPlan } from "@mark1russell7/rigor-chaos";
+
+const plan = faultPlan({ connections: 20, perConnection: 3, kinds: { split: 2, delay: 1, reset: 1 }, within: { frame: 50 } }, "drill");
+```
+
+- Each connection draws from its own stream of the seed. Thus a spec with more connections keeps the faults of the first connections.
+- Each draw is an integer, thus the same seed gives the same plan on each platform.
+- `ranges` sets the interval of each parameter. `DEFAULT_FAULT_RANGES` gives the intervals that a spec does not set.
+- `faultPlanOf` makes a plan from faults that a person wrote. `checkFaultPlan` gives each problem of a plan from a record.
 
 ## A closed-loop record
 

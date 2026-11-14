@@ -1,4 +1,25 @@
 export { closedLoopPlan, type ClosedLoopOptions, type ClosedLoopRun, type LoopRequest } from "./closed.ts";
+export {
+  DEFAULT_FAULT_RANGES,
+  FAULT_KINDS,
+  FAULT_PLAN_FORMAT,
+  checkFault,
+  checkFaultPlan,
+  checkFaultSpec,
+  faultPlan,
+  faultPlanOf,
+  faultsOf,
+  triggerOf,
+  type Direction,
+  type Fault,
+  type FaultKind,
+  type FaultPlan,
+  type FaultPoint,
+  type FaultRanges,
+  type FaultSpec,
+  type Interval,
+  type Trigger,
+} from "./faults.ts";
 export { latencyQuantile, measureLoad, scheduleHeld, type Completion, type LoadMeasure, type ScheduleCheck, type SecondSample } from "./measure.ts";
 export {
   SCHEDULE_FORMAT,

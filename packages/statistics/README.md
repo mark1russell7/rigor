@@ -155,6 +155,34 @@ logLoss([{ p: p.a, hit: true }]);                // the probability of the obser
 
 `glicko2Update` gives the update of one player after one rating period (Glickman, 2012). A test examines the worked example of the paper: 1500, 200 and 0.06 against three opponents give 1464.06, 151.52 and 0.05999. `glicko2Idle` gives the growth of the RD for a period with no games.
 
+### A large log, an ordered replay and the next pair
+
+```ts
+import { bradleyTerrySparse, choosePair, eloReplay, fitRatings, glicko2Replay, selectRatingModel } from "@mark1russell7/rigor-statistics";
+
+const sparse = bradleyTerrySparse(10_000, picks); // the model of bradleyTerry, with memory in proportion to the pairs
+sparse.bound;                                     // a bound of the distance from the exact optimum
+eloReplay(3, picks, { k: 32 });                   // one Elo update for each pick, in the order of the log
+glicko2Replay(3, picks);                          // one Glicko-2 rating period for each pick
+const choice = selectRatingModel(3, picks);       // the model with the lowest log-loss on the last picks
+fitRatings(choice.model, 3, picks);               // the log-strengths of that model
+choosePair(pool, { seed: "duel-1" });             // the next pair of a duel, the same for each seed
+```
+
+`bradleyTerrySparse` has the model, the prior and the tie models of `bradleyTerry`. Its memory is in proportion to the items plus the distinct pairs. At 10,000 items, the Hessian of `bradleyTerry` has 800 MB. The sparse fit uses a few MB.
+
+- The fit uses MM steps. The first part of a step minimizes a quadratic bound of the strengths (Böhning and Lindsay, 1988). The second part moves each connected group to the prior mean. The third part uses the tie bound of Hunter (2004).
+- The objective is strongly convex. Thus the norm of the gradient over the smallest prior precision is a bound of the distance from the exact optimum. The fit stops when `bound` is `tolerance` (1e-8) or less.
+- A property test compares the two fits on small logs. The strengths agree to 1e-7, and the distance is at most `bound`.
+- The standard errors are approximate. The variance of an item is `1 / (n * p) + (1 - 1 / n) / h`. Here `n` is the number of items of its connected group, `p` is the prior precision and `h` is the diagonal entry of the Hessian.
+- These errors do not include the uncertainty of the tie parameter. On a log of 20 items and 1,500 comparisons, they are within 2 percent of the errors of `bradleyTerry`.
+
+`eloReplay` and `glicko2Replay` read the log in its order, and the order changes the ratings. Each pick is one update, so each weight is 1. In `glicko2Replay`, each pick is one rating period of its two items.
+
+`selectRatingModel` fits each model on the first picks of the log. It gives the log-loss of each model on the last picks, 20 percent by default. All the models use the tie parameter of the Bradley-Terry fit of the first picks. With fewer than 30 picks, the choice is `"bradley-terry"` with no test. `fitRatings` fits one model. Above `BRADLEY_TERRY_DENSE_LIMIT` items (200), it uses `bradleyTerrySparse`.
+
+`choosePair` chooses the next pair of a duel from a pool of rated items. A draw selects the first item with the weight `1 / (1 + picks)`. The second item is the candidate with the most `pairInformation`. A recent pair loses to each pair that is not recent. The option `information` changes the value of a pair, or forbids a pair.
+
 ## The functions
 
 | Function | What it gives |
@@ -199,6 +227,11 @@ logLoss([{ p: p.a, hit: true }]);                // the probability of the obser
 | `eloExpected(ra, rb, { scale, base })`, `eloUpdate(ra, rb, score, { k, scale, base })` | The expected score of the first item, and the ratings of a pair after one result. The defaults are 400, 10 and a `k` of 32. |
 | `glicko2Update(player, games, { tau, tolerance })`, `glicko2Idle(player)` | The Glicko-2 rating, RD and volatility after one rating period, and after a period with no games. The default `tau` is 0.5. |
 | `bradleyTerry(items, comparisons, options)` | The Bradley-Terry fit of pairwise comparisons, with a normal prior and Davidson ties. It gives the strengths, the standard errors, the tie parameter, the log-likelihood, the steps and `converged`. |
+| `bradleyTerrySparse(items, comparisons, options)` | The fit of `bradleyTerry`, with memory in proportion to the distinct pairs. It also gives `bound`, `pairs` and approximate standard errors. |
+| `eloReplay(items, picks, { start, k })`, `glicko2Replay(items, picks, { start, tau })` | The ratings after one update for each pick, in the order of the log. |
+| `fitRatings(model, items, picks, options)`, `selectRatingModel(items, picks, options)` | The log-strengths of one rating model, and the model with the lowest log-loss on held-out picks. |
+| `choosePair(items, { seed, recent, candidates, information })` | The next pair of a duel. The same seed gives the same pair. |
+| `pairInformation(a, b)`, `ratingUncertainty(item)` | The expected information of a pick, `p * (1 - p) * (ua^2 + ub^2)`, and the uncertainty of one rating. |
 | `pairProbabilities(sa, sb, tie)` | The probabilities of a win of each item and of a tie, from two log-strengths and the tie parameter. |
 | `strengthToRating(strength, { center, scale, base })`, `ratingToStrength(rating, options)` | The rating of a log-strength, `center + scale * strength / ln(base)`, and the inverse. |
 | `fitResponse(data, options)` | A record of the format `response-records/1`, with one model for each measure and held-out folds. |

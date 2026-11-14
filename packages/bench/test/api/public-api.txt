@@ -14,6 +14,7 @@ type Balanced: build/index.d.ts#Balanced
 type Band: build/index.d.ts#Band
 type BandKind: build/index.d.ts#BandKind
 type BandOptions: build/index.d.ts#BandOptions
+type Better: build/index.d.ts#Better
 type BudgetLook: build/index.d.ts#BudgetLook
 type BudgetLooksOptions: build/index.d.ts#BudgetLooksOptions
 type BudgetLooksVerdict: build/index.d.ts#BudgetLooksVerdict
@@ -25,6 +26,8 @@ type BudgetRound: build/index.d.ts#BudgetRound
 type BudgetVerdict: build/index.d.ts#BudgetVerdict
 CEILING_ONLY: build/index.d.ts#CEILING_ONLY
 CHILD_SOURCES: build/index.d.ts#CHILD_SOURCES
+type CandidateLimit: build/index.d.ts#CandidateLimit
+type CandidateStatus: build/index.d.ts#CandidateStatus
 type CaseBudget: build/index.d.ts#CaseBudget
 type CaseGate: build/index.d.ts#CaseGate
 type CaseInterval: build/index.d.ts#CaseInterval
@@ -54,6 +57,7 @@ type FamilyPower: build/index.d.ts#FamilyPower
 type FamilyPowerOptions: build/index.d.ts#FamilyPowerOptions
 type FamilyRead: build/index.d.ts#FamilyRead
 type FamilyShares: build/index.d.ts#FamilyShares
+type FreezeStamp: build/index.d.ts#FreezeStamp
 GATE_LINE_HELP: build/index.d.ts#GATE_LINE_HELP
 GATE_LINE_LIMIT: build/index.d.ts#GATE_LINE_LIMIT
 GATE_LINE_NAMES: build/index.d.ts#GATE_LINE_NAMES
@@ -93,10 +97,15 @@ type Ladder: build/index.d.ts#Ladder
 type LadderDimension: build/index.d.ts#LadderDimension
 type LadderOptions: build/index.d.ts#LadderOptions
 type LadderVerdict: build/index.d.ts#LadderVerdict
+type LimitChange: build/index.d.ts#LimitChange
+type LimitChangeKind: build/index.d.ts#LimitChangeKind
+type LimitChanges: build/index.d.ts#LimitChanges
 type LimitOnModel: build/index.d.ts#LimitOnModel
 type LimitOptions: build/index.d.ts#LimitOptions
 type LimitOutcome: build/index.d.ts#LimitOutcome
 type LimitVerdict: build/index.d.ts#LimitVerdict
+MODEL_LIMITS_FORMAT: build/index.d.ts#MODEL_LIMITS_FORMAT
+MODEL_LIMIT_RULE: build/index.d.ts#MODEL_LIMIT_RULE
 type MeasureCheck: build/index.d.ts#MeasureCheck
 type MeasureCheckOptions: build/index.d.ts#MeasureCheckOptions
 type MeasureChecks: build/index.d.ts#MeasureChecks
@@ -107,7 +116,12 @@ type MeasureRule: build/index.d.ts#MeasureRule
 type MeasuredFactor: build/index.d.ts#MeasuredFactor
 type MedianBudget: build/index.d.ts#MedianBudget
 type ModelCost: build/index.d.ts#ModelCost
+type ModelLimit: build/index.d.ts#ModelLimit
+type ModelLimitOutcome: build/index.d.ts#ModelLimitOutcome
+type ModelLimitRead: build/index.d.ts#ModelLimitRead
+type ModelLimitRule: build/index.d.ts#ModelLimitRule
 type ModelLimits: build/index.d.ts#ModelLimits
+type ModelLimitsFile: build/index.d.ts#ModelLimitsFile
 type ModelRead: build/index.d.ts#ModelRead
 type ModelRow: build/index.d.ts#ModelRow
 type ModelStatus: build/index.d.ts#ModelStatus
@@ -174,11 +188,13 @@ balanceOrders: build/index.d.ts#balanceOrders
 budgetLookSpend: build/index.d.ts#budgetLookSpend
 budgetLooksVerdict: build/index.d.ts#budgetLooksVerdict
 budgetVerdict: build/index.d.ts#budgetVerdict
+candidateLimits: build/index.d.ts#candidateLimits
 caseIntervals: build/index.d.ts#caseIntervals
 caseRatios: build/paired.d.ts#caseRatios
 caseTails: build/index.d.ts#caseTails
 checkLadder: build/index.d.ts#checkLadder
 checkMeasures: build/index.d.ts#checkMeasures
+checkModelLimits: build/index.d.ts#checkModelLimits
 checkPairedTime: build/paired.d.ts#checkPairedTime
 childRecords: build/index.d.ts#childRecords
 childTimes: build/index.d.ts#childTimes
@@ -186,6 +202,7 @@ controlFactor: build/index.d.ts#controlFactor
 familyPower: build/index.d.ts#familyPower
 familyRead: build/index.d.ts#familyRead
 firstArm: build/paired.d.ts#firstArm
+freezeLimits: build/index.d.ts#freezeLimits
 gateLine: build/index.d.ts#gateLine
 gateLineCli: build/index.d.ts#gateLineCli
 gateOf: build/index.d.ts#gateOf
@@ -195,8 +212,10 @@ isNoRead: build/index.d.ts#isNoRead
 jobModels: build/index.d.ts#jobModels
 jointClaim: build/index.d.ts#jointClaim
 ladderVerdict: build/index.d.ts#ladderVerdict
+limitChanges: build/index.d.ts#limitChanges
 limitOnModel: build/index.d.ts#limitOnModel
 limitVerdict: build/index.d.ts#limitVerdict
+modelLimitRead: build/index.d.ts#modelLimitRead
 modelRowText: build/index.d.ts#modelRowText
 modelTest: build/index.d.ts#modelTest
 notSlowerVerdict: build/index.d.ts#notSlowerVerdict
@@ -474,6 +493,9 @@ interface BandOptions {
   readonly bootstrap?: BootstrapOptions;
 }
 
+### build/index.d.ts#Better
+type Better = "lower" | "higher";
+
 ### build/index.d.ts#BudgetLook
 interface BudgetLook {
   readonly rounds: number;
@@ -540,6 +562,20 @@ export declare const CEILING_ONLY = "gain not read on this model, ceiling only";
 
 ### build/index.d.ts#CHILD_SOURCES
 export declare const CHILD_SOURCES: readonly ["base", "candidate", "copy"];
+
+### build/index.d.ts#CandidateLimit
+interface CandidateLimit {
+  readonly case: string;
+  readonly model: string;
+  readonly status: CandidateStatus;
+  readonly values: readonly number[];
+  readonly mean: number | null;
+  readonly sd: number | null;
+  readonly limit: number | null;
+}
+
+### build/index.d.ts#CandidateStatus
+type CandidateStatus = "limit" | "too-few" | "no-spread" | "unknown-model";
 
 ### build/index.d.ts#CaseBudget
 interface CaseBudget {
@@ -772,6 +808,12 @@ interface FamilyShares {
   readonly holm: number;
   readonly eachJob: number;
   readonly eachJobHolm: number;
+}
+
+### build/index.d.ts#FreezeStamp
+interface FreezeStamp {
+  readonly commit: string;
+  readonly date: string;
 }
 
 ### build/index.d.ts#GATE_LINE_HELP
@@ -1041,6 +1083,25 @@ interface LadderVerdict {
   readonly rungs: readonly RungVerdict[];
 }
 
+### build/index.d.ts#LimitChange
+interface LimitChange {
+  readonly case: string;
+  readonly model: string;
+  readonly kind: LimitChangeKind;
+  readonly from: number | null;
+  readonly to: number | null;
+  readonly reason?: string;
+}
+
+### build/index.d.ts#LimitChangeKind
+type LimitChangeKind = "tighter" | "looser" | "same" | "added" | "removed";
+
+### build/index.d.ts#LimitChanges
+interface LimitChanges {
+  readonly changes: readonly LimitChange[];
+  readonly refused: readonly string[];
+}
+
 ### build/index.d.ts#LimitOnModel
 interface LimitOnModel {
   readonly limit: number;
@@ -1068,6 +1129,12 @@ interface LimitVerdict {
   readonly share: number;
   readonly allowed: number;
 }
+
+### build/index.d.ts#MODEL_LIMITS_FORMAT
+export declare const MODEL_LIMITS_FORMAT = "rigor-model-limits/1";
+
+### build/index.d.ts#MODEL_LIMIT_RULE
+export declare const MODEL_LIMIT_RULE: ModelLimitRule;
 
 ### build/index.d.ts#MeasureCheck
 interface MeasureCheck {
@@ -1160,11 +1227,51 @@ interface ModelCost {
   readonly missing: readonly string[];
 }
 
+### build/index.d.ts#ModelLimit
+interface ModelLimit {
+  readonly limit: number;
+  readonly mean: number;
+  readonly sd: number;
+  readonly values: readonly number[];
+  readonly commit: string;
+  readonly date: string;
+  readonly reason?: string;
+}
+
+### build/index.d.ts#ModelLimitOutcome
+type ModelLimitOutcome = "within" | "beyond" | "no read";
+
+### build/index.d.ts#ModelLimitRead
+interface ModelLimitRead {
+  readonly case: string;
+  readonly model: string;
+  readonly value: number;
+  readonly limit: number | null;
+  readonly outcome: ModelLimitOutcome;
+  readonly note: string;
+}
+
+### build/index.d.ts#ModelLimitRule
+interface ModelLimitRule {
+  readonly k: number;
+  readonly minimum: number;
+  readonly better: Better;
+}
+
 ### build/index.d.ts#ModelLimits
 interface ModelLimits {
   readonly gain: number;
   readonly ceiling: number;
   readonly models: readonly string[];
+}
+
+### build/index.d.ts#ModelLimitsFile
+interface ModelLimitsFile {
+  readonly format: typeof MODEL_LIMITS_FORMAT;
+  readonly measure: string;
+  readonly rule: ModelLimitRule;
+  readonly ruleReason?: string;
+  readonly limits: Readonly<Record<string, Readonly<Record<string, ModelLimit>>>>;
 }
 
 ### build/index.d.ts#ModelRead
@@ -1649,6 +1756,9 @@ export declare function budgetLooksVerdict(rounds: readonly BudgetRound[], aa: r
 ### build/index.d.ts#budgetVerdict
 export declare function budgetVerdict(rounds: readonly BudgetRound[], aa: readonly BudgetRound[], options: BudgetOptions): BudgetVerdict;
 
+### build/index.d.ts#candidateLimits
+export declare function candidateLimits(reads: readonly ModelRead[], rule?: ModelLimitRule): CandidateLimit[];
+
 ### build/index.d.ts#caseIntervals
 export declare function caseIntervals(records: readonly PairedTime[], level?: number): CaseInterval[];
 
@@ -1660,6 +1770,9 @@ export declare function checkLadder(ladder: Ladder): readonly string[];
 
 ### build/index.d.ts#checkMeasures
 export declare function checkMeasures(rows: readonly MeasureRow[], options: MeasureCheckOptions): MeasureChecks;
+
+### build/index.d.ts#checkModelLimits
+export declare function checkModelLimits(file: ModelLimitsFile): string[];
 
 ### build/index.d.ts#childRecords
 export declare function childRecords(caseName: string, round: number, offset: number, order: readonly ChildStep[], times: readonly number[]): ChildRecords;
@@ -1675,6 +1788,9 @@ export declare function familyPower(options: FamilyPowerOptions): FamilyPower;
 
 ### build/index.d.ts#familyRead
 export declare function familyRead(items: readonly FamilyItem[], level?: number): FamilyRead;
+
+### build/index.d.ts#freezeLimits
+export declare function freezeLimits(measure: string, candidates: readonly CandidateLimit[], stamp: FreezeStamp, rule?: ModelLimitRule): ModelLimitsFile;
 
 ### build/index.d.ts#gateLine
 export declare function gateLine(reads: readonly CaseRead[], options: GateLineOptions): GateLine | undefined;
@@ -1703,11 +1819,17 @@ export declare function jointClaim(check: MeasureChecks, measures: readonly stri
 ### build/index.d.ts#ladderVerdict
 export declare function ladderVerdict(ladder: Ladder, records: readonly RungRecord[], options: LadderOptions): LadderVerdict;
 
+### build/index.d.ts#limitChanges
+export declare function limitChanges(before: ModelLimitsFile, after: ModelLimitsFile): LimitChanges;
+
 ### build/index.d.ts#limitOnModel
 export declare function limitOnModel(limits: ModelLimits, model: string): LimitOnModel;
 
 ### build/index.d.ts#limitVerdict
 export declare function limitVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[], options: LimitOptions): LimitVerdict;
+
+### build/index.d.ts#modelLimitRead
+export declare function modelLimitRead(file: ModelLimitsFile, read: ModelRead): ModelLimitRead;
 
 ### build/index.d.ts#modelRowText
 export declare function modelRowText(row: ModelRow, family: number): string;
