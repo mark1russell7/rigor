@@ -207,6 +207,7 @@ const report = await propagationGate({ key: "request.id", capture, transports })
 - The metric reader collects only when the test asks, with the delta temporality. Thus `metricPoints()` gives the points after the last collection.
 - `reset()` removes all spans, log records and metric points.
 - The capture is also a `PropagationCapture` of the propagation gate.
+- The capture serves the SDK 2 and the SDK 3 of OpenTelemetry. They use different logs APIs. The SDK 3 uses the logs API of `@opentelemetry/api` 1.10, and the SDK 2 uses `@opentelemetry/api-logs`. `register()` sets the logger provider in each of the two APIs. With `sdk: "external"`, `logRecords()` flushes the provider of each API. The propagation gate writes its log record through the API that has a provider.
 
 ## License
 

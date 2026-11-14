@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   context,
   createContextKey,
+  logs as apiLogs,
   metrics,
   propagation,
   trace,
@@ -118,6 +119,18 @@ describe("propagationGate", () => {
       { transport: "port", verdict: "no read", faults: ["no worker in this test"] },
     ]);
     expect(report.ok).toBe(true);
+  });
+
+  it("reads the log record of a program that sets its logger provider in the logs API of @opentelemetry/api (the SDK 3)", async () => {
+    logs.disable();
+    apiLogs.setGlobalLoggerProvider(loggerProvider);
+    try {
+      const report = await propagationGate({ key: KEY, capture, transports: [localTransport(internalCall)] });
+      expect(report.lines).toEqual([{ transport: "local", verdict: "pass", faults: [] }]);
+    } finally {
+      apiLogs.disable();
+      logs.setGlobalLoggerProvider(loggerProvider);
+    }
   });
 
   it("fails a transport that sends no baggage: the handler does not read the id", async () => {
