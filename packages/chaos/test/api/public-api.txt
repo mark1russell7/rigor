@@ -6,6 +6,8 @@
 
 ## . (build/index.d.ts): names
 
+ANSWER_RESERVED_FIELDS: build/faults.d.ts#ANSWER_RESERVED_FIELDS
+type AnswerFault: build/faults.d.ts#AnswerFault
 type Arrivals: build/schedule.d.ts#Arrivals
 type ClosedLoopOptions: build/closed.d.ts#ClosedLoopOptions
 type ClosedLoopRun: build/closed.d.ts#ClosedLoopRun
@@ -78,6 +80,17 @@ export interface LoopRequest {
 ### build/closed.d.ts#closedLoopPlan
 export declare function closedLoopPlan(requests: readonly LoopRequest[], options: ClosedLoopOptions): ClosedLoopRun;
 
+### build/faults.d.ts#ANSWER_RESERVED_FIELDS
+export declare const ANSWER_RESERVED_FIELDS: readonly ["connection", "content-length", "transfer-encoding"];
+
+### build/faults.d.ts#AnswerFault
+export interface AnswerFault {
+  readonly kind: "answer";
+  readonly status: number;
+  readonly fields?: Readonly<Record<string, string>>;
+  readonly body?: string;
+}
+
 ### build/faults.d.ts#DEFAULT_FAULT_RANGES
 export declare const DEFAULT_FAULT_RANGES: FaultRanges;
 
@@ -113,7 +126,7 @@ export type Fault = FaultPoint & ({
 } | {
   readonly kind: "duplicate";
   readonly copies: number;
-});
+} | AnswerFault);
 
 ### build/faults.d.ts#FaultKind
 export type FaultKind = (typeof FAULT_KINDS)[number];

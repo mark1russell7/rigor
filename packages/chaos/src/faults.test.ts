@@ -108,3 +108,35 @@ describe("a fault plan that a person writes", () => {
     expect(() => faultPlanOf([{ connection: 0, direction: "up", at: { ms: -1 }, kind: "stall", ms: 10 }])).toThrow(RangeError);
   });
 });
+
+describe("an answer in a written plan", () => {
+  const answer = (fields: Record<string, unknown>): Fault => ({ connection: 0, direction: "down", at: { frame: 0 }, kind: "answer", status: 429, ...fields }) as Fault;
+
+  it("is valid with a status, fields and a body, in both directions", () => {
+    expect(checkFault(answer({ fields: { "retry-after": "120" }, body: "slow down" }))).toEqual([]);
+    expect(checkFault({ ...answer({}), direction: "up" } as Fault)).toEqual([]);
+    expect(checkFault(answer({ status: 304, fields: { etag: '"v1"' } }))).toEqual([]);
+    expect(faultPlanOf([answer({ status: 503 })]).faults[0]?.kind).toBe("answer");
+  });
+
+  it("states each problem of its status, its fields and its body", () => {
+    expect(checkFault(answer({ status: 101 }))[0]).toMatch(/status/);
+    expect(checkFault(answer({ status: 600 }))[0]).toMatch(/status/);
+    expect(checkFault(answer({ status: 429.5 }))[0]).toMatch(/status/);
+    expect(checkFault(answer({ fields: { "bad name": "1" } }))[0]).toMatch(/token/);
+    expect(checkFault(answer({ fields: { "Content-Length": "9" } }))[0]).toMatch(/proxy writes it/);
+    expect(checkFault(answer({ fields: { "x-a": "1\r\nx-b: 2" } }))[0]).toMatch(/line end/);
+    expect(checkFault(answer({ fields: { "x-a": " 1" } }))[0]).toMatch(/line end/);
+    expect(checkFault(answer({ fields: { "x-a": 1 } }))[0]).toMatch(/line end/);
+    expect(checkFault(answer({ fields: ["x"] }))[0]).toMatch(/object/);
+    expect(checkFault(answer({ body: 7 }))[0]).toMatch(/text/);
+    expect(checkFault(answer({ status: 304, body: "x" }))[0]).toMatch(/no body/);
+    expect(checkFault(answer({ status: 204, body: "x" }))[0]).toMatch(/no body/);
+  });
+
+  it("is not a kind that a spec draws", () => {
+    expect(FAULT_KINDS).not.toContain("answer");
+    const spec = { connections: 1, perConnection: 1, kinds: { cut: 1, answer: 1 }, within: { frame: 5 } } as unknown as FaultSpec;
+    expect(checkFaultSpec(spec)).toEqual(["A spec does not draw an answer. Write each answer in a plan with faultPlanOf."]);
+  });
+});

@@ -110,6 +110,8 @@ export async function startFaultProxy(options: ProxyOptions): Promise<FaultProxy
     const sides = [side("up", client, upstream), side("down", upstream, client)] as const;
     let end: ConnectionEnd | undefined;
     let closed = 0;
+    /** After an answer, no byte of the server goes to the client. */
+    let answered = false;
 
     const cancelTimers = (): void => {
       for (const s of sides) {
@@ -150,9 +152,15 @@ export async function startFaultProxy(options: ProxyOptions): Promise<FaultProxy
         records.push(record);
         options.onFault?.(record);
       }
-      if (step.sends.length > 0) {
+      if (step.sends.length > 0 && !(answered && s.direction === "down")) {
         s.queue.push(...step.sends);
         if (s.write === undefined) pump(s);
+      }
+      if (step.answer !== undefined && !answered) {
+        answered = true;
+        const down = sides[1];
+        down.queue.push(step.answer);
+        if (down.write === undefined) pump(down);
       }
       if (step.pauseUntil !== undefined) {
         s.stalled = true;

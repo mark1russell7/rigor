@@ -183,6 +183,40 @@ describe("an HTTP fault proxy", () => {
     expect(Buffer.concat(chunks).toString()).toBe("body");
     expect(started.records[0]).toMatchObject({ kind: "split", direction: "down", frame: 0 });
   });
+
+  const get = async (port: number): Promise<{ status: number | undefined; fields: IncomingMessage["headers"]; body: string }> => {
+    const response = await new Promise<IncomingMessage>((resolve, reject) => request({ port, host: "127.0.0.1", path: "/alerts", agent: false }, resolve).on("error", reject).end());
+    const chunks: Buffer[] = [];
+    for await (const chunk of response) chunks.push(chunk as Buffer);
+    return { status: response.statusCode, fields: response.headers, body: Buffer.concat(chunks).toString() };
+  };
+
+  it("replaces the response of the server with an answer on down", async () => {
+    const server = createHttpServer((_, response) => response.end("the alerts"));
+    const port = await listen(server);
+    const answer = { kind: "answer", status: 429, fields: { "retry-after": "120" }, body: "slow down" } as const;
+    const started = await proxy(port, [{ connection: 0, direction: "down", at: { frame: 0 }, ...answer }], { protocol: "http" });
+    const got = await get(started.port);
+    expect(got).toMatchObject({ status: 429, body: "slow down" });
+    expect(got.fields["retry-after"]).toBe("120");
+    expect(started.records).toMatchObject([{ kind: "answer", direction: "down", frame: 0 }]);
+    expect((await closed(started))[0]).toMatchObject({ end: "cut", missed: [] });
+  });
+
+  it("answers on up, and the server does not get the request", async () => {
+    let requests = 0;
+    const server = createHttpServer((_, response) => {
+      requests += 1;
+      response.end("the alerts");
+    });
+    const port = await listen(server);
+    const started = await proxy(port, [{ connection: 0, direction: "up", at: { frame: 0 }, kind: "answer", status: 503 }], { protocol: "http" });
+    const got = await get(started.port);
+    expect(got).toMatchObject({ status: 503, body: "" });
+    await closed(started);
+    expect(requests).toBe(0);
+    expect(started.records).toMatchObject([{ kind: "answer", direction: "up", frame: 0 }]);
+  });
 });
 
 describe("a WebSocket fault proxy", () => {

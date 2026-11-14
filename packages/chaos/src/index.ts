@@ -1,5 +1,6 @@
 export { closedLoopPlan, type ClosedLoopOptions, type ClosedLoopRun, type LoopRequest } from "./closed.ts";
 export {
+  ANSWER_RESERVED_FIELDS,
   DEFAULT_FAULT_RANGES,
   FAULT_KINDS,
   FAULT_PLAN_FORMAT,
@@ -10,6 +11,7 @@ export {
   faultPlanOf,
   faultsOf,
   triggerOf,
+  type AnswerFault,
   type Direction,
   type Fault,
   type FaultKind,

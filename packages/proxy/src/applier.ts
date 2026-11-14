@@ -1,4 +1,5 @@
-import { type Direction, type Fault, type FaultKind, type FaultPlan, triggerOf } from "@mark1russell7/rigor-chaos";
+import { type Direction, type Fault, type FaultPlan, triggerOf } from "@mark1russell7/rigor-chaos";
+import { answerBytes } from "./answer.ts";
 
 /**
  * An applier puts the faults of a plan into the frames of one direction of one connection. It is pure: it reads no
@@ -18,14 +19,14 @@ export interface FaultRecord {
   readonly index: number;
   readonly connection: number;
   readonly direction: Direction;
-  readonly kind: FaultKind;
+  readonly kind: Fault["kind"];
   /** The time of the fault, in ms from the start of the connection. */
   readonly at: number;
   /** The bytes of the direction before the fault. */
   readonly byte: number;
   /** The frames of the direction before the fault. */
   readonly frame: number;
-  /** The bytes of the frames that a `split`, a `duplicate` or a `reorder` changed. It is 0 for the other kinds. */
+  /** The bytes of the frames that a `split`, a `duplicate` or a `reorder` changed, or the bytes of the response of an `answer`. It is 0 for the other kinds. */
   readonly bytes: number;
 }
 
@@ -37,6 +38,8 @@ export interface Step {
   readonly pauseUntil?: number;
   /** The connection closes. A `cut` closes after the writes before it, and a `reset` closes at once. */
   readonly close?: { readonly kind: "cut" | "reset"; readonly at: number };
+  /** The response of an `answer`, for the client in both directions. After it, no byte goes to the client. A `cut` follows it. */
+  readonly answer?: Send;
 }
 
 /** An applier of one direction of one connection. */
@@ -110,6 +113,7 @@ export function applierOf(plan: FaultPlan, connection: number, direction: Direct
   let records: FaultRecord[] = [];
   let pauseUntil: number | undefined;
   let close: Step["close"];
+  let answer: Send | undefined;
 
   const record = (entry: Entry, at: number, bytes: number, where: { byte: number; frame: number } = { byte, frame }): void => {
     applied.add(entry.index);
@@ -157,6 +161,17 @@ export function applierOf(plan: FaultPlan, connection: number, direction: Direct
         release(now);
         hold = { entry, units: [], left: fault.count, until: now + fault.holdMs, at: now, byte, frame };
         return;
+      case "answer": {
+        // The frames that a reorder holds came before the point, thus they go out before the answer.
+        release(now);
+        const bytes = answerBytes(fault);
+        record(entry, now, bytes.length);
+        const at = direction === "down" ? Math.max(now, last) : now;
+        answer = { bytes, at };
+        closed = true;
+        close = { kind: "cut", at };
+        return;
+      }
       default:
         armed.push(entry);
     }
@@ -198,11 +213,18 @@ export function applierOf(plan: FaultPlan, connection: number, direction: Direct
   };
 
   const step = (): Step => {
-    const out: Step = { sends, records, ...(pauseUntil === undefined ? {} : { pauseUntil }), ...(close === undefined ? {} : { close }) };
+    const out: Step = {
+      sends,
+      records,
+      ...(pauseUntil === undefined ? {} : { pauseUntil }),
+      ...(close === undefined ? {} : { close }),
+      ...(answer === undefined ? {} : { answer }),
+    };
     sends = [];
     records = [];
     pauseUntil = undefined;
     close = undefined;
+    answer = undefined;
     return out;
   };
 
