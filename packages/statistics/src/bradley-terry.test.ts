@@ -112,6 +112,29 @@ describe("bradleyTerry: exact cases", () => {
     expect(() => bradleyTerry(2, [], { maxIterations: 0 })).toThrow(RangeError);
     expect(() => bradleyTerry(2, [], { ties: "other" as "half" })).toThrow(RangeError);
   });
+
+  it("refuses a start with the wrong number of items, a value that is not finite, and a tie parameter of 0", () => {
+    expect(() => bradleyTerry(2, [], { start: { strengths: [0] } })).toThrow(RangeError);
+    expect(() => bradleyTerry(2, [], { start: { strengths: [0, Number.NaN] } })).toThrow(RangeError);
+    expect(() => bradleyTerry(2, [], { start: { strengths: [0, 0], tie: 0 } })).toThrow(RangeError);
+    expect(() => bradleyTerry(2, [], { start: { strengths: [0, 0], tie: Number.POSITIVE_INFINITY } })).toThrow(RangeError);
+  });
+
+  it("gives the same fit from a start at the fit, a far start and the default start", () => {
+    const r = random("bt-start");
+    const truth = Array.from({ length: 12 }, () => r.normal());
+    const comparisons = drawComparisons(r.fork("picks"), truth, 300, 0.3);
+    const cold = bradleyTerry(12, comparisons);
+    const warm = bradleyTerry(12, comparisons, { start: { strengths: cold.strengths, tie: cold.tie } });
+    const far = bradleyTerry(12, comparisons, { start: { strengths: truth.map((x) => 4 - 3 * x), tie: 20 } });
+    for (const fit of [warm, far]) {
+      expect(fit.converged).toBe(true);
+      for (let i = 0; i < 12; i++) expect(fit.strengths[i]).toBeCloseTo(cold.strengths[i]!, 8);
+      expect(fit.tie).toBeCloseTo(cold.tie, 8);
+    }
+    // A start at the optimum needs one Newton step to show that it is the optimum.
+    expect(warm.iterations).toBe(1);
+  });
 });
 
 /* ---------- Ties ---------- */

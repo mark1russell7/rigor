@@ -158,6 +158,7 @@ export {
 export {
   type BradleyTerryFit,
   type BradleyTerryOptions,
+  type BradleyTerryStart,
   type PairComparison,
   type PairOutcome,
   type TieModel,

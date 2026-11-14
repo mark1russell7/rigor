@@ -159,6 +159,54 @@ describe("bradleyTerrySparse: exact cases", () => {
   });
 });
 
+/* ---------- The start and the Newton steps ---------- */
+
+describe("bradleyTerrySparse: the start and the Newton steps", () => {
+  it("refuses a start with the wrong number of items, a value that is not finite, and a tie parameter of 0", () => {
+    expect(() => bradleyTerrySparse(2, [], { start: { strengths: [0, 0, 0] } })).toThrow(RangeError);
+    expect(() => bradleyTerrySparse(2, [], { start: { strengths: [Number.POSITIVE_INFINITY, 0] } })).toThrow(RangeError);
+    expect(() => bradleyTerrySparse(2, [], { start: { strengths: [0, 0], tie: -1 } })).toThrow(RangeError);
+  });
+
+  it("fits a log after one more comparison from the last fit, in fewer steps, to the same optimum", () => {
+    const items = 600;
+    const r = random("bt-sparse-warm");
+    const truth = Array.from({ length: items }, () => r.normal());
+    const comparisons = drawComparisons(r.fork("picks"), truth, 6_000, 0.3);
+    const before = bradleyTerrySparse(items, comparisons);
+    const after = [...comparisons, { a: 3, b: 7, outcome: "a" as const }];
+    const cold = bradleyTerrySparse(items, after);
+    const warm = bradleyTerrySparse(items, after, { start: { strengths: before.strengths, tie: before.tie } });
+    expect(cold.converged).toBe(true);
+    expect(warm.converged).toBe(true);
+    expect(distance(warm, cold)).toBeLessThanOrEqual(warm.bound + cold.bound);
+    expect(warm.logLikelihood).toBeCloseTo(cold.logLikelihood, 6);
+    expect(warm.iterations).toBeLessThan(cold.iterations);
+  });
+
+  it("goes to the same optimum from a far start", () => {
+    const r = random("bt-sparse-far");
+    const truth = Array.from({ length: 40 }, () => r.normal());
+    const comparisons = drawComparisons(r.fork("picks"), truth, 800, 0.4);
+    const cold = bradleyTerrySparse(40, comparisons);
+    const far = bradleyTerrySparse(40, comparisons, { start: { strengths: truth.map((x) => 5 - 4 * x), tie: 30 } });
+    expect(far.converged).toBe(true);
+    expect(distance(far, cold)).toBeLessThanOrEqual(far.bound + cold.bound);
+  });
+
+  it("fits 2,000 items with 20 picks each in few Newton steps", () => {
+    const items = 2_000;
+    const r = random("bt-sparse-steps");
+    const truth = Array.from({ length: items }, () => r.normal(0, 1.5));
+    const comparisons = drawComparisons(r.fork("picks"), truth, 20_000, 0.2);
+    const fit = bradleyTerrySparse(items, comparisons);
+    expect(fit.converged).toBe(true);
+    expect(fit.bound).toBeLessThanOrEqual(1e-8);
+    // Each Newton step reads the pairs a few times. A first-order method needs hundreds of steps on this log.
+    expect(fit.iterations).toBeLessThanOrEqual(30);
+  });
+});
+
 /* ---------- Invariance ---------- */
 
 describe("bradleyTerrySparse: invariance", () => {
