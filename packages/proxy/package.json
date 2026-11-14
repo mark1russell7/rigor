@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/rigor-proxy",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A TCP proxy that applies a seeded fault plan to TCP, HTTP and WebSocket streams, and records each fault.",
   "keywords": [
     "proxy",
