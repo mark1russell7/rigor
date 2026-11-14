@@ -62,7 +62,8 @@ export interface BradleyTerryStart {
 
 /**
  * This function gives the start of a fit: the log-strengths, and the log of the tie parameter. It throws a RangeError
- * for a start with the wrong number of items, a log-strength that is not finite, and a tie parameter that is not above 0.
+ * for a start with the wrong number of items. It also throws for a log-strength that is not finite, or a tie parameter
+ * of 0 or less.
  */
 export function startOf(name: string, items: number, priorMean: number, start: BradleyTerryStart | undefined): { strengths: Float64Array; logTie: number } {
   if (start === undefined) return { strengths: new Float64Array(items).fill(priorMean), logTie: 0 };
