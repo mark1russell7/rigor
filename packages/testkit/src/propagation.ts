@@ -8,7 +8,7 @@
  * @packageDocumentation
  */
 import { context, metrics, propagation, ROOT_CONTEXT, trace } from "@opentelemetry/api";
-import { logs } from "@opentelemetry/api-logs";
+import { globalLogger } from "./logs-api.ts";
 
 /** One transport of the gate: it makes one call from the client side to `handler` on the server side. */
 export interface PropagationTransport {
@@ -146,7 +146,7 @@ async function runOne(transport: PropagationTransport, call: NonNullable<Propaga
   const readValue = options.readValue ?? baggageRead;
   const tracer = trace.getTracer(GATE_NAMES.tracer);
   const counter = metrics.getMeter(GATE_NAMES.tracer).createCounter(GATE_NAMES.counter);
-  const logger = logs.getLogger(GATE_NAMES.tracer);
+  const logger = globalLogger(GATE_NAMES.tracer);
   await capture.reset();
 
   let observed: Observed | undefined;

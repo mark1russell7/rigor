@@ -8,10 +8,12 @@
  *
  * The object that `captureTelemetry()` returns is also a `PropagationCapture` of the entry `/propagation`.
  *
+ * The capture serves the two logs APIs: the API of `@opentelemetry/api` (1.10 and later, used by the SDK 3) and
+ * `@opentelemetry/api-logs` (used by the SDK 2).
+ *
  * @packageDocumentation
  */
 import { metrics, trace } from "@opentelemetry/api";
-import { logs } from "@opentelemetry/api-logs";
 import {
   InMemoryLogRecordExporter,
   LoggerProvider,
@@ -21,6 +23,7 @@ import {
 } from "@opentelemetry/sdk-logs";
 import { AggregationTemporality, MeterProvider, MetricReader, type MetricProducer, type ViewOptions } from "@opentelemetry/sdk-metrics";
 import { BasicTracerProvider, InMemorySpanExporter, SimpleSpanProcessor, type ReadableSpan, type SpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { LOGS_APIS, registeredLoggerProviders } from "./logs-api.ts";
 
 /** A metric data point: the name of its metric and its attributes */
 export interface OtelMetricPoint {
@@ -73,8 +76,8 @@ export interface OwnSdkTelemetryCapture extends TelemetryCapture {
   readonly loggerProvider: LoggerProvider;
   readonly meterProvider: MeterProvider;
   /**
-   * This function sets the three providers as the global providers of the OpenTelemetry API. The function that
-   * it returns removes the global providers.
+   * This function sets the three providers as the global providers of the OpenTelemetry API. It sets the logger
+   * provider in each logs API. The function that it returns removes the global providers.
    */
   register(): () => void;
   /** This function stops the three providers. */
@@ -141,9 +144,12 @@ export function captureTelemetry(options: OwnSdkCaptureOptions | ExternalSdkCapt
   };
 
   if (options.sdk === "external") {
+    const flushLogs = async (): Promise<void> => {
+      for (const provider of registeredLoggerProviders()) await flush(provider);
+    };
     const flushGlobal = async (): Promise<void> => {
       await flush(trace.getTracerProvider());
-      await flush(logs.getLoggerProvider());
+      await flushLogs();
     };
     return {
       spanExporter,
@@ -154,7 +160,7 @@ export function captureTelemetry(options: OwnSdkCaptureOptions | ExternalSdkCapt
         return spanExporter.getFinishedSpans();
       },
       logRecords: async () => {
-        await flush(logs.getLoggerProvider());
+        await flushLogs();
         return logExporter.getFinishedLogRecords();
       },
       metricPoints,
@@ -189,11 +195,11 @@ export function captureTelemetry(options: OwnSdkCaptureOptions | ExternalSdkCapt
     reset: () => resetWith(flushOwn),
     register() {
       trace.setGlobalTracerProvider(tracerProvider);
-      logs.setGlobalLoggerProvider(loggerProvider);
+      for (const logsApi of LOGS_APIS) logsApi.setGlobalLoggerProvider(loggerProvider);
       metrics.setGlobalMeterProvider(meterProvider);
       return () => {
         trace.disable();
-        logs.disable();
+        for (const logsApi of LOGS_APIS) logsApi.disable();
         metrics.disable();
       };
     },

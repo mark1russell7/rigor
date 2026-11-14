@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { metrics, trace } from "@opentelemetry/api";
+import { logs as apiLogs, metrics, trace } from "@opentelemetry/api";
 import { logs } from "@opentelemetry/api-logs";
-import { LoggerProvider, SimpleLogRecordProcessor } from "@opentelemetry/sdk-logs";
+import { BatchLogRecordProcessor, LoggerProvider, SimpleLogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { MeterProvider } from "@opentelemetry/sdk-metrics";
 import { BasicTracerProvider, SimpleSpanProcessor, type SpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { captureTelemetry, type TelemetryCapture } from "./otel.ts";
@@ -76,6 +76,26 @@ describe("captureTelemetry with the providers of the capture", () => {
     expect(await capture.metricPoints()).toEqual([]);
   });
 
+  it("sets its logger provider in each logs API: a record through either API comes to the capture one time", async () => {
+    const capture = captureTelemetry();
+    const unregister = capture.register();
+    cleanup = async () => {
+      unregister();
+      await capture.shutdown();
+    };
+
+    apiLogs.getLogger("test").emit({ body: "through @opentelemetry/api" });
+    logs.getLogger("test").emit({ body: "through @opentelemetry/api-logs" });
+    const both = ["through @opentelemetry/api", "through @opentelemetry/api-logs"];
+    expect((await capture.logRecords()).map((record) => record.body)).toEqual(both);
+
+    // After unregister(), neither API has the provider of the capture
+    unregister();
+    apiLogs.getLogger("test").emit({ body: "late" });
+    logs.getLogger("test").emit({ body: "late" });
+    expect((await capture.logRecords()).map((record) => record.body)).toEqual(both);
+  });
+
   it("is a capture of the propagation gate", () => {
     const capture: PropagationCapture = captureTelemetry({ sdk: "external" });
     expect(typeof capture.reset).toBe("function");
@@ -109,6 +129,25 @@ describe("captureTelemetry with the SDK of the program under test", () => {
     writeOneOfEach();
     await capture.reset();
     expect(await recordsOf(capture)).toEqual({ spans: [], logs: [], metrics: [] });
+  });
+
+  it("flushes an SDK that sets its logger provider in the logs API of @opentelemetry/api (the SDK 3)", async () => {
+    const capture = captureTelemetry({ sdk: "external" });
+    // A batch that does not export by itself: the records come only with the flush of the capture
+    const loggerProvider = new LoggerProvider({ processors: [new BatchLogRecordProcessor({ exporter: capture.logExporter, scheduledDelayMillis: 3_600_000 })] });
+    apiLogs.setGlobalLoggerProvider(loggerProvider);
+    cleanup = async () => {
+      apiLogs.disable();
+      await loggerProvider.shutdown();
+    };
+
+    apiLogs.getLogger("test").emit({ body: "a log" });
+    expect(capture.logExporter.getFinishedLogRecords()).toEqual([]);
+    expect((await capture.logRecords()).map((record) => record.body)).toEqual(["a log"]);
+
+    apiLogs.getLogger("test").emit({ body: "a second log" });
+    await capture.reset();
+    expect(await capture.logRecords()).toEqual([]);
   });
 
   it("resets before the SDK starts", async () => {
