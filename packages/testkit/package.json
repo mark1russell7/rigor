@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/rigor-testkit",
-  "version": "0.1.6",
-  "description": "Test helpers: the code blocks of Markdown files as test cases, model-based tests on fast-check, the propagation gate of one context id over each transport, the capture of the OpenTelemetry SDK, and a check of an operation that must give a rejected promise.",
+  "version": "0.1.7",
+  "description": "Test helpers: the code blocks of Markdown files as test cases, model-based tests on fast-check, the propagation gate of one context id over each transport, the capture of the OpenTelemetry SDK, a scripted HTTP server for fixtures, and a check of an operation that must give a rejected promise.",
   "keywords": [
     "testing",
     "markdown",
@@ -60,6 +60,11 @@
         "import": "./build/otel.js",
         "default": "./build/otel.js"
       },
+      "./http": {
+        "types": "./build/http.d.ts",
+        "import": "./build/http.js",
+        "default": "./build/http.js"
+      },
       "./package.json": "./package.json"
     }
   },
@@ -92,6 +97,7 @@
     "./model": "./src/model.ts",
     "./propagation": "./src/propagation.ts",
     "./otel": "./src/otel.ts",
+    "./http": "./src/http.ts",
     "./package.json": "./package.json"
   },
   "peerDependencies": {
