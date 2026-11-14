@@ -3,23 +3,20 @@
  * one optimum. This fit keeps one record for each distinct pair of items, not a matrix of all the items. Thus its
  * memory is in proportion to the items and the pairs. The dense fit of 10,000 items keeps a Hessian of 800 MB.
  *
- * The fit is a majorization-minimization (MM) iteration on the negative log posterior. This is the MM method of a
- * minimum, the same as the minorization-maximization of the log posterior. Each step has three parts:
+ * The fit uses Newton steps on the negative log posterior, as `bradleyTerry` does. It does not factor the Hessian.
+ * Preconditioned conjugate gradients solve each Newton system, and the diagonal of the Hessian is the preconditioner.
+ * One product of the Hessian and a vector reads each pair one time.
  *
- * 1. Each log-strength moves to the minimum of a separable quadratic bound. The bound uses the curvature 1/4 of the
- *    log-likelihood of a pair (Böhning and Lindsay, 1988).
- * 2. Each connected group of items moves together, so that its mean is the prior mean. A comparison does not change
- *    when its two strengths move together, so this move is exact.
- * 3. The log of the Davidson tie parameter moves to the minimum of the bound of Hunter (2004), with its prior.
- *
- * Each part makes the objective smaller or keeps it. The objective is strongly convex, so the steps go to its one
- * minimum. The fit stops when the gradient puts each parameter inside the tolerance of that minimum.
+ * The prior makes the objective strongly convex, so the Hessian is positive definite. Thus each step of the solve
+ * gives a direction that goes down. The solve is loose far from the minimum and tight near it (an inexact Newton
+ * method). A line search with the Armijo rule makes the objective smaller at each step. The steps go to the one
+ * minimum, and the fit stops when the gradient puts each parameter inside the tolerance of that minimum.
  */
-import type { BradleyTerryFit, BradleyTerryOptions, PairComparison, TieModel } from "./bradley-terry.ts";
+import { type BradleyTerryFit, type BradleyTerryOptions, type PairComparison, type TieModel, startOf } from "./bradley-terry.ts";
 
 /** The options of `bradleyTerrySparse`. The prior and the tie model are the same as in `bradleyTerry`. */
 export interface BradleyTerrySparseOptions extends BradleyTerryOptions {
-  /** The largest number of MM steps. The default is 10000. */
+  /** The largest number of Newton steps. The default is 100. */
   readonly maxIterations?: number;
   /**
    * The largest distance of the parameters from the exact optimum at the stop. The default is 1e-8. The distance is the
@@ -37,7 +34,7 @@ export interface BradleyTerrySparseFit extends BradleyTerryFit {
    * has the prior SD, as in `bradleyTerry`.
    */
   readonly se: number[];
-  /** The number of MM steps. */
+  /** The number of Newton steps. */
   readonly iterations: number;
   /**
    * True when `bound` is the tolerance or less, or when the gradient is at the rounding level of floating point. At the
@@ -57,6 +54,12 @@ export interface BradleyTerrySparseFit extends BradleyTerryFit {
 const MAX_ITEMS = Math.floor(Math.sqrt(Number.MAX_SAFE_INTEGER));
 const ROUNDING = 64 * Number.EPSILON;
 const NAME = "bradleyTerrySparse";
+/** The Armijo constant of the line search: a step gives at least this part of the decrease that the slope forecasts. */
+const ARMIJO = 1e-4;
+/** The largest number of halvings of a step in the line search. */
+const HALVINGS = 60;
+/** The largest number of conjugate-gradient steps for one Newton system. */
+const SOLVE_LIMIT = 500;
 
 /** The comparisons of each distinct pair, summed over the comparisons of the pair. */
 interface Pairs {
@@ -178,22 +181,202 @@ function outcomes(d: number, logNu: number, out: Float64Array): void {
   out[3] = top + Math.log(sum);
 }
 
+/** The log and the prior of a fit: the data that each evaluation of the objective reads. */
+interface Problem {
+  readonly items: number;
+  readonly pairs: Pairs;
+  /** True when a comparison is a Davidson tie. Else the tie parameter is 0, and the model is plain Bradley-Terry. */
+  readonly fitTie: boolean;
+  readonly priorMean: number;
+  /** The prior precision of each log-strength. */
+  readonly p: number;
+  /** The prior precision of the log of the tie parameter. */
+  readonly tau: number;
+  /** The total weight of the Davidson ties. */
+  readonly tieWeight: number;
+}
+
 /**
- * The minimum over `z` of `s * exp(z) + tau * (lambda + z) ^ 2 / 2 - t * z`: the root of
- * `s * exp(z) + tau * z = t - tau * lambda`. The left side increases and is convex. Newton steps from a point right of
- * the root thus go down to the root, and they do not go past it.
+ * A point of the fit, with the objective and its derivatives at the point. The parameters are the log-strengths and
+ * the log of the tie parameter. The loop keeps two points and swaps them, so a step makes no new arrays.
  */
-function tieStep(s: number, t: number, tau: number, lambda: number): number {
-  const c = t - tau * lambda;
-  if (s === 0) return c / tau;
-  let z = c > 0 ? Math.max(0, Math.log(c / s)) : 0;
-  for (let step = 0; step < 200; step++) {
-    const ez = s * Math.exp(z);
-    const move = (ez + tau * z - c) / (ez + tau);
-    z -= move;
-    if (!(Math.abs(move) > ROUNDING * (1 + Math.abs(z)))) break;
+interface Point {
+  readonly s: Float64Array;
+  lambda: number;
+  /** The negative log posterior. */
+  value: number;
+  /** The log-likelihood of the comparisons, with no prior term. */
+  logLikelihood: number;
+  readonly gradient: Float64Array;
+  tieGradient: number;
+  /** The Euclidean norm of the gradient, over the log-strengths and the log of the tie parameter. */
+  norm: number;
+  /** The second derivative of the objective of each pair in the difference of its two log-strengths. */
+  readonly curvature: Float64Array;
+  /** The diagonal of the Hessian at each log-strength. */
+  readonly diagonal: Float64Array;
+  /** The mixed second derivative of the objective in each log-strength and the log of the tie parameter. */
+  readonly cross: Float64Array;
+  /** The second derivative of the objective in the log of the tie parameter. */
+  tieCurvature: number;
+}
+
+/** This function makes an empty point for `items` items and `count` pairs. */
+function pointOf(items: number, count: number): Point {
+  return {
+    s: new Float64Array(items),
+    lambda: 0,
+    value: 0,
+    logLikelihood: 0,
+    gradient: new Float64Array(items),
+    tieGradient: 0,
+    norm: 0,
+    curvature: new Float64Array(count),
+    diagonal: new Float64Array(items),
+    cross: new Float64Array(items),
+    tieCurvature: 0,
+  };
+}
+
+/** This function writes the objective, the gradient and the Hessian at the parameters of `point` into `point`. */
+function evaluate(problem: Problem, point: Point, out: Float64Array): void {
+  const { items, pairs, fitTie, priorMean, p, tau, tieWeight } = problem;
+  const { s, gradient, curvature, diagonal, cross, lambda } = point;
+  const logNu = fitTie ? lambda : Number.NEGATIVE_INFINITY;
+  let prior = 0;
+  for (let i = 0; i < items; i++) {
+    const offset = (s[i] as number) - priorMean;
+    prior += offset * offset;
+    gradient[i] = p * offset;
+    diagonal[i] = p;
+    cross[i] = 0;
   }
-  return z;
+  let logLikelihood = fitTie ? tieWeight * lambda : 0;
+  let tieGradient = fitTie ? tau * lambda - tieWeight : 0;
+  let tieCurvature = fitTie ? tau : 0;
+  for (let q = 0; q < pairs.count; q++) {
+    const lo = pairs.low[q] as number;
+    const hi = pairs.high[q] as number;
+    const total = pairs.total[q] as number;
+    const net = pairs.net[q] as number;
+    const d = (s[lo] as number) - (s[hi] as number);
+    outcomes(d, logNu, out);
+    const pa = out[0] as number;
+    const pb = out[1] as number;
+    const pt = out[2] as number;
+    const half = (pa - pb) / 2;
+    logLikelihood += (net / 2) * d - total * (out[3] as number);
+    const g = total * half - net / 2;
+    gradient[lo] = (gradient[lo] as number) + g;
+    gradient[hi] = (gradient[hi] as number) - g;
+    // The curvature is (pa + pb) / 4 - half ^ 2. This form of it has no cancellation, and it is never below 0.
+    const c = total * (pa * pb + (pt * (1 - pt)) / 4);
+    curvature[q] = c;
+    diagonal[lo] = (diagonal[lo] as number) + c;
+    diagonal[hi] = (diagonal[hi] as number) + c;
+    if (fitTie) {
+      tieGradient += total * pt;
+      tieCurvature += total * pt * (1 - pt);
+      const b = -total * pt * half;
+      cross[lo] = (cross[lo] as number) + b;
+      cross[hi] = (cross[hi] as number) - b;
+    }
+  }
+  let norm = tieGradient * tieGradient;
+  for (let i = 0; i < items; i++) norm += (gradient[i] as number) ** 2;
+  point.value = (p * prior) / 2 + (fitTie ? (tau * lambda * lambda) / 2 : 0) - logLikelihood;
+  point.logLikelihood = logLikelihood;
+  point.tieGradient = tieGradient;
+  point.tieCurvature = tieCurvature;
+  point.norm = Math.sqrt(norm);
+}
+
+/**
+ * This function writes the product of the Hessian at `point` and the vector (`v`, `vTie`) into `out`. It gives the
+ * tie part of the product. The product reads each pair one time, and it makes no arrays.
+ */
+function multiply(problem: Problem, point: Point, v: Float64Array, vTie: number, out: Float64Array): number {
+  const { items, pairs, fitTie, p } = problem;
+  const { curvature, cross } = point;
+  for (let i = 0; i < items; i++) out[i] = p * (v[i] as number) + (cross[i] as number) * vTie;
+  for (let q = 0; q < pairs.count; q++) {
+    const lo = pairs.low[q] as number;
+    const hi = pairs.high[q] as number;
+    const t = (curvature[q] as number) * ((v[lo] as number) - (v[hi] as number));
+    out[lo] = (out[lo] as number) + t;
+    out[hi] = (out[hi] as number) - t;
+  }
+  if (!fitTie) return 0;
+  let tie = point.tieCurvature * vTie;
+  for (let i = 0; i < items; i++) tie += (cross[i] as number) * (v[i] as number);
+  return tie;
+}
+
+/** The work arrays of the conjugate-gradient solve. The fit makes them one time. */
+interface Work {
+  readonly residual: Float64Array;
+  readonly scaled: Float64Array;
+  readonly direction: Float64Array;
+  readonly product: Float64Array;
+}
+
+/**
+ * This function solves the Newton system `H x = -g` at `point` with preconditioned conjugate gradients. It writes the
+ * log-strength part of `x` into `step`, and it gives the tie part. The solve stops when the norm of the residual is
+ * `forcing` times the norm of the gradient or less. The solve starts at 0, so each step of it gives a descent direction.
+ */
+function newtonStep(problem: Problem, point: Point, forcing: number, step: Float64Array, work: Work): number {
+  const { items, fitTie } = problem;
+  const { residual: r, scaled: z, direction: d, product: ad } = work;
+  const { gradient, diagonal } = point;
+  let rz = 0;
+  for (let i = 0; i < items; i++) {
+    const ri = -(gradient[i] as number);
+    const zi = ri / (diagonal[i] as number);
+    r[i] = ri;
+    z[i] = zi;
+    d[i] = zi;
+    rz += ri * zi;
+  }
+  let rTie = fitTie ? -point.tieGradient : 0;
+  let dTie = fitTie ? rTie / point.tieCurvature : 0;
+  rz += rTie * dTie;
+  step.fill(0);
+  let stepTie = 0;
+  const target = forcing * point.norm;
+  const limit = Math.min(SOLVE_LIMIT, items + 1);
+  for (let k = 0; k < limit; k++) {
+    const adTie = multiply(problem, point, d, dTie, ad);
+    let dad = dTie * adTie;
+    for (let i = 0; i < items; i++) dad += (d[i] as number) * (ad[i] as number);
+    // Rounding can make the curvature of a very small direction 0. The step so far is then the result.
+    if (!(dad > 0)) break;
+    const alpha = rz / dad;
+    let residual = 0;
+    for (let i = 0; i < items; i++) {
+      step[i] = (step[i] as number) + alpha * (d[i] as number);
+      const ri = (r[i] as number) - alpha * (ad[i] as number);
+      r[i] = ri;
+      residual += ri * ri;
+    }
+    stepTie += alpha * dTie;
+    rTie -= alpha * adTie;
+    residual += rTie * rTie;
+    if (Math.sqrt(residual) <= target) break;
+    let next = 0;
+    for (let i = 0; i < items; i++) {
+      const zi = (r[i] as number) / (diagonal[i] as number);
+      z[i] = zi;
+      next += (r[i] as number) * zi;
+    }
+    const zTie = fitTie ? rTie / point.tieCurvature : 0;
+    next += rTie * zTie;
+    const beta = next / rz;
+    rz = next;
+    for (let i = 0; i < items; i++) d[i] = (z[i] as number) + beta * (d[i] as number);
+    dTie = zTie + beta * dTie;
+  }
+  return stepTie;
 }
 
 /**
@@ -209,7 +392,7 @@ export function bradleyTerrySparse(items: number, comparisons: readonly PairComp
   const priorSd = options.priorSd ?? 1;
   const ties = options.ties ?? "davidson";
   const tiePriorSd = options.tiePriorSd ?? 10;
-  const maxIterations = options.maxIterations ?? 10_000;
+  const maxIterations = options.maxIterations ?? 100;
   const tolerance = options.tolerance ?? 1e-8;
   if (!Number.isFinite(priorMean)) throw new RangeError(`${NAME}: the prior mean is a finite number, not ${priorMean}.`);
   positiveOption("the prior SD", priorSd);
@@ -219,100 +402,69 @@ export function bradleyTerrySparse(items: number, comparisons: readonly PairComp
   if (!Number.isSafeInteger(maxIterations) || maxIterations < 1) {
     throw new RangeError(`${NAME}: maxIterations is a whole number of 1 or more, not ${maxIterations}.`);
   }
+  const begin = startOf(NAME, items, priorMean, options.start);
 
   const pairs = pairsOf(items, comparisons, ties);
-  const { group, size, count: groupCount } = groupsOf(items, pairs);
-  const p = 1 / (priorSd * priorSd);
-  const tau = 1 / (tiePriorSd * tiePriorSd);
   let tieWeight = 0;
   let totalWeight = 0;
-  const weight = new Float64Array(items);
   for (let q = 0; q < pairs.count; q++) {
     tieWeight += pairs.ties[q] as number;
     totalWeight += pairs.total[q] as number;
-    weight[pairs.low[q] as number] = (weight[pairs.low[q] as number] as number) + (pairs.total[q] as number);
-    weight[pairs.high[q] as number] = (weight[pairs.high[q] as number] as number) + (pairs.total[q] as number);
   }
-  // The tie parameter is free only when a comparison is a Davidson tie. Else it is 0, and the model is plain Bradley-Terry.
-  const fitTie = tieWeight > 0;
-  const smallest = fitTie ? Math.min(p, tau) : p;
+  const p = 1 / (priorSd * priorSd);
+  const tau = 1 / (tiePriorSd * tiePriorSd);
+  const problem: Problem = { items, pairs, fitTie: tieWeight > 0, priorMean, p, tau, tieWeight };
+  const smallest = problem.fitTie ? Math.min(p, tau) : p;
   // The gradient has a rounding error in proportion to the sum of its terms. Below this size, a step gains nothing.
   const floor = 4 * Number.EPSILON * (totalWeight + 1);
 
-  const s = new Float64Array(items).fill(priorMean);
-  const gradient = new Float64Array(items);
-  const sums = new Float64Array(groupCount);
+  let current = pointOf(items, pairs.count);
+  let trial = pointOf(items, pairs.count);
+  current.s.set(begin.strengths);
+  current.lambda = problem.fitTie ? begin.logTie : 0;
   const out = new Float64Array(4);
-  let lambda = 0;
+  const step = new Float64Array(items);
+  const work: Work = { residual: new Float64Array(items), scaled: new Float64Array(items), direction: new Float64Array(items), product: new Float64Array(items) };
+  evaluate(problem, current, out);
   let iterations = 0;
-  let bound = Number.POSITIVE_INFINITY;
-  let rounded = false;
+  let bound = current.norm / smallest;
+  let rounded = current.norm <= floor;
 
-  for (;;) {
-    // The gradient of the negative log posterior at the current point.
-    const logNu = fitTie ? lambda : Number.NEGATIVE_INFINITY;
-    for (let i = 0; i < items; i++) gradient[i] = p * ((s[i] as number) - priorMean);
-    let tieGradient = fitTie ? tau * lambda - tieWeight : 0;
-    for (let q = 0; q < pairs.count; q++) {
-      const lo = pairs.low[q] as number;
-      const hi = pairs.high[q] as number;
-      const total = pairs.total[q] as number;
-      outcomes((s[lo] as number) - (s[hi] as number), logNu, out);
-      const g = total * (((out[0] as number) - (out[1] as number)) / 2) - (pairs.net[q] as number) / 2;
-      gradient[lo] = (gradient[lo] as number) + g;
-      gradient[hi] = (gradient[hi] as number) - g;
-      if (fitTie) tieGradient += total * (out[2] as number);
-    }
-    let norm = tieGradient * tieGradient;
-    for (let i = 0; i < items; i++) norm += (gradient[i] as number) ** 2;
-    norm = Math.sqrt(norm);
-    bound = norm / smallest;
-    rounded = norm <= floor;
-    if (bound <= tolerance || rounded || iterations >= maxIterations) break;
+  while (!(bound <= tolerance || rounded) && iterations < maxIterations) {
     iterations++;
-
-    // Part 1: the minimum of the separable quadratic bound. A pair adds total / 2 to the curvature of each of its items.
-    for (let i = 0; i < items; i++) s[i] = (s[i] as number) - (gradient[i] as number) / ((weight[i] as number) / 2 + p);
-    // Part 2: each connected group moves to the prior mean.
-    sums.fill(0);
-    for (let i = 0; i < items; i++) sums[group[i] as number] = (sums[group[i] as number] as number) + (s[i] as number);
-    for (let i = 0; i < items; i++) s[i] = (s[i] as number) + priorMean - (sums[group[i] as number] as number) / (size[group[i] as number] as number);
-    // Part 3: the log of the tie parameter, with the new strengths.
-    if (fitTie) {
-      let expected = 0;
-      for (let q = 0; q < pairs.count; q++) {
-        outcomes((s[pairs.low[q] as number] as number) - (s[pairs.high[q] as number] as number), lambda, out);
-        expected += (pairs.total[q] as number) * (out[2] as number);
-      }
-      lambda += tieStep(expected, tieWeight, tau, lambda);
+    // The forcing term of the inexact Newton method (Eisenstat and Walker, 1996): it goes to 0 with the gradient.
+    const forcing = Math.min(0.5, Math.sqrt(current.norm));
+    const stepTie = newtonStep(problem, current, forcing, step, work);
+    let slope = stepTie * current.tieGradient;
+    for (let i = 0; i < items; i++) slope += (step[i] as number) * (current.gradient[i] as number);
+    // Near the minimum, a full step changes the objective by less than its rounding. The slack accepts that step.
+    const slack = ROUNDING * (Math.abs(current.value) + 1);
+    let t = 1;
+    let accepted = false;
+    for (let h = 0; h <= HALVINGS && !accepted; h++) {
+      for (let i = 0; i < items; i++) trial.s[i] = (current.s[i] as number) + t * (step[i] as number);
+      trial.lambda = current.lambda + t * stepTie;
+      evaluate(problem, trial, out);
+      accepted = trial.value <= current.value + ARMIJO * t * slope + slack;
+      if (!accepted) t /= 2;
     }
+    // A step that no halving accepts gains nothing above the rounding. The fit then stops at the current point.
+    if (!accepted) break;
+    [current, trial] = [trial, current];
+    bound = current.norm / smallest;
+    rounded = current.norm <= floor;
   }
 
-  // The log-likelihood and the diagonal of the Hessian at the fit.
-  const logNu = fitTie ? lambda : Number.NEGATIVE_INFINITY;
-  const diagonal = new Float64Array(items).fill(p);
-  let logLikelihood = 0;
-  for (let q = 0; q < pairs.count; q++) {
-    const lo = pairs.low[q] as number;
-    const hi = pairs.high[q] as number;
-    const total = pairs.total[q] as number;
-    const d = (s[lo] as number) - (s[hi] as number);
-    outcomes(d, logNu, out);
-    const half = ((out[0] as number) - (out[1] as number)) / 2;
-    const curvature = total * (((out[0] as number) + (out[1] as number)) / 4 - half * half);
-    diagonal[lo] = (diagonal[lo] as number) + curvature;
-    diagonal[hi] = (diagonal[hi] as number) + curvature;
-    logLikelihood += ((pairs.net[q] as number) / 2) * d - total * (out[3] as number) + (fitTie ? (pairs.ties[q] as number) * lambda : 0);
-  }
-  const se = Array.from(s, (_, i) => {
+  const { group, size } = groupsOf(items, pairs);
+  const se = Array.from(current.s, (_, i) => {
     const n = size[group[i] as number] as number;
-    return Math.sqrt(1 / (n * p) + (1 - 1 / n) / (diagonal[i] as number));
+    return Math.sqrt(1 / (n * p) + (1 - 1 / n) / (current.diagonal[i] as number));
   });
   return {
-    strengths: Array.from(s),
+    strengths: Array.from(current.s),
     se,
-    tie: fitTie ? Math.exp(lambda) : 0,
-    logLikelihood,
+    tie: problem.fitTie ? Math.exp(current.lambda) : 0,
+    logLikelihood: current.logLikelihood,
     iterations,
     converged: bound <= tolerance || rounded,
     bound,
