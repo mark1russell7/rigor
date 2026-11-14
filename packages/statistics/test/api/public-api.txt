@@ -13,6 +13,7 @@ type BradleyTerryFit: build/index.d.ts#BradleyTerryFit
 type BradleyTerryOptions: build/index.d.ts#BradleyTerryOptions
 type BradleyTerrySparseFit: build/index.d.ts#BradleyTerrySparseFit
 type BradleyTerrySparseOptions: build/index.d.ts#BradleyTerrySparseOptions
+type BradleyTerryStart: build/index.d.ts#BradleyTerryStart
 type CalibrationLevel: build/index.d.ts#CalibrationLevel
 type CategoricalDimension: build/index.d.ts#CategoricalDimension
 type CompareOptions: build/index.d.ts#CompareOptions
@@ -252,6 +253,7 @@ interface BradleyTerryOptions {
   readonly tiePriorSd?: number;
   readonly maxIterations?: number;
   readonly tolerance?: number;
+  readonly start?: BradleyTerryStart;
 }
 
 ### build/index.d.ts#BradleyTerrySparseFit
@@ -267,6 +269,12 @@ interface BradleyTerrySparseFit extends BradleyTerryFit {
 interface BradleyTerrySparseOptions extends BradleyTerryOptions {
   readonly maxIterations?: number;
   readonly tolerance?: number;
+}
+
+### build/index.d.ts#BradleyTerryStart
+interface BradleyTerryStart {
+  readonly strengths: readonly number[];
+  readonly tie?: number;
 }
 
 ### build/index.d.ts#CalibrationLevel
