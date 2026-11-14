@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/rigor-chaos",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Open-loop load schedules, seeded fault plans for a proxy, and a measure of latency from the planned time with no coordinated omission.",
   "keywords": [
     "load",

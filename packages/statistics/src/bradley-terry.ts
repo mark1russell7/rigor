@@ -44,6 +44,37 @@ export interface BradleyTerryOptions {
   readonly maxIterations?: number;
   /** The fit stops when the full Newton step moves no parameter more than this value. The default is 1e-10. */
   readonly tolerance?: number;
+  /**
+   * The point where the fit starts. The default is the prior mean for each log-strength, and 1 for the tie parameter.
+   * A start near the optimum saves steps. An example is the fit of the log before its last comparisons. The optimum
+   * does not change.
+   */
+  readonly start?: BradleyTerryStart;
+}
+
+/** The start of a Bradley-Terry fit: a log-strength for each item, and the Davidson tie parameter. */
+export interface BradleyTerryStart {
+  /** The log-strength of each item, in the order of the indexes. Each value is a finite number. */
+  readonly strengths: readonly number[];
+  /** The Davidson tie parameter, a finite number above 0. The default is 1. A fit with no Davidson tie does not use it. */
+  readonly tie?: number;
+}
+
+/**
+ * This function gives the start of a fit: the log-strengths, and the log of the tie parameter. It throws a RangeError
+ * for a start with the wrong number of items. It also throws for a log-strength that is not finite, or a tie parameter
+ * of 0 or less.
+ */
+export function startOf(name: string, items: number, priorMean: number, start: BradleyTerryStart | undefined): { strengths: Float64Array; logTie: number } {
+  if (start === undefined) return { strengths: new Float64Array(items).fill(priorMean), logTie: 0 };
+  if (start.strengths.length !== items) throw new RangeError(`${name}: the start has ${start.strengths.length} log-strengths, and the fit has ${items} items.`);
+  const strengths = Float64Array.from(start.strengths);
+  for (const [i, value] of strengths.entries()) {
+    if (!Number.isFinite(value)) throw new RangeError(`${name}: the start log-strength of item ${i} is a finite number, not ${start.strengths[i]}.`);
+  }
+  const tie = start.tie ?? 1;
+  if (!(tie > 0 && Number.isFinite(tie))) throw new RangeError(`${name}: the start tie parameter is a finite number above 0, not ${tie}.`);
+  return { strengths, logTie: Math.log(tie) };
 }
 
 /** The result of `bradleyTerry`. The lists have one value for each item, in the order of the indexes. */
@@ -123,14 +154,16 @@ export function bradleyTerry(items: number, comparisons: readonly PairComparison
   if (!Number.isSafeInteger(maxIterations) || maxIterations < 1) {
     throw new RangeError(`bradleyTerry: maxIterations is a whole number of 1 or more, not ${maxIterations}.`);
   }
+  const begin = startOf("bradleyTerry", items, priorMean, options.start);
   const terms = checkedTerms(items, comparisons, ties);
   // The tie parameter is free only when a comparison is a Davidson tie. Else it is 0, and the model is plain Bradley-Terry.
   const fitTie = terms.some((t) => t.tie === 1);
   const k = fitTie ? items + 1 : items;
   const model: Model = { items, terms, fitTie, priorMean, priorPrecision: 1 / (priorSd * priorSd), tiePrecision: 1 / (tiePriorSd * tiePriorSd) };
 
-  const x = new Float64Array(k).fill(priorMean);
-  if (fitTie) x[items] = 0;
+  const x = new Float64Array(k);
+  x.set(begin.strengths);
+  if (fitTie) x[items] = begin.logTie;
   let iterations = 0;
   let converged = false;
   let value = objective(model, x);

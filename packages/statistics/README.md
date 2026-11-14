@@ -171,7 +171,9 @@ choosePair(pool, { seed: "duel-1" });             // the next pair of a duel, th
 
 `bradleyTerrySparse` has the model, the prior and the tie models of `bradleyTerry`. Its memory is in proportion to the items plus the distinct pairs. At 10,000 items, the Hessian of `bradleyTerry` has 800 MB. The sparse fit uses a few MB.
 
-- The fit uses MM steps. The first part of a step minimizes a quadratic bound of the strengths (Böhning and Lindsay, 1988). The second part moves each connected group to the prior mean. The third part uses the tie bound of Hunter (2004).
+- The fit uses Newton steps, as `bradleyTerry` does. Preconditioned conjugate gradients solve each Newton system, so the fit does not factor the Hessian. One product with the Hessian reads each pair one time.
+- The solve is loose far from the minimum and tight near it (an inexact Newton method). A line search with the Armijo rule makes the objective smaller at each step.
+- The option `start` of both fits sets the start point. A start from the fit before the last comparisons saves steps, and the optimum does not change.
 - The objective is strongly convex. Thus the norm of the gradient over the smallest prior precision is a bound of the distance from the exact optimum. The fit stops when `bound` is `tolerance` (1e-8) or less.
 - A property test compares the two fits on small logs. The strengths agree to 1e-7, and the distance is at most `bound`.
 - The standard errors are approximate. The variance of an item is `1 / (n * p) + (1 - 1 / n) / h`. Here `n` is the number of items of its connected group, `p` is the prior precision and `h` is the diagonal entry of the Hessian.
