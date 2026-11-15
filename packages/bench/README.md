@@ -49,10 +49,14 @@ v.comparison;                                     // the cases that gain and dro
 | `limitVerdict(candidate, aa, options)` | The verdict of the claim "the ratio of each case is at most `limit`": `within`, `beyond` or `cannot decide`. |
 | `tailLimitVerdict(candidate, aa, options)` | The verdict of the claim "the median and a high value of each case are at most their limits", for a bench with few rounds. |
 | `caseTails(records, rank)` | The value at one rank of the ratios of each case, from the largest. |
+| `processVerdict(reads, options)` | The verdict of each case over its first k valid processes: the median against a limit, and the count above a slow line. |
+| `processCaseLine(case)` | One line of a case of `processVerdict`: the outcome, the median, the slow count and the ratio of each process. |
+| `isValidRead(read)` | True when the A/A band of a process read contains 1, or when the read has no band. |
 | `modelTest(reads, options)` | The read of each CPU model against the rest, for each case: `differs`, `no read`, `too-few` or `not asked`. |
 | `visibleShift(values, rest, level, direction, options)` | The smallest shift in one direction that a test can see at this count and level, and the smallest p of this count. |
 | `modelRowText(row, family)` | The words of one row. No word says that a model is the same as the rest. |
 | `limitOnModel(limits, model)` | The limit of a gain on one CPU model: the gain limit, or the ceiling with its words. |
+| `cpuEntry(table, cpu)` | The entry of a table whose key is a part of the CPU name, with the case ignored, or the entry `other`. |
 | `armModels(pairs)` | The CPU models of each arm of a set of pairs, and if all the reads come from one known model. |
 | `candidateLimits(reads, rule)` | The candidate limit of each case on each CPU model: the mean plus k standard deviations, from 5 reads or more. |
 | `freezeLimits(measure, candidates, stamp, rule)` | A file of frozen limits, with the values, the commit and the date of each limit. |
@@ -149,6 +153,29 @@ The verdict has no interval, so a limit needs a margin from the spread of earlie
 
 A limit under 1 states a gain, and an A/A pair shows no gain. So the A/A arm has no read of that case, and the case goes in `gains` with that reason. The false fails of a gain limit come from repeat reads of an unchanged tree against its fixed base.
 
+## A verdict over k processes
+
+Each fresh process of Node.js is one sample, because each user gets one process. A gate script can time each case in a process. It gives one ratio and the A/A band of the process. `processVerdict` decides each case over its first k valid processes:
+
+```ts
+const limits = cpuEntry({ "7763": { limit: 1.1, slow: 1.2, maxSlow: 2 }, other: { limit: 1.2, slow: 1.3, maxSlow: 2 } }, cpu);
+const v = processVerdict(reads, { k: 7, limits: limits.value });
+v.outcome;                                        // "pass", "block" or "no read"
+v.more;                                           // the processes to start before the next read
+v.cases.map(processCaseLine);                     // one line for each case
+```
+
+The rule of the verdict:
+
+- A read is `{ process, case, ratio, aa, fault }`. A process counts for a case only when its A/A band contains 1.
+- Check (a): the median of the first k valid ratios is at most `limit`.
+- Check (b): the count of these ratios above `slow` is at most `maxSlow`. Without `maxSlow`, the count is a record only.
+- A case with a fault is `beyond`. A case with no read from a process of the option `processes` is `cannot decide`.
+- With fewer than k valid processes, a case is `cannot decide`. Then `more` gives the count that it needs.
+- A case that fails a check for each value of the other processes is `beyond` at once.
+
+Check (b) is the tail rule of `tailLimitVerdict` with the rank `maxSlow + 1`. With `slow` equal to `limit` and `maxSlow` 0, check (b) is "the worst ratio is at most the limit". Thus a read can also be the median ratio of one job, and the verdict reads k jobs. Take each limit from earlier runs with `runLimit`.
+
 ## A read of each CPU model
 
 Runners of one label have different CPU models. A check of the pool passes when most reads come from the other models, so it can hide a model that reads apart. `modelTest` reads each model against the rest of its case. It uses a two-sample permutation test of the median, with one Holm family over all the rows.
@@ -161,6 +188,8 @@ Runners of one label have different CPU models. A check of the pool passes when 
 A read of `differs` tells where to look. It does not name a cause, because the reads of one model can share a runner image and a date.
 
 `limitOnModel` gives the limit of a gain that reads on some models only. A model with no earlier reads gets the ceiling, and its read carries the words of `CEILING_ONLY`. A pass at the ceiling stops a loss, and it does not hold the gain.
+
+`cpuEntry` gives the entry of a table for a CPU name, for example the limits of each model. The key is a part of the name, and the case of the letters does not count. A name with no key gets the entry `other`.
 
 `armModels` reads the models of the two arms of a set of pairs. When the arms come from different computers, a ratio compares the computers. A record with no model reads as `unknown`, and `unknown` is not one known model.
 
