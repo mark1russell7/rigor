@@ -4,16 +4,24 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 172 names
+## . (build/index.d.ts): names
 
+type AaLimitOptions: build/index.d.ts#AaLimitOptions
+type AaLimits: build/index.d.ts#AaLimits
+type AaOrders: build/index.d.ts#AaOrders
 type Arm: build/paired.d.ts#Arm
 type ArmModels: build/index.d.ts#ArmModels
+type ArmOptions: build/index.d.ts#ArmOptions
 type ArmPair: build/index.d.ts#ArmPair
+type ArmRounds: build/index.d.ts#ArmRounds
+type ArmRoundsOptions: build/index.d.ts#ArmRoundsOptions
+type ArmTime: build/index.d.ts#ArmTime
 BUDGET_LOOKS: build/index.d.ts#BUDGET_LOOKS
 type Balanced: build/index.d.ts#Balanced
 type Band: build/index.d.ts#Band
 type BandKind: build/index.d.ts#BandKind
 type BandOptions: build/index.d.ts#BandOptions
+type Better: build/index.d.ts#Better
 type BudgetLook: build/index.d.ts#BudgetLook
 type BudgetLooksOptions: build/index.d.ts#BudgetLooksOptions
 type BudgetLooksVerdict: build/index.d.ts#BudgetLooksVerdict
@@ -24,30 +32,77 @@ type BudgetResult: build/index.d.ts#BudgetResult
 type BudgetRound: build/index.d.ts#BudgetRound
 type BudgetVerdict: build/index.d.ts#BudgetVerdict
 CEILING_ONLY: build/index.d.ts#CEILING_ONLY
+CHILD_SOURCES: build/index.d.ts#CHILD_SOURCES
+type CandidateLimit: build/index.d.ts#CandidateLimit
+type CandidateStatus: build/index.d.ts#CandidateStatus
+type CaseAaStat: build/index.d.ts#CaseAaStat
 type CaseBudget: build/index.d.ts#CaseBudget
 type CaseGate: build/index.d.ts#CaseGate
 type CaseInterval: build/index.d.ts#CaseInterval
 type CaseLimit: build/index.d.ts#CaseLimit
+type CaseProcesses: build/index.d.ts#CaseProcesses
 type CaseRatio: build/paired.d.ts#CaseRatio
+type CaseRead: build/index.d.ts#CaseRead
 type CaseResults: build/index.d.ts#CaseResults
 type CaseTail: build/index.d.ts#CaseTail
 type CaseTailLimit: build/index.d.ts#CaseTailLimit
+type CaseWarm: build/index.d.ts#CaseWarm
+type CellBudget: build/index.d.ts#CellBudget
+type ChildPair: build/index.d.ts#ChildPair
+type ChildRecords: build/index.d.ts#ChildRecords
+type ChildSource: build/index.d.ts#ChildSource
+type ChildStep: build/index.d.ts#ChildStep
 type Comparison: build/index.d.ts#Comparison
 type ControlFactors: build/index.d.ts#ControlFactors
 type ControlOptions: build/index.d.ts#ControlOptions
 type ControlRead: build/index.d.ts#ControlRead
 type ControlRow: build/index.d.ts#ControlRow
+type CostCells: build/index.d.ts#CostCells
+type CostProbe: build/index.d.ts#CostProbe
+type CpuEntry: build/index.d.ts#CpuEntry
+type DroppedJob: build/index.d.ts#DroppedJob
 type EntryCount: build/index.d.ts#EntryCount
+type FamilyCase: build/index.d.ts#FamilyCase
+type FamilyCount: build/index.d.ts#FamilyCount
+type FamilyItem: build/index.d.ts#FamilyItem
+type FamilyLimits: build/index.d.ts#FamilyLimits
+type FamilyPower: build/index.d.ts#FamilyPower
+type FamilyPowerOptions: build/index.d.ts#FamilyPowerOptions
+type FamilyRead: build/index.d.ts#FamilyRead
+type FamilyShares: build/index.d.ts#FamilyShares
 type FirstAgainstSecond: build/index.d.ts#FirstAgainstSecond
+type FreezeStamp: build/index.d.ts#FreezeStamp
+GATE_LINE_HELP: build/index.d.ts#GATE_LINE_HELP
+GATE_LINE_LIMIT: build/index.d.ts#GATE_LINE_LIMIT
+GATE_LINE_NAMES: build/index.d.ts#GATE_LINE_NAMES
 GATE_LOOKS: build/index.d.ts#GATE_LOOKS
 type Gate: build/index.d.ts#Gate
 type GateCaseOutcome: build/index.d.ts#GateCaseOutcome
 type GateJobRead: build/index.d.ts#GateJobRead
+type GateLine: build/index.d.ts#GateLine
+type GateLineCases: build/index.d.ts#GateLineCases
+type GateLineCliIo: build/index.d.ts#GateLineCliIo
+type GateLineLevel: build/index.d.ts#GateLineLevel
+type GateLineOptions: build/index.d.ts#GateLineOptions
+type GateLineOutputs: build/index.d.ts#GateLineOutputs
+type GateLineWritten: build/index.d.ts#GateLineWritten
 type GateOutcome: build/index.d.ts#GateOutcome
 type GroupCounts: build/index.d.ts#GroupCounts
 type GroupFactor: build/index.d.ts#GroupFactor
+type GroupJobs: build/index.d.ts#GroupJobs
+type GroupLimits: build/index.d.ts#GroupLimits
+type GrowthOptions: build/index.d.ts#GrowthOptions
+type GrowthOutcome: build/index.d.ts#GrowthOutcome
+type GrowthRound: build/index.d.ts#GrowthRound
+type GrowthStep: build/index.d.ts#GrowthStep
+type GrowthVerdict: build/index.d.ts#GrowthVerdict
 type GuardRead: build/index.d.ts#GuardRead
+type JobAaStats: build/index.d.ts#JobAaStats
+type JobCost: build/index.d.ts#JobCost
+type JobEnv: build/index.d.ts#JobEnv
 type JobLimitVerdict: build/index.d.ts#JobLimitVerdict
+type JobModel: build/index.d.ts#JobModel
+type JobModelsOptions: build/index.d.ts#JobModelsOptions
 type JobRecords: build/index.d.ts#JobRecords
 type JobVerdict: build/index.d.ts#JobVerdict
 type JointClaim: build/index.d.ts#JointClaim
@@ -59,10 +114,15 @@ type Ladder: build/index.d.ts#Ladder
 type LadderDimension: build/index.d.ts#LadderDimension
 type LadderOptions: build/index.d.ts#LadderOptions
 type LadderVerdict: build/index.d.ts#LadderVerdict
+type LimitChange: build/index.d.ts#LimitChange
+type LimitChangeKind: build/index.d.ts#LimitChangeKind
+type LimitChanges: build/index.d.ts#LimitChanges
 type LimitOnModel: build/index.d.ts#LimitOnModel
 type LimitOptions: build/index.d.ts#LimitOptions
 type LimitOutcome: build/index.d.ts#LimitOutcome
 type LimitVerdict: build/index.d.ts#LimitVerdict
+MODEL_LIMITS_FORMAT: build/index.d.ts#MODEL_LIMITS_FORMAT
+MODEL_LIMIT_RULE: build/index.d.ts#MODEL_LIMIT_RULE
 type MeasureCheck: build/index.d.ts#MeasureCheck
 type MeasureCheckOptions: build/index.d.ts#MeasureCheckOptions
 type MeasureChecks: build/index.d.ts#MeasureChecks
@@ -72,19 +132,31 @@ type MeasureRow: build/index.d.ts#MeasureRow
 type MeasureRule: build/index.d.ts#MeasureRule
 type MeasuredFactor: build/index.d.ts#MeasuredFactor
 type MedianBudget: build/index.d.ts#MedianBudget
+type MergedCases: build/index.d.ts#MergedCases
+type ModelCost: build/index.d.ts#ModelCost
+type ModelLimit: build/index.d.ts#ModelLimit
+type ModelLimitOutcome: build/index.d.ts#ModelLimitOutcome
+type ModelLimitRead: build/index.d.ts#ModelLimitRead
+type ModelLimitRule: build/index.d.ts#ModelLimitRule
 type ModelLimits: build/index.d.ts#ModelLimits
+type ModelLimitsFile: build/index.d.ts#ModelLimitsFile
 type ModelRead: build/index.d.ts#ModelRead
 type ModelRow: build/index.d.ts#ModelRow
 type ModelStatus: build/index.d.ts#ModelStatus
 type ModelTest: build/index.d.ts#ModelTest
 type ModelTestOptions: build/index.d.ts#ModelTestOptions
+type ModuleListGaps: build/index.d.ts#ModuleListGaps
+NARROW_SPREAD_SHARE: build/index.d.ts#NARROW_SPREAD_SHARE
 type NoControl: build/index.d.ts#NoControl
 type NoFactor: build/index.d.ts#NoFactor
 type NoiseCheck: build/index.d.ts#NoiseCheck
 type NotSlowerOptions: build/index.d.ts#NotSlowerOptions
 type NotSlowerRead: build/index.d.ts#NotSlowerRead
 type NotSlowerVerdict: build/index.d.ts#NotSlowerVerdict
+type OrderRatio: build/index.d.ts#OrderRatio
 type OrderSize: build/paired.d.ts#OrderSize
+type PairedChild: build/index.d.ts#PairedChild
+type PairedChildOptions: build/index.d.ts#PairedChildOptions
 type PairedTime: build/paired.d.ts#PairedTime
 type PartnerRead: build/index.d.ts#PartnerRead
 type PoolFacts: build/index.d.ts#PoolFacts
@@ -95,6 +167,11 @@ type PooledRecords: build/index.d.ts#PooledRecords
 type PooledVerdict: build/index.d.ts#PooledVerdict
 type Power: build/index.d.ts#Power
 type PowerOptions: build/index.d.ts#PowerOptions
+type ProcessArm: build/index.d.ts#ProcessArm
+type ProcessLimits: build/index.d.ts#ProcessLimits
+type ProcessOptions: build/index.d.ts#ProcessOptions
+type ProcessRead: build/index.d.ts#ProcessRead
+type ProcessVerdict: build/index.d.ts#ProcessVerdict
 type QuantileBudget: build/index.d.ts#QuantileBudget
 type RateBudget: build/index.d.ts#RateBudget
 type ResultRead: build/index.d.ts#ResultRead
@@ -104,6 +181,10 @@ type ResultVerdict: build/index.d.ts#ResultVerdict
 type Rounds: build/index.d.ts#Rounds
 type RoundsOptions: build/index.d.ts#RoundsOptions
 type RowRead: build/index.d.ts#RowRead
+type RunCost: build/index.d.ts#RunCost
+type RunCostOptions: build/index.d.ts#RunCostOptions
+type RunLimit: build/index.d.ts#RunLimit
+type RunLimitOptions: build/index.d.ts#RunLimitOptions
 type RunMethod: build/index.d.ts#RunMethod
 type RunMethodOptions: build/index.d.ts#RunMethodOptions
 type RunPairs: build/index.d.ts#RunPairs
@@ -114,6 +195,11 @@ type RungRecord: build/index.d.ts#RungRecord
 type RungVerdict: build/index.d.ts#RungVerdict
 type Sentinel: build/index.d.ts#Sentinel
 type SentinelOptions: build/index.d.ts#SentinelOptions
+type SlopeOptions: build/index.d.ts#SlopeOptions
+type SlopeRound: build/index.d.ts#SlopeRound
+type SlopeRun: build/index.d.ts#SlopeRun
+type SlopeRung: build/index.d.ts#SlopeRung
+type SlopeVerdict: build/index.d.ts#SlopeVerdict
 type SpreadRead: build/index.d.ts#SpreadRead
 type TailFalseFails: build/index.d.ts#TailFalseFails
 type TailGainCase: build/index.d.ts#TailGainCase
@@ -129,57 +215,100 @@ UNKNOWN_MODEL: build/index.d.ts#UNKNOWN_MODEL
 type VerdictOptions: build/index.d.ts#VerdictOptions
 type VerdictRule: build/index.d.ts#VerdictRule
 type VisibleShift: build/index.d.ts#VisibleShift
+type WarmArm: build/index.d.ts#WarmArm
+type WarmBand: build/index.d.ts#WarmBand
+type WarmCheck: build/index.d.ts#WarmCheck
+type WarmOptions: build/index.d.ts#WarmOptions
+type WarmRecord: build/index.d.ts#WarmRecord
+type WarmVerdict: build/index.d.ts#WarmVerdict
 type WinClaim: build/index.d.ts#WinClaim
 type WorstBudget: build/index.d.ts#WorstBudget
 aaBand: build/index.d.ts#aaBand
+aaLimitOf: build/index.d.ts#aaLimitOf
+aaLimits: build/index.d.ts#aaLimits
+aaOrders: build/index.d.ts#aaOrders
 aaSpread: build/index.d.ts#aaSpread
+aaStats: build/index.d.ts#aaStats
 armModels: build/index.d.ts#armModels
 armOrder: build/paired.d.ts#armOrder
 armVerdicts: build/index.d.ts#armVerdicts
 balanceOrders: build/index.d.ts#balanceOrders
+balancedRounds: build/paired.d.ts#balancedRounds
 budgetLookSpend: build/index.d.ts#budgetLookSpend
 budgetLooksVerdict: build/index.d.ts#budgetLooksVerdict
 budgetVerdict: build/index.d.ts#budgetVerdict
+candidateLimits: build/index.d.ts#candidateLimits
 caseIntervals: build/index.d.ts#caseIntervals
 caseRatios: build/paired.d.ts#caseRatios
 caseTails: build/index.d.ts#caseTails
+caseWarms: build/index.d.ts#caseWarms
 checkLadder: build/index.d.ts#checkLadder
 checkMeasures: build/index.d.ts#checkMeasures
+checkModelLimits: build/index.d.ts#checkModelLimits
 checkPairedTime: build/paired.d.ts#checkPairedTime
+childRecords: build/index.d.ts#childRecords
+childTimes: build/index.d.ts#childTimes
 controlFactor: build/index.d.ts#controlFactor
+cpuEntry: build/index.d.ts#cpuEntry
+familyPower: build/index.d.ts#familyPower
+familyRead: build/index.d.ts#familyRead
 firstAgainstSecond: build/index.d.ts#firstAgainstSecond
 firstAgainstSecondLine: build/index.d.ts#firstAgainstSecondLine
 firstArm: build/paired.d.ts#firstArm
+freezeLimits: build/index.d.ts#freezeLimits
+gateLine: build/index.d.ts#gateLine
+gateLineCli: build/index.d.ts#gateLineCli
 gateOf: build/index.d.ts#gateOf
+growthVerdict: build/index.d.ts#growthVerdict
+isBlock: build/index.d.ts#isBlock
+isNoRead: build/index.d.ts#isNoRead
+isValidRead: build/index.d.ts#isValidRead
+jobModels: build/index.d.ts#jobModels
 jointClaim: build/index.d.ts#jointClaim
 ladderVerdict: build/index.d.ts#ladderVerdict
+limitChanges: build/index.d.ts#limitChanges
 limitOnModel: build/index.d.ts#limitOnModel
 limitVerdict: build/index.d.ts#limitVerdict
+mergeCaseModules: build/index.d.ts#mergeCaseModules
+modelLimitRead: build/index.d.ts#modelLimitRead
 modelRowText: build/index.d.ts#modelRowText
 modelTest: build/index.d.ts#modelTest
+moduleListGaps: build/index.d.ts#moduleListGaps
 notSlowerVerdict: build/index.d.ts#notSlowerVerdict
 orderSize: build/paired.d.ts#orderSize
 overLimit: build/index.d.ts#overLimit
+pairedChild: build/index.d.ts#pairedChild
+pairedChildOrder: build/index.d.ts#pairedChildOrder
 poolRecords: build/index.d.ts#poolRecords
 pooledBand: build/index.d.ts#pooledBand
 pooledLimitVerdict: build/index.d.ts#pooledLimitVerdict
 pooledVerdict: build/index.d.ts#pooledVerdict
+processCaseLine: build/index.d.ts#processCaseLine
+processVerdict: build/index.d.ts#processVerdict
 resultRows: build/index.d.ts#resultRows
 resultVerdict: build/index.d.ts#resultVerdict
+roundSlope: build/index.d.ts#roundSlope
+runCost: build/index.d.ts#runCost
+runLimit: build/index.d.ts#runLimit
 runMethod: build/index.d.ts#runMethod
 rungVerdict: build/index.d.ts#rungVerdict
 sameResult: build/index.d.ts#sameResult
 sentinelCases: build/index.d.ts#sentinelCases
+slopeVerdict: build/index.d.ts#slopeVerdict
 tailFalseFails: build/index.d.ts#tailFalseFails
 tailLimitVerdict: build/index.d.ts#tailLimitVerdict
+timeArm: build/index.d.ts#timeArm
+timeArmRounds: build/index.d.ts#timeArmRounds
 timeRounds: build/index.d.ts#timeRounds
 timeVerdict: build/index.d.ts#timeVerdict
 verdictMargin: build/index.d.ts#verdictMargin
 verdictPower: build/index.d.ts#verdictPower
 visibleShift: build/index.d.ts#visibleShift
+warmVerdict: build/index.d.ts#warmVerdict
 winClaim: build/index.d.ts#winClaim
+writeGateLine: build/index.d.ts#writeGateLine
 
-## ./code-stamp (build/code-stamp.d.ts): 8 names
+## ./code-stamp (build/code-stamp.d.ts): names
 
 CODE_STAMP_READ_WORDS: build/code-stamp.d.ts#CODE_STAMP_READ_WORDS
 CodeStamp: build/code-stamp.d.ts#CodeStamp
@@ -190,27 +319,52 @@ EngineClosure: build/code-stamp.d.ts#EngineClosure
 codeStamp: build/code-stamp.d.ts#codeStamp
 lockClosure: build/code-stamp.d.ts#lockClosure
 
-## ./fresh (build/fresh.d.ts): 17 names
+## ./fresh (build/fresh.d.ts): names
 
+type ArmProcess: build/fresh.d.ts#ArmProcess
+type ArmTimes: build/fresh.d.ts#ArmTimes
+ArmsFixtures: build/fresh.d.ts#ArmsFixtures
 BenchEnv: build/fresh.d.ts#BenchEnv
+CaseArm: build/fresh.d.ts#CaseArm
+type CheckoutArm: build/fresh.d.ts#CheckoutArm
+type CheckoutArmOptions: build/fresh.d.ts#CheckoutArmOptions
+ChildEvents: build/fresh.d.ts#ChildEvents
 ChildExit: build/fresh.d.ts#ChildExit
+ChildFields: build/fresh.d.ts#ChildFields
 ChildLine: build/fresh.d.ts#ChildLine
 ChildSkip: build/fresh.d.ts#ChildSkip
 ChildTime: build/fresh.d.ts#ChildTime
+EventProbe: build/fresh.d.ts#EventProbe
+type FixtureFile: build/fresh.d.ts#FixtureFile
+type FixtureHash: build/fresh.d.ts#FixtureHash
+type FixtureOptions: build/fresh.d.ts#FixtureOptions
 FreshArm: build/fresh.d.ts#FreshArm
+FreshArms: build/fresh.d.ts#FreshArms
+FreshArmsOptions: build/fresh.d.ts#FreshArmsOptions
 FreshOptions: build/fresh.d.ts#FreshOptions
 FreshRecord: build/fresh.d.ts#FreshRecord
 FreshRun: build/fresh.d.ts#FreshRun
 FreshSkip: build/fresh.d.ts#FreshSkip
+HalfCounts: build/fresh.d.ts#HalfCounts
 PairSlot: build/fresh.d.ts#PairSlot
+ProbeOptions: build/fresh.d.ts#ProbeOptions
+type RepoCommitOptions: build/fresh.d.ts#RepoCommitOptions
 StartChild: build/fresh.d.ts#StartChild
 StartOptions: build/fresh.d.ts#StartOptions
+armTimes: build/fresh.d.ts#armTimes
 benchEnv: build/fresh.d.ts#benchEnv
+checkFixtures: build/fresh.d.ts#checkFixtures
+checkoutArm: build/fresh.d.ts#checkoutArm
 childLine: build/fresh.d.ts#childLine
+eventProbe: build/fresh.d.ts#eventProbe
+fixtureDifferences: build/fresh.d.ts#fixtureDifferences
+freshArms: build/fresh.d.ts#freshArms
 freshRun: build/fresh.d.ts#freshRun
 pairOrder: build/fresh.d.ts#pairOrder
+peakRss: build/fresh.d.ts#peakRss
+repoCommit: build/fresh.d.ts#repoCommit
 
-## ./supervise (build/supervise.d.ts): 11 names
+## ./supervise (build/supervise.d.ts): names
 
 CaseProgress: build/supervise.d.ts#CaseProgress
 DEFAULT_OVERRUNS: build/supervise.d.ts#DEFAULT_OVERRUNS
@@ -223,6 +377,10 @@ SupervisedEnd: build/supervise.d.ts#SupervisedEnd
 caseProgress: build/supervise.d.ts#caseProgress
 startSupervisedProcess: build/supervise.d.ts#startSupervisedProcess
 superviseCases: build/supervise.d.ts#superviseCases
+
+## bin: 1 commands
+
+rigor-gate-line: ./build/cli.js
 
 ## Declarations
 
@@ -277,6 +435,34 @@ export declare function codeStamp(options: CodeStampOptions): Promise<CodeStamp>
 ### build/code-stamp.d.ts#lockClosure
 export declare function lockClosure(lockText: string, importer: string, names: readonly string[]): readonly EngineClosure[];
 
+### build/fresh.d.ts#ArmProcess
+interface ArmProcess {
+  readonly arm: string;
+  readonly case: string;
+  readonly round: number;
+  readonly position: number;
+  readonly ms: number;
+  readonly fields?: ChildFields;
+}
+
+### build/fresh.d.ts#ArmTimes
+interface ArmTimes {
+  readonly arm: string;
+  readonly case: string;
+  readonly processes: number;
+  readonly median: number;
+  readonly p10: number;
+  readonly p90: number;
+  readonly spread: number;
+}
+
+### build/fresh.d.ts#ArmsFixtures
+export interface ArmsFixtures {
+  readonly folder: string;
+  readonly files: readonly FixtureFile[];
+  readonly read?: (path: string) => Uint8Array;
+}
+
 ### build/fresh.d.ts#BenchEnv
 export interface BenchEnv {
   readonly cpu: string;
@@ -287,6 +473,39 @@ export interface BenchEnv {
   readonly runner?: string;
 }
 
+### build/fresh.d.ts#CaseArm
+export interface CaseArm {
+  readonly id: string;
+  readonly case: string;
+  readonly command?: readonly string[];
+  readonly cwd?: string;
+}
+
+### build/fresh.d.ts#CheckoutArm
+interface CheckoutArm extends FreshArm {
+  readonly cwd: string;
+  readonly commit: string;
+  readonly remove: () => Promise<void>;
+}
+
+### build/fresh.d.ts#CheckoutArmOptions
+interface CheckoutArmOptions {
+  readonly id: string;
+  readonly commit: string;
+  readonly dir: string;
+  readonly command: readonly string[];
+  readonly setup?: readonly (readonly string[])[];
+  readonly repo?: string;
+  readonly timeoutMs?: number;
+  readonly start?: StartChild;
+}
+
+### build/fresh.d.ts#ChildEvents
+export interface ChildEvents {
+  readonly gc: HalfCounts;
+  readonly deopt?: HalfCounts;
+}
+
 ### build/fresh.d.ts#ChildExit
 export interface ChildExit {
   readonly stdout: string;
@@ -294,6 +513,13 @@ export interface ChildExit {
   readonly code: number | null;
   readonly timedOut?: boolean;
   readonly error?: string;
+}
+
+### build/fresh.d.ts#ChildFields
+export interface ChildFields {
+  readonly peakRss?: number;
+  readonly warm?: number;
+  readonly events?: ChildEvents;
 }
 
 ### build/fresh.d.ts#ChildLine
@@ -307,16 +533,69 @@ export interface ChildSkip {
 }
 
 ### build/fresh.d.ts#ChildTime
-export interface ChildTime {
+export interface ChildTime extends ChildFields {
   readonly ms: number;
   readonly hash?: string;
   readonly skipped?: undefined;
+}
+
+### build/fresh.d.ts#EventProbe
+export interface EventProbe {
+  readonly mark: (sample: number) => void;
+  readonly events: (samples: number) => Promise<ChildEvents>;
+}
+
+### build/fresh.d.ts#FixtureFile
+interface FixtureFile {
+  readonly file: string;
+  readonly sha256: string;
+}
+
+### build/fresh.d.ts#FixtureHash
+interface FixtureHash extends FixtureFile {
+  readonly bytes: number;
+}
+
+### build/fresh.d.ts#FixtureOptions
+interface FixtureOptions {
+  readonly read?: (path: string) => Uint8Array;
 }
 
 ### build/fresh.d.ts#FreshArm
 export interface FreshArm {
   readonly id: string;
   readonly command: readonly string[];
+  readonly cwd?: string;
+  readonly commit?: string;
+}
+
+### build/fresh.d.ts#FreshArms
+export interface FreshArms {
+  readonly env: BenchEnv;
+  readonly job: string;
+  readonly rounds: number;
+  readonly balanced: boolean;
+  readonly warnings: readonly string[];
+  readonly processes: readonly ArmProcess[];
+  readonly aa: readonly FreshRecord[];
+  readonly fixtures?: readonly FixtureHash[];
+}
+
+### build/fresh.d.ts#FreshArmsOptions
+export interface FreshArmsOptions {
+  readonly arms: readonly CaseArm[];
+  readonly command?: readonly string[];
+  readonly args?: (caseId: string) => readonly string[];
+  readonly aa?: readonly [string, string];
+  readonly rounds?: number;
+  readonly roundOffset?: number;
+  readonly fixtures?: ArmsFixtures;
+  readonly timeoutMs?: number;
+  readonly maxBuffer?: number;
+  readonly job?: string;
+  readonly env?: BenchEnv;
+  readonly start?: StartChild;
+  readonly onProcess?: (record: ArmProcess) => void;
 }
 
 ### build/fresh.d.ts#FreshOptions
@@ -326,9 +605,10 @@ export interface FreshOptions {
   readonly cases: readonly string[];
   readonly rounds: number;
   readonly roundOffset?: number;
-  readonly aa?: boolean;
+  readonly aa?: boolean | "each";
   readonly args?: (caseId: string) => readonly string[];
   readonly timeoutMs?: number;
+  readonly overLimit?: "error" | "skip";
   readonly maxBuffer?: number;
   readonly job?: string;
   readonly env?: BenchEnv;
@@ -339,6 +619,14 @@ export interface FreshOptions {
 export interface FreshRecord extends PairedTime {
   readonly job: string;
   readonly env: BenchEnv;
+  readonly fields?: {
+    readonly a: ChildFields;
+    readonly b: ChildFields;
+  };
+  readonly commits?: {
+    readonly a?: string;
+    readonly b?: string;
+  };
 }
 
 ### build/fresh.d.ts#FreshRun
@@ -357,10 +645,26 @@ export interface FreshSkip {
   readonly reason: string;
 }
 
+### build/fresh.d.ts#HalfCounts
+export type HalfCounts = readonly [early: number, late: number];
+
 ### build/fresh.d.ts#PairSlot
 export interface PairSlot {
   readonly pair: number;
   readonly first: Arm;
+}
+
+### build/fresh.d.ts#ProbeOptions
+export interface ProbeOptions {
+  readonly deopt?: boolean;
+  readonly dir?: string;
+}
+
+### build/fresh.d.ts#RepoCommitOptions
+interface RepoCommitOptions {
+  readonly repo?: string;
+  readonly timeoutMs?: number;
+  readonly start?: StartChild;
 }
 
 ### build/fresh.d.ts#StartChild
@@ -370,19 +674,67 @@ export type StartChild = (argv: readonly string[], options: StartOptions) => Pro
 export interface StartOptions {
   readonly timeoutMs: number;
   readonly maxBuffer: number;
+  readonly cwd?: string;
 }
+
+### build/fresh.d.ts#armTimes
+export declare function armTimes(processes: readonly ArmProcess[]): ArmTimes[];
 
 ### build/fresh.d.ts#benchEnv
 export declare function benchEnv(): BenchEnv;
 
+### build/fresh.d.ts#checkFixtures
+export declare function checkFixtures(folder: string, files: readonly FixtureFile[], options?: FixtureOptions): FixtureHash[];
+
+### build/fresh.d.ts#checkoutArm
+export declare function checkoutArm(options: CheckoutArmOptions): Promise<CheckoutArm>;
+
 ### build/fresh.d.ts#childLine
 export declare function childLine(stdout: string): ChildLine;
+
+### build/fresh.d.ts#eventProbe
+export declare function eventProbe(options?: ProbeOptions): EventProbe;
+
+### build/fresh.d.ts#fixtureDifferences
+export declare function fixtureDifferences(a: readonly FixtureFile[], b: readonly FixtureFile[]): string[];
+
+### build/fresh.d.ts#freshArms
+export declare function freshArms(options: FreshArmsOptions): Promise<FreshArms>;
 
 ### build/fresh.d.ts#freshRun
 export declare function freshRun(options: FreshOptions): Promise<FreshRun>;
 
 ### build/fresh.d.ts#pairOrder
 export declare function pairOrder(pairs: number, round: number, caseIndex: number): PairSlot[];
+
+### build/fresh.d.ts#peakRss
+export declare function peakRss(): number;
+
+### build/fresh.d.ts#repoCommit
+export declare function repoCommit(ref: string, options?: RepoCommitOptions): Promise<string>;
+
+### build/index.d.ts#AaLimitOptions
+interface AaLimitOptions {
+  readonly family?: (name: string) => string | undefined;
+  readonly minimum?: number;
+  readonly digits?: number;
+  readonly marginFloor?: number;
+  readonly cut?: number;
+}
+
+### build/index.d.ts#AaLimits
+interface AaLimits {
+  readonly families: Readonly<Record<string, FamilyLimits>>;
+  readonly fallback: GroupLimits;
+}
+
+### build/index.d.ts#AaOrders
+interface AaOrders {
+  readonly case: string;
+  readonly all: OrderRatio;
+  readonly aFirst?: OrderRatio;
+  readonly bFirst?: OrderRatio;
+}
 
 ### build/index.d.ts#ArmModels
 interface ArmModels {
@@ -391,10 +743,51 @@ interface ArmModels {
   readonly one: boolean;
 }
 
+### build/index.d.ts#ArmOptions
+interface ArmOptions {
+  readonly samples: number;
+  readonly calls?: number;
+  readonly targetMs?: number;
+  readonly warmMs?: number;
+  readonly warmSamples?: number;
+  readonly now?: () => number;
+  readonly mark?: (sample: number) => void;
+  readonly slow?: number;
+}
+
 ### build/index.d.ts#ArmPair
 interface ArmPair {
   readonly a: string | undefined;
   readonly b: string | undefined;
+}
+
+### build/index.d.ts#ArmRounds
+interface ArmRounds {
+  readonly pairs: Record<string, PairedTime[]>;
+  readonly orders: readonly (readonly string[])[];
+  readonly count: number;
+  readonly sink: number;
+}
+
+### build/index.d.ts#ArmRoundsOptions
+interface ArmRoundsOptions {
+  readonly case: string;
+  readonly base: ProcessArm;
+  readonly candidates: readonly ProcessArm[];
+  readonly rounds: number;
+  readonly offset?: number;
+  readonly aa?: boolean;
+  readonly targetMs?: number;
+  readonly warmMs?: number;
+  readonly now?: () => number;
+}
+
+### build/index.d.ts#ArmTime
+interface ArmTime {
+  readonly ms: number;
+  readonly calls: number;
+  readonly samples: readonly number[];
+  readonly warm?: number;
 }
 
 ### build/index.d.ts#BUDGET_LOOKS
@@ -426,6 +819,9 @@ interface BandOptions {
   readonly minimum?: number;
   readonly bootstrap?: BootstrapOptions;
 }
+
+### build/index.d.ts#Better
+type Better = "lower" | "higher";
 
 ### build/index.d.ts#BudgetLook
 interface BudgetLook {
@@ -491,6 +887,31 @@ interface BudgetVerdict {
 ### build/index.d.ts#CEILING_ONLY
 export declare const CEILING_ONLY = "gain not read on this model, ceiling only";
 
+### build/index.d.ts#CHILD_SOURCES
+export declare const CHILD_SOURCES: readonly ["base", "candidate", "copy"];
+
+### build/index.d.ts#CandidateLimit
+interface CandidateLimit {
+  readonly case: string;
+  readonly model: string;
+  readonly status: CandidateStatus;
+  readonly values: readonly number[];
+  readonly mean: number | null;
+  readonly sd: number | null;
+  readonly limit: number | null;
+}
+
+### build/index.d.ts#CandidateStatus
+type CandidateStatus = "limit" | "too-few" | "no-spread" | "unknown-model";
+
+### build/index.d.ts#CaseAaStat
+interface CaseAaStat {
+  readonly case: string;
+  readonly median: number;
+  readonly spread: number;
+  readonly rounds: number;
+}
+
 ### build/index.d.ts#CaseBudget
 interface CaseBudget {
   readonly case: string;
@@ -526,7 +947,32 @@ interface CaseInterval extends CaseRatio {
 interface CaseLimit extends CaseInterval {
   readonly bound: number;
   readonly floor: number;
+  readonly noise: number;
   readonly outcome: LimitOutcome;
+}
+
+### build/index.d.ts#CaseProcesses
+interface CaseProcesses {
+  readonly case: string;
+  readonly outcome: LimitOutcome;
+  readonly limit: number;
+  readonly slow: number;
+  readonly maxSlow: number | undefined;
+  readonly ratios: readonly number[];
+  readonly used: readonly string[];
+  readonly median: number | undefined;
+  readonly slowCount: number;
+  readonly invalid: readonly string[];
+  readonly missing: readonly string[];
+  readonly faults: readonly string[];
+  readonly more: number;
+  readonly reason: string;
+}
+
+### build/index.d.ts#CaseRead
+interface CaseRead {
+  readonly case: string;
+  readonly outcome: string;
 }
 
 ### build/index.d.ts#CaseResults
@@ -550,6 +996,37 @@ interface CaseTailLimit extends CaseTail {
   readonly overMedian: boolean;
   readonly overTail: boolean;
   readonly outcome: LimitOutcome;
+}
+
+### build/index.d.ts#CaseWarm
+interface CaseWarm {
+  readonly case: string;
+  readonly warm: number;
+  readonly rounds: number;
+}
+
+### build/index.d.ts#CellBudget
+interface CellBudget {
+  readonly upTo: number;
+  readonly ms: number;
+}
+
+### build/index.d.ts#ChildPair
+type ChildPair = "candidate" | "aa";
+
+### build/index.d.ts#ChildRecords
+interface ChildRecords {
+  readonly candidate: PairedTime;
+  readonly aa: PairedTime;
+}
+
+### build/index.d.ts#ChildSource
+type ChildSource = (typeof CHILD_SOURCES)[number];
+
+### build/index.d.ts#ChildStep
+interface ChildStep {
+  readonly pair: ChildPair;
+  readonly source: ChildSource;
 }
 
 ### build/index.d.ts#Comparison
@@ -606,12 +1083,112 @@ interface ControlRow {
   readonly censored?: boolean;
 }
 
+### build/index.d.ts#CostCells
+interface CostCells {
+  readonly job: string;
+  readonly size: number;
+  readonly cells: number;
+}
+
+### build/index.d.ts#CostProbe
+interface CostProbe {
+  readonly job: string;
+  readonly size: number;
+  readonly model: string;
+  readonly ms: number;
+}
+
+### build/index.d.ts#CpuEntry
+interface CpuEntry<T> {
+  readonly model: string;
+  readonly value: T;
+}
+
+### build/index.d.ts#DroppedJob
+interface DroppedJob {
+  readonly job: string;
+  readonly spread: number;
+  readonly score: number;
+}
+
 ### build/index.d.ts#EntryCount
 interface EntryCount {
   readonly group: string;
   readonly stratum: string | undefined;
   readonly finished: number;
   readonly censored: number;
+}
+
+### build/index.d.ts#FamilyCase
+interface FamilyCase {
+  readonly case: string;
+  readonly outcome: TimeOutcome;
+  readonly holm: TimeOutcome;
+  readonly eachJob: TimeOutcome;
+  readonly eachJobHolm: TimeOutcome;
+  readonly adjustedSlower: number | undefined;
+  readonly adjustedFaster: number | undefined;
+}
+
+### build/index.d.ts#FamilyCount
+interface FamilyCount {
+  readonly slower: number;
+  readonly faster: number;
+}
+
+### build/index.d.ts#FamilyItem
+interface FamilyItem {
+  readonly case: string;
+  readonly verdict: TimeVerdict | PooledVerdict;
+}
+
+### build/index.d.ts#FamilyLimits
+type FamilyLimits = (GroupLimits & {
+  readonly source: "family";
+}) | (GroupJobs & {
+  readonly source: "fallback";
+});
+
+### build/index.d.ts#FamilyPower
+interface FamilyPower {
+  readonly trials: number;
+  readonly falseSlower: FamilyShares;
+  readonly firstSlower: FamilyShares;
+}
+
+### build/index.d.ts#FamilyPowerOptions
+interface FamilyPowerOptions {
+  readonly family: number;
+  readonly ratio?: number;
+  readonly rounds?: number;
+  readonly jobs?: number;
+  readonly sigma?: number;
+  readonly jobShift?: number;
+  readonly trials?: number;
+  readonly seed?: number | string;
+  readonly level?: number;
+  readonly verdict?: VerdictOptions;
+}
+
+### build/index.d.ts#FamilyRead
+interface FamilyRead {
+  readonly level: number;
+  readonly cases: readonly FamilyCase[];
+  readonly plain: FamilyCount;
+  readonly holm: FamilyCount;
+  readonly eachJob: FamilyCount;
+  readonly eachJobHolm: FamilyCount;
+  readonly floor: number | undefined;
+  readonly firstStep: number | undefined;
+  readonly lines: readonly string[];
+}
+
+### build/index.d.ts#FamilyShares
+interface FamilyShares {
+  readonly plain: number;
+  readonly holm: number;
+  readonly eachJob: number;
+  readonly eachJobHolm: number;
 }
 
 ### build/index.d.ts#FirstAgainstSecond
@@ -622,6 +1199,21 @@ interface FirstAgainstSecond {
   readonly low: number;
   readonly high: number;
 }
+
+### build/index.d.ts#FreezeStamp
+interface FreezeStamp {
+  readonly commit: string;
+  readonly date: string;
+}
+
+### build/index.d.ts#GATE_LINE_HELP
+export declare const GATE_LINE_HELP: string;
+
+### build/index.d.ts#GATE_LINE_LIMIT
+export declare const GATE_LINE_LIMIT: number;
+
+### build/index.d.ts#GATE_LINE_NAMES
+export declare const GATE_LINE_NAMES: number;
 
 ### build/index.d.ts#GATE_LOOKS
 export declare const GATE_LOOKS: readonly number[];
@@ -651,6 +1243,59 @@ interface GateJobRead {
   readonly centre: number | undefined;
 }
 
+### build/index.d.ts#GateLine
+interface GateLine {
+  readonly title: string;
+  readonly outcome: Exclude<GateOutcome, "pass">;
+  readonly level: GateLineLevel;
+  readonly total: number;
+  readonly blocks: GateLineCases;
+  readonly noReads: GateLineCases;
+  readonly reason: string | undefined;
+  readonly cpu: string | undefined;
+  readonly mixed: boolean;
+  readonly text: string;
+}
+
+### build/index.d.ts#GateLineCases
+interface GateLineCases {
+  readonly count: number;
+  readonly cases: readonly string[];
+}
+
+### build/index.d.ts#GateLineCliIo
+interface GateLineCliIo {
+  readonly readFile: (path: string) => string;
+  readonly readStdin: () => string;
+  readonly stdout: (text: string) => void;
+  readonly stderr: (text: string) => void;
+  readonly env: Readonly<Record<string, string | undefined>>;
+}
+
+### build/index.d.ts#GateLineLevel
+type GateLineLevel = "warning" | "error";
+
+### build/index.d.ts#GateLineOptions
+interface GateLineOptions {
+  readonly title: string;
+  readonly enforced?: boolean;
+  readonly reason?: string;
+  readonly models?: ArmModels | readonly JobModel[];
+}
+
+### build/index.d.ts#GateLineOutputs
+interface GateLineOutputs {
+  readonly log?: (line: string) => void;
+  readonly stream?: "stdout" | "stderr";
+  readonly summary?: string | undefined;
+}
+
+### build/index.d.ts#GateLineWritten
+interface GateLineWritten {
+  readonly annotation: string;
+  readonly summary: string;
+}
+
 ### build/index.d.ts#GateOutcome
 type GateOutcome = "pass" | "block" | "no read";
 
@@ -665,6 +1310,57 @@ interface GroupCounts {
 ### build/index.d.ts#GroupFactor
 type GroupFactor = MeasuredFactor | NoFactor;
 
+### build/index.d.ts#GroupJobs
+interface GroupJobs {
+  readonly cases: readonly string[];
+  readonly jobs: readonly string[];
+  readonly dropped: readonly DroppedJob[];
+}
+
+### build/index.d.ts#GroupLimits
+interface GroupLimits extends GroupJobs {
+  readonly margin: RunLimit;
+  readonly noiseCap: RunLimit;
+}
+
+### build/index.d.ts#GrowthOptions
+interface GrowthOptions {
+  readonly maxGrowth: number;
+  readonly per?: number;
+  readonly level?: number;
+}
+
+### build/index.d.ts#GrowthOutcome
+type GrowthOutcome = "within" | "beyond" | "cannot decide";
+
+### build/index.d.ts#GrowthRound
+interface GrowthRound {
+  readonly job: string;
+  readonly size: number;
+  readonly value: number;
+}
+
+### build/index.d.ts#GrowthStep
+interface GrowthStep {
+  readonly from: number;
+  readonly to: number;
+  readonly growths: readonly number[];
+  readonly median: number;
+  readonly low: number;
+  readonly high: number;
+  readonly coverage: number;
+  readonly exponent: number;
+  readonly outcome: GrowthOutcome;
+}
+
+### build/index.d.ts#GrowthVerdict
+interface GrowthVerdict {
+  readonly outcome: GrowthOutcome;
+  readonly maxGrowth: number;
+  readonly per: number;
+  readonly steps: readonly GrowthStep[];
+}
+
 ### build/index.d.ts#GuardRead
 interface GuardRead {
   readonly control: string;
@@ -673,10 +1369,45 @@ interface GuardRead {
   readonly partners: readonly PartnerRead[];
 }
 
+### build/index.d.ts#JobAaStats
+interface JobAaStats {
+  readonly job: string;
+  readonly cases: readonly CaseAaStat[];
+}
+
+### build/index.d.ts#JobCost
+interface JobCost {
+  readonly job: string;
+  readonly minutes: number;
+  readonly callMinutes: number;
+  readonly cells: number;
+  readonly overruns: number;
+  readonly stopsAt: number | undefined;
+  readonly extrapolated: readonly number[];
+}
+
+### build/index.d.ts#JobEnv
+interface JobEnv {
+  readonly cpu: string;
+  readonly cores?: number;
+}
+
 ### build/index.d.ts#JobLimitVerdict
 interface JobLimitVerdict {
   readonly job: string;
   readonly verdict: LimitVerdict;
+}
+
+### build/index.d.ts#JobModel
+interface JobModel {
+  readonly model: string;
+  readonly cores?: number;
+  readonly jobs: number;
+}
+
+### build/index.d.ts#JobModelsOptions
+interface JobModelsOptions {
+  readonly cores?: boolean;
 }
 
 ### build/index.d.ts#JobRecords
@@ -761,6 +1492,25 @@ interface LadderVerdict {
   readonly rungs: readonly RungVerdict[];
 }
 
+### build/index.d.ts#LimitChange
+interface LimitChange {
+  readonly case: string;
+  readonly model: string;
+  readonly kind: LimitChangeKind;
+  readonly from: number | null;
+  readonly to: number | null;
+  readonly reason?: string;
+}
+
+### build/index.d.ts#LimitChangeKind
+type LimitChangeKind = "tighter" | "looser" | "same" | "added" | "removed";
+
+### build/index.d.ts#LimitChanges
+interface LimitChanges {
+  readonly changes: readonly LimitChange[];
+  readonly refused: readonly string[];
+}
+
 ### build/index.d.ts#LimitOnModel
 interface LimitOnModel {
   readonly limit: number;
@@ -773,6 +1523,7 @@ interface LimitOptions extends BandOptions {
   readonly limit: number;
   readonly caseLevel?: number;
   readonly share?: number;
+  readonly aaFrom?: "cases" | "rounds";
 }
 
 ### build/index.d.ts#LimitOutcome
@@ -788,6 +1539,12 @@ interface LimitVerdict {
   readonly share: number;
   readonly allowed: number;
 }
+
+### build/index.d.ts#MODEL_LIMITS_FORMAT
+export declare const MODEL_LIMITS_FORMAT = "rigor-model-limits/1";
+
+### build/index.d.ts#MODEL_LIMIT_RULE
+export declare const MODEL_LIMIT_RULE: ModelLimitRule;
 
 ### build/index.d.ts#MeasureCheck
 interface MeasureCheck {
@@ -872,11 +1629,65 @@ interface MedianBudget {
   readonly caseLevel?: number;
 }
 
+### build/index.d.ts#MergedCases
+interface MergedCases<T> {
+  readonly cases: Readonly<Record<string, T>>;
+  readonly moduleOf: Readonly<Record<string, string>>;
+}
+
+### build/index.d.ts#ModelCost
+interface ModelCost {
+  readonly model: string;
+  readonly minutes: number;
+  readonly jobs: readonly JobCost[];
+  readonly missing: readonly string[];
+}
+
+### build/index.d.ts#ModelLimit
+interface ModelLimit {
+  readonly limit: number;
+  readonly mean: number;
+  readonly sd: number;
+  readonly values: readonly number[];
+  readonly commit: string;
+  readonly date: string;
+  readonly reason?: string;
+}
+
+### build/index.d.ts#ModelLimitOutcome
+type ModelLimitOutcome = "within" | "beyond" | "no read";
+
+### build/index.d.ts#ModelLimitRead
+interface ModelLimitRead {
+  readonly case: string;
+  readonly model: string;
+  readonly value: number;
+  readonly limit: number | null;
+  readonly outcome: ModelLimitOutcome;
+  readonly note: string;
+}
+
+### build/index.d.ts#ModelLimitRule
+interface ModelLimitRule {
+  readonly k: number;
+  readonly minimum: number;
+  readonly better: Better;
+}
+
 ### build/index.d.ts#ModelLimits
 interface ModelLimits {
   readonly gain: number;
   readonly ceiling: number;
   readonly models: readonly string[];
+}
+
+### build/index.d.ts#ModelLimitsFile
+interface ModelLimitsFile {
+  readonly format: typeof MODEL_LIMITS_FORMAT;
+  readonly measure: string;
+  readonly rule: ModelLimitRule;
+  readonly ruleReason?: string;
+  readonly limits: Readonly<Record<string, Readonly<Record<string, ModelLimit>>>>;
 }
 
 ### build/index.d.ts#ModelRead
@@ -928,6 +1739,15 @@ interface ModelTestOptions {
   readonly searchVisible?: boolean;
 }
 
+### build/index.d.ts#ModuleListGaps
+interface ModuleListGaps {
+  readonly unlisted: readonly string[];
+  readonly missing: readonly string[];
+}
+
+### build/index.d.ts#NARROW_SPREAD_SHARE
+export declare const NARROW_SPREAD_SHARE = .1;
+
 ### build/index.d.ts#NoControl
 interface NoControl {
   readonly because: string;
@@ -967,6 +1787,31 @@ interface NotSlowerVerdict extends Gate {
   readonly need: number;
   readonly cases: readonly CaseGate[];
   readonly more: readonly BudgetMore[];
+}
+
+### build/index.d.ts#OrderRatio
+interface OrderRatio {
+  readonly ratio: number;
+  readonly low: number;
+  readonly high: number;
+  readonly coverage: number;
+  readonly rounds: number;
+}
+
+### build/index.d.ts#PairedChild
+interface PairedChild {
+  readonly order: readonly ChildStep[];
+  readonly times: readonly number[];
+  readonly records: ChildRecords;
+}
+
+### build/index.d.ts#PairedChildOptions
+interface PairedChildOptions {
+  readonly case: string;
+  readonly round: number;
+  readonly offset: number;
+  readonly steps: number;
+  readonly sample: Readonly<Record<ChildSource, (tag: string) => Promise<number>>>;
 }
 
 ### build/index.d.ts#PartnerRead
@@ -1048,6 +1893,42 @@ interface PowerOptions {
   readonly verdict?: VerdictOptions;
 }
 
+### build/index.d.ts#ProcessArm
+interface ProcessArm {
+  readonly id: string;
+  readonly run: () => number;
+}
+
+### build/index.d.ts#ProcessLimits
+interface ProcessLimits {
+  readonly limit: number;
+  readonly slow?: number;
+  readonly maxSlow?: number;
+}
+
+### build/index.d.ts#ProcessOptions
+interface ProcessOptions {
+  readonly k: number;
+  readonly limits: ProcessLimits | ((caseName: string) => ProcessLimits);
+  readonly processes?: readonly string[];
+}
+
+### build/index.d.ts#ProcessRead
+interface ProcessRead {
+  readonly process: string;
+  readonly case: string;
+  readonly ratio: number;
+  readonly aa?: readonly [number, number];
+  readonly fault?: string;
+}
+
+### build/index.d.ts#ProcessVerdict
+interface ProcessVerdict extends Gate {
+  readonly k: number;
+  readonly cases: readonly CaseProcesses[];
+  readonly more: number;
+}
+
 ### build/index.d.ts#QuantileBudget
 interface QuantileBudget {
   readonly kind: "quantile";
@@ -1116,6 +1997,42 @@ interface RoundsOptions {
 interface RowRead {
   readonly row: ResultRow;
   readonly line: string;
+}
+
+### build/index.d.ts#RunCost
+interface RunCost {
+  readonly models: readonly ModelCost[];
+  readonly low: number | undefined;
+  readonly high: number | undefined;
+}
+
+### build/index.d.ts#RunCostOptions
+interface RunCostOptions {
+  readonly calls: number;
+  readonly slow?: {
+    readonly ms: number;
+    readonly calls: number;
+  };
+  readonly budgets?: readonly CellBudget[];
+  readonly overruns?: number;
+  readonly overhead?: number;
+  readonly jobMinutes?: number;
+}
+
+### build/index.d.ts#RunLimit
+interface RunLimit {
+  readonly limit: number;
+  readonly worst: number;
+  readonly spread: number;
+  readonly values: readonly number[];
+}
+
+### build/index.d.ts#RunLimitOptions
+interface RunLimitOptions {
+  readonly minimum?: number;
+  readonly digits?: number;
+  readonly better?: Better;
+  readonly bound?: number;
 }
 
 ### build/index.d.ts#RunMethod
@@ -1202,6 +2119,54 @@ interface SentinelOptions {
   readonly seed: number | string;
 }
 
+### build/index.d.ts#SlopeOptions
+interface SlopeOptions {
+  readonly limit: number;
+  readonly holds?: number;
+  readonly band?: number;
+  readonly interval?: "spread" | "median";
+  readonly level?: number;
+  readonly aaLevel?: number;
+  readonly minRuns?: number;
+}
+
+### build/index.d.ts#SlopeRound
+interface SlopeRound {
+  readonly run: string;
+  readonly rungs: readonly SlopeRung[];
+  readonly aa: number;
+}
+
+### build/index.d.ts#SlopeRun
+interface SlopeRun {
+  readonly run: string;
+  readonly rounds: number;
+  readonly median: number;
+  readonly aaLow: number;
+  readonly aaHigh: number;
+  readonly counts: boolean;
+}
+
+### build/index.d.ts#SlopeRung
+interface SlopeRung {
+  readonly size: number;
+  readonly value: number;
+}
+
+### build/index.d.ts#SlopeVerdict
+interface SlopeVerdict {
+  readonly outcome: LimitOutcome;
+  readonly reason: string;
+  readonly slopes: readonly number[];
+  readonly slope: number;
+  readonly low: number;
+  readonly high: number;
+  readonly runs: readonly SlopeRun[];
+  readonly limit: number;
+  readonly holds: number | undefined;
+  readonly band: number;
+}
+
 ### build/index.d.ts#SpreadRead
 interface SpreadRead {
   readonly stratum: string | undefined;
@@ -1209,6 +2174,10 @@ interface SpreadRead {
   readonly separated: number;
   readonly tooFew: number;
   readonly widest: number | undefined;
+  readonly entries: number;
+  readonly share: number | undefined;
+  readonly apart: readonly string[];
+  readonly narrow: boolean;
 }
 
 ### build/index.d.ts#TailFalseFails
@@ -1266,6 +2235,8 @@ interface TimeVerdict {
   readonly comparison: Comparison$1 | undefined;
   readonly pool?: PoolFacts;
   readonly noise?: NoiseCheck;
+  readonly pSlower?: number;
+  readonly pFaster?: number;
 }
 
 ### build/index.d.ts#TimedCase
@@ -1292,6 +2263,7 @@ interface VerdictOptions extends BandOptions {
   readonly noiseCap?: number;
   readonly spreadLevel?: number;
   readonly pool?: PoolOptions;
+  readonly pValues?: boolean;
 }
 
 ### build/index.d.ts#VerdictRule
@@ -1301,6 +2273,56 @@ type VerdictRule = "band" | "difference";
 interface VisibleShift {
   readonly shift: number | undefined;
   readonly floor: number;
+}
+
+### build/index.d.ts#WarmArm
+interface WarmArm extends WarmCheck {
+  readonly ok: boolean;
+}
+
+### build/index.d.ts#WarmBand
+interface WarmBand {
+  readonly low: number;
+  readonly high: number;
+}
+
+### build/index.d.ts#WarmCheck
+interface WarmCheck {
+  readonly cases: number;
+  readonly median: number;
+  readonly p10: number;
+  readonly p90: number;
+  readonly outside: number;
+}
+
+### build/index.d.ts#WarmOptions
+interface WarmOptions {
+  readonly aa: string;
+  readonly band: WarmBand;
+  readonly arms?: readonly string[];
+  readonly slack?: number;
+  readonly median?: readonly [low: number, high: number];
+}
+
+### build/index.d.ts#WarmRecord
+interface WarmRecord {
+  readonly case: string;
+  readonly fields?: {
+    readonly a: {
+      readonly warm?: number;
+    };
+    readonly b: {
+      readonly warm?: number;
+    };
+  };
+}
+
+### build/index.d.ts#WarmVerdict
+interface WarmVerdict {
+  readonly ok: boolean;
+  readonly aa: WarmCheck;
+  readonly arms: Readonly<Record<string, WarmArm>>;
+  readonly steady: readonly string[];
 }
 
 ### build/index.d.ts#WinClaim
@@ -1330,8 +2352,24 @@ interface WorstBudget {
 ### build/index.d.ts#aaBand
 export declare function aaBand(aa: readonly PairedTime[], options?: BandOptions): Band;
 
+### build/index.d.ts#aaLimitOf
+export declare function aaLimitOf(limits: AaLimits, family: string | undefined): {
+  readonly margin: number;
+  readonly noiseCap: number;
+  readonly source: "family" | "fallback";
+};
+
+### build/index.d.ts#aaLimits
+export declare function aaLimits(jobs: readonly JobAaStats[], options?: AaLimitOptions): AaLimits;
+
+### build/index.d.ts#aaOrders
+export declare function aaOrders(aa: readonly PairedTime[], level?: number): AaOrders[];
+
 ### build/index.d.ts#aaSpread
 export declare function aaSpread(aa: readonly PairedTime[], level?: number): number;
+
+### build/index.d.ts#aaStats
+export declare function aaStats(aa: readonly PairedTime[], level?: number): CaseAaStat[];
 
 ### build/index.d.ts#armModels
 export declare function armModels(pairs: readonly ArmPair[]): ArmModels;
@@ -1351,11 +2389,17 @@ export declare function budgetLooksVerdict(rounds: readonly BudgetRound[], aa: r
 ### build/index.d.ts#budgetVerdict
 export declare function budgetVerdict(rounds: readonly BudgetRound[], aa: readonly BudgetRound[], options: BudgetOptions): BudgetVerdict;
 
+### build/index.d.ts#candidateLimits
+export declare function candidateLimits(reads: readonly ModelRead[], rule?: ModelLimitRule): CandidateLimit[];
+
 ### build/index.d.ts#caseIntervals
 export declare function caseIntervals(records: readonly PairedTime[], level?: number): CaseInterval[];
 
 ### build/index.d.ts#caseTails
 export declare function caseTails(records: readonly PairedTime[], rank?: number): CaseTail[];
+
+### build/index.d.ts#caseWarms
+export declare function caseWarms(records: readonly WarmRecord[], arm?: Arm): CaseWarm[];
 
 ### build/index.d.ts#checkLadder
 export declare function checkLadder(ladder: Ladder): readonly string[];
@@ -1363,8 +2407,28 @@ export declare function checkLadder(ladder: Ladder): readonly string[];
 ### build/index.d.ts#checkMeasures
 export declare function checkMeasures(rows: readonly MeasureRow[], options: MeasureCheckOptions): MeasureChecks;
 
+### build/index.d.ts#checkModelLimits
+export declare function checkModelLimits(file: ModelLimitsFile): string[];
+
+### build/index.d.ts#childRecords
+export declare function childRecords(caseName: string, round: number, offset: number, order: readonly ChildStep[], times: readonly number[]): ChildRecords;
+
+### build/index.d.ts#childTimes
+export declare function childTimes(order: readonly ChildStep[], times: readonly number[]): Record<ChildPair, Record<ChildSource, number[]>>;
+
 ### build/index.d.ts#controlFactor
 export declare function controlFactor(rows: readonly ControlRow[], options?: ControlOptions): ControlFactors;
+
+### build/index.d.ts#cpuEntry
+export declare function cpuEntry<T>(table: Readonly<Record<string, T>> & {
+  readonly other: T;
+}, cpu: string): CpuEntry<T>;
+
+### build/index.d.ts#familyPower
+export declare function familyPower(options: FamilyPowerOptions): FamilyPower;
+
+### build/index.d.ts#familyRead
+export declare function familyRead(items: readonly FamilyItem[], level?: number): FamilyRead;
 
 ### build/index.d.ts#firstAgainstSecond
 export declare function firstAgainstSecond(rows: readonly TwoRunTimes[]): FirstAgainstSecond[];
@@ -1372,8 +2436,32 @@ export declare function firstAgainstSecond(rows: readonly TwoRunTimes[]): FirstA
 ### build/index.d.ts#firstAgainstSecondLine
 export declare function firstAgainstSecondLine(groups: readonly FirstAgainstSecond[]): string;
 
+### build/index.d.ts#freezeLimits
+export declare function freezeLimits(measure: string, candidates: readonly CandidateLimit[], stamp: FreezeStamp, rule?: ModelLimitRule): ModelLimitsFile;
+
+### build/index.d.ts#gateLine
+export declare function gateLine(reads: readonly CaseRead[], options: GateLineOptions): GateLine | undefined;
+
+### build/index.d.ts#gateLineCli
+export declare function gateLineCli(argv: readonly string[], io: GateLineCliIo): number;
+
 ### build/index.d.ts#gateOf
 export declare function gateOf(cases: readonly GateCaseOutcome[]): Gate;
+
+### build/index.d.ts#growthVerdict
+export declare function growthVerdict(rounds: readonly GrowthRound[], options: GrowthOptions): GrowthVerdict;
+
+### build/index.d.ts#isBlock
+export declare function isBlock(outcome: string): boolean;
+
+### build/index.d.ts#isNoRead
+export declare function isNoRead(outcome: string): boolean;
+
+### build/index.d.ts#isValidRead
+export declare function isValidRead(read: ProcessRead): boolean;
+
+### build/index.d.ts#jobModels
+export declare function jobModels(envs: readonly JobEnv[], options?: JobModelsOptions): JobModel[];
 
 ### build/index.d.ts#jointClaim
 export declare function jointClaim(check: MeasureChecks, measures: readonly string[], entry: string, stratum?: string): JointClaim;
@@ -1381,11 +2469,20 @@ export declare function jointClaim(check: MeasureChecks, measures: readonly stri
 ### build/index.d.ts#ladderVerdict
 export declare function ladderVerdict(ladder: Ladder, records: readonly RungRecord[], options: LadderOptions): LadderVerdict;
 
+### build/index.d.ts#limitChanges
+export declare function limitChanges(before: ModelLimitsFile, after: ModelLimitsFile): LimitChanges;
+
 ### build/index.d.ts#limitOnModel
 export declare function limitOnModel(limits: ModelLimits, model: string): LimitOnModel;
 
 ### build/index.d.ts#limitVerdict
 export declare function limitVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[], options: LimitOptions): LimitVerdict;
+
+### build/index.d.ts#mergeCaseModules
+export declare function mergeCaseModules<T>(modules: Readonly<Record<string, Readonly<Record<string, T>>>>): MergedCases<T>;
+
+### build/index.d.ts#modelLimitRead
+export declare function modelLimitRead(file: ModelLimitsFile, read: ModelRead): ModelLimitRead;
 
 ### build/index.d.ts#modelRowText
 export declare function modelRowText(row: ModelRow, family: number): string;
@@ -1393,11 +2490,20 @@ export declare function modelRowText(row: ModelRow, family: number): string;
 ### build/index.d.ts#modelTest
 export declare function modelTest(reads: readonly ModelRead[], options?: ModelTestOptions): ModelTest;
 
+### build/index.d.ts#moduleListGaps
+export declare function moduleListGaps(files: readonly string[], listed: readonly string[]): ModuleListGaps;
+
 ### build/index.d.ts#notSlowerVerdict
 export declare function notSlowerVerdict(jobs: readonly JobRecords[], options: NotSlowerOptions): NotSlowerVerdict;
 
 ### build/index.d.ts#overLimit
 export declare function overLimit(firstMs: number, limitMs?: number): boolean;
+
+### build/index.d.ts#pairedChild
+export declare function pairedChild(options: PairedChildOptions): Promise<PairedChild>;
+
+### build/index.d.ts#pairedChildOrder
+export declare function pairedChildOrder(round: number, offset: number, steps: number): ChildStep[];
 
 ### build/index.d.ts#poolRecords
 export declare function poolRecords(jobs: readonly JobRecords[]): PooledRecords;
@@ -1411,11 +2517,26 @@ export declare function pooledLimitVerdict(jobs: readonly JobRecords[], options:
 ### build/index.d.ts#pooledVerdict
 export declare function pooledVerdict(jobs: readonly JobRecords[], options?: VerdictOptions): PooledVerdict;
 
+### build/index.d.ts#processCaseLine
+export declare function processCaseLine(c: CaseProcesses): string;
+
+### build/index.d.ts#processVerdict
+export declare function processVerdict(reads: readonly ProcessRead[], options: ProcessOptions): ProcessVerdict;
+
 ### build/index.d.ts#resultRows
 export declare function resultRows(content: unknown): ResultRow[];
 
 ### build/index.d.ts#resultVerdict
 export declare function resultVerdict(results: readonly CaseResults[], rows: ResultRows): ResultVerdict;
+
+### build/index.d.ts#roundSlope
+export declare function roundSlope(rungs: readonly SlopeRung[]): number;
+
+### build/index.d.ts#runCost
+export declare function runCost(cells: readonly CostCells[], probes: readonly CostProbe[], options: RunCostOptions): RunCost;
+
+### build/index.d.ts#runLimit
+export declare function runLimit(values: readonly number[], options?: RunLimitOptions): RunLimit;
 
 ### build/index.d.ts#runMethod
 export declare function runMethod(firstMs: number, options?: RunMethodOptions): RunMethod;
@@ -1429,11 +2550,20 @@ export declare function sameResult(method: RunMethod, firstHash: string, secondH
 ### build/index.d.ts#sentinelCases
 export declare function sentinelCases(cases: readonly TimedCase[], options: SentinelOptions): Sentinel[];
 
+### build/index.d.ts#slopeVerdict
+export declare function slopeVerdict(rounds: readonly SlopeRound[], options: SlopeOptions): SlopeVerdict;
+
 ### build/index.d.ts#tailFalseFails
 export declare function tailFalseFails(aa: readonly PairedTime[], options: TailRuleOptions): TailFalseFails;
 
 ### build/index.d.ts#tailLimitVerdict
 export declare function tailLimitVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[], options: TailLimitOptions): TailLimitVerdict;
+
+### build/index.d.ts#timeArm
+export declare function timeArm(run: () => unknown, options: ArmOptions): ArmTime;
+
+### build/index.d.ts#timeArmRounds
+export declare function timeArmRounds(options: ArmRoundsOptions): ArmRounds;
 
 ### build/index.d.ts#timeRounds
 export declare function timeRounds(arms: Readonly<Record<Arm, () => number>>, options: RoundsOptions): Rounds;
@@ -1450,8 +2580,14 @@ export declare function verdictPower(options: PowerOptions): Power;
 ### build/index.d.ts#visibleShift
 export declare function visibleShift(values: readonly number[], rest: readonly number[], level: number, direction: 1 | -1, options?: TwoSamplePermutationOptions): VisibleShift;
 
+### build/index.d.ts#warmVerdict
+export declare function warmVerdict(pairs: Readonly<Record<string, readonly WarmRecord[]>>, options: WarmOptions): WarmVerdict;
+
 ### build/index.d.ts#winClaim
 export declare function winClaim(check: MeasureChecks, measure: string, entry: string, stratum?: string): WinClaim;
+
+### build/index.d.ts#writeGateLine
+export declare function writeGateLine(line: GateLine | undefined, outputs?: GateLineOutputs): GateLineWritten | undefined;
 
 ### build/paired.d.ts#Arm
 type Arm = "a" | "b";
@@ -1484,6 +2620,9 @@ interface PairedTime {
 
 ### build/paired.d.ts#armOrder
 declare function armOrder<T>(arms: readonly T[], round: number): readonly T[];
+
+### build/paired.d.ts#balancedRounds
+declare function balancedRounds(arms: number): number;
 
 ### build/paired.d.ts#caseRatios
 declare function caseRatios(records: readonly PairedTime[]): CaseRatio[];

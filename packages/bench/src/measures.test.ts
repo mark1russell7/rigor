@@ -1,6 +1,6 @@
 import { signTestPower } from "@mark1russell7/rigor-statistics";
 import { describe, expect, it } from "vitest";
-import { type MeasureCheckOptions, type MeasureChecks, type MeasureFindingKind, type MeasureRow, type MeasureRule, checkMeasures, jointClaim, winClaim } from "./measures.ts";
+import { type MeasureCheckOptions, type MeasureChecks, type MeasureFindingKind, type MeasureRow, type MeasureRule, NARROW_SPREAD_SHARE, checkMeasures, jointClaim, winClaim } from "./measures.ts";
 
 const keys = (count: number, prefix = "k"): string[] => Array.from({ length: count }, (_, i) => `${prefix}${i}`);
 
@@ -322,6 +322,74 @@ describe("the finding censored-win", () => {
     const fill = real().map((r, i) => (r.measure === "fill" && i % 40 < 10 ? { ...r, censored: true } : r));
     const trick = caught().map((r, i) => (r.measure === "fill" ? stopped(r, i) : r));
     expect(has(checkMeasures([...fill, ...trick], options()), "censored-win")).toBe(false);
+  });
+});
+
+describe("the report of a narrow spread", () => {
+  /** The rows of one entry for each value of `levels`. Entries at one level tie on each key, and other pairs differ on each key. */
+  const levelled = (levels: readonly number[], count = 60): MeasureRow[] => levels.flatMap((level, e) => rows("x", `e${e}`, count, (i) => level + i * 1e-6));
+  const rule: MeasureRule = { measure: "x", sense: "higher", controls: [], partners: [], noControl: ORDER.noControl! };
+  const read = (data: readonly MeasureRow[], extra: Partial<MeasureRule> = {}) => {
+    const check = checkMeasures(data, { rules: [{ ...rule, ...extra }], controls: [], asOf: AS_OF });
+    return { spread: check.measures[0]!.spread[0]!, check };
+  };
+  /** The entries all sit at one level with a tie on each key, and the last entry alone stands away. */
+  const outlier = (count: number): MeasureRow[] => [...Array.from({ length: count }, (_, e) => rows("x", `e${e}`, 60, () => 0.5)).flat(), ...rows("x", "far", 60, () => 0.9)];
+
+  it("reads narrow when one entry alone gives each separated pair, and no-spread stays silent", () => {
+    const { spread, check } = read(outlier(23));
+    expect(spread).toMatchObject({ entries: 24, separated: 23, share: 1 / 23, apart: ["far"], narrow: true });
+    expect(has(check, "no-spread")).toBe(false);
+  });
+
+  it("does not read narrow on two tiers, where a real split separates half of the pairs", () => {
+    const { spread } = read(levelled([...Array.from({ length: 12 }, () => 0.5), ...Array.from({ length: 12 }, () => 0.9)]));
+    expect(spread.share).toBeCloseTo(12 / 23);
+    expect(spread.narrow).toBe(false);
+  });
+
+  it("does not read narrow when each pair separates", () => {
+    const { spread } = read(levelled([0.1, 0.2, 0.3, 0.4]));
+    expect(spread).toMatchObject({ entries: 4, separated: 6, share: 1, narrow: false });
+    expect(spread.apart).toHaveLength(4);
+  });
+
+  it("does not read narrow when no pair separates, and the finding no-spread stays", () => {
+    const { spread, check } = read(outlier(3).filter((row) => row.group !== "far"));
+    expect(spread).toMatchObject({ separated: 0, share: 0, apart: [], narrow: false });
+    expect(has(check, "no-spread")).toBe(true);
+  });
+
+  it("gives no finding for a narrow read", () => {
+    expect(read(outlier(23)).check.findings).toEqual([]);
+  });
+
+  it("takes a pair with no read out of the share, so too few keys do not read as narrow", () => {
+    const data = [...rows("x", "a", 60, () => 0.5), ...rows("x", "b", 60, () => 0.9), ...rows("x", "c", 3, () => 0.7)];
+    const { spread } = read(data);
+    expect(spread.tooFew).toBe(2);
+    expect(spread).toMatchObject({ entries: 2, share: 1, narrow: false });
+  });
+
+  it("has no share when no pair has a read", () => {
+    const { spread } = read([...rows("x", "a", 3, (i) => i), ...rows("x", "b", 3, (i) => 2 * i + 1)]);
+    expect(spread).toMatchObject({ entries: 0, apart: [], narrow: false });
+    expect(spread.share).toBeUndefined();
+  });
+
+  it("gives the finding and no narrow read when a resolution takes the separated pairs away", () => {
+    const data = [...outlier(23)];
+    expect(read(data, { resolution: 0.5 }).spread).toMatchObject({ separated: 0, narrow: false });
+    expect(has(read(data, { resolution: 0.5 }).check, "no-spread")).toBe(true);
+  });
+
+  it("reads the limit on each side: a share at the limit is not narrow", () => {
+    expect(NARROW_SPREAD_SHARE).toBe(0.1);
+    expect(read(outlier(9)).spread.share).toBeCloseTo(1 / 9);
+    expect(read(outlier(9)).spread.narrow).toBe(false);
+    expect(read(outlier(10)).spread.share).toBeCloseTo(1 / 10);
+    expect(read(outlier(10)).spread.narrow).toBe(false);
+    expect(read(outlier(11)).spread.narrow).toBe(true);
   });
 });
 

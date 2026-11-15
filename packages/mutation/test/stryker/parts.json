@@ -1,0 +1,9 @@
+{
+  "packages": {
+    "two": {
+      "dir": "parts",
+      "mutate": ["src/*.ts", "!src/*.test.ts"],
+      "parts": { "a": ["src/add.ts"], "b": ["src/sign.ts"] }
+    }
+  }
+}

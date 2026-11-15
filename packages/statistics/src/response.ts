@@ -450,7 +450,7 @@ export function product(factors: readonly ResponseFactor[], at: ReadonlyMap<stri
 }
 
 /** This function gives the prediction on the scale of the model. The sum with 0 removes a negative zero. */
-function predictScaled(model: ResponseModel, inputs: Readonly<Record<string, ResponseInputValue>>): number {
+export function predictScaled(model: ResponseModel, inputs: Readonly<Record<string, ResponseInputValue>>): number {
   if (model.kind === "table") {
     const at = model.dimensions.map((d) => inputValue(inputs, d, model.conditional?.includes(d) === true));
     return model.cells.find((cell) => cell.at.every((v, i) => v === at[i]))?.value ?? model.fallback;

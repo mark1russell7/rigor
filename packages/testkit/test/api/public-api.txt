@@ -4,7 +4,7 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 6 names
+## . (build/index.d.ts): names
 
 type FencedBlock: build/markdown-examples.d.ts#FencedBlock
 type MarkdownExample: build/markdown-examples.d.ts#MarkdownExample
@@ -12,8 +12,149 @@ type MarkdownExampleOptions: build/markdown-examples.d.ts#MarkdownExampleOptions
 fencedBlocks: build/markdown-examples.d.ts#fencedBlocks
 mapImports: build/markdown-examples.d.ts#mapImports
 markdownExamples: build/markdown-examples.d.ts#markdownExamples
+rejects: build/rejects.d.ts#rejects
+
+## ./model (build/model.d.ts): names
+
+RunModelOptions: build/model.d.ts#RunModelOptions
+Step: build/model.d.ts#Step
+runModel: build/model.d.ts#runModel
+step: build/model.d.ts#step
+
+## ./arbitrary (build/arbitrary.d.ts): names
+
+UniformDoubleOptions: build/arbitrary.d.ts#UniformDoubleOptions
+uniformDouble: build/arbitrary.d.ts#uniformDouble
+
+## ./propagation (build/propagation.d.ts): names
+
+GATE_NAMES: build/propagation.d.ts#GATE_NAMES
+PropagationCapture: build/propagation.d.ts#PropagationCapture
+PropagationGateOptions: build/propagation.d.ts#PropagationGateOptions
+PropagationLine: build/propagation.d.ts#PropagationLine
+PropagationLogRecord: build/propagation.d.ts#PropagationLogRecord
+PropagationMetricPoint: build/propagation.d.ts#PropagationMetricPoint
+PropagationReport: build/propagation.d.ts#PropagationReport
+PropagationSpan: build/propagation.d.ts#PropagationSpan
+PropagationTransport: build/propagation.d.ts#PropagationTransport
+formatPropagationReport: build/propagation.d.ts#formatPropagationReport
+localTransport: build/propagation.d.ts#localTransport
+losingContext: build/propagation.d.ts#losingContext
+propagationGate: build/propagation.d.ts#propagationGate
+
+## ./otel (build/otel.d.ts): names
+
+ExternalSdkCaptureOptions: build/otel.d.ts#ExternalSdkCaptureOptions
+OtelMetricPoint: build/otel.d.ts#OtelMetricPoint
+OwnSdkCaptureOptions: build/otel.d.ts#OwnSdkCaptureOptions
+OwnSdkTelemetryCapture: build/otel.d.ts#OwnSdkTelemetryCapture
+TelemetryCapture: build/otel.d.ts#TelemetryCapture
+captureTelemetry: build/otel.d.ts#captureTelemetry
+
+## ./http (build/http.d.ts): names
+
+BodyPart: build/http.d.ts#BodyPart
+FRAMINGS: build/http.d.ts#FRAMINGS
+Framing: build/http.d.ts#Framing
+REPLY_RESERVED_FIELDS: build/http.d.ts#REPLY_RESERVED_FIELDS
+ReplyWire: build/http.d.ts#ReplyWire
+ScriptedReply: build/http.d.ts#ScriptedReply
+ScriptedRequest: build/http.d.ts#ScriptedRequest
+ScriptedRoute: build/http.d.ts#ScriptedRoute
+ScriptedServer: build/http.d.ts#ScriptedServer
+ScriptedServerOptions: build/http.d.ts#ScriptedServerOptions
+checkScriptedReply: build/http.d.ts#checkScriptedReply
+checkScriptedServer: build/http.d.ts#checkScriptedServer
+startScriptedServer: build/http.d.ts#startScriptedServer
 
 ## Declarations
+
+### build/arbitrary.d.ts#UniformDoubleOptions
+export interface UniformDoubleOptions {
+  readonly min: number;
+  readonly max: number;
+}
+
+### build/arbitrary.d.ts#uniformDouble
+export declare function uniformDouble(options: UniformDoubleOptions): fc.Arbitrary<number>;
+
+### build/http.d.ts#BodyPart
+export type BodyPart = string | Uint8Array;
+
+### build/http.d.ts#FRAMINGS
+export declare const FRAMINGS: readonly Framing[];
+
+### build/http.d.ts#Framing
+export type Framing = "length" | "chunked" | "close";
+
+### build/http.d.ts#REPLY_RESERVED_FIELDS
+export declare const REPLY_RESERVED_FIELDS: readonly ["connection", "content-length", "transfer-encoding"];
+
+### build/http.d.ts#ReplyWire
+export interface ReplyWire {
+  readonly offset: number;
+  readonly head: number;
+  readonly body: number;
+  readonly whole: boolean;
+}
+
+### build/http.d.ts#ScriptedReply
+export interface ScriptedReply {
+  readonly status?: number;
+  readonly fields?: Readonly<Record<string, string>>;
+  readonly body?: BodyPart | readonly BodyPart[];
+  readonly framing?: Framing;
+  readonly delayMs?: number;
+  readonly gapMs?: number;
+  readonly stopAfter?: number;
+}
+
+### build/http.d.ts#ScriptedRequest
+export interface ScriptedRequest {
+  readonly connection: number;
+  readonly method: string;
+  readonly target: string;
+  readonly fields: Readonly<Record<string, string>>;
+  readonly body: string;
+  readonly route: number;
+  readonly reply: number;
+  readonly wire: ReplyWire;
+}
+
+### build/http.d.ts#ScriptedRoute
+export interface ScriptedRoute {
+  readonly method?: string;
+  readonly path: string;
+  readonly replies: readonly ScriptedReply[];
+}
+
+### build/http.d.ts#ScriptedServer
+export interface ScriptedServer {
+  readonly url: string;
+  readonly host: string;
+  readonly port: number;
+  readonly requests: readonly ScriptedRequest[];
+  close(): Promise<void>;
+}
+
+### build/http.d.ts#ScriptedServerOptions
+export interface ScriptedServerOptions {
+  readonly routes: readonly ScriptedRoute[];
+  readonly unmatched?: ScriptedReply;
+  readonly listen?: {
+    readonly host?: string;
+    readonly port?: number;
+  };
+}
+
+### build/http.d.ts#checkScriptedReply
+export declare function checkScriptedReply(reply: ScriptedReply): readonly string[];
+
+### build/http.d.ts#checkScriptedServer
+export declare function checkScriptedServer(options: ScriptedServerOptions): readonly string[];
+
+### build/http.d.ts#startScriptedServer
+export declare function startScriptedServer(options: ScriptedServerOptions): Promise<ScriptedServer>;
 
 ### build/markdown-examples.d.ts#FencedBlock
 export interface FencedBlock {
@@ -49,3 +190,162 @@ export declare function mapImports(code: string, imports: Readonly<Record<string
 
 ### build/markdown-examples.d.ts#markdownExamples
 export declare function markdownExamples(files: readonly string[], options?: MarkdownExampleOptions): MarkdownExample[];
+
+### build/model.d.ts#RunModelOptions
+export interface RunModelOptions<S, M> {
+  create: () => {
+    sut: S;
+    model: M;
+  };
+  steps: fc.Arbitrary<Step<S, M>>;
+  check: (sut: S, model: M) => void;
+  maxSteps?: number;
+  numRuns?: number;
+  dispose?: (sut: S) => void;
+  clear?: () => void;
+  parameters?: fc.Parameters<[Step<S, M>[]]>;
+}
+
+### build/model.d.ts#Step
+export interface Step<S, M> {
+  readonly label: string;
+  run(sut: S, model: M): void;
+}
+
+### build/model.d.ts#runModel
+export declare function runModel<S, M>(options: RunModelOptions<S, M>): void;
+
+### build/model.d.ts#step
+export declare function step<S, M>(label: string, run: (sut: S, model: M) => void): Step<S, M>;
+
+### build/otel.d.ts#ExternalSdkCaptureOptions
+export interface ExternalSdkCaptureOptions {
+  readonly sdk: "external";
+}
+
+### build/otel.d.ts#OtelMetricPoint
+export interface OtelMetricPoint {
+  readonly name: string;
+  readonly attributes: Readonly<Record<string, unknown>>;
+}
+
+### build/otel.d.ts#OwnSdkCaptureOptions
+export interface OwnSdkCaptureOptions {
+  readonly sdk?: "own";
+  readonly spanProcessors?: readonly SpanProcessor[];
+  readonly logProcessors?: readonly LogRecordProcessor[];
+  readonly views?: readonly ViewOptions[];
+}
+
+### build/otel.d.ts#OwnSdkTelemetryCapture
+export interface OwnSdkTelemetryCapture extends TelemetryCapture {
+  readonly tracerProvider: BasicTracerProvider;
+  readonly loggerProvider: LoggerProvider;
+  readonly meterProvider: MeterProvider;
+  register(): () => void;
+  shutdown(): Promise<void>;
+}
+
+### build/otel.d.ts#TelemetryCapture
+export interface TelemetryCapture {
+  readonly spanExporter: InMemorySpanExporter;
+  readonly logExporter: InMemoryLogRecordExporter;
+  readonly metricReader: MetricReader;
+  spans(): Promise<readonly ReadableSpan[]>;
+  logRecords(): Promise<readonly ReadableLogRecord[]>;
+  metricPoints(): Promise<readonly OtelMetricPoint[]>;
+  reset(): Promise<void>;
+}
+
+### build/otel.d.ts#captureTelemetry
+export declare function captureTelemetry(options?: OwnSdkCaptureOptions): OwnSdkTelemetryCapture;
+export declare function captureTelemetry(options: ExternalSdkCaptureOptions): TelemetryCapture;
+
+### build/propagation.d.ts#GATE_NAMES
+export declare const GATE_NAMES: {
+  readonly tracer: "@mark1russell7/rigor-testkit/propagation";
+  readonly clientSpan: "rigor.gate.client";
+  readonly handlerSpan: "rigor.gate.handler";
+  readonly logBody: "rigor.gate.handler";
+  readonly counter: "rigor.gate.calls";
+  readonly transportAttribute: "rigor.gate.transport";
+};
+
+### build/propagation.d.ts#PropagationCapture
+export interface PropagationCapture {
+  spans(): readonly PropagationSpan[] | Promise<readonly PropagationSpan[]>;
+  logRecords(): readonly PropagationLogRecord[] | Promise<readonly PropagationLogRecord[]>;
+  metricPoints(): readonly PropagationMetricPoint[] | Promise<readonly PropagationMetricPoint[]>;
+  reset(): void | Promise<void>;
+}
+
+### build/propagation.d.ts#PropagationGateOptions
+export interface PropagationGateOptions {
+  readonly key: string;
+  readonly transports: readonly PropagationTransport[];
+  readonly capture: PropagationCapture;
+  readonly withValue?: <T>(key: string, value: string, fn: () => T) => T;
+  readonly readValue?: (key: string) => string | undefined;
+  readonly cardinality?: "low" | "high";
+  readonly flip?: false | ((transport: PropagationTransport) => PropagationTransport);
+}
+
+### build/propagation.d.ts#PropagationLine
+export interface PropagationLine {
+  readonly transport: string;
+  readonly verdict: "pass" | "fail" | "no read";
+  readonly faults: readonly string[];
+}
+
+### build/propagation.d.ts#PropagationLogRecord
+export interface PropagationLogRecord {
+  readonly body?: unknown;
+  readonly attributes: Readonly<Record<string, unknown>>;
+  readonly spanContext?: {
+    readonly traceId: string;
+  } | undefined;
+}
+
+### build/propagation.d.ts#PropagationMetricPoint
+export interface PropagationMetricPoint {
+  readonly name: string;
+  readonly attributes: Readonly<Record<string, unknown>>;
+}
+
+### build/propagation.d.ts#PropagationReport
+export interface PropagationReport {
+  readonly key: string;
+  readonly lines: readonly PropagationLine[];
+  readonly ok: boolean;
+}
+
+### build/propagation.d.ts#PropagationSpan
+export interface PropagationSpan {
+  readonly name: string;
+  readonly attributes: Readonly<Record<string, unknown>>;
+  spanContext(): {
+    readonly traceId: string;
+  };
+}
+
+### build/propagation.d.ts#PropagationTransport
+export interface PropagationTransport {
+  readonly name: string;
+  readonly call?: (handler: () => Promise<void>) => Promise<void>;
+  readonly noRead?: string;
+}
+
+### build/propagation.d.ts#formatPropagationReport
+export declare function formatPropagationReport(report: PropagationReport): string;
+
+### build/propagation.d.ts#localTransport
+export declare function localTransport(internalCall?: <T>(fn: () => T) => T): PropagationTransport;
+
+### build/propagation.d.ts#losingContext
+export declare function losingContext(transport: PropagationTransport): PropagationTransport;
+
+### build/propagation.d.ts#propagationGate
+export declare function propagationGate(options: PropagationGateOptions): Promise<PropagationReport>;
+
+### build/rejects.d.ts#rejects
+export declare function rejects(start: () => PromiseLike<unknown>, what: string): Promise<unknown>;

@@ -243,6 +243,24 @@ export function limitOnModel(limits: ModelLimits, model: string): LimitOnModel {
   return limits.models.includes(model) ? { limit: limits.gain, holdsGain: true, note: undefined } : { limit: limits.ceiling, holdsGain: false, note: CEILING_ONLY };
 }
 
+/** The entry of a table for one CPU name, with its key. */
+export interface CpuEntry<T> {
+  /** The key of the entry: a part of the CPU name, or `other`. */
+  readonly model: string;
+  readonly value: T;
+}
+
+/**
+ * This function gives the entry of `table` for the CPU name `cpu`. It is the first entry whose key is a part of the name, or the entry `other`.
+ * - The comparison ignores the case of the letters, because a runner can give the name of a model in capital letters.
+ * - The key `other` is not a part of a name at any time. Its entry holds, for example, the worst limits of all the models.
+ */
+export function cpuEntry<T>(table: Readonly<Record<string, T>> & { readonly other: T }, cpu: string): CpuEntry<T> {
+  const name = cpu.toLowerCase();
+  const known = Object.entries(table).find(([part]) => part !== "other" && part !== "" && name.includes(part.toLowerCase()));
+  return known === undefined ? { model: "other", value: table.other } : { model: known[0], value: known[1] };
+}
+
 /** One pair of reads, with the CPU model of each arm. A record with no model has `undefined`. */
 export interface ArmPair {
   readonly a: string | undefined;

@@ -4,11 +4,31 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 20 names
+## . (build/index.d.ts): names
 
+ANSWER_RESERVED_FIELDS: build/faults.d.ts#ANSWER_RESERVED_FIELDS
+type AnswerFault: build/faults.d.ts#AnswerFault
 type Arrivals: build/schedule.d.ts#Arrivals
+type ClosedLoopOptions: build/closed.d.ts#ClosedLoopOptions
+type ClosedLoopRun: build/closed.d.ts#ClosedLoopRun
 type Completion: build/measure.d.ts#Completion
+DEFAULT_FAULT_RANGES: build/faults.d.ts#DEFAULT_FAULT_RANGES
+type Direction: build/faults.d.ts#Direction
+FAULT_KINDS: build/faults.d.ts#FAULT_KINDS
+FAULT_PLAN_FORMAT: build/faults.d.ts#FAULT_PLAN_FORMAT
+type Fault: build/faults.d.ts#Fault
+type FaultAction: build/faults.d.ts#FaultAction
+type FaultKind: build/faults.d.ts#FaultKind
+type FaultPlan: build/faults.d.ts#FaultPlan
+type FaultPlanFormat: build/faults.d.ts#FaultPlanFormat
+type FaultPoint: build/faults.d.ts#FaultPoint
+type FaultRanges: build/faults.d.ts#FaultRanges
+type FaultSpec: build/faults.d.ts#FaultSpec
+type FaultWindow: build/faults.d.ts#FaultWindow
+type HealthSample: build/window.d.ts#HealthSample
+type Interval: build/faults.d.ts#Interval
 type LoadMeasure: build/measure.d.ts#LoadMeasure
+type LoopRequest: build/closed.d.ts#LoopRequest
 type Phase: build/schedule.d.ts#Phase
 type Profile: build/schedule.d.ts#Profile
 SCHEDULE_FORMAT: build/schedule.d.ts#SCHEDULE_FORMAT
@@ -16,9 +36,23 @@ type Schedule: build/schedule.d.ts#Schedule
 type ScheduleCheck: build/measure.d.ts#ScheduleCheck
 type ScheduleOptions: build/schedule.d.ts#ScheduleOptions
 type SecondSample: build/measure.d.ts#SecondSample
+type Trigger: build/faults.d.ts#Trigger
+WINDOW_PLAN_FORMAT: build/faults.d.ts#WINDOW_PLAN_FORMAT
+type WindowFault: build/faults.d.ts#WindowFault
+type WindowLimits: build/window.d.ts#WindowLimits
+type WindowResponse: build/window.d.ts#WindowResponse
+type WindowVerdict: build/window.d.ts#WindowVerdict
+checkFault: build/faults.d.ts#checkFault
+checkFaultPlan: build/faults.d.ts#checkFaultPlan
+checkFaultSpec: build/faults.d.ts#checkFaultSpec
 checkProfile: build/schedule.d.ts#checkProfile
+checkWindowFault: build/faults.d.ts#checkWindowFault
+closedLoopPlan: build/closed.d.ts#closedLoopPlan
 constant: build/schedule.d.ts#constant
 expectedArrivals: build/schedule.d.ts#expectedArrivals
+faultPlan: build/faults.d.ts#faultPlan
+faultPlanOf: build/faults.d.ts#faultPlanOf
+faultsOf: build/faults.d.ts#faultsOf
 latencyQuantile: build/measure.d.ts#latencyQuantile
 measureLoad: build/measure.d.ts#measureLoad
 ramp: build/schedule.d.ts#ramp
@@ -26,8 +60,189 @@ schedule: build/schedule.d.ts#schedule
 scheduleHeld: build/measure.d.ts#scheduleHeld
 spike: build/schedule.d.ts#spike
 steps: build/schedule.d.ts#steps
+sweepPoints: build/faults.d.ts#sweepPoints
+triggerOf: build/faults.d.ts#triggerOf
+windowResponse: build/window.d.ts#windowResponse
 
 ## Declarations
+
+### build/closed.d.ts#ClosedLoopOptions
+export interface ClosedLoopOptions {
+  readonly interval: number;
+  readonly end: number;
+  readonly tolerance: number;
+  readonly pause?: number;
+}
+
+### build/closed.d.ts#ClosedLoopRun
+export interface ClosedLoopRun {
+  readonly plan: Schedule;
+  readonly completions: readonly Completion[];
+  readonly hidden: number;
+  readonly driverGaps: number;
+  readonly driverGapTotal: number;
+}
+
+### build/closed.d.ts#LoopRequest
+export interface LoopRequest {
+  readonly sent: number;
+  readonly done: number | null;
+}
+
+### build/closed.d.ts#closedLoopPlan
+export declare function closedLoopPlan(requests: readonly LoopRequest[], options: ClosedLoopOptions): ClosedLoopRun;
+
+### build/faults.d.ts#ANSWER_RESERVED_FIELDS
+export declare const ANSWER_RESERVED_FIELDS: readonly ["connection", "content-length", "transfer-encoding"];
+
+### build/faults.d.ts#AnswerFault
+export interface AnswerFault {
+  readonly kind: "answer";
+  readonly status: number;
+  readonly fields?: Readonly<Record<string, string>>;
+  readonly body?: string;
+}
+
+### build/faults.d.ts#DEFAULT_FAULT_RANGES
+export declare const DEFAULT_FAULT_RANGES: FaultRanges;
+
+### build/faults.d.ts#Direction
+export type Direction = "up" | "down";
+
+### build/faults.d.ts#FAULT_KINDS
+export declare const FAULT_KINDS: readonly ["delay", "stall", "cut", "reset", "split", "reorder", "duplicate"];
+
+### build/faults.d.ts#FAULT_PLAN_FORMAT
+export declare const FAULT_PLAN_FORMAT = "rigor-faults/1";
+
+### build/faults.d.ts#Fault
+export type Fault = FaultPoint & FaultAction;
+
+### build/faults.d.ts#FaultAction
+export type FaultAction = {
+  readonly kind: "delay";
+  readonly ms: number;
+  readonly forMs: number;
+} | {
+  readonly kind: "stall";
+  readonly ms: number;
+} | {
+  readonly kind: "cut";
+} | {
+  readonly kind: "reset";
+} | {
+  readonly kind: "split";
+  readonly pieces: number;
+  readonly gapMs: number;
+} | {
+  readonly kind: "reorder";
+  readonly count: number;
+  readonly holdMs: number;
+} | {
+  readonly kind: "duplicate";
+  readonly copies: number;
+} | AnswerFault;
+
+### build/faults.d.ts#FaultKind
+export type FaultKind = (typeof FAULT_KINDS)[number];
+
+### build/faults.d.ts#FaultPlan
+export interface FaultPlan {
+  readonly format: FaultPlanFormat;
+  readonly seed: number | string | null;
+  readonly faults: readonly Fault[];
+  readonly windows?: readonly WindowFault[];
+}
+
+### build/faults.d.ts#FaultPlanFormat
+export type FaultPlanFormat = typeof FAULT_PLAN_FORMAT | typeof WINDOW_PLAN_FORMAT;
+
+### build/faults.d.ts#FaultPoint
+export interface FaultPoint {
+  readonly connection: number;
+  readonly direction: Direction;
+  readonly at: Trigger;
+}
+
+### build/faults.d.ts#FaultRanges
+export interface FaultRanges {
+  readonly delayMs: Interval;
+  readonly delayForMs: Interval;
+  readonly stallMs: Interval;
+  readonly splitPieces: Interval;
+  readonly splitGapMs: Interval;
+  readonly reorderCount: Interval;
+  readonly reorderHoldMs: Interval;
+  readonly duplicateCopies: Interval;
+}
+
+### build/faults.d.ts#FaultSpec
+export interface FaultSpec {
+  readonly connections: number;
+  readonly perConnection: number;
+  readonly kinds: Partial<Readonly<Record<FaultKind, number>>>;
+  readonly within: Trigger;
+  readonly directions?: readonly Direction[];
+  readonly ranges?: Partial<FaultRanges>;
+}
+
+### build/faults.d.ts#FaultWindow
+export interface FaultWindow {
+  readonly from: number;
+  readonly to: number;
+}
+
+### build/faults.d.ts#Interval
+export type Interval = readonly [number, number];
+
+### build/faults.d.ts#Trigger
+export type Trigger = {
+  readonly ms: number;
+} | {
+  readonly byte: number;
+} | {
+  readonly frame: number;
+};
+
+### build/faults.d.ts#WINDOW_PLAN_FORMAT
+export declare const WINDOW_PLAN_FORMAT = "rigor-faults/2";
+
+### build/faults.d.ts#WindowFault
+export type WindowFault = {
+  readonly window: FaultWindow;
+  readonly direction: Direction;
+  readonly at: Trigger;
+} & FaultAction;
+
+### build/faults.d.ts#checkFault
+export declare function checkFault(fault: Fault): readonly string[];
+
+### build/faults.d.ts#checkFaultPlan
+export declare function checkFaultPlan(plan: FaultPlan): readonly string[];
+
+### build/faults.d.ts#checkFaultSpec
+export declare function checkFaultSpec(spec: FaultSpec): readonly string[];
+
+### build/faults.d.ts#checkWindowFault
+export declare function checkWindowFault(fault: WindowFault): readonly string[];
+
+### build/faults.d.ts#faultPlan
+export declare function faultPlan(spec: FaultSpec, seed: number | string): FaultPlan;
+
+### build/faults.d.ts#faultPlanOf
+export declare function faultPlanOf(faults: readonly Fault[], windows?: readonly WindowFault[]): FaultPlan;
+
+### build/faults.d.ts#faultsOf
+export declare function faultsOf(plan: FaultPlan, connection: number): readonly Fault[];
+
+### build/faults.d.ts#sweepPoints
+export declare function sweepPoints(length: number, draws: number, seed: number | string): number[];
+
+### build/faults.d.ts#triggerOf
+export declare function triggerOf(at: Trigger): {
+  readonly measure: "ms" | "byte" | "frame";
+  readonly value: number;
+} | undefined;
 
 ### build/measure.d.ts#Completion
 export interface Completion {
@@ -130,3 +345,30 @@ export declare function spike(base: number, peak: number, shape: {
 
 ### build/schedule.d.ts#steps
 export declare function steps(rates: readonly number[], ms: number): Profile;
+
+### build/window.d.ts#HealthSample
+export interface HealthSample {
+  readonly at: number;
+  readonly up: boolean;
+}
+
+### build/window.d.ts#WindowLimits
+export interface WindowLimits {
+  readonly detectMs: number;
+  readonly recoverMs: number;
+}
+
+### build/window.d.ts#WindowResponse
+export interface WindowResponse {
+  readonly detectMs?: number;
+  readonly recoverMs?: number;
+  readonly detected: WindowVerdict;
+  readonly recovered: WindowVerdict;
+  readonly problems: readonly string[];
+}
+
+### build/window.d.ts#WindowVerdict
+export type WindowVerdict = "pass" | "fail" | "no read";
+
+### build/window.d.ts#windowResponse
+export declare function windowResponse(window: FaultWindow, samples: readonly HealthSample[], limits: WindowLimits): WindowResponse;

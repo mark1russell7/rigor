@@ -159,6 +159,11 @@ export interface VerdictOptions extends BandOptions {
    * The rule `difference` uses the larger of `margin` and the noise of the pooled band as its margin. The default is no pool.
    */
   readonly pool?: PoolOptions;
+  /**
+   * This option adds `pSlower` and `pFaster` to a verdict of the rule `difference`. The default is off, so the output of a verdict
+   * stays the same. `familyRead` needs the two fields.
+   */
+  readonly pValues?: boolean;
 }
 
 /** The noise cap of a verdict: the A/A spread of the run, the A/A median ratio of the run and the cap. */
@@ -202,6 +207,14 @@ export interface TimeVerdict {
   readonly pool?: PoolFacts;
   /** The noise cap. The verdict has this field only with the option `noiseCap`. */
   readonly noise?: NoiseCheck;
+  /**
+   * The bootstrap p of the claim "the candidate is slower": the median difference is above 0. A family correction reads it.
+   * The value comes from the draws of `interval`, so it does not change the outcome. The verdict has this field only with the option
+   * `pValues`, the rule `difference` and a band.
+   */
+  readonly pSlower?: number;
+  /** The bootstrap p of the claim "the candidate is faster". It has the same source as `pSlower`. */
+  readonly pFaster?: number;
 }
 
 /**
@@ -287,14 +300,17 @@ function ruleVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[]
     const shown = pooled === undefined ? margin : round(margin);
     const logs = cases.map((c) => Math.log(c.ratio));
     const aaLogs = aaRatios.map((c) => Math.log(c.ratio));
-    const d = bootstrapTwo(logs, aaLogs, (x, y) => median(x) - median(y), options.bootstrap);
-    const interval: Interval = { ...d, estimate: Math.exp(d.estimate), low: Math.exp(d.low), high: Math.exp(d.high) };
+    const d = bootstrapTwo(logs, aaLogs, (x, y) => median(x) - median(y), options.pValues === true ? { ...options.bootstrap, against: 0 } : options.bootstrap);
+    const { level, runs, finite, seed } = d;
+    const interval: Interval = { estimate: Math.exp(d.estimate), low: Math.exp(d.low), high: Math.exp(d.high), level, runs, finite, seed };
+    // The option `against` gives both p, so 1 never applies.
+    const sides = options.pValues === true ? { pSlower: d.pAbove ?? 1, pFaster: d.pBelow ?? 1 } : {};
     const span = `The interval of the candidate median over the A/A median is [${round(interval.low)}, ${round(interval.high)}].`;
     // The margin comes first: an interval in the margin is `same`, also when it is wholly below or above 1.
-    if (d.low >= -margin && d.high <= margin) return { ...facts, interval, outcome: "same", reason: `${span} The interval is in the margin of ${shown}.` };
-    if (interval.high < 1) return { ...facts, interval, outcome: "faster", reason: `${span} The interval is below 1.` };
-    if (interval.low > 1) return { ...facts, interval, outcome: "slower", reason: `${span} The interval is above 1.` };
-    return { ...facts, interval, outcome: "cannot decide", reason: `${span} The interval holds 1 and crosses the margin of ${shown}.` };
+    if (d.low >= -margin && d.high <= margin) return { ...facts, ...sides, interval, outcome: "same", reason: `${span} The interval is in the margin of ${shown}.` };
+    if (interval.high < 1) return { ...facts, ...sides, interval, outcome: "faster", reason: `${span} The interval is below 1.` };
+    if (interval.low > 1) return { ...facts, ...sides, interval, outcome: "slower", reason: `${span} The interval is above 1.` };
+    return { ...facts, ...sides, interval, outcome: "cannot decide", reason: `${span} The interval holds 1 and crosses the margin of ${shown}.` };
   }
   const interval = bootstrapMedian(cases.map((c) => c.ratio), options.bootstrap);
   const span = `The interval of the median ratio is [${round(interval.low)}, ${round(interval.high)}], and the A/A band is [${round(band.low)}, ${round(band.high)}].`;

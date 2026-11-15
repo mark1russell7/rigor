@@ -141,7 +141,21 @@ export interface SpreadRead {
   readonly tooFew: number;
   /** The largest absolute median paired difference of a pair. */
   readonly widest: number | undefined;
+  /** The real entries with at least one pair that has a read. */
+  readonly entries: number;
+  /** The median, over these entries, of the share of the other entries that a test separates from the entry. A pair with no read does not count in a share. It is undefined with no such entry. */
+  readonly share: number | undefined;
+  /** The entries that a test separates from more than half of the others that they have a read with. */
+  readonly apart: readonly string[];
+  /** Some pair separates and `share` is under `NARROW_SPREAD_SHARE`. A few entries then carry the separated pairs. This field is a report, and no finding reads it. */
+  readonly narrow: boolean;
 }
+
+/**
+ * The limit of `SpreadRead.narrow`. This value is a fitted default and not a limit of a gate.
+ * It comes from a gap in the rows of one project, and it has no test on rows that had no part in its choice.
+ */
+export const NARROW_SPREAD_SHARE = 0.1;
 
 /** The result of one control and one partner on one stratum. */
 export interface PartnerRead {
@@ -414,6 +428,21 @@ function controlReads(measure: string, control: string, data: StratumRows | unde
   });
 }
 
+/** This function reads how many entries carry the separated pairs of one stratum. */
+function shareRead(here: readonly Comparison[], real: readonly string[]): Pick<SpreadRead, "entries" | "share" | "apart" | "narrow"> {
+  const shares = real.flatMap((entry) => {
+    const own = here.filter((c) => !unread(c) && (c.better === entry || c.other === entry));
+    return own.length === 0 ? [] : [{ entry, share: own.filter((c) => c.beats).length / own.length }];
+  });
+  const share = shares.length === 0 ? undefined : median(shares.map((s) => s.share));
+  return {
+    entries: shares.length,
+    share,
+    apart: shares.filter((s) => s.share > 0.5).map((s) => s.entry),
+    narrow: share !== undefined && share < NARROW_SPREAD_SHARE && here.some((c) => c.beats),
+  };
+}
+
 /** The read of the spread of one measure: one family over all pairs of real entries and all strata. */
 function spreadReads(data: StratumRows, rule: MeasureRule, real: readonly string[], alpha: number): { reads: SpreadRead[]; comparisons: Comparison[] } {
   const tests = [...data].flatMap(([stratum, groups]) => real.flatMap((entry, i) => real.slice(i + 1).flatMap((other) => rawTest(entry, other, stratum, groups, rule.sense) ?? [])));
@@ -421,7 +450,7 @@ function spreadReads(data: StratumRows, rule: MeasureRule, real: readonly string
   const reads = [...data.keys()].map((stratum) => {
     const here = comparisons.filter((c) => c.stratum === stratum);
     const widest = here.length === 0 ? undefined : Math.max(...here.map((c) => Math.abs(c.medianDifference)));
-    return { stratum, pairs: here.length, separated: here.filter((c) => c.beats).length, tooFew: here.filter(unread).length, widest };
+    return { stratum, pairs: here.length, separated: here.filter((c) => c.beats).length, tooFew: here.filter(unread).length, widest, ...shareRead(here, real) };
   });
   return { reads, comparisons };
 }

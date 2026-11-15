@@ -1,8 +1,10 @@
 /**
  * The intervals that come from a discrete distribution. The interval of a median or of a quantile comes from the order
- * statistics. The central interval of a count comes from a binomial or a negative binomial distribution.
+ * statistics. The central interval of a count comes from a binomial or a negative binomial distribution. The exact
+ * interval of a proportion comes from the two tails of a binomial distribution.
  */
 import { sorted } from "./describe.ts";
+import type { Proportion } from "./tests.ts";
 
 function whole(name: string, value: number): void {
   if (!Number.isSafeInteger(value) || value < 0) throw new RangeError(`${name}: ${value} is not a whole number of 0 or more.`);
@@ -167,6 +169,90 @@ export function binomialInterval(n: number, p: number, level = 0.95): CountInter
   let coverage = 0;
   for (let k = low; k <= high; k++) coverage += terms[k] as number;
   return { low, high, coverage: Math.min(1, coverage) };
+}
+
+/** The side of `binomialTest`: `"less"` gives `P(X <= k)`, and `"greater"` gives `P(X >= k)`. */
+export type BinomialSide = "less" | "greater";
+
+/**
+ * This function gives the p of the exact one-sided binomial test of `k` successes in `n` trials, with
+ * X ~ Binomial(n, p). The side `"less"` gives `P(X <= k)`. A small value rejects the claim "the chance is `p` or
+ * more". The side `"greater"` gives `P(X >= k)`. A small value rejects the claim "the chance is `p` or less".
+ *
+ * The sum starts at the largest term of the tail, so a small tail keeps its digits. At `p = 1/2`, the side
+ * `"greater"` is equal to the one-sided `signTest(k, n - k)`.
+ *
+ * @param k - The count of successes, a whole number from 0 to `n`.
+ * @param n - The count of trials, a whole number of 0 or more.
+ * @param p - The chance of a success under the claim, from 0 to 1.
+ * @param side - The side of the tail.
+ * @returns The p of the test, from 0 to 1.
+ */
+export function binomialTest(k: number, n: number, p: number, side: BinomialSide): number {
+  whole("binomialTest", k);
+  whole("binomialTest", n);
+  if (k > n) throw new RangeError(`binomialTest: k ${k} is more than n ${n}.`);
+  if (!(p >= 0 && p <= 1)) throw new RangeError(`binomialTest: p is from 0 to 1, not ${p}.`);
+  if (side !== "less" && side !== "greater") throw new RangeError(`binomialTest: side is "less" or "greater", not ${String(side)}.`);
+  const [from, to] = side === "less" ? [0, k] : [k, n];
+  if (from === 0 && to === n) return 1;
+  if (p === 0) return from === 0 ? 1 : 0;
+  if (p === 1) return to === n ? 1 : 0;
+  const [logP, logQ] = [Math.log(p), Math.log1p(-p)];
+  const logs: number[] = [];
+  let logChoose = 0;
+  for (let i = 0; i <= to; i++) {
+    if (i > 0) logChoose += Math.log((n - i + 1) / i);
+    if (i >= from) logs.push(logChoose + i * logP + (n - i) * logQ);
+  }
+  // A spread of the logs into Math.max overflows the stack above about 120 000 terms.
+  const top = logs.reduce((max, l) => Math.max(max, l), Number.NEGATIVE_INFINITY);
+  const sum = logs.reduce((s, l) => s + Math.exp(l - top), 0);
+  return Math.min(1, Math.exp(top) * sum);
+}
+
+/**
+ * This function halves the range 0 to 1 until its ends are two adjacent doubles, and it gives the two ends. The test
+ * `rootAbove(p)` is true when the root is above p. The test must be monotone in p.
+ */
+function bisect(rootAbove: (p: number) => boolean): readonly [number, number] {
+  let [lo, hi] = [0, 1];
+  for (;;) {
+    const middle = lo + (hi - lo) / 2;
+    if (middle <= lo || middle >= hi) return [lo, hi];
+    if (rootAbove(middle)) lo = middle;
+    else hi = middle;
+  }
+}
+
+/**
+ * This function gives the Clopper-Pearson interval of `k` successes in `n` trials (Clopper and Pearson, 1934). It is the
+ * exact two-sided interval of a proportion. Let X ~ Binomial(n, p). `high` is the p with P(X <= k) = (1 - level) / 2.
+ * `low` is the p with P(X >= k) = (1 - level) / 2.
+ *
+ * The coverage of the interval is `level` or more at each p, so it is wider than `wilson`. For k = 0, `low` is 0 and
+ * `high` is 1 - ((1 - level) / 2)^(1 / n). For k = n, `high` is 1 and `low` is ((1 - level) / 2)^(1 / n). For n = 0, the
+ * interval is 0 to 1.
+ *
+ * For a different k, a bisection on `binomialTest` finds each end to two adjacent doubles. The function gives the outer
+ * double of each pair, so the bisection does not make the interval narrower. Each end uses `binomialTest` approximately
+ * 53 + log2(1 / end) times, and each use reads up to n + 1 terms.
+ *
+ * @param k - The count of successes, a whole number from 0 to `n`.
+ * @param n - The count of trials, a whole number of 0 or more.
+ * @param level - The level of the interval, more than 0 and less than 1.
+ * @returns The interval, from `low` to `high`.
+ */
+export function clopperPearson(k: number, n: number, level = 0.95): Proportion {
+  whole("clopperPearson", k);
+  whole("clopperPearson", n);
+  if (k > n) throw new RangeError(`clopperPearson: k ${k} is more than n ${n}.`);
+  const tail = levelOf("clopperPearson", level);
+  if (n === 0) return { low: 0, high: 1 };
+  // P(X >= k) grows with p, and P(X <= k) falls with p. The expm1 keeps the digits of a high end near 0.
+  const low = k === 0 ? 0 : k === n ? Math.exp(Math.log(tail) / n) : bisect((p) => binomialTest(k, n, p, "greater") < tail)[0];
+  const high = k === n ? 1 : k === 0 ? -Math.expm1(Math.log(tail) / n) : bisect((p) => binomialTest(k, n, p, "less") > tail)[1];
+  return { low, high };
 }
 
 /**

@@ -71,4 +71,49 @@ describe("limitVerdict", () => {
     expect(limitVerdict(records(19, 1.5, 13), aa, { limit: 2, share: 0.95 }).allowed).toBe(0);
     for (const share of [0, -0.1, 1.5, Number.NaN]) expect(() => limitVerdict(near, aa, { limit: 2, share }), String(share)).toThrow(/the share is above 0 and at most 1/);
   });
+
+  it("keeps the band of the A/A cases by default, and gives its noise to each case", () => {
+    const verdict = limitVerdict(records(6, 1.5, 3), aa, { limit: 2 });
+    expect(verdict.band).toBeDefined();
+    for (const c of verdict.cases) {
+      expect(c.noise).toBe(verdict.band!.noise);
+      expect(c.bound).toBe(c.high * verdict.band!.high);
+      expect(c.floor).toBe(c.low * verdict.band!.low);
+    }
+  });
+});
+
+describe("limitVerdict with the A/A noise of the rounds", () => {
+  it("decides a bench of 1 case, where the band of the A/A cases cannot", () => {
+    const aaOne = records(1, 1, 21);
+    expect(limitVerdict(records(1, 1.5, 22), aaOne, { limit: 2 }).outcome).toBe("cannot decide");
+    const within = limitVerdict(records(1, 1.5, 22), aaOne, { limit: 2, aaFrom: "rounds" });
+    expect(within).toMatchObject({ outcome: "within", band: undefined });
+    expect(limitVerdict(records(1, 3, 23), aaOne, { limit: 2, aaFrom: "rounds" }).outcome).toBe("beyond");
+    expect(limitVerdict(records(1, 2, 24), aaOne, { limit: 2, aaFrom: "rounds" }).outcome).toBe("cannot decide");
+  });
+
+  it("widens each case with the interval of the A/A median of the same case", () => {
+    const aaRounds = records(3, 1, 25);
+    const verdict = limitVerdict(records(3, 1.5, 26), aaRounds, { limit: 2, aaFrom: "rounds" });
+    const own = caseIntervals(aaRounds);
+    for (const c of verdict.cases) {
+      const a = own.find((x) => x.case === c.case)!;
+      const noise = Math.max(Math.abs(Math.log(a.low)), Math.abs(Math.log(a.high)));
+      expect(c.noise).toBe(noise);
+      expect(c.bound).toBeCloseTo(c.high * Math.exp(noise), 12);
+      expect(c.floor).toBeCloseTo(c.low * Math.exp(-noise), 12);
+    }
+  });
+
+  it("cannot decide on a case with no A/A rounds", () => {
+    const verdict = limitVerdict(records(2, 1.5, 27), records(1, 1, 28), { limit: 2, aaFrom: "rounds" });
+    expect(verdict.cases.map((c) => [c.case, c.outcome])).toEqual([["c0", "within"], ["c1", "cannot decide"]]);
+    expect(verdict.outcome).toBe("cannot decide");
+    expect(limitVerdict(records(2, 1.5, 27), records(1, 1, 28), { limit: 2, aaFrom: "rounds", share: 0.5 }).outcome).toBe("within");
+  });
+
+  it("refuses an unknown source of the A/A noise", () => {
+    expect(() => limitVerdict(records(1, 1.5, 22), records(1, 1, 21), { limit: 2, aaFrom: "jobs" as "rounds" })).toThrow(/"cases" or "rounds"/);
+  });
 });

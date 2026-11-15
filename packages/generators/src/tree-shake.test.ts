@@ -40,7 +40,7 @@ describe("the bundle of a user of this package", () => {
     rmSync(outDir, { recursive: true, force: true });
   });
 
-  it.each(["fnv1a32, random, mulberry32", "fnv1a32, mulberry32", "sampler", "seedOf, deriveSeed"])("%s holds no table", async (names) => {
+  it.each(["fnv1a32, random, mulberry32", "fnv1a32, mulberry32", "sampler", "seedOf, deriveSeed", "sha256Hex, canonicalJson, canonicalHash"])("%s holds no table", async (names) => {
     expect(await bundleOf(names)).not.toContain(TABLE_TEXT);
   });
 

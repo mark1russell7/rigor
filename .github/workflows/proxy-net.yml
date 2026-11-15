@@ -1,0 +1,98 @@
+# The tests of rigor-proxy with real sockets. They measure time, thus they run only in CI, not on a shared computer.
+# ci.yml uses this workflow, so the check CI OK of the ruleset needs it. The job changes examines the changed files of a
+# pull request. The tests run only when the proxy, the fault plans of chaos, the lock file or this file changed.
+# A person starts a run with repeats: gh workflow run proxy-net.yml -f repeats=20
+name: Proxy net
+
+on:
+  workflow_call:
+  workflow_dispatch:
+    inputs:
+      repeats:
+        description: The number of runs of the suite. More runs find a test that fails only some of the time
+        type: string
+        required: true
+        default: "3"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: proxy-net-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.paths.outputs.run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Examine the changed files
+        id: paths
+        env:
+          EVENT: ${{ github.event_name }}
+          WORKFLOW: ${{ github.workflow }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # A manual run of this file always runs the tests
+          if [ "$EVENT" = workflow_dispatch ] && [ "$WORKFLOW" = "Proxy net" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$EVENT" != pull_request ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "A push or a release does not repeat the proxy tests. The pull request of the change ran them." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          files="$(git diff --name-only "$BASE" "$GITHUB_SHA")"
+          if echo "$files" | grep -qE '^(packages/proxy/|packages/chaos/src/|pnpm-lock\.yaml$|\.github/workflows/proxy-net\.yml$)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "No file of the proxy, the fault plans, the lock file or this workflow changed, so the proxy tests did not run." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  net:
+    name: Proxy net
+    needs: changes
+    if: ${{ needs.changes.outputs.run == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        node: [26]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run the socket tests
+        env:
+          REPEATS: ${{ inputs.repeats || '3' }}
+        run: |
+          case "$REPEATS" in ''|*[!0-9]*) echo "::error::repeats is a whole number, not $REPEATS"; exit 1 ;; esac
+          for run in $(seq 1 "$REPEATS"); do
+            echo "::group::Run $run of $REPEATS"
+            pnpm --filter @mark1russell7/rigor-proxy test:net
+            echo "::endgroup::"
+          done

@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/rigor-statistics",
-  "version": "0.1.15",
-  "description": "The statistics of measured work: quantiles, bootstrap intervals, the sign test, the paired permutation test, Wilson intervals, the Holm correction, rank correlation, the comparison with a baseline beyond the noise, the Brier score, and fitted response records.",
+  "version": "0.2.5",
+  "description": "The statistics of measured work: quantiles, bootstrap intervals, the sign test, the paired permutation test, the sign-flip test of a weighted sum, the stratified bootstrap, the quantile and the distribution function of the standard normal law, Wilson and Clopper-Pearson intervals, the Holm correction, rank correlation, the comparison with a baseline beyond the noise, the Brier score and the log-loss, pairwise ratings (Elo, Glicko-2 and a Bradley-Terry fit with Davidson ties), fitted response records, and the Sobol indices of their models.",
   "keywords": [
     "statistics",
     "bootstrap",
@@ -11,10 +11,18 @@
     "sign-test",
     "permutation-test",
     "wilson",
+    "clopper-pearson",
     "holm",
     "spearman",
     "kendall",
     "brier",
+    "log-loss",
+    "elo",
+    "glicko-2",
+    "bradley-terry",
+    "pairwise-comparison",
+    "sobol",
+    "sensitivity-analysis",
     "calibration",
     "benchmark",
     "effect-size"
@@ -43,7 +51,8 @@
     "exports": {
       ".": {
         "types": "./build/index.d.ts",
-        "import": "./build/index.js"
+        "import": "./build/index.js",
+        "default": "./build/index.js"
       },
       "./package.json": "./package.json"
     }
@@ -62,6 +71,7 @@
   },
   "devDependencies": {
     "@mark1russell7/cue": "^2.0.0",
+    "@mark1russell7/rigor-testkit": "workspace:^",
     "@types/node": "^26.6.5",
     "fast-check": "^4.10.2",
     "tsdown": "^0.23.1",

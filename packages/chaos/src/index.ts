@@ -1,3 +1,34 @@
+export { closedLoopPlan, type ClosedLoopOptions, type ClosedLoopRun, type LoopRequest } from "./closed.ts";
+export {
+  ANSWER_RESERVED_FIELDS,
+  DEFAULT_FAULT_RANGES,
+  FAULT_KINDS,
+  FAULT_PLAN_FORMAT,
+  WINDOW_PLAN_FORMAT,
+  checkFault,
+  checkFaultPlan,
+  checkFaultSpec,
+  checkWindowFault,
+  faultPlan,
+  faultPlanOf,
+  faultsOf,
+  sweepPoints,
+  triggerOf,
+  type AnswerFault,
+  type Direction,
+  type Fault,
+  type FaultAction,
+  type FaultKind,
+  type FaultPlan,
+  type FaultPlanFormat,
+  type FaultPoint,
+  type FaultRanges,
+  type FaultSpec,
+  type FaultWindow,
+  type Interval,
+  type Trigger,
+  type WindowFault,
+} from "./faults.ts";
 export { latencyQuantile, measureLoad, scheduleHeld, type Completion, type LoadMeasure, type ScheduleCheck, type SecondSample } from "./measure.ts";
 export {
   SCHEDULE_FORMAT,
@@ -14,3 +45,4 @@ export {
   type Schedule,
   type ScheduleOptions,
 } from "./schedule.ts";
+export { windowResponse, type HealthSample, type WindowLimits, type WindowResponse, type WindowVerdict } from "./window.ts";
