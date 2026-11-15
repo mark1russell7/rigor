@@ -209,6 +209,66 @@ const report = await propagationGate({ key: "request.id", capture, transports })
 - The capture is also a `PropagationCapture` of the propagation gate.
 - The capture serves the SDK 2 and the SDK 3 of OpenTelemetry. They use different logs APIs. The SDK 3 uses the logs API of `@opentelemetry/api` 1.10, and the SDK 2 uses `@opentelemetry/api-logs`. `register()` sets the logger provider in each of the two APIs. With `sdk: "external"`, `logRecords()` flushes the provider of each API. The propagation gate writes its log record through the API that has a provider.
 
+## A scripted HTTP server
+
+The entry `@mark1russell7/rigor-testkit/http` gives an HTTP/1.1 server for the fixtures of a client test. Each route has a list of replies, as data. It uses only `node:http`.
+
+```ts no-run
+import { startScriptedServer } from "@mark1russell7/rigor-testkit/http";
+
+const server = await startScriptedServer({
+  routes: [
+    {
+      path: "/alerts/active",
+      replies: [
+        { body: fixture, fields: { "content-type": "application/geo+json" } },
+        { status: 429, fields: { "retry-after": "120" } },
+        { body: ['{"features":[', "]}"], framing: "chunked" },
+      ],
+    },
+  ],
+});
+// The client under test uses server.url, or a fault proxy in front of server.port.
+expect(server.requests.map((request) => request.target)).toEqual(["/alerts/active?area=KS"]);
+await server.close();
+```
+
+### The rules
+
+- A request gets the replies of the first route that matches its method and path. The default method is `GET`.
+- A path with `?` matches the whole target. A path with no `?` matches the path of the target, with any query.
+- The replies of a route go in their order. After the end of the list, the route gives its last reply again.
+- A request that no route matches gets `unmatched`. The default is the status 404 with no body.
+- `requests` holds each request: its connection, method, target, fields, body, route and reply.
+
+### The framing of a body
+
+| `framing` | The end of the body | A cut inside the body |
+|---|---|---|
+| `length` (the default) | `content-length` | The client sees it. |
+| `chunked` | Each part of the body is one chunk, then the last chunk. | The client sees it. |
+| `close` | No length. The server closes the connection after the body. | The client cannot see it. |
+
+- A list of parts in `body` gives one write for each part. With `chunked`, each part is one chunk. Thus each part is one frame of the HTTP framers of `@mark1russell7/rigor-proxy`.
+- `delayMs` holds the head, and `gapMs` holds each part after the first. A slow or silent server uses them.
+- `stopAfter` writes only that number of parts. Then the server writes nothing more, and keeps the connection open.
+- The server sends no `date`. Thus the same script gives the same bytes on each run.
+
+### The place of a reply on the wire
+
+The record of each request has `wire`, the place of its reply in the bytes of the connection. A fault plan of `@mark1russell7/rigor-proxy` with a `byte` point uses it.
+
+| Field | Value |
+|---|---|
+| `offset` | The bytes that the server sent on the connection before the reply. |
+| `head` | The bytes of the status line and the fields, with the empty line. |
+| `body` | The bytes of the body on the wire. With `chunked`, the size lines are in this count. |
+| `whole` | True when the server sent the whole reply. |
+
+- The first byte of the body is at `offset + head` of the down direction.
+- The server sends the head alone, before the body. Thus `head` is known before the first part.
+- A test can measure the place with one request, then cut a second connection at the same place. The same script gives the same bytes.
+
 ## License
 
 MIT

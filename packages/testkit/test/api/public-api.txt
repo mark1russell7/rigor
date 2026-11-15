@@ -46,7 +46,101 @@ OwnSdkTelemetryCapture: build/otel.d.ts#OwnSdkTelemetryCapture
 TelemetryCapture: build/otel.d.ts#TelemetryCapture
 captureTelemetry: build/otel.d.ts#captureTelemetry
 
+## ./http (build/http.d.ts): names
+
+BodyPart: build/http.d.ts#BodyPart
+FRAMINGS: build/http.d.ts#FRAMINGS
+Framing: build/http.d.ts#Framing
+REPLY_RESERVED_FIELDS: build/http.d.ts#REPLY_RESERVED_FIELDS
+ReplyWire: build/http.d.ts#ReplyWire
+ScriptedReply: build/http.d.ts#ScriptedReply
+ScriptedRequest: build/http.d.ts#ScriptedRequest
+ScriptedRoute: build/http.d.ts#ScriptedRoute
+ScriptedServer: build/http.d.ts#ScriptedServer
+ScriptedServerOptions: build/http.d.ts#ScriptedServerOptions
+checkScriptedReply: build/http.d.ts#checkScriptedReply
+checkScriptedServer: build/http.d.ts#checkScriptedServer
+startScriptedServer: build/http.d.ts#startScriptedServer
+
 ## Declarations
+
+### build/http.d.ts#BodyPart
+export type BodyPart = string | Uint8Array;
+
+### build/http.d.ts#FRAMINGS
+export declare const FRAMINGS: readonly Framing[];
+
+### build/http.d.ts#Framing
+export type Framing = "length" | "chunked" | "close";
+
+### build/http.d.ts#REPLY_RESERVED_FIELDS
+export declare const REPLY_RESERVED_FIELDS: readonly ["connection", "content-length", "transfer-encoding"];
+
+### build/http.d.ts#ReplyWire
+export interface ReplyWire {
+  readonly offset: number;
+  readonly head: number;
+  readonly body: number;
+  readonly whole: boolean;
+}
+
+### build/http.d.ts#ScriptedReply
+export interface ScriptedReply {
+  readonly status?: number;
+  readonly fields?: Readonly<Record<string, string>>;
+  readonly body?: BodyPart | readonly BodyPart[];
+  readonly framing?: Framing;
+  readonly delayMs?: number;
+  readonly gapMs?: number;
+  readonly stopAfter?: number;
+}
+
+### build/http.d.ts#ScriptedRequest
+export interface ScriptedRequest {
+  readonly connection: number;
+  readonly method: string;
+  readonly target: string;
+  readonly fields: Readonly<Record<string, string>>;
+  readonly body: string;
+  readonly route: number;
+  readonly reply: number;
+  readonly wire: ReplyWire;
+}
+
+### build/http.d.ts#ScriptedRoute
+export interface ScriptedRoute {
+  readonly method?: string;
+  readonly path: string;
+  readonly replies: readonly ScriptedReply[];
+}
+
+### build/http.d.ts#ScriptedServer
+export interface ScriptedServer {
+  readonly url: string;
+  readonly host: string;
+  readonly port: number;
+  readonly requests: readonly ScriptedRequest[];
+  close(): Promise<void>;
+}
+
+### build/http.d.ts#ScriptedServerOptions
+export interface ScriptedServerOptions {
+  readonly routes: readonly ScriptedRoute[];
+  readonly unmatched?: ScriptedReply;
+  readonly listen?: {
+    readonly host?: string;
+    readonly port?: number;
+  };
+}
+
+### build/http.d.ts#checkScriptedReply
+export declare function checkScriptedReply(reply: ScriptedReply): readonly string[];
+
+### build/http.d.ts#checkScriptedServer
+export declare function checkScriptedServer(options: ScriptedServerOptions): readonly string[];
+
+### build/http.d.ts#startScriptedServer
+export declare function startScriptedServer(options: ScriptedServerOptions): Promise<ScriptedServer>;
 
 ### build/markdown-examples.d.ts#FencedBlock
 export interface FencedBlock {
