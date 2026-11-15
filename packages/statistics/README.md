@@ -1,6 +1,6 @@
 # @mark1russell7/rigor-statistics
 
-The statistics of measured work. It gives quantiles, bootstrap intervals, the sign test, the paired permutation test, Wilson intervals and the Holm correction. It gives the interval of a median from order statistics, and the central interval of a binomial count. It also gives least squares, rank correlation, the comparison with a baseline beyond the noise, and the Brier score and the log-loss of predictions. It rates items from pairwise results with Elo, Glicko-2 and a Bradley-Terry fit. It fits response records that a browser can evaluate from plain JSON, and it gives the Sobol indices of their models.
+The statistics of measured work. It gives quantiles, bootstrap intervals, the sign test, the paired permutation test, Wilson and Clopper-Pearson intervals and the Holm correction. It gives the interval of a median from order statistics, and the central interval of a binomial count. It also gives least squares, rank correlation, the comparison with a baseline beyond the noise, and the Brier score and the log-loss of predictions. It rates items from pairwise results with Elo, Glicko-2 and a Bradley-Terry fit. It fits response records that a browser can evaluate from plain JSON, and it gives the Sobol indices of their models.
 
 ```sh
 npm install @mark1russell7/rigor-statistics
@@ -209,6 +209,7 @@ choosePair(pool, { seed: "duel-1" });             // the next pair of a duel, th
 | `twoSamplePermutation(a, b, options)` | The two-sample permutation test (a split of the pooled values). It reads each split when their count is `runs` or less, so the p is exact. It compares groups of different sizes, and its default statistic is the difference of the medians. |
 | `wilson(k, n, z)` | The Wilson interval of a proportion. |
 | `wilsonSampleSize(target, expected, z, max)` | The smallest number of trials at which the Wilson lower end reaches the target, at the expected proportion. |
+| `clopperPearson(k, n, level)` | The exact Clopper-Pearson interval of a proportion. Each tail outside holds `(1 - level) / 2`, so the coverage is `level` or more at each proportion. It is wider than `wilson`. |
 | `cohenKappa(a, b)` | The agreement of two raters beyond chance (Cohen's kappa), with the observed and the chance agreement. |
 | `medianInterval(values, level)` | The distribution-free interval of a median, from two order statistics. It gives `low`, `high`, the `rank` of `low` and the `coverage`. |
 | `quantileInterval(values, p, level)` | The distribution-free interval of a quantile, from two order statistics. A side with no rank is infinite. The values must be independent draws. |

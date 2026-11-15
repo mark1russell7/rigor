@@ -150,6 +150,7 @@ bradleyTerrySparse: build/index.d.ts#bradleyTerrySparse
 brier: build/index.d.ts#brier
 calibration: build/index.d.ts#calibration
 choosePair: build/index.d.ts#choosePair
+clopperPearson: build/index.d.ts#clopperPearson
 cohenKappa: build/index.d.ts#cohenKappa
 compareRatios: build/index.d.ts#compareRatios
 coverageMinSample: build/index.d.ts#coverageMinSample
@@ -1146,6 +1147,9 @@ export declare function calibration(forecasts: readonly Forecast[]): Calibration
 
 ### build/index.d.ts#choosePair
 export declare function choosePair<T extends RatedItem>(items: readonly T[], options: PairChoiceOptions<T>): PairChoice | undefined;
+
+### build/index.d.ts#clopperPearson
+export declare function clopperPearson(k: number, n: number, level?: number): Proportion;
 
 ### build/index.d.ts#cohenKappa
 export declare function cohenKappa<T>(a: readonly T[], b: readonly T[]): Kappa;
