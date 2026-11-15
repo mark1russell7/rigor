@@ -176,6 +176,21 @@ export { type Rounds, type RoundsOptions, timeRounds } from "./rounds.ts";
 export { type ArmRounds, type ArmRoundsOptions, type ProcessArm, timeArmRounds } from "./arm-rounds.ts";
 export { type SlopeOptions, type SlopeRound, type SlopeRun, type SlopeRung, type SlopeVerdict, roundSlope, slopeVerdict } from "./slope.ts";
 export {
+  type FirstAgainstSecond,
+  type RunMethod,
+  type RunMethodOptions,
+  type Sentinel,
+  type SentinelOptions,
+  type TimedCase,
+  type TwoRunTimes,
+  firstAgainstSecond,
+  firstAgainstSecondLine,
+  overLimit,
+  runMethod,
+  sameResult,
+  sentinelCases,
+} from "./second-run.ts";
+export {
   type Band,
   type BandKind,
   type BandOptions,

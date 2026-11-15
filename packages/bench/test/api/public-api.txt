@@ -70,6 +70,7 @@ type FamilyPower: build/index.d.ts#FamilyPower
 type FamilyPowerOptions: build/index.d.ts#FamilyPowerOptions
 type FamilyRead: build/index.d.ts#FamilyRead
 type FamilyShares: build/index.d.ts#FamilyShares
+type FirstAgainstSecond: build/index.d.ts#FirstAgainstSecond
 type FreezeStamp: build/index.d.ts#FreezeStamp
 GATE_LINE_HELP: build/index.d.ts#GATE_LINE_HELP
 GATE_LINE_LIMIT: build/index.d.ts#GATE_LINE_LIMIT
@@ -184,12 +185,16 @@ type RunCost: build/index.d.ts#RunCost
 type RunCostOptions: build/index.d.ts#RunCostOptions
 type RunLimit: build/index.d.ts#RunLimit
 type RunLimitOptions: build/index.d.ts#RunLimitOptions
+type RunMethod: build/index.d.ts#RunMethod
+type RunMethodOptions: build/index.d.ts#RunMethodOptions
 type RunPairs: build/index.d.ts#RunPairs
 type Rung: build/index.d.ts#Rung
 type RungBudget: build/index.d.ts#RungBudget
 type RungEvidence: build/index.d.ts#RungEvidence
 type RungRecord: build/index.d.ts#RungRecord
 type RungVerdict: build/index.d.ts#RungVerdict
+type Sentinel: build/index.d.ts#Sentinel
+type SentinelOptions: build/index.d.ts#SentinelOptions
 type SlopeOptions: build/index.d.ts#SlopeOptions
 type SlopeRound: build/index.d.ts#SlopeRound
 type SlopeRun: build/index.d.ts#SlopeRun
@@ -204,6 +209,8 @@ type TailLimitVerdict: build/index.d.ts#TailLimitVerdict
 type TailRuleOptions: build/index.d.ts#TailRuleOptions
 type TimeOutcome: build/index.d.ts#TimeOutcome
 type TimeVerdict: build/index.d.ts#TimeVerdict
+type TimedCase: build/index.d.ts#TimedCase
+type TwoRunTimes: build/index.d.ts#TwoRunTimes
 UNKNOWN_MODEL: build/index.d.ts#UNKNOWN_MODEL
 type VerdictOptions: build/index.d.ts#VerdictOptions
 type VerdictRule: build/index.d.ts#VerdictRule
@@ -245,6 +252,8 @@ controlFactor: build/index.d.ts#controlFactor
 cpuEntry: build/index.d.ts#cpuEntry
 familyPower: build/index.d.ts#familyPower
 familyRead: build/index.d.ts#familyRead
+firstAgainstSecond: build/index.d.ts#firstAgainstSecond
+firstAgainstSecondLine: build/index.d.ts#firstAgainstSecondLine
 firstArm: build/paired.d.ts#firstArm
 freezeLimits: build/index.d.ts#freezeLimits
 gateLine: build/index.d.ts#gateLine
@@ -267,6 +276,7 @@ modelTest: build/index.d.ts#modelTest
 moduleListGaps: build/index.d.ts#moduleListGaps
 notSlowerVerdict: build/index.d.ts#notSlowerVerdict
 orderSize: build/paired.d.ts#orderSize
+overLimit: build/index.d.ts#overLimit
 pairedChild: build/index.d.ts#pairedChild
 pairedChildOrder: build/index.d.ts#pairedChildOrder
 poolRecords: build/index.d.ts#poolRecords
@@ -280,7 +290,10 @@ resultVerdict: build/index.d.ts#resultVerdict
 roundSlope: build/index.d.ts#roundSlope
 runCost: build/index.d.ts#runCost
 runLimit: build/index.d.ts#runLimit
+runMethod: build/index.d.ts#runMethod
 rungVerdict: build/index.d.ts#rungVerdict
+sameResult: build/index.d.ts#sameResult
+sentinelCases: build/index.d.ts#sentinelCases
 slopeVerdict: build/index.d.ts#slopeVerdict
 tailFalseFails: build/index.d.ts#tailFalseFails
 tailLimitVerdict: build/index.d.ts#tailLimitVerdict
@@ -1178,6 +1191,15 @@ interface FamilyShares {
   readonly eachJobHolm: number;
 }
 
+### build/index.d.ts#FirstAgainstSecond
+interface FirstAgainstSecond {
+  readonly group: string;
+  readonly n: number;
+  readonly median: number;
+  readonly low: number;
+  readonly high: number;
+}
+
 ### build/index.d.ts#FreezeStamp
 interface FreezeStamp {
   readonly commit: string;
@@ -2017,6 +2039,15 @@ interface RunLimitOptions {
   readonly bound?: number;
 }
 
+### build/index.d.ts#RunMethod
+type RunMethod = "two runs" | "sentinel" | "one run";
+
+### build/index.d.ts#RunMethodOptions
+interface RunMethodOptions {
+  readonly limitMs?: number;
+  readonly sentinel?: boolean;
+}
+
 ### build/index.d.ts#RunPairs
 interface RunPairs {
   readonly pairs: Readonly<Record<string, readonly PairedTime[]>>;
@@ -2077,6 +2108,19 @@ interface RungVerdict {
   readonly commit: string | undefined;
   readonly real: readonly string[];
   readonly synthetic: readonly string[];
+}
+
+### build/index.d.ts#Sentinel
+interface Sentinel {
+  readonly key: string;
+  readonly group: string;
+  readonly reason: "smallest" | "rotating";
+}
+
+### build/index.d.ts#SentinelOptions
+interface SentinelOptions {
+  readonly limitMs?: number;
+  readonly seed: number | string;
 }
 
 ### build/index.d.ts#SlopeOptions
@@ -2197,6 +2241,20 @@ interface TimeVerdict {
   readonly noise?: NoiseCheck;
   readonly pSlower?: number;
   readonly pFaster?: number;
+}
+
+### build/index.d.ts#TimedCase
+interface TimedCase {
+  readonly key: string;
+  readonly group: string;
+  readonly ms: number;
+}
+
+### build/index.d.ts#TwoRunTimes
+interface TwoRunTimes {
+  readonly group: string;
+  readonly firstMs: number;
+  readonly secondMs: number;
 }
 
 ### build/index.d.ts#UNKNOWN_MODEL
@@ -2376,6 +2434,12 @@ export declare function familyPower(options: FamilyPowerOptions): FamilyPower;
 ### build/index.d.ts#familyRead
 export declare function familyRead(items: readonly FamilyItem[], level?: number): FamilyRead;
 
+### build/index.d.ts#firstAgainstSecond
+export declare function firstAgainstSecond(rows: readonly TwoRunTimes[]): FirstAgainstSecond[];
+
+### build/index.d.ts#firstAgainstSecondLine
+export declare function firstAgainstSecondLine(groups: readonly FirstAgainstSecond[]): string;
+
 ### build/index.d.ts#freezeLimits
 export declare function freezeLimits(measure: string, candidates: readonly CandidateLimit[], stamp: FreezeStamp, rule?: ModelLimitRule): ModelLimitsFile;
 
@@ -2436,6 +2500,9 @@ export declare function moduleListGaps(files: readonly string[], listed: readonl
 ### build/index.d.ts#notSlowerVerdict
 export declare function notSlowerVerdict(jobs: readonly JobRecords[], options: NotSlowerOptions): NotSlowerVerdict;
 
+### build/index.d.ts#overLimit
+export declare function overLimit(firstMs: number, limitMs?: number): boolean;
+
 ### build/index.d.ts#pairedChild
 export declare function pairedChild(options: PairedChildOptions): Promise<PairedChild>;
 
@@ -2475,8 +2542,17 @@ export declare function runCost(cells: readonly CostCells[], probes: readonly Co
 ### build/index.d.ts#runLimit
 export declare function runLimit(values: readonly number[], options?: RunLimitOptions): RunLimit;
 
+### build/index.d.ts#runMethod
+export declare function runMethod(firstMs: number, options?: RunMethodOptions): RunMethod;
+
 ### build/index.d.ts#rungVerdict
 export declare function rungVerdict(rung: Rung, record: RungRecord | undefined, options: LadderOptions): RungVerdict;
+
+### build/index.d.ts#sameResult
+export declare function sameResult(method: RunMethod, firstHash: string, secondHash?: string): boolean | null;
+
+### build/index.d.ts#sentinelCases
+export declare function sentinelCases(cases: readonly TimedCase[], options: SentinelOptions): Sentinel[];
 
 ### build/index.d.ts#slopeVerdict
 export declare function slopeVerdict(rounds: readonly SlopeRound[], options: SlopeOptions): SlopeVerdict;
