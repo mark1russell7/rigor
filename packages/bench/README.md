@@ -81,6 +81,11 @@ v.comparison;                                     // the cases that gain and dro
 | `budgetVerdict(rounds, aa, options)` | The verdict of the claim "the median of each case is at most `limit`", for one build: `within`, `beyond` or `cannot decide`. |
 | `budgetLooksVerdict(rounds, aa, options)` | The budget verdict of a run that adds rounds to the cases with no outcome, up to a stated budget. |
 | `budgetLookSpend(looks)` | The chance of error that a list of looks spends. |
+| `overLimit(firstMs, limitMs)` | True when a first run is over the limit. With no limit, no run is over it. |
+| `runMethod(firstMs, options)` | The method of one case: `two runs`, `sentinel` or `one run`. |
+| `sameResult(method, firstHash, secondHash)` | The claim that the result stays the same: `true`, `false`, or `null` for one run. |
+| `sentinelCases(cases, options)` | The cases that keep their second run over the limit: the smallest one, and one rotating case of each group. |
+| `firstAgainstSecond(rows)` | The ratio of the second time over the first time of each group, with `firstAgainstSecondLine` for its text. |
 | `timeRounds(arms, options)` | The timed rounds of one case in one process: a warm-up, a batch of at least the target time, and the order of `firstArm`. |
 | `slopeVerdict(rounds, options)` | The verdict of a slope claim from a ladder on a log-log scale, with the A/A check of each run: `within`, `beyond` or `cannot decide`. |
 | `roundSlope(rungs)` | The least-squares slope of `log value` against `log size` of one round of 3 rungs or more. |
@@ -580,6 +585,25 @@ warm.arms.next; // { cases: 40, median: 1.0, p10: 0.97, p90: 1.04, outside: 0.15
 - The defaults are `slack: 0.1` and `median: [0.97, 1.03]`. A fixed limit on the share fails, because the A/A pair also has cases outside.
 - `steady` lists the cases with each pair and the A/A pair in the band. A time gate can read only these cases.
 - A pair with no warm check is an error. Thus a rule that cannot read a pair does not pass.
+
+## Drop the second run of a slow case
+
+A bench can run each case two times. The second run tells if the result stays the same. A slow case can drop its second run to save time. Then that case has no read of the same result. Each bench states if it keeps the second run.
+
+```ts
+const sentinels = new Set(sentinelCases(lastTimes, { limitMs: 60_000, seed: "2026-11-15" }).map((s) => s.key));
+const method = runMethod(first.ms, { limitMs: 60_000, sentinel: sentinels.has(key) });
+const second = method === "one run" ? undefined : run(key);
+const same = sameResult(method, first.hash, second?.hash);
+```
+
+- `overLimit` reads a time over the limit, not equal to it. With no limit, each case keeps its second run.
+- Each record states its method. A case with `one run` has `null` as its claim of the same result. It is not `true`.
+- `sentinelCases` keeps the check live on the slow cases. The case over the limit with the smallest time keeps its second run.
+- Each group with a case over the limit also gets one rotating sentinel, chosen with `stablePick` under the seed and the name of the group. A new seed for each run turns it.
+- The times of `sentinelCases` can come from an earlier run, because the choice comes before the first run.
+- `firstAgainstSecond` gives the ratio of the second time over the first time for each group, from the cases with two runs.
+- A median under 1 tells that the second run is faster. Then a time of the first run alone is another measure, and a page that quotes it says so.
 
 ## Read the load of a run from a control
 
