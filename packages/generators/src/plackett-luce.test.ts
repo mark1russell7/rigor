@@ -1,5 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { uniformDouble } from "@mark1russell7/rigor-testkit/arbitrary";
 import { plackettLuceOrder, random } from "./random.ts";
 
 interface Entry {
@@ -14,7 +15,7 @@ const logWeightOf = (entry: Entry): number => entry.logWeight;
 const entries = fc.uniqueArray(
   fc.record({
     key: fc.string({ maxLength: 6 }),
-    logWeight: fc.oneof(fc.double({ min: -20, max: 20, noNaN: true }), fc.constant(Number.NEGATIVE_INFINITY)),
+    logWeight: fc.oneof(uniformDouble({ min: -20, max: 20 }), fc.constant(Number.NEGATIVE_INFINITY)),
   }),
   { selector: (entry) => entry.key, maxLength: 30 },
 );

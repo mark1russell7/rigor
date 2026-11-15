@@ -77,6 +77,7 @@ describe("optionFloor", () => {
   });
 
   it("gives the first count that meets its form, and depends only on the ratio of delta to sigma", () => {
+    // fc.double draws near log-uniformly over these ranges. A ratio and a scale are multiplicative, so this is the correct law.
     fc.assert(
       fc.property(
         fc.double({ min: 0.3, max: 3, noNaN: true }),

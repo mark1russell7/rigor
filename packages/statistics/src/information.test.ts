@@ -1,10 +1,11 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { uniformDouble } from "@mark1russell7/rigor-testkit/arbitrary";
 import { entropy, informationGain } from "./index.ts";
 
 /** A distribution with n values from positive weights. */
 const weights = (n: number): fc.Arbitrary<number[]> =>
-  fc.array(fc.double({ min: 0.001, max: 1, noNaN: true }), { minLength: n, maxLength: n }).map((w) => {
+  fc.array(uniformDouble({ min: 0.001, max: 1 }), { minLength: n, maxLength: n }).map((w) => {
     const sum = w.reduce((a, b) => a + b, 0);
     return w.map((x) => x / sum);
   });
