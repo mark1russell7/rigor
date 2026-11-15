@@ -86,6 +86,22 @@ describe("a TCP fault proxy", () => {
     expect(opened).toBeGreaterThanOrEqual(0);
   });
 
+  it("gives the summary of each open connection before close resolves", async () => {
+    const server = await recorder(true);
+    const started = await proxy(server.port, []);
+    const socket = await client(started.port);
+    // One kept-alive connection with 3 round trips. It is open at the close.
+    for (const word of ["one", "two", "six"]) {
+      socket.write(word);
+      await once(socket, "data");
+    }
+    await started.close();
+    expect(started.connections).toEqual([expect.objectContaining({ connection: 0, end: "close", bytes: { up: 9, down: 9 }, missed: [] })]);
+    // A second close also resolves.
+    await started.close();
+    expect(started.connections).toHaveLength(1);
+  });
+
   it("splits a frame into writes that the server reads one by one", async () => {
     const server = await recorder(false);
     const started = await proxy(server.port, [{ connection: 0, direction: "up", at: { frame: 0 }, kind: "split", pieces: 3, gapMs: 100 }]);

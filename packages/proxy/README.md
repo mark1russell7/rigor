@@ -20,6 +20,7 @@ await proxy.close();
 - `records` holds each fault that occurred: its time, its connection, its direction, its kind, and its byte and frame position.
 - `connections` holds the summary of each connection that closed: how it ended, the bytes of each direction, and the faults that did not occur.
 - `onFault` and `onClose` get the same data when it occurs.
+- `close()` destroys each open connection. Its promise resolves after each connection closes, so then `connections` has the summary of each connection.
 - `clock` sets the clock of the times and the timers. A test gives `fakeClock()` of `@mark1russell7/algebra/clock`, and it moves the time itself.
 
 ## Windows
