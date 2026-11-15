@@ -85,6 +85,8 @@ v.comparison;                                     // the cases that gain and dro
 | `timeArm(run, options)` | The child side of `freshRun`: the median time of one call of one arm, over calibrated samples. |
 | `peakRss()` | From `/fresh`: the memory peak of this process in bytes, for the child line. |
 | `eventProbe(options)` | From `/fresh`: the GC events and the deopts of a child in each half of its counted samples. |
+| `caseWarms(records, arm)` | The median warm check of each case over its rounds, for one arm of the records. |
+| `warmVerdict(pairs, options)` | The warm rule of a fresh run: each pair against the A/A pair, and the steady cases. |
 | `pairedChild(options)` | The samples of one paired child: the base, the candidate and a copy of the base in one process, in turn. |
 | `pairedChildOrder(round, offset, steps)` | The order of the samples of a paired child: a block A B B A for each pair at each step. |
 | `childRecords(case, round, offset, order, times)` | The `PairedTime` of the candidate pair and of the A/A pair of a paired child, from the medians. |
@@ -442,6 +444,25 @@ console.log(JSON.stringify({ ms: time.ms, warm: time.warm, peakRss: peakRss(), e
 - `events.gc` and `events.deopt` each have two counts: the first half and the last half of the counted samples.
 - The probe counts the deopts only with `deopt: true`. Then the V8 flag `--trace-deopt` writes them to a temporary file.
 - `childLine` refuses a field that is not valid. A record has `fields` only when a child of the record gives a field.
+
+### The warm rule
+
+A child whose time goes down while it counts was not warm. `warmVerdict` compares the warm checks of each pair with the A/A pair:
+
+```ts
+import { aaBand, warmVerdict } from "@mark1russell7/rigor-bench";
+
+const aa = "base~aa";
+const band = aaBand(run.pairs[aa], { kind: "case", level: 0.8 });
+const warm = warmVerdict(run.pairs, { aa, band });
+warm.arms.next; // { cases: 40, median: 1.0, p10: 0.97, p90: 1.04, outside: 0.15, ok: true }
+```
+
+- The warm value of a case is the median warm check of the arm b of the pair over the rounds of the case.
+- A pair is warm when its share of cases outside the band is at most the share of the A/A pair plus `slack`. Its median warm value must also be in `median`.
+- The defaults are `slack: 0.1` and `median: [0.97, 1.03]`. A fixed limit on the share fails, because the A/A pair also has cases outside.
+- `steady` lists the cases with each pair and the A/A pair in the band. A time gate can read only these cases.
+- A pair with no warm check is an error. Thus a rule that cannot read a pair does not pass.
 
 ## Read the load of a run from a control
 

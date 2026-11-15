@@ -152,6 +152,7 @@ export {
 export { type Power, type PowerOptions, verdictPower } from "./power.ts";
 export { type CaseResults, type ResultRead, type ResultRow, type ResultRows, type ResultVerdict, type RowRead, resultRows, resultVerdict } from "./results.ts";
 export { type ArmOptions, type ArmTime, timeArm } from "./arm.ts";
+export { type CaseWarm, type WarmArm, type WarmBand, type WarmCheck, type WarmOptions, type WarmRecord, type WarmVerdict, caseWarms, warmVerdict } from "./warm.ts";
 export { type Rounds, type RoundsOptions, timeRounds } from "./rounds.ts";
 export {
   type Band,

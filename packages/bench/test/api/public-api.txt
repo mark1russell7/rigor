@@ -39,6 +39,7 @@ type CaseRead: build/index.d.ts#CaseRead
 type CaseResults: build/index.d.ts#CaseResults
 type CaseTail: build/index.d.ts#CaseTail
 type CaseTailLimit: build/index.d.ts#CaseTailLimit
+type CaseWarm: build/index.d.ts#CaseWarm
 type CellBudget: build/index.d.ts#CellBudget
 type ChildPair: build/index.d.ts#ChildPair
 type ChildRecords: build/index.d.ts#ChildRecords
@@ -179,6 +180,12 @@ UNKNOWN_MODEL: build/index.d.ts#UNKNOWN_MODEL
 type VerdictOptions: build/index.d.ts#VerdictOptions
 type VerdictRule: build/index.d.ts#VerdictRule
 type VisibleShift: build/index.d.ts#VisibleShift
+type WarmArm: build/index.d.ts#WarmArm
+type WarmBand: build/index.d.ts#WarmBand
+type WarmCheck: build/index.d.ts#WarmCheck
+type WarmOptions: build/index.d.ts#WarmOptions
+type WarmRecord: build/index.d.ts#WarmRecord
+type WarmVerdict: build/index.d.ts#WarmVerdict
 type WinClaim: build/index.d.ts#WinClaim
 type WorstBudget: build/index.d.ts#WorstBudget
 aaBand: build/index.d.ts#aaBand
@@ -194,6 +201,7 @@ candidateLimits: build/index.d.ts#candidateLimits
 caseIntervals: build/index.d.ts#caseIntervals
 caseRatios: build/paired.d.ts#caseRatios
 caseTails: build/index.d.ts#caseTails
+caseWarms: build/index.d.ts#caseWarms
 checkLadder: build/index.d.ts#checkLadder
 checkMeasures: build/index.d.ts#checkMeasures
 checkModelLimits: build/index.d.ts#checkModelLimits
@@ -240,6 +248,7 @@ timeVerdict: build/index.d.ts#timeVerdict
 verdictMargin: build/index.d.ts#verdictMargin
 verdictPower: build/index.d.ts#verdictPower
 visibleShift: build/index.d.ts#visibleShift
+warmVerdict: build/index.d.ts#warmVerdict
 winClaim: build/index.d.ts#winClaim
 writeGateLine: build/index.d.ts#writeGateLine
 
@@ -710,6 +719,13 @@ interface CaseTailLimit extends CaseTail {
   readonly overMedian: boolean;
   readonly overTail: boolean;
   readonly outcome: LimitOutcome;
+}
+
+### build/index.d.ts#CaseWarm
+interface CaseWarm {
+  readonly case: string;
+  readonly warm: number;
+  readonly rounds: number;
 }
 
 ### build/index.d.ts#CellBudget
@@ -1776,6 +1792,56 @@ interface VisibleShift {
   readonly floor: number;
 }
 
+### build/index.d.ts#WarmArm
+interface WarmArm extends WarmCheck {
+  readonly ok: boolean;
+}
+
+### build/index.d.ts#WarmBand
+interface WarmBand {
+  readonly low: number;
+  readonly high: number;
+}
+
+### build/index.d.ts#WarmCheck
+interface WarmCheck {
+  readonly cases: number;
+  readonly median: number;
+  readonly p10: number;
+  readonly p90: number;
+  readonly outside: number;
+}
+
+### build/index.d.ts#WarmOptions
+interface WarmOptions {
+  readonly aa: string;
+  readonly band: WarmBand;
+  readonly arms?: readonly string[];
+  readonly slack?: number;
+  readonly median?: readonly [low: number, high: number];
+}
+
+### build/index.d.ts#WarmRecord
+interface WarmRecord {
+  readonly case: string;
+  readonly fields?: {
+    readonly a: {
+      readonly warm?: number;
+    };
+    readonly b: {
+      readonly warm?: number;
+    };
+  };
+}
+
+### build/index.d.ts#WarmVerdict
+interface WarmVerdict {
+  readonly ok: boolean;
+  readonly aa: WarmCheck;
+  readonly arms: Readonly<Record<string, WarmArm>>;
+  readonly steady: readonly string[];
+}
+
 ### build/index.d.ts#WinClaim
 interface WinClaim {
   readonly alone: boolean;
@@ -1832,6 +1898,9 @@ export declare function caseIntervals(records: readonly PairedTime[], level?: nu
 
 ### build/index.d.ts#caseTails
 export declare function caseTails(records: readonly PairedTime[], rank?: number): CaseTail[];
+
+### build/index.d.ts#caseWarms
+export declare function caseWarms(records: readonly WarmRecord[], arm?: Arm): CaseWarm[];
 
 ### build/index.d.ts#checkLadder
 export declare function checkLadder(ladder: Ladder): readonly string[];
@@ -1961,6 +2030,9 @@ export declare function verdictPower(options: PowerOptions): Power;
 
 ### build/index.d.ts#visibleShift
 export declare function visibleShift(values: readonly number[], rest: readonly number[], level: number, direction: 1 | -1, options?: TwoSamplePermutationOptions): VisibleShift;
+
+### build/index.d.ts#warmVerdict
+export declare function warmVerdict(pairs: Readonly<Record<string, readonly WarmRecord[]>>, options: WarmOptions): WarmVerdict;
 
 ### build/index.d.ts#winClaim
 export declare function winClaim(check: MeasureChecks, measure: string, entry: string, stratum?: string): WinClaim;
