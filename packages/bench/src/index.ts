@@ -136,7 +136,9 @@ export {
   jointClaim,
   winClaim,
 } from "./measures.ts";
-export { type Arm, type CaseRatio, type OrderSize, type PairedTime, armOrder, caseRatios, checkPairedTime, firstArm, orderSize } from "./paired.ts";
+export { type AaOrders, type OrderRatio, aaOrders } from "./aa-orders.ts";
+export { type MergedCases, type ModuleListGaps, mergeCaseModules, moduleListGaps } from "./case-modules.ts";
+export { type Arm, type CaseRatio, type OrderSize, type PairedTime, armOrder, balancedRounds, caseRatios, checkPairedTime, firstArm, orderSize } from "./paired.ts";
 export {
   CHILD_SOURCES,
   type ChildPair,

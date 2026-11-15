@@ -8,6 +8,7 @@
 
 type AaLimitOptions: build/index.d.ts#AaLimitOptions
 type AaLimits: build/index.d.ts#AaLimits
+type AaOrders: build/index.d.ts#AaOrders
 type Arm: build/paired.d.ts#Arm
 type ArmModels: build/index.d.ts#ArmModels
 type ArmOptions: build/index.d.ts#ArmOptions
@@ -130,6 +131,7 @@ type MeasureRow: build/index.d.ts#MeasureRow
 type MeasureRule: build/index.d.ts#MeasureRule
 type MeasuredFactor: build/index.d.ts#MeasuredFactor
 type MedianBudget: build/index.d.ts#MedianBudget
+type MergedCases: build/index.d.ts#MergedCases
 type ModelCost: build/index.d.ts#ModelCost
 type ModelLimit: build/index.d.ts#ModelLimit
 type ModelLimitOutcome: build/index.d.ts#ModelLimitOutcome
@@ -142,6 +144,7 @@ type ModelRow: build/index.d.ts#ModelRow
 type ModelStatus: build/index.d.ts#ModelStatus
 type ModelTest: build/index.d.ts#ModelTest
 type ModelTestOptions: build/index.d.ts#ModelTestOptions
+type ModuleListGaps: build/index.d.ts#ModuleListGaps
 NARROW_SPREAD_SHARE: build/index.d.ts#NARROW_SPREAD_SHARE
 type NoControl: build/index.d.ts#NoControl
 type NoFactor: build/index.d.ts#NoFactor
@@ -149,6 +152,7 @@ type NoiseCheck: build/index.d.ts#NoiseCheck
 type NotSlowerOptions: build/index.d.ts#NotSlowerOptions
 type NotSlowerRead: build/index.d.ts#NotSlowerRead
 type NotSlowerVerdict: build/index.d.ts#NotSlowerVerdict
+type OrderRatio: build/index.d.ts#OrderRatio
 type OrderSize: build/paired.d.ts#OrderSize
 type PairedChild: build/index.d.ts#PairedChild
 type PairedChildOptions: build/index.d.ts#PairedChildOptions
@@ -215,12 +219,14 @@ type WorstBudget: build/index.d.ts#WorstBudget
 aaBand: build/index.d.ts#aaBand
 aaLimitOf: build/index.d.ts#aaLimitOf
 aaLimits: build/index.d.ts#aaLimits
+aaOrders: build/index.d.ts#aaOrders
 aaSpread: build/index.d.ts#aaSpread
 aaStats: build/index.d.ts#aaStats
 armModels: build/index.d.ts#armModels
 armOrder: build/paired.d.ts#armOrder
 armVerdicts: build/index.d.ts#armVerdicts
 balanceOrders: build/index.d.ts#balanceOrders
+balancedRounds: build/paired.d.ts#balancedRounds
 budgetLookSpend: build/index.d.ts#budgetLookSpend
 budgetLooksVerdict: build/index.d.ts#budgetLooksVerdict
 budgetVerdict: build/index.d.ts#budgetVerdict
@@ -254,9 +260,11 @@ ladderVerdict: build/index.d.ts#ladderVerdict
 limitChanges: build/index.d.ts#limitChanges
 limitOnModel: build/index.d.ts#limitOnModel
 limitVerdict: build/index.d.ts#limitVerdict
+mergeCaseModules: build/index.d.ts#mergeCaseModules
 modelLimitRead: build/index.d.ts#modelLimitRead
 modelRowText: build/index.d.ts#modelRowText
 modelTest: build/index.d.ts#modelTest
+moduleListGaps: build/index.d.ts#moduleListGaps
 notSlowerVerdict: build/index.d.ts#notSlowerVerdict
 orderSize: build/paired.d.ts#orderSize
 pairedChild: build/index.d.ts#pairedChild
@@ -300,7 +308,11 @@ lockClosure: build/code-stamp.d.ts#lockClosure
 
 ## ./fresh (build/fresh.d.ts): names
 
+type ArmProcess: build/fresh.d.ts#ArmProcess
+type ArmTimes: build/fresh.d.ts#ArmTimes
+ArmsFixtures: build/fresh.d.ts#ArmsFixtures
 BenchEnv: build/fresh.d.ts#BenchEnv
+CaseArm: build/fresh.d.ts#CaseArm
 type CheckoutArm: build/fresh.d.ts#CheckoutArm
 type CheckoutArmOptions: build/fresh.d.ts#CheckoutArmOptions
 ChildEvents: build/fresh.d.ts#ChildEvents
@@ -310,7 +322,12 @@ ChildLine: build/fresh.d.ts#ChildLine
 ChildSkip: build/fresh.d.ts#ChildSkip
 ChildTime: build/fresh.d.ts#ChildTime
 EventProbe: build/fresh.d.ts#EventProbe
+type FixtureFile: build/fresh.d.ts#FixtureFile
+type FixtureHash: build/fresh.d.ts#FixtureHash
+type FixtureOptions: build/fresh.d.ts#FixtureOptions
 FreshArm: build/fresh.d.ts#FreshArm
+FreshArms: build/fresh.d.ts#FreshArms
+FreshArmsOptions: build/fresh.d.ts#FreshArmsOptions
 FreshOptions: build/fresh.d.ts#FreshOptions
 FreshRecord: build/fresh.d.ts#FreshRecord
 FreshRun: build/fresh.d.ts#FreshRun
@@ -321,10 +338,14 @@ ProbeOptions: build/fresh.d.ts#ProbeOptions
 type RepoCommitOptions: build/fresh.d.ts#RepoCommitOptions
 StartChild: build/fresh.d.ts#StartChild
 StartOptions: build/fresh.d.ts#StartOptions
+armTimes: build/fresh.d.ts#armTimes
 benchEnv: build/fresh.d.ts#benchEnv
+checkFixtures: build/fresh.d.ts#checkFixtures
 checkoutArm: build/fresh.d.ts#checkoutArm
 childLine: build/fresh.d.ts#childLine
 eventProbe: build/fresh.d.ts#eventProbe
+fixtureDifferences: build/fresh.d.ts#fixtureDifferences
+freshArms: build/fresh.d.ts#freshArms
 freshRun: build/fresh.d.ts#freshRun
 pairOrder: build/fresh.d.ts#pairOrder
 peakRss: build/fresh.d.ts#peakRss
@@ -401,6 +422,34 @@ export declare function codeStamp(options: CodeStampOptions): Promise<CodeStamp>
 ### build/code-stamp.d.ts#lockClosure
 export declare function lockClosure(lockText: string, importer: string, names: readonly string[]): readonly EngineClosure[];
 
+### build/fresh.d.ts#ArmProcess
+interface ArmProcess {
+  readonly arm: string;
+  readonly case: string;
+  readonly round: number;
+  readonly position: number;
+  readonly ms: number;
+  readonly fields?: ChildFields;
+}
+
+### build/fresh.d.ts#ArmTimes
+interface ArmTimes {
+  readonly arm: string;
+  readonly case: string;
+  readonly processes: number;
+  readonly median: number;
+  readonly p10: number;
+  readonly p90: number;
+  readonly spread: number;
+}
+
+### build/fresh.d.ts#ArmsFixtures
+export interface ArmsFixtures {
+  readonly folder: string;
+  readonly files: readonly FixtureFile[];
+  readonly read?: (path: string) => Uint8Array;
+}
+
 ### build/fresh.d.ts#BenchEnv
 export interface BenchEnv {
   readonly cpu: string;
@@ -409,6 +458,14 @@ export interface BenchEnv {
   readonly arch: string;
   readonly node: string;
   readonly runner?: string;
+}
+
+### build/fresh.d.ts#CaseArm
+export interface CaseArm {
+  readonly id: string;
+  readonly case: string;
+  readonly command?: readonly string[];
+  readonly cwd?: string;
 }
 
 ### build/fresh.d.ts#CheckoutArm
@@ -475,12 +532,57 @@ export interface EventProbe {
   readonly events: (samples: number) => Promise<ChildEvents>;
 }
 
+### build/fresh.d.ts#FixtureFile
+interface FixtureFile {
+  readonly file: string;
+  readonly sha256: string;
+}
+
+### build/fresh.d.ts#FixtureHash
+interface FixtureHash extends FixtureFile {
+  readonly bytes: number;
+}
+
+### build/fresh.d.ts#FixtureOptions
+interface FixtureOptions {
+  readonly read?: (path: string) => Uint8Array;
+}
+
 ### build/fresh.d.ts#FreshArm
 export interface FreshArm {
   readonly id: string;
   readonly command: readonly string[];
   readonly cwd?: string;
   readonly commit?: string;
+}
+
+### build/fresh.d.ts#FreshArms
+export interface FreshArms {
+  readonly env: BenchEnv;
+  readonly job: string;
+  readonly rounds: number;
+  readonly balanced: boolean;
+  readonly warnings: readonly string[];
+  readonly processes: readonly ArmProcess[];
+  readonly aa: readonly FreshRecord[];
+  readonly fixtures?: readonly FixtureHash[];
+}
+
+### build/fresh.d.ts#FreshArmsOptions
+export interface FreshArmsOptions {
+  readonly arms: readonly CaseArm[];
+  readonly command?: readonly string[];
+  readonly args?: (caseId: string) => readonly string[];
+  readonly aa?: readonly [string, string];
+  readonly rounds?: number;
+  readonly roundOffset?: number;
+  readonly fixtures?: ArmsFixtures;
+  readonly timeoutMs?: number;
+  readonly maxBuffer?: number;
+  readonly job?: string;
+  readonly env?: BenchEnv;
+  readonly start?: StartChild;
+  readonly onProcess?: (record: ArmProcess) => void;
 }
 
 ### build/fresh.d.ts#FreshOptions
@@ -562,8 +664,14 @@ export interface StartOptions {
   readonly cwd?: string;
 }
 
+### build/fresh.d.ts#armTimes
+export declare function armTimes(processes: readonly ArmProcess[]): ArmTimes[];
+
 ### build/fresh.d.ts#benchEnv
 export declare function benchEnv(): BenchEnv;
+
+### build/fresh.d.ts#checkFixtures
+export declare function checkFixtures(folder: string, files: readonly FixtureFile[], options?: FixtureOptions): FixtureHash[];
 
 ### build/fresh.d.ts#checkoutArm
 export declare function checkoutArm(options: CheckoutArmOptions): Promise<CheckoutArm>;
@@ -573,6 +681,12 @@ export declare function childLine(stdout: string): ChildLine;
 
 ### build/fresh.d.ts#eventProbe
 export declare function eventProbe(options?: ProbeOptions): EventProbe;
+
+### build/fresh.d.ts#fixtureDifferences
+export declare function fixtureDifferences(a: readonly FixtureFile[], b: readonly FixtureFile[]): string[];
+
+### build/fresh.d.ts#freshArms
+export declare function freshArms(options: FreshArmsOptions): Promise<FreshArms>;
 
 ### build/fresh.d.ts#freshRun
 export declare function freshRun(options: FreshOptions): Promise<FreshRun>;
@@ -599,6 +713,14 @@ interface AaLimitOptions {
 interface AaLimits {
   readonly families: Readonly<Record<string, FamilyLimits>>;
   readonly fallback: GroupLimits;
+}
+
+### build/index.d.ts#AaOrders
+interface AaOrders {
+  readonly case: string;
+  readonly all: OrderRatio;
+  readonly aFirst?: OrderRatio;
+  readonly bFirst?: OrderRatio;
 }
 
 ### build/index.d.ts#ArmModels
@@ -1485,6 +1607,12 @@ interface MedianBudget {
   readonly caseLevel?: number;
 }
 
+### build/index.d.ts#MergedCases
+interface MergedCases<T> {
+  readonly cases: Readonly<Record<string, T>>;
+  readonly moduleOf: Readonly<Record<string, string>>;
+}
+
 ### build/index.d.ts#ModelCost
 interface ModelCost {
   readonly model: string;
@@ -1589,6 +1717,12 @@ interface ModelTestOptions {
   readonly searchVisible?: boolean;
 }
 
+### build/index.d.ts#ModuleListGaps
+interface ModuleListGaps {
+  readonly unlisted: readonly string[];
+  readonly missing: readonly string[];
+}
+
 ### build/index.d.ts#NARROW_SPREAD_SHARE
 export declare const NARROW_SPREAD_SHARE = .1;
 
@@ -1631,6 +1765,15 @@ interface NotSlowerVerdict extends Gate {
   readonly need: number;
   readonly cases: readonly CaseGate[];
   readonly more: readonly BudgetMore[];
+}
+
+### build/index.d.ts#OrderRatio
+interface OrderRatio {
+  readonly ratio: number;
+  readonly low: number;
+  readonly high: number;
+  readonly coverage: number;
+  readonly rounds: number;
 }
 
 ### build/index.d.ts#PairedChild
@@ -2161,6 +2304,9 @@ export declare function aaLimitOf(limits: AaLimits, family: string | undefined):
 ### build/index.d.ts#aaLimits
 export declare function aaLimits(jobs: readonly JobAaStats[], options?: AaLimitOptions): AaLimits;
 
+### build/index.d.ts#aaOrders
+export declare function aaOrders(aa: readonly PairedTime[], level?: number): AaOrders[];
+
 ### build/index.d.ts#aaSpread
 export declare function aaSpread(aa: readonly PairedTime[], level?: number): number;
 
@@ -2268,6 +2414,9 @@ export declare function limitOnModel(limits: ModelLimits, model: string): LimitO
 ### build/index.d.ts#limitVerdict
 export declare function limitVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[], options: LimitOptions): LimitVerdict;
 
+### build/index.d.ts#mergeCaseModules
+export declare function mergeCaseModules<T>(modules: Readonly<Record<string, Readonly<Record<string, T>>>>): MergedCases<T>;
+
 ### build/index.d.ts#modelLimitRead
 export declare function modelLimitRead(file: ModelLimitsFile, read: ModelRead): ModelLimitRead;
 
@@ -2276,6 +2425,9 @@ export declare function modelRowText(row: ModelRow, family: number): string;
 
 ### build/index.d.ts#modelTest
 export declare function modelTest(reads: readonly ModelRead[], options?: ModelTestOptions): ModelTest;
+
+### build/index.d.ts#moduleListGaps
+export declare function moduleListGaps(files: readonly string[], listed: readonly string[]): ModuleListGaps;
 
 ### build/index.d.ts#notSlowerVerdict
 export declare function notSlowerVerdict(jobs: readonly JobRecords[], options: NotSlowerOptions): NotSlowerVerdict;
@@ -2392,6 +2544,9 @@ interface PairedTime {
 
 ### build/paired.d.ts#armOrder
 declare function armOrder<T>(arms: readonly T[], round: number): readonly T[];
+
+### build/paired.d.ts#balancedRounds
+declare function balancedRounds(arms: number): number;
 
 ### build/paired.d.ts#caseRatios
 declare function caseRatios(records: readonly PairedTime[]): CaseRatio[];
