@@ -44,6 +44,7 @@ type Kappa: build/index.d.ts#Kappa
 type LeastSquaresFit: build/index.d.ts#LeastSquaresFit
 type LeastSquaresOptions: build/index.d.ts#LeastSquaresOptions
 MODIFIED_Z_CUT: build/index.d.ts#MODIFIED_Z_CUT
+type MeanInterval: build/index.d.ts#MeanInterval
 type MedianInterval: build/index.d.ts#MedianInterval
 type ModeOptions: build/index.d.ts#ModeOptions
 type ModifiedZ: build/index.d.ts#ModifiedZ
@@ -179,6 +180,7 @@ kendallTau: build/index.d.ts#kendallTau
 leastSquares: build/index.d.ts#leastSquares
 logLoss: build/index.d.ts#logLoss
 mean: build/index.d.ts#mean
+meanInterval: build/index.d.ts#meanInterval
 median: build/index.d.ts#median
 medianInterval: build/index.d.ts#medianInterval
 mergeRunning: build/index.d.ts#mergeRunning
@@ -504,6 +506,17 @@ interface LeastSquaresOptions {
 
 ### build/index.d.ts#MODIFIED_Z_CUT
 export declare const MODIFIED_Z_CUT = 3.5;
+
+### build/index.d.ts#MeanInterval
+interface MeanInterval {
+  readonly mean: number;
+  readonly half: number;
+  readonly low: number;
+  readonly high: number;
+  readonly level: number;
+  readonly df: number;
+  readonly t: number;
+}
 
 ### build/index.d.ts#MedianInterval
 interface MedianInterval {
@@ -1267,6 +1280,9 @@ export declare function logLoss(forecasts: readonly Forecast[]): number;
 
 ### build/index.d.ts#mean
 export declare function mean(values: readonly number[]): number;
+
+### build/index.d.ts#meanInterval
+export declare function meanInterval(values: readonly number[], level?: number): MeanInterval;
 
 ### build/index.d.ts#median
 export declare function median(values: readonly number[]): number;

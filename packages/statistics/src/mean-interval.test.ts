@@ -20,7 +20,8 @@ describe("meanInterval", () => {
   });
 
   it("gives a half width of 0 for equal values", () => {
-    expect(meanInterval([0.1, 0.1, 0.1])).toMatchObject({ mean: 0.1, half: 0, low: 0.1, high: 0.1 });
+    // 2.5 has an exact binary form, so the mean of the values is exactly 2.5.
+    expect(meanInterval([2.5, 2.5, 2.5])).toMatchObject({ mean: 2.5, half: 0, low: 2.5, high: 2.5 });
   });
 
   it("covers the true mean in the share of the level", () => {
