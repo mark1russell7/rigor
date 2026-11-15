@@ -139,7 +139,7 @@ export function checkScriptedServer(options: ScriptedServerOptions): readonly st
       }
     }
     if (!Array.isArray(route.replies) || route.replies.length === 0) out.push(`The route ${index}: the replies are a list with one reply or more.`);
-    else route.replies.forEach((reply, at) => out.push(...checkScriptedReply(reply).map((problem) => `The route ${index}, the reply ${at}: ${problem}`)));
+    else route.replies.forEach((reply: ScriptedReply, at: number) => out.push(...checkScriptedReply(reply).map((problem) => `The route ${index}, the reply ${at}: ${problem}`)));
   });
   if (options.unmatched !== undefined) out.push(...checkScriptedReply(options.unmatched).map((problem) => `The unmatched reply: ${problem}`));
   return out;
@@ -191,6 +191,19 @@ export async function startScriptedServer(options: ScriptedServerOptions): Promi
           timers.add(timer);
         });
 
+  /**
+   * This function writes one part and waits until Node.js gives it to the socket. Node.js 26 joins the chunked writes
+   * of one tick into one chunk, so the next part waits for this callback.
+   */
+  const flush = (response: ServerResponse, part: Uint8Array): Promise<void> =>
+    new Promise((resolve) => {
+      response.once("close", resolve);
+      response.write(part, () => {
+        response.off("close", resolve);
+        resolve();
+      });
+    });
+
   const send = async (request: IncomingMessage, response: ServerResponse, reply: ScriptedReply): Promise<void> => {
     await wait(reply.delayMs ?? 0);
     if (stopped || response.destroyed) return;
@@ -217,7 +230,7 @@ export async function startScriptedServer(options: ScriptedServerOptions): Promi
       if (i > 0) await wait(reply.gapMs ?? 0);
       if (stopped || response.destroyed) return;
       // An empty chunk ends a chunked body, thus the server does not write an empty part.
-      if ((parts[i] as Uint8Array).length > 0) response.write(parts[i]);
+      if ((parts[i] as Uint8Array).length > 0) await flush(response, parts[i] as Uint8Array);
     }
     if (count === parts.length) response.end();
     else response.flushHeaders();
