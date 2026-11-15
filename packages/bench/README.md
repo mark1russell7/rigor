@@ -88,6 +88,8 @@ v.comparison;                                     // the cases that gain and dro
 | `freshRun(options)` | From `/fresh`: the records of each pair, with each arm in its own fresh child process. |
 | `timeArm(run, options)` | The child side of `freshRun`: the median time of one call of one arm, over calibrated samples. |
 | `peakRss()` | From `/fresh`: the memory peak of this process in bytes, for the child line. |
+| `checkoutArm(options)` | From `/fresh`: an arm on a git worktree of a commit, built by its setup commands. |
+| `repoCommit(ref, options)` | From `/fresh`: the full hash of the commit of a ref, for the arm of the job. |
 | `eventProbe(options)` | From `/fresh`: the GC events and the deopts of a child in each half of its counted samples. |
 | `caseWarms(records, arm)` | The median warm check of each case over its rounds, for one arm of the records. |
 | `warmVerdict(pairs, options)` | The warm rule of a fresh run: each pair against the A/A pair, and the steady cases. |
@@ -642,6 +644,38 @@ A run of many jobs sets `roundOffset` to `job * rounds`. Then the merged records
 ### Why pairs, and not a rotation of all arms
 
 A rotation of N arms turns the order of two arms only when they are N/2 apart in the rotation. For 4 arms, two arms 1 apart come in the order 3:1 over 4 rounds. Thus each pair of `freshRun` has its own two children, and the order of each pair turns each round.
+
+### Two commits in one job
+
+A claim of a change compares two commits. Two jobs can have an offset between them, so the bench measures the two builds in one job. `checkoutArm` makes the arm of the base commit, and `repoCommit` gives the commit of the job:
+
+```ts
+import { checkoutArm, freshRun, repoCommit } from "@mark1russell7/rigor-bench/fresh";
+
+const command = ["node", "bench/arm.js"];
+const base = await checkoutArm({
+  id: "base",
+  commit: process.env["BASE_SHA"]!,               // the base commit of the pull request
+  dir: "../base",                                 // a new folder
+  command,
+  setup: [["pnpm", "install", "--frozen-lockfile"], ["pnpm", "build"]],
+});
+try {
+  const head = { id: "head", command, commit: await repoCommit("HEAD") };
+  const run = await freshRun({ base, candidates: [head], cases, rounds: 5, aa: "each" });
+  run.pairs["head"];                              // the pair (base, head)
+  run.pairs["base~aa"];                           // the A/A pair of the base build
+  run.pairs["head~aa"];                           // the A/A pair of the build of the job
+} finally {
+  await base.remove();
+}
+```
+
+- `checkoutArm` adds a detached git worktree of the commit in `dir`, and starts each setup command in it, in order. A setup command that fails removes the worktree.
+- Each child of an arm starts in the folder `cwd` of the arm. The arm of `checkoutArm` has the folder of its checkout.
+- Each record names the commits of its arms in the field `commits`.
+- With `aa: "each"`, the run has an A/A pair of each build, because the two builds can have different noise. A gate gives `timeVerdict` the A/A records of each build. When one of the two verdicts is noisy, the run cannot decide.
+- A checkout in CI needs the history of the base commit, for example `fetch-depth: 0` of `actions/checkout`.
 
 ## The paired child
 

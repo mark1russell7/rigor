@@ -280,6 +280,8 @@ lockClosure: build/code-stamp.d.ts#lockClosure
 ## ./fresh (build/fresh.d.ts): names
 
 BenchEnv: build/fresh.d.ts#BenchEnv
+type CheckoutArm: build/fresh.d.ts#CheckoutArm
+type CheckoutArmOptions: build/fresh.d.ts#CheckoutArmOptions
 ChildEvents: build/fresh.d.ts#ChildEvents
 ChildExit: build/fresh.d.ts#ChildExit
 ChildFields: build/fresh.d.ts#ChildFields
@@ -295,14 +297,17 @@ FreshSkip: build/fresh.d.ts#FreshSkip
 HalfCounts: build/fresh.d.ts#HalfCounts
 PairSlot: build/fresh.d.ts#PairSlot
 ProbeOptions: build/fresh.d.ts#ProbeOptions
+type RepoCommitOptions: build/fresh.d.ts#RepoCommitOptions
 StartChild: build/fresh.d.ts#StartChild
 StartOptions: build/fresh.d.ts#StartOptions
 benchEnv: build/fresh.d.ts#benchEnv
+checkoutArm: build/fresh.d.ts#checkoutArm
 childLine: build/fresh.d.ts#childLine
 eventProbe: build/fresh.d.ts#eventProbe
 freshRun: build/fresh.d.ts#freshRun
 pairOrder: build/fresh.d.ts#pairOrder
 peakRss: build/fresh.d.ts#peakRss
+repoCommit: build/fresh.d.ts#repoCommit
 
 ## ./supervise (build/supervise.d.ts): names
 
@@ -385,6 +390,25 @@ export interface BenchEnv {
   readonly runner?: string;
 }
 
+### build/fresh.d.ts#CheckoutArm
+interface CheckoutArm extends FreshArm {
+  readonly cwd: string;
+  readonly commit: string;
+  readonly remove: () => Promise<void>;
+}
+
+### build/fresh.d.ts#CheckoutArmOptions
+interface CheckoutArmOptions {
+  readonly id: string;
+  readonly commit: string;
+  readonly dir: string;
+  readonly command: readonly string[];
+  readonly setup?: readonly (readonly string[])[];
+  readonly repo?: string;
+  readonly timeoutMs?: number;
+  readonly start?: StartChild;
+}
+
 ### build/fresh.d.ts#ChildEvents
 export interface ChildEvents {
   readonly gc: HalfCounts;
@@ -434,6 +458,8 @@ export interface EventProbe {
 export interface FreshArm {
   readonly id: string;
   readonly command: readonly string[];
+  readonly cwd?: string;
+  readonly commit?: string;
 }
 
 ### build/fresh.d.ts#FreshOptions
@@ -443,7 +469,7 @@ export interface FreshOptions {
   readonly cases: readonly string[];
   readonly rounds: number;
   readonly roundOffset?: number;
-  readonly aa?: boolean;
+  readonly aa?: boolean | "each";
   readonly args?: (caseId: string) => readonly string[];
   readonly timeoutMs?: number;
   readonly overLimit?: "error" | "skip";
@@ -460,6 +486,10 @@ export interface FreshRecord extends PairedTime {
   readonly fields?: {
     readonly a: ChildFields;
     readonly b: ChildFields;
+  };
+  readonly commits?: {
+    readonly a?: string;
+    readonly b?: string;
   };
 }
 
@@ -494,6 +524,13 @@ export interface ProbeOptions {
   readonly dir?: string;
 }
 
+### build/fresh.d.ts#RepoCommitOptions
+interface RepoCommitOptions {
+  readonly repo?: string;
+  readonly timeoutMs?: number;
+  readonly start?: StartChild;
+}
+
 ### build/fresh.d.ts#StartChild
 export type StartChild = (argv: readonly string[], options: StartOptions) => Promise<ChildExit>;
 
@@ -501,10 +538,14 @@ export type StartChild = (argv: readonly string[], options: StartOptions) => Pro
 export interface StartOptions {
   readonly timeoutMs: number;
   readonly maxBuffer: number;
+  readonly cwd?: string;
 }
 
 ### build/fresh.d.ts#benchEnv
 export declare function benchEnv(): BenchEnv;
+
+### build/fresh.d.ts#checkoutArm
+export declare function checkoutArm(options: CheckoutArmOptions): Promise<CheckoutArm>;
 
 ### build/fresh.d.ts#childLine
 export declare function childLine(stdout: string): ChildLine;
@@ -520,6 +561,9 @@ export declare function pairOrder(pairs: number, round: number, caseIndex: numbe
 
 ### build/fresh.d.ts#peakRss
 export declare function peakRss(): number;
+
+### build/fresh.d.ts#repoCommit
+export declare function repoCommit(ref: string, options?: RepoCommitOptions): Promise<string>;
 
 ### build/index.d.ts#AaLimitOptions
 interface AaLimitOptions {
