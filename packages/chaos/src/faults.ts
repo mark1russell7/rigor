@@ -8,8 +8,17 @@ import { random } from "@mark1russell7/rigor-generators";
  * Each draw of a plan is an integer from `mulberry32`, thus the same seed gives the same plan on each platform.
  */
 
-/** This value is the format of a fault plan. */
+/** This value is the format of a fault plan with no windows. */
 export const FAULT_PLAN_FORMAT = "rigor-faults/1";
+
+/**
+ * This value is the format of a fault plan with windows. A reader of the format `rigor-faults/1` refuses it. Thus an old
+ * proxy does not drop the faults of the windows with no word.
+ */
+export const WINDOW_PLAN_FORMAT = "rigor-faults/2";
+
+/** The formats of a fault plan. */
+export type FaultPlanFormat = typeof FAULT_PLAN_FORMAT | typeof WINDOW_PLAN_FORMAT;
 
 /**
  * These are the kinds of faults that a spec draws, in the order that a weight list of a spec uses. The kind `answer` is
@@ -41,7 +50,7 @@ export interface FaultPoint {
 }
 
 /**
- * One fault of a plan.
+ * The kind and the parameters of a fault.
  *
  * - `delay`: each frame that the proxy reads in the next `forMs` goes out `ms` later. The proxy does not stop its reads.
  * - `stall`: the proxy stops reading the direction for `ms`. Thus the sender sees back pressure.
@@ -54,17 +63,38 @@ export interface FaultPoint {
  *   The bytes of both directions after the point do not go through. On `up` at frame 0, the server does not get the
  *   request. On `down` at frame 0, the answer replaces the response of the server. A spec does not draw an answer.
  */
-export type Fault = FaultPoint &
-  (
-    | { readonly kind: "delay"; readonly ms: number; readonly forMs: number }
-    | { readonly kind: "stall"; readonly ms: number }
-    | { readonly kind: "cut" }
-    | { readonly kind: "reset" }
-    | { readonly kind: "split"; readonly pieces: number; readonly gapMs: number }
-    | { readonly kind: "reorder"; readonly count: number; readonly holdMs: number }
-    | { readonly kind: "duplicate"; readonly copies: number }
-    | AnswerFault
-  );
+export type FaultAction =
+  | { readonly kind: "delay"; readonly ms: number; readonly forMs: number }
+  | { readonly kind: "stall"; readonly ms: number }
+  | { readonly kind: "cut" }
+  | { readonly kind: "reset" }
+  | { readonly kind: "split"; readonly pieces: number; readonly gapMs: number }
+  | { readonly kind: "reorder"; readonly count: number; readonly holdMs: number }
+  | { readonly kind: "duplicate"; readonly copies: number }
+  | AnswerFault;
+
+/** One fault of a plan, at a point of one connection. */
+export type Fault = FaultPoint & FaultAction;
+
+/**
+ * A window of the time of a run, in ms from the start of the plan. The proxy sets the start of the plan. The window
+ * has its start and does not have its end.
+ */
+export interface FaultWindow {
+  readonly from: number;
+  readonly to: number;
+}
+
+/**
+ * A fault of a window applies to each connection that is open at a time in the window. Thus a window can make an
+ * outage. For example, a `reset` at `byte: 0` of `up` stops each request of the window. This includes a connection
+ * that opened before the window.
+ *
+ * The point counts from the later of the start of the connection and the start of the window. `ms: 0` is the start of
+ * the window, or the start of a connection that opens in the window. `byte: 0` and `frame: 0` are the first byte and
+ * the first frame of the direction in the window. A fault that is not due before the end of the window does not occur.
+ */
+export type WindowFault = { readonly window: FaultWindow; readonly direction: Direction; readonly at: Trigger } & FaultAction;
 
 /**
  * The parameters of an `answer`. The proxy writes the status line, the fields in their order, `content-length` and
@@ -82,11 +112,14 @@ export interface AnswerFault {
 
 /** A fault plan is data, thus a record can keep the plan that a proxy applied. */
 export interface FaultPlan {
-  readonly format: typeof FAULT_PLAN_FORMAT;
+  /** The format is `rigor-faults/2` when the plan has windows, and `rigor-faults/1` when it does not. */
+  readonly format: FaultPlanFormat;
   /** The seed of a plan from a spec, or `null` for a plan that a person wrote. */
   readonly seed: number | string | null;
   /** The faults, in the order of their connections. In a plan from a spec, the faults of a connection are in the order of their points. */
   readonly faults: readonly Fault[];
+  /** The faults of windows, in the order that a person wrote them. Only a plan of the format `rigor-faults/2` has them. */
+  readonly windows?: readonly WindowFault[];
 }
 
 /** An interval of whole numbers. Both ends are included, and the low end comes first. */
@@ -172,7 +205,7 @@ const TOKEN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
 const FIELD_VALUE = /^(?:[\x21-\x7e](?:[\x20\x09\x21-\x7e]*[\x21-\x7e])?)?$/;
 
 /** This function gives each problem of the parameters of an `answer`. */
-function answerProblems(fault: FaultPoint & AnswerFault): string[] {
+function answerProblems(fault: AnswerFault): string[] {
   const out: string[] = [];
   if (!isWhole(fault.status, 200) || fault.status > 599) out.push(`The answer field status is a whole number from 200 to 599, not ${String(fault.status)}.`);
   const fields: unknown = fault.fields ?? {};
@@ -193,6 +226,12 @@ function answerProblems(fault: FaultPoint & AnswerFault): string[] {
 export function checkFault(fault: Fault): readonly string[] {
   const out: string[] = [];
   if (!isWhole(fault.connection, 0)) out.push(`The connection is a whole number of 0 or more, not ${String(fault.connection)}.`);
+  return [...out, ...actionProblems(fault)];
+}
+
+/** This function gives each problem of the direction, the point, the kind and the parameters of a fault. */
+function actionProblems(fault: Omit<FaultPoint, "connection"> & FaultAction): string[] {
+  const out: string[] = [];
   if (fault.direction !== "up" && fault.direction !== "down") out.push(`The direction is up or down, not ${String(fault.direction)}.`);
   if (triggerOf(fault.at) === undefined) out.push(`The point has one key of ms, byte or frame, with a value of 0 or more, not ${JSON.stringify(fault.at)}.`);
   if (fault.kind === "answer") return [...out, ...answerProblems(fault)];
@@ -208,23 +247,48 @@ export function checkFault(fault: Fault): readonly string[] {
   return out;
 }
 
+/** This function gives each problem of one fault of a window. An empty list means that the fault is valid. */
+export function checkWindowFault(fault: WindowFault): readonly string[] {
+  const out: string[] = [];
+  const window: unknown = fault.window;
+  if (typeof window !== "object" || window === null) out.push("The window is an object with the times from and to.");
+  else {
+    const { from, to } = window as Record<string, unknown>;
+    if (!isTime(from, 0) || !isTime(to, 0) || (to as number) <= (from as number)) {
+      out.push(`The window has two finite times of 0 or more, from before to, not ${JSON.stringify(window)}.`);
+    }
+  }
+  return [...out, ...actionProblems(fault)];
+}
+
 /** This function gives each problem of a plan. An empty list means that the plan is valid. */
 export function checkFaultPlan(plan: FaultPlan): readonly string[] {
   const out: string[] = [];
-  if (plan.format !== FAULT_PLAN_FORMAT) out.push(`The format is ${FAULT_PLAN_FORMAT}, not ${String(plan.format)}.`);
+  const windows: unknown = plan.windows;
+  if (plan.format === FAULT_PLAN_FORMAT) {
+    if (windows !== undefined) out.push(`A plan with windows has the format ${WINDOW_PLAN_FORMAT}, not ${FAULT_PLAN_FORMAT}.`);
+  } else if (plan.format !== WINDOW_PLAN_FORMAT) out.push(`The format is ${FAULT_PLAN_FORMAT} or ${WINDOW_PLAN_FORMAT}, not ${String(plan.format)}.`);
   if (!Array.isArray(plan.faults)) return [...out, "The faults are a list."];
   plan.faults.forEach((fault, index) => {
     for (const problem of checkFault(fault)) out.push(`The fault ${index}: ${problem}`);
+  });
+  if (plan.format !== WINDOW_PLAN_FORMAT) return out;
+  if (!Array.isArray(windows)) return [...out, "The windows are a list."];
+  (windows as readonly WindowFault[]).forEach((fault, index) => {
+    for (const problem of checkWindowFault(fault)) out.push(`The window fault ${index}: ${problem}`);
   });
   return out;
 }
 
 /**
  * This function makes a plan from faults that a person wrote. The faults go into the order of their connections, and the
- * faults of one connection keep their order. This function throws a `RangeError` for a fault with problems.
+ * faults of one connection keep their order. The faults of windows keep their order. With one window fault or more,
+ * the plan has the format `rigor-faults/2`. This function throws a `RangeError` for a fault with problems.
  */
-export function faultPlanOf(faults: readonly Fault[]): FaultPlan {
-  const plan: FaultPlan = { format: FAULT_PLAN_FORMAT, seed: null, faults: [...faults].sort((a, b) => a.connection - b.connection) };
+export function faultPlanOf(faults: readonly Fault[], windows: readonly WindowFault[] = []): FaultPlan {
+  const sorted = [...faults].sort((a, b) => a.connection - b.connection);
+  const plan: FaultPlan =
+    windows.length === 0 ? { format: FAULT_PLAN_FORMAT, seed: null, faults: sorted } : { format: WINDOW_PLAN_FORMAT, seed: null, faults: sorted, windows: [...windows] };
   const problems = checkFaultPlan(plan);
   if (problems.length > 0) throw new RangeError(`faultPlanOf: ${problems.join(" ")}`);
   return plan;

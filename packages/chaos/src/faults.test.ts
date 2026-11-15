@@ -4,10 +4,14 @@ import {
   FAULT_KINDS,
   FAULT_PLAN_FORMAT,
   type Fault,
+  type FaultPlan,
   type FaultSpec,
+  WINDOW_PLAN_FORMAT,
+  type WindowFault,
   checkFault,
   checkFaultPlan,
   checkFaultSpec,
+  checkWindowFault,
   faultPlan,
   faultPlanOf,
   faultsOf,
@@ -107,6 +111,36 @@ describe("a fault plan that a person writes", () => {
     expect(checkFault({ connection: 0, direction: "up", at: { frame: 0 }, kind: "jam" } as unknown as Fault)[0]).toMatch(/kind/);
     expect(checkFaultPlan({ format: "rigor-faults/0" as typeof FAULT_PLAN_FORMAT, seed: null, faults: [] })[0]).toMatch(/format/);
     expect(() => faultPlanOf([{ connection: 0, direction: "up", at: { ms: -1 }, kind: "stall", ms: 10 }])).toThrow(RangeError);
+  });
+});
+
+describe("a plan with windows", () => {
+  const outage: WindowFault = { window: { from: 1000, to: 3000 }, direction: "up", at: { byte: 0 }, kind: "reset" };
+  const slow: WindowFault = { window: { from: 0, to: 500 }, direction: "down", at: { ms: 0 }, kind: "delay", ms: 200, forMs: 500 };
+
+  it("has the second format, and keeps the order of its windows", () => {
+    const plan = faultPlanOf([{ connection: 2, direction: "up", at: { frame: 0 }, kind: "cut" }], [outage, slow]);
+    expect(plan.format).toBe(WINDOW_PLAN_FORMAT);
+    expect(plan.windows).toEqual([outage, slow]);
+    expect(checkFaultPlan(plan)).toEqual([]);
+    expect(faultPlanOf([], []).format).toBe(FAULT_PLAN_FORMAT);
+    expect(faultPlanOf([]).windows).toBeUndefined();
+  });
+
+  it("states each problem of a window fault", () => {
+    expect(checkWindowFault(outage)).toEqual([]);
+    expect(checkWindowFault({ ...outage, window: { from: 3000, to: 3000 } })[0]).toMatch(/from before to/);
+    expect(checkWindowFault({ ...outage, window: { from: -1, to: 3000 } })[0]).toMatch(/0 or more/);
+    expect(checkWindowFault({ ...outage, window: null as unknown as WindowFault["window"] })[0]).toMatch(/object/);
+    expect(checkWindowFault({ ...slow, forMs: 0 })[0]).toMatch(/forMs/);
+    expect(() => faultPlanOf([], [{ ...outage, at: { byte: -1 } }])).toThrow(/The window fault 0/);
+  });
+
+  it("refuses windows in the first format, and a second format with no list of windows", () => {
+    const first = { format: FAULT_PLAN_FORMAT, seed: null, faults: [], windows: [outage] } satisfies FaultPlan;
+    expect(checkFaultPlan(first)).toEqual([`A plan with windows has the format ${WINDOW_PLAN_FORMAT}, not ${FAULT_PLAN_FORMAT}.`]);
+    expect(checkFaultPlan({ format: WINDOW_PLAN_FORMAT, seed: null, faults: [] })).toEqual(["The windows are a list."]);
+    expect(checkFaultPlan({ format: WINDOW_PLAN_FORMAT, seed: null, faults: [], windows: [] })).toEqual([]);
   });
 });
 

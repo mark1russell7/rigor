@@ -1,4 +1,4 @@
-import { type Direction, type Fault, type FaultPlan, triggerOf } from "@mark1russell7/rigor-chaos";
+import { type Direction, type Fault, type FaultPlan, type WindowFault, triggerOf } from "@mark1russell7/rigor-chaos";
 import { answerBytes } from "./answer.ts";
 
 /**
@@ -15,8 +15,10 @@ export interface Send {
 
 /** A record of one fault that the proxy applied. */
 export interface FaultRecord {
-  /** The position of the fault in the list of the plan. */
+  /** The position of the fault in the list `faults` of the plan, or in the list `windows` when `window` is true. */
   readonly index: number;
+  /** This field is true for a fault of a window. */
+  readonly window?: true;
   readonly connection: number;
   readonly direction: Direction;
   readonly kind: Fault["kind"];
@@ -58,8 +60,21 @@ export interface Applier {
 
 interface Entry {
   readonly index: number;
-  readonly fault: Fault;
+  readonly fault: Fault | WindowFault;
   readonly value: number;
+  /** The fault does not occur at this time or after it. It is infinite for a fault of a connection. */
+  readonly until: number;
+  readonly window: boolean;
+}
+
+/** A fault of a window with a point in bytes or frames. Its value is known only at the start of the window. */
+interface Waiting {
+  readonly index: number;
+  readonly fault: WindowFault;
+  readonly measure: "byte" | "frame";
+  readonly offset: number;
+  readonly from: number;
+  readonly until: number;
 }
 
 interface Piece {
@@ -90,13 +105,26 @@ export function splitBytes(bytes: Uint8Array, pieces: number): Uint8Array[] {
   return out;
 }
 
-/** This function gives the applier of one direction of one connection of a plan. */
-export function applierOf(plan: FaultPlan, connection: number, direction: Direction): Applier {
+/**
+ * This function gives the applier of one direction of one connection of a plan. `opened` is the start of the
+ * connection, in ms from the start of the plan. The windows of the plan count from the start of the plan.
+ */
+export function applierOf(plan: FaultPlan, connection: number, direction: Direction, opened = 0): Applier {
   const lists: Record<"ms" | "byte" | "frame", Entry[]> = { ms: [], byte: [], frame: [] };
   plan.faults.forEach((fault, index) => {
     if (fault.connection !== connection || fault.direction !== direction) return;
     const trigger = triggerOf(fault.at);
-    if (trigger !== undefined) lists[trigger.measure].push({ index, fault, value: trigger.value });
+    if (trigger !== undefined) lists[trigger.measure].push({ index, fault, value: trigger.value, until: Number.POSITIVE_INFINITY, window: false });
+  });
+  let waiting: Waiting[] = [];
+  (plan.windows ?? []).forEach((fault, index) => {
+    const trigger = triggerOf(fault.at);
+    // The times of the window, in ms from the start of the connection.
+    const from = Math.max(0, fault.window.from - opened);
+    const until = fault.window.to - opened;
+    if (fault.direction !== direction || trigger === undefined || until <= from) return;
+    if (trigger.measure !== "ms") waiting.push({ index, fault, measure: trigger.measure, offset: trigger.value, from, until });
+    else if (from + trigger.value < until) lists.ms.push({ index, fault, value: from + trigger.value, until, window: true });
   });
   for (const list of Object.values(lists)) list.sort((a, b) => a.value - b.value);
 
@@ -116,8 +144,43 @@ export function applierOf(plan: FaultPlan, connection: number, direction: Direct
   let answer: Send | undefined;
 
   const record = (entry: Entry, at: number, bytes: number, where: { byte: number; frame: number } = { byte, frame }): void => {
-    applied.add(entry.index);
-    records.push({ index: entry.index, connection, direction, kind: entry.fault.kind, at, byte: where.byte, frame: where.frame, bytes });
+    if (!entry.window) applied.add(entry.index);
+    records.push({
+      index: entry.index,
+      ...(entry.window ? { window: true as const } : {}),
+      connection,
+      direction,
+      kind: entry.fault.kind,
+      at,
+      byte: where.byte,
+      frame: where.frame,
+      bytes,
+    });
+  };
+
+  /** This function removes each fault of a window that ended at or before `now`, thus it does not split a frame or set a wake. */
+  const expire = (now: number): void => {
+    for (const measure of ["ms", "byte", "frame"] as const) {
+      if (lists[measure].some((entry) => entry.until <= now)) lists[measure] = lists[measure].filter((entry) => entry.until > now);
+    }
+    if (waiting.some((one) => one.until <= now)) waiting = waiting.filter((one) => one.until > now);
+  };
+
+  /** This function puts each fault of a window that started at or before `now` into its list. Its value comes from the counts at that time. */
+  const activate = (now: number): void => {
+    if (waiting.length === 0) return;
+    const later: Waiting[] = [];
+    for (const one of waiting) {
+      if (one.from > now) {
+        later.push(one);
+        continue;
+      }
+      const list = lists[one.measure];
+      const entry: Entry = { index: one.index, fault: one.fault, value: (one.measure === "byte" ? byte : frame) + one.offset, until: one.until, window: true };
+      const at = list.findIndex((other) => other.value > entry.value);
+      list.splice(at === -1 ? list.length : at, 0, entry);
+    }
+    waiting = later;
   };
 
   const schedule = (unit: Unit, now: number): void => {
@@ -178,7 +241,11 @@ export function applierOf(plan: FaultPlan, connection: number, direction: Direct
   };
 
   const fireUntil = (list: Entry[], value: number, now: number): void => {
-    while (!closed && list.length > 0 && (list[0] as Entry).value <= value) fire(list.shift() as Entry, now);
+    while (!closed && list.length > 0 && (list[0] as Entry).value <= value) {
+      const entry = list.shift() as Entry;
+      // A fault of a window that is due after the end of its window does not occur.
+      if (now < entry.until) fire(entry, now);
+    }
   };
 
   const fireTimes = (now: number): void => {
@@ -191,6 +258,8 @@ export function applierOf(plan: FaultPlan, connection: number, direction: Direct
     if (delay !== undefined && now >= delay.until) delay = undefined;
     let pieces: Piece[] = [{ bytes, offset: 0 }];
     for (const entry of armed) {
+      // A split or a duplicate of a window applies only to a frame in the window.
+      if (now >= entry.until) continue;
       const fault = entry.fault;
       if (fault.kind === "split") {
         const parts = pieces.flatMap((piece) => splitBytes(piece.bytes, fault.pieces));
@@ -232,6 +301,8 @@ export function applierOf(plan: FaultPlan, connection: number, direction: Direct
     push(bytes, now) {
       if (closed) return step();
       fireTimes(now);
+      expire(now);
+      activate(now);
       fireUntil(lists.frame, frame, now);
       let rest = bytes;
       while (!closed && rest.length > 0) {
@@ -247,7 +318,10 @@ export function applierOf(plan: FaultPlan, connection: number, direction: Direct
       return step();
     },
     tick(now) {
-      if (!closed) fireTimes(now);
+      if (!closed) {
+        fireTimes(now);
+        expire(now);
+      }
       return step();
     },
     end(now) {
@@ -260,6 +334,7 @@ export function applierOf(plan: FaultPlan, connection: number, direction: Direct
       const times = [lists.ms[0]?.value, hold?.until].filter((time): time is number => time !== undefined);
       return times.length === 0 ? undefined : Math.min(...times);
     },
+    /** The faults of windows are not in this list. A fault of a window does not belong to one connection. */
     pending() {
       return plan.faults.flatMap((fault, index) => (fault.connection === connection && fault.direction === direction && !applied.has(index) ? [{ index, fault }] : []));
     },

@@ -80,7 +80,10 @@ describe("a TCP fault proxy", () => {
     await once(socket, "end");
     expect(Buffer.concat(got).toString()).toBe("hello");
     const [summary] = await closed(started);
-    expect(summary).toEqual({ connection: 0, end: "close", bytes: { up: 5, down: 5 }, missed: [] });
+    const { opened, ...rest } = summary ?? { opened: Number.NaN };
+    expect(rest).toEqual({ connection: 0, end: "close", bytes: { up: 5, down: 5 }, missed: [] });
+    // The real clock gives the time from the origin to the accept of the connection.
+    expect(opened).toBeGreaterThanOrEqual(0);
   });
 
   it("splits a frame into writes that the server reads one by one", async () => {
@@ -157,6 +160,38 @@ describe("a TCP fault proxy", () => {
     await clock.advance(1000);
     await until(() => server.reads.length === 1);
     expect(String(server.reads[0])).toBe("late");
+  });
+
+  it("resets each connection that is open in a window, and counts the window from the origin", async () => {
+    const clock = fakeClock();
+    const server = await recorder(true);
+    const plan = faultPlanOf([], [{ window: { from: 1000, to: 2000 }, direction: "up", at: { ms: 0 }, kind: "reset" }]);
+    await expect(startFaultProxy({ target: { port: server.port }, plan, clock, origin: Number.NaN })).rejects.toThrow(RangeError);
+    const started = await startFaultProxy({ target: { port: server.port }, plan, clock, origin: clock.now() });
+    cleanups.push(() => started.close());
+    const first = await client(started.port);
+    first.write("a");
+    await until(() => server.reads.length === 1);
+    await clock.advance(1000);
+    expect((await closed(started, 1))[0]).toMatchObject({ connection: 0, opened: 0, end: "reset", missed: [] });
+    // A connection that opens in the window gets the fault at its start. The reset can come before the connect event.
+    const second = connect({ port: started.port, host: "127.0.0.1" });
+    second.on("error", () => undefined);
+    cleanups.push(() => {
+      second.destroy();
+    });
+    expect((await closed(started, 2))[1]).toMatchObject({ connection: 1, opened: 1000, end: "reset" });
+    await clock.advance(1000);
+    const third = await client(started.port);
+    const got: Buffer[] = [];
+    third.on("data", (bytes: Buffer) => got.push(bytes));
+    third.end("z");
+    await once(third, "end");
+    expect(Buffer.concat(got).toString()).toBe("z");
+    expect(started.records.map((record) => [record.connection, record.window, record.kind, record.index])).toEqual([
+      [0, true, "reset", 0],
+      [1, true, "reset", 0],
+    ]);
   });
 
   it("stalls the reads of a direction, and the bytes after the point wait for the end of the stall", async () => {

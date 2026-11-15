@@ -22,6 +22,16 @@ await proxy.close();
 - `onFault` and `onClose` get the same data when it occurs.
 - `clock` sets the clock of the times and the timers. A test gives `fakeClock()` of `@mark1russell7/algebra/clock`, and it moves the time itself.
 
+## Windows
+
+The proxy applies each fault of a window to each connection that is open at a time in the window. Thus a window of a plan makes an outage for each client, also for a client that keeps its connection open.
+
+- `origin` is the time of the clock at the start of the plan. The windows count from it. The default is the time when the proxy starts.
+- Give the time of the start of your case as `origin`. Then the windows of the plan and the samples of your case use the same times.
+- The record of a window fault has `window: true`, and its `index` is the position in the list `windows` of the plan.
+- The summary of each connection has `opened`, the start of the connection in ms from the start of the plan.
+- The faults of windows are not in `missed`, because a window fault does not belong to one connection.
+
 ## Frames
 
 A fault with a `frame` point counts frames, and `split`, `reorder` and `duplicate` change one frame. The framers of `protocol` set what a frame is.
