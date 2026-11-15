@@ -171,6 +171,7 @@ export {
 } from "./run-limit.ts";
 export { type CaseWarm, type WarmArm, type WarmBand, type WarmCheck, type WarmOptions, type WarmRecord, type WarmVerdict, caseWarms, warmVerdict } from "./warm.ts";
 export { type Rounds, type RoundsOptions, timeRounds } from "./rounds.ts";
+export { type ArmRounds, type ArmRoundsOptions, type ProcessArm, timeArmRounds } from "./arm-rounds.ts";
 export {
   type Band,
   type BandKind,

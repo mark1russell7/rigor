@@ -46,7 +46,7 @@ v.comparison;                                     // the cases that gain and dro
 | `aaSpread(aa, level)` | The A/A spread: the `level` quantile of `abs(log(ratio))` over the A/A cases. The default level is 0.9. |
 | `pooledBand(pool, level)` | The pooled band: the larger of the floor and the A/A spread of the records of earlier runs. |
 | `caseIntervals(records, level)` | The ratio of each case with a distribution-free interval of its median over the rounds. The level 0.95 needs 6 rounds or more. |
-| `limitVerdict(candidate, aa, options)` | The verdict of the claim "the ratio of each case is at most `limit`": `within`, `beyond` or `cannot decide`. |
+| `limitVerdict(candidate, aa, options)` | The verdict of the claim "the ratio of each case is at most `limit`": `within`, `beyond` or `cannot decide`. `aaFrom: "rounds"` takes the A/A noise from the rounds of each case. |
 | `tailLimitVerdict(candidate, aa, options)` | The verdict of the claim "the median and a high value of each case are at most their limits", for a bench with few rounds. |
 | `caseTails(records, rank)` | The value at one rank of the ratios of each case, from the largest. |
 | `processVerdict(reads, options)` | The verdict of each case over its first k valid processes: the median against a limit, and the count above a slow line. |
@@ -78,6 +78,7 @@ v.comparison;                                     // the cases that gain and dro
 | `budgetLooksVerdict(rounds, aa, options)` | The budget verdict of a run that adds rounds to the cases with no outcome, up to a stated budget. |
 | `budgetLookSpend(looks)` | The chance of error that a list of looks spends. |
 | `timeRounds(arms, options)` | The timed rounds of one case in one process: a warm-up, a batch of at least the target time, and the order of `firstArm`. |
+| `timeArmRounds(options)` | The timed rounds of one case in one process for a base and 1 or more candidates, with the order of `armOrder` and an A/A pair. |
 | `verdictPower(options)` | The share of each outcome over seeded benches with a known ratio: the power test of a rule. |
 | `familyRead(items, level)` | The reads of a family of cases as a report: Holm over the cases, each job alone, and both. Each read changes only `slower` and `faster`. |
 | `familyPower(options)` | The false-slower share of a family and the share of a slow case read, for each read, over seeded families. |
@@ -121,6 +122,15 @@ v.cases;                                          // the interval, the bound and
 - A case is `within` when its bound is at most the limit. It is `beyond` when its low end times the low end of the band is above the limit.
 - The verdict is `beyond` when a case is `beyond`, and `within` when each case is `within`.
 - The option `share` permits some cases out of the limit. With `share: 0.95` and 20 cases, 1 case can be other than `within`. The verdict is `within` when that number of cases or fewer are other than `within`. It is `beyond` when more cases are `beyond`. The field `allowed` gives the number.
+
+The band of the A/A arm needs 5 A/A cases or more. A bench with fewer cases gives `aaFrom: "rounds"`:
+
+```ts
+const v = limitVerdict(records, aaRecords, { limit: 1.1, aaFrom: "rounds" });
+```
+
+- The A/A rounds of each case give the noise of that case. The noise is the larger distance from 0 of an end of the interval of the A/A median, on a log scale.
+- A case with no A/A rounds cannot decide. The verdict has no `band`, and the field `noise` of each case gives its noise.
 
 The verdict has no correction for many cases. Each case has its own interval at the level `caseLevel`. Thus with many cases, a verdict `beyond` can come from noise only. Set `caseLevel` higher when a bench has many cases. A correction of Holm is an option for a later version.
 
@@ -470,6 +480,27 @@ const { records } = timeRounds({ a: () => oldCode(input), b: () => newCode(input
 ```
 
 Each arm gives a number. The engine cannot remove the work of a call, because the sum of these numbers uses it.
+
+### More than two arms in one process
+
+`timeArmRounds` times a base and 1 or more candidates of one case in one process. The records have the form of a fresh run:
+
+```ts
+const run = timeArmRounds({
+  case: "board-1",
+  base: { id: "loops", run: () => loops(input) },
+  candidates: [{ id: "engine", run: () => engine(input) }],
+  rounds: 16,
+});
+const verdicts = armVerdicts(run, "loops~aa");
+```
+
+- Each candidate makes a pair with the base. The id of the pair is the id of the candidate.
+- The A/A pair `<base>~aa` times the base a second time in each round. `aa: false` removes it.
+- Each round times one batch of each arm in the order of `armOrder`. Thus each pair has each order one time in each two rounds.
+- `offset` turns the arms before `armOrder`. Give the index of the case, so the cases start with different arms.
+- Each pair of a round uses the one base batch of that round. `orders` has the order of the batches of each round.
+- The count of calls of a batch grows until a batch of the base takes `targetMs`. Each arm uses that count.
 
 ## Time one arm in a child
 
