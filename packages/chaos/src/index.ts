@@ -1,3 +1,4 @@
+export { failureWindows, latencyWindows, type FailureOptions, type LatencyOptions } from "./fault-schedule.ts";
 export { closedLoopPlan, type ClosedLoopOptions, type ClosedLoopRun, type LoopRequest } from "./closed.ts";
 export {
   ANSWER_RESERVED_FIELDS,

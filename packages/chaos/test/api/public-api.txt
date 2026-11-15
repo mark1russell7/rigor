@@ -16,6 +16,7 @@ DEFAULT_FAULT_RANGES: build/faults.d.ts#DEFAULT_FAULT_RANGES
 type Direction: build/faults.d.ts#Direction
 FAULT_KINDS: build/faults.d.ts#FAULT_KINDS
 FAULT_PLAN_FORMAT: build/faults.d.ts#FAULT_PLAN_FORMAT
+type FailureOptions: build/fault-schedule.d.ts#FailureOptions
 type Fault: build/faults.d.ts#Fault
 type FaultAction: build/faults.d.ts#FaultAction
 type FaultKind: build/faults.d.ts#FaultKind
@@ -27,6 +28,7 @@ type FaultSpec: build/faults.d.ts#FaultSpec
 type FaultWindow: build/faults.d.ts#FaultWindow
 type HealthSample: build/window.d.ts#HealthSample
 type Interval: build/faults.d.ts#Interval
+type LatencyOptions: build/fault-schedule.d.ts#LatencyOptions
 type LoadMeasure: build/measure.d.ts#LoadMeasure
 type LoopRequest: build/closed.d.ts#LoopRequest
 type Phase: build/schedule.d.ts#Phase
@@ -50,10 +52,12 @@ checkWindowFault: build/faults.d.ts#checkWindowFault
 closedLoopPlan: build/closed.d.ts#closedLoopPlan
 constant: build/schedule.d.ts#constant
 expectedArrivals: build/schedule.d.ts#expectedArrivals
+failureWindows: build/fault-schedule.d.ts#failureWindows
 faultPlan: build/faults.d.ts#faultPlan
 faultPlanOf: build/faults.d.ts#faultPlanOf
 faultsOf: build/faults.d.ts#faultsOf
 latencyQuantile: build/measure.d.ts#latencyQuantile
+latencyWindows: build/fault-schedule.d.ts#latencyWindows
 measureLoad: build/measure.d.ts#measureLoad
 ramp: build/schedule.d.ts#ramp
 schedule: build/schedule.d.ts#schedule
@@ -91,6 +95,27 @@ export interface LoopRequest {
 
 ### build/closed.d.ts#closedLoopPlan
 export declare function closedLoopPlan(requests: readonly LoopRequest[], options: ClosedLoopOptions): ClosedLoopRun;
+
+### build/fault-schedule.d.ts#FailureOptions
+export interface FailureOptions {
+  readonly action: FaultAction;
+  readonly widthMs: number;
+  readonly seed: number | string;
+  readonly direction?: Direction;
+  readonly at?: Trigger;
+}
+
+### build/fault-schedule.d.ts#LatencyOptions
+export interface LatencyOptions {
+  readonly stepMs: number;
+  readonly direction?: Direction;
+}
+
+### build/fault-schedule.d.ts#failureWindows
+export declare function failureWindows(profile: Profile, options: FailureOptions): WindowFault[];
+
+### build/fault-schedule.d.ts#latencyWindows
+export declare function latencyWindows(profile: Profile, options: LatencyOptions): WindowFault[];
 
 ### build/faults.d.ts#ANSWER_RESERVED_FIELDS
 export declare const ANSWER_RESERVED_FIELDS: readonly ["connection", "content-length", "transfer-encoding"];
