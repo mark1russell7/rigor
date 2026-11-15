@@ -82,6 +82,7 @@ v.comparison;                                     // the cases that gain and dro
 | `childLine(stdout)` | From `/fresh`: the last JSON line of a child, with its time `ms`, its `hash` and the reason of a skip. |
 | `pairOrder(pairs, round, caseIndex)` | From `/fresh`: the order of the pairs of one case in one round, and the first arm of each pair. |
 | `freshRun(options)` | From `/fresh`: the records of each pair, with each arm in its own fresh child process. |
+| `timeArm(run, options)` | The child side of `freshRun`: the median time of one call of one arm, over calibrated samples. |
 | `pairedChild(options)` | The samples of one paired child: the base, the candidate and a copy of the base in one process, in turn. |
 | `pairedChildOrder(round, offset, steps)` | The order of the samples of a paired child: a block A B B A for each pair at each step. |
 | `childRecords(case, round, offset, order, times)` | The `PairedTime` of the candidate pair and of the A/A pair of a paired child, from the medians. |
@@ -406,6 +407,22 @@ const { records } = timeRounds({ a: () => oldCode(input), b: () => newCode(input
 ```
 
 Each arm gives a number. The engine cannot remove the work of a call, because the sum of these numbers uses it.
+
+## Time one arm in a child
+
+`timeArm` is the child side of `freshRun`. Each child times only its own arm, and prints one JSON line:
+
+```ts
+import { timeArm } from "@mark1russell7/rigor-bench";
+
+const time = timeArm(() => kernel(input), { samples: 15 });
+console.log(JSON.stringify({ ms: time.ms, calls: time.calls }));
+```
+
+- The arm first operates for the warm-up time `warmMs`. Then the calls of one sample double until a sample takes `targetMs`.
+- After `warmSamples` samples that do not count, the function times `samples` samples. `ms` is the median time of one call.
+- Give `calls` of an earlier process. Then the function does not calibrate, and each process does the same work.
+- The module keeps the value of each call. Thus the engine cannot remove the work of a call.
 
 ## Read the load of a run from a control
 
