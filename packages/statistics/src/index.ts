@@ -69,6 +69,7 @@ export {
 export { type ParsedResponseRecord, type ResponseFault, RESPONSE_MAX_POWER, parseResponseRecord } from "./response-parse.ts";
 export { type ResponseFitOptions, RESPONSE_LAMBDAS, RESPONSE_MAX_TERMS, fitResponse } from "./response-fit.ts";
 export { type SobolIndex, type SobolIndices, type SobolOptions, sobolIndices } from "./response-sobol.ts";
+export { FOLD_RULE_BAR, FOLD_RULE_MIN_FOLDS, type FoldRuleOptions, type FoldVerdict, type FoldVerdictKind, foldRule, foldSkills } from "./fold-rule.ts";
 export {
   type Corrected,
   type PermutationOptions,

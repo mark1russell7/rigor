@@ -122,6 +122,25 @@ sobol.evaluations; // n * (dimensions + 2) evaluations of the model
 
 A test examines models with known indices. At N = 16384, the root mean square error of an index is approximately 0.01.
 
+### The fold rule
+
+The fold rule tells if a fitted model counts. The model counts when it beats the mean on each held-out fold, and its mean skill is at the bar or above it.
+
+```ts
+import { fitResponse, foldRule, foldSkills } from "@mark1russell7/rigor-statistics";
+
+const record = fitResponse(data, { folds: 5, seed: 1 });
+const verdict = foldRule(foldSkills(record, "ms"));
+verdict.verdict; // "pass", "fail" or "no read"
+verdict.chance;  // 1/32: the chance that a model with no skill beats the mean on each of 5 folds
+```
+
+- The skill of a fold is `1 - mae / baselineMae`. A fold with a baseline error of 0 gives 0, because no model beats it.
+- The defaults are 5 folds or more (`FOLD_RULE_MIN_FOLDS`) and a mean skill of 0.05 or more (`FOLD_RULE_BAR`).
+- With fewer folds, the verdict is `no read`, not a pass and not a fail. A measure with no fold also has no read.
+- `foldRule` also reads the skills of another cross-validation. It throws a RangeError for a skill that is not finite.
+- The sum of `chance` over many models gives the expected count of false passes. The folds share training points, thus this value is an approximation.
+
 ## Rate items from pairwise results
 
 A pairwise result is a comparison of two items: the first item wins, the second item wins, or a tie. Each function of this section is pure, so a log of results gives the same ratings each time.
@@ -248,6 +267,7 @@ choosePair(pool, { seed: "duel-1" });             // the next pair of a duel, th
 | `predictResponse(model, inputs)`, `heldOutError(record, measure)` | The value of a model at one set of inputs, and the error of the folds of a measure. |
 | `heldOutErrorAt(record, measure, ids)` | The held-out error of a chosen set of points, from the predictions of the option `outOfFold`. |
 | `sobolIndices(record, measure, options)` | The first-order and the total Sobol index of each dimension, for the model of a measure. The default N is 4096. |
+| `foldSkills(record, measure)`, `foldRule(skills, options)` | The held-out skill of each fold of a measure, and the verdict of the fold rule: `pass`, `fail` or `no read`. |
 | `responseCells(record, vary, steps)` | The number of fitted places of a view, level axes included. It lets a caller bound the time of a view before the view starts. |
 | `whenHolds(dimension, values)` | True when a place has the condition of a dimension. A dimension with no `when` is always present. |
 | `sliceResponse(record, measure, options)`, `surfaceResponse(record, measure, options)` | A fitted curve over one dimension, or a fitted surface over two, with the matching measured points, the matching points with no value, a band and the distance to the nearest measurement. |
@@ -340,6 +360,8 @@ The tests prove that these functions give the same numbers as the copies in the 
 | `spearman` of the highways backtest, `kendallTau` of highways | `spearman`, `kendallTau` |
 | `medianInterval` of the harness and kind of systems | `medianInterval(sortedValues)`, with `low` and `high` |
 | The binomial band of `targetConnections` and `negativeBinomial` of the cells of systems | `binomialInterval(n, p, cover)` and `negativeBinomialInterval(successes, p, cover)` |
+| `foldSkills` of the highways space fits | `foldSkills(record, measure)` |
+| The fold part of `fitCounts` of highways | `foldRule(skills).verdict === "pass"`. A skill that is not finite throws. The checks of the Sobol indices stay in highways. |
 | `summarizingNumber` of collections (`count`, `sum`, `min`, `max`, `average`) | `addToRunning` in the accumulator, then `n`, `sum`, `min`, `max` and `runningMean`. The average was `sum / count`, so the bits stay. |
 
 A copy that gives NaN, 0 or `undefined` for an empty list must test the list at the call, because these functions throw.
