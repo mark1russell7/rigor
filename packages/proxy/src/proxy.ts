@@ -20,6 +20,11 @@ export interface ProxyOptions {
   readonly listen?: { readonly host?: string; readonly port?: number };
   /** The clock of the times and the timers. The default is `platformClock()`. A test can give `fakeClock()`. */
   readonly clock?: Clock;
+  /**
+   * The time of the clock at the start of the plan. The windows of the plan count from it. The default is the time of
+   * the clock when the proxy starts. A case gives the time of its own start, so its windows and the proxy agree.
+   */
+  readonly origin?: number;
   /** This function gets each record when the fault occurs. */
   readonly onFault?: (record: FaultRecord) => void;
   /** This function gets the summary of each connection when the connection closes. */
@@ -32,6 +37,8 @@ export type ConnectionEnd = "close" | "cut" | "reset" | "error";
 /** The summary of one connection. */
 export interface ConnectionSummary {
   readonly connection: number;
+  /** The start of the connection, in ms from the start of the plan. */
+  readonly opened: number;
   readonly end: ConnectionEnd;
   /** The bytes that the proxy read in each direction. */
   readonly bytes: { readonly up: number; readonly down: number };
@@ -75,6 +82,8 @@ export async function startFaultProxy(options: ProxyOptions): Promise<FaultProxy
   const problems = checkFaultPlan(options.plan);
   if (problems.length > 0) throw new RangeError(`startFaultProxy: ${problems.join(" ")}`);
   const clock = options.clock ?? platformClock();
+  if (options.origin !== undefined && !Number.isFinite(options.origin)) throw new RangeError(`startFaultProxy: the origin is a finite time, not ${String(options.origin)}.`);
+  const origin = options.origin ?? clock.now();
   const makeFramers = options.framers ?? (options.protocol === undefined || options.protocol === "tcp" ? tcpFramers : httpFramers);
   const records: FaultRecord[] = [];
   const connections: ConnectionSummary[] = [];
@@ -85,6 +94,7 @@ export async function startFaultProxy(options: ProxyOptions): Promise<FaultProxy
     const connection = next;
     next += 1;
     const start = clock.now();
+    const opened = start - origin;
     const now = (): number => clock.now() - start;
     const upstream = connect({ host: options.target.host ?? "127.0.0.1", port: options.target.port, allowHalfOpen: true, noDelay: true });
     // Each write goes out at once, thus a split or a gap of the plan stays on the wire.
@@ -97,7 +107,7 @@ export async function startFaultProxy(options: ProxyOptions): Promise<FaultProxy
       from,
       to,
       framer: pair[direction],
-      applier: applierOf(options.plan, connection, direction),
+      applier: applierOf(options.plan, connection, direction, opened),
       queue: [],
       write: undefined,
       wake: undefined,
@@ -240,6 +250,7 @@ export async function startFaultProxy(options: ProxyOptions): Promise<FaultProxy
         cancelTimers();
         const summary: ConnectionSummary = {
           connection,
+          opened,
           end: end ?? "close",
           bytes: { up: sides[0].read, down: sides[1].read },
           missed: [...sides[0].applier.pending(), ...sides[1].applier.pending()].sort((a, b) => a.index - b.index),

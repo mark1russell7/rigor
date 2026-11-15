@@ -49,6 +49,7 @@ export interface Applier {
 ### build/applier.d.ts#FaultRecord
 export interface FaultRecord {
   readonly index: number;
+  readonly window?: true;
   readonly connection: number;
   readonly direction: Direction;
   readonly kind: Fault["kind"];
@@ -77,7 +78,7 @@ export interface Step {
 }
 
 ### build/applier.d.ts#applierOf
-export declare function applierOf(plan: FaultPlan, connection: number, direction: Direction): Applier;
+export declare function applierOf(plan: FaultPlan, connection: number, direction: Direction, opened?: number): Applier;
 
 ### build/applier.d.ts#splitBytes
 export declare function splitBytes(bytes: Uint8Array, pieces: number): Uint8Array[];
@@ -125,6 +126,7 @@ export type ConnectionEnd = "close" | "cut" | "reset" | "error";
 ### build/proxy.d.ts#ConnectionSummary
 export interface ConnectionSummary {
   readonly connection: number;
+  readonly opened: number;
   readonly end: ConnectionEnd;
   readonly bytes: {
     readonly up: number;
@@ -162,6 +164,7 @@ export interface ProxyOptions {
     readonly port?: number;
   };
   readonly clock?: Clock;
+  readonly origin?: number;
   readonly onFault?: (record: FaultRecord) => void;
   readonly onClose?: (summary: ConnectionSummary) => void;
 }

@@ -159,6 +159,34 @@ describe("a TCP fault proxy", () => {
     expect(String(server.reads[0])).toBe("late");
   });
 
+  it("resets each connection that is open in a window, and counts the window from the origin", async () => {
+    const clock = fakeClock();
+    const server = await recorder(true);
+    const plan = faultPlanOf([], [{ window: { from: 1000, to: 2000 }, direction: "up", at: { ms: 0 }, kind: "reset" }]);
+    await expect(startFaultProxy({ target: { port: server.port }, plan, clock, origin: Number.NaN })).rejects.toThrow(RangeError);
+    const started = await startFaultProxy({ target: { port: server.port }, plan, clock, origin: clock.now() });
+    cleanups.push(() => started.close());
+    const first = await client(started.port);
+    first.write("a");
+    await until(() => server.reads.length === 1);
+    await clock.advance(1000);
+    expect((await closed(started, 1))[0]).toMatchObject({ connection: 0, opened: 0, end: "reset", missed: [] });
+    // A connection that opens in the window gets the fault at its start.
+    await client(started.port);
+    expect((await closed(started, 2))[1]).toMatchObject({ connection: 1, opened: 1000, end: "reset" });
+    await clock.advance(1000);
+    const third = await client(started.port);
+    const got: Buffer[] = [];
+    third.on("data", (bytes: Buffer) => got.push(bytes));
+    third.end("z");
+    await once(third, "end");
+    expect(Buffer.concat(got).toString()).toBe("z");
+    expect(started.records.map((record) => [record.connection, record.window, record.kind, record.index])).toEqual([
+      [0, true, "reset", 0],
+      [1, true, "reset", 0],
+    ]);
+  });
+
   it("stalls the reads of a direction, and the bytes after the point wait for the end of the stall", async () => {
     const server = await recorder(false);
     const started = await proxy(server.port, [{ connection: 0, direction: "up", at: { byte: 2 }, kind: "stall", ms: 300 }]);

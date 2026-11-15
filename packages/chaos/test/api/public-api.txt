@@ -17,11 +17,15 @@ type Direction: build/faults.d.ts#Direction
 FAULT_KINDS: build/faults.d.ts#FAULT_KINDS
 FAULT_PLAN_FORMAT: build/faults.d.ts#FAULT_PLAN_FORMAT
 type Fault: build/faults.d.ts#Fault
+type FaultAction: build/faults.d.ts#FaultAction
 type FaultKind: build/faults.d.ts#FaultKind
 type FaultPlan: build/faults.d.ts#FaultPlan
+type FaultPlanFormat: build/faults.d.ts#FaultPlanFormat
 type FaultPoint: build/faults.d.ts#FaultPoint
 type FaultRanges: build/faults.d.ts#FaultRanges
 type FaultSpec: build/faults.d.ts#FaultSpec
+type FaultWindow: build/faults.d.ts#FaultWindow
+type HealthSample: build/window.d.ts#HealthSample
 type Interval: build/faults.d.ts#Interval
 type LoadMeasure: build/measure.d.ts#LoadMeasure
 type LoopRequest: build/closed.d.ts#LoopRequest
@@ -33,10 +37,16 @@ type ScheduleCheck: build/measure.d.ts#ScheduleCheck
 type ScheduleOptions: build/schedule.d.ts#ScheduleOptions
 type SecondSample: build/measure.d.ts#SecondSample
 type Trigger: build/faults.d.ts#Trigger
+WINDOW_PLAN_FORMAT: build/faults.d.ts#WINDOW_PLAN_FORMAT
+type WindowFault: build/faults.d.ts#WindowFault
+type WindowLimits: build/window.d.ts#WindowLimits
+type WindowResponse: build/window.d.ts#WindowResponse
+type WindowVerdict: build/window.d.ts#WindowVerdict
 checkFault: build/faults.d.ts#checkFault
 checkFaultPlan: build/faults.d.ts#checkFaultPlan
 checkFaultSpec: build/faults.d.ts#checkFaultSpec
 checkProfile: build/schedule.d.ts#checkProfile
+checkWindowFault: build/faults.d.ts#checkWindowFault
 closedLoopPlan: build/closed.d.ts#closedLoopPlan
 constant: build/schedule.d.ts#constant
 expectedArrivals: build/schedule.d.ts#expectedArrivals
@@ -52,6 +62,7 @@ spike: build/schedule.d.ts#spike
 steps: build/schedule.d.ts#steps
 sweepPoints: build/faults.d.ts#sweepPoints
 triggerOf: build/faults.d.ts#triggerOf
+windowResponse: build/window.d.ts#windowResponse
 
 ## Declarations
 
@@ -105,7 +116,10 @@ export declare const FAULT_KINDS: readonly ["delay", "stall", "cut", "reset", "s
 export declare const FAULT_PLAN_FORMAT = "rigor-faults/1";
 
 ### build/faults.d.ts#Fault
-export type Fault = FaultPoint & ({
+export type Fault = FaultPoint & FaultAction;
+
+### build/faults.d.ts#FaultAction
+export type FaultAction = {
   readonly kind: "delay";
   readonly ms: number;
   readonly forMs: number;
@@ -127,17 +141,21 @@ export type Fault = FaultPoint & ({
 } | {
   readonly kind: "duplicate";
   readonly copies: number;
-} | AnswerFault);
+} | AnswerFault;
 
 ### build/faults.d.ts#FaultKind
 export type FaultKind = (typeof FAULT_KINDS)[number];
 
 ### build/faults.d.ts#FaultPlan
 export interface FaultPlan {
-  readonly format: typeof FAULT_PLAN_FORMAT;
+  readonly format: FaultPlanFormat;
   readonly seed: number | string | null;
   readonly faults: readonly Fault[];
+  readonly windows?: readonly WindowFault[];
 }
+
+### build/faults.d.ts#FaultPlanFormat
+export type FaultPlanFormat = typeof FAULT_PLAN_FORMAT | typeof WINDOW_PLAN_FORMAT;
 
 ### build/faults.d.ts#FaultPoint
 export interface FaultPoint {
@@ -168,6 +186,12 @@ export interface FaultSpec {
   readonly ranges?: Partial<FaultRanges>;
 }
 
+### build/faults.d.ts#FaultWindow
+export interface FaultWindow {
+  readonly from: number;
+  readonly to: number;
+}
+
 ### build/faults.d.ts#Interval
 export type Interval = readonly [number, number];
 
@@ -180,6 +204,16 @@ export type Trigger = {
   readonly frame: number;
 };
 
+### build/faults.d.ts#WINDOW_PLAN_FORMAT
+export declare const WINDOW_PLAN_FORMAT = "rigor-faults/2";
+
+### build/faults.d.ts#WindowFault
+export type WindowFault = {
+  readonly window: FaultWindow;
+  readonly direction: Direction;
+  readonly at: Trigger;
+} & FaultAction;
+
 ### build/faults.d.ts#checkFault
 export declare function checkFault(fault: Fault): readonly string[];
 
@@ -189,11 +223,14 @@ export declare function checkFaultPlan(plan: FaultPlan): readonly string[];
 ### build/faults.d.ts#checkFaultSpec
 export declare function checkFaultSpec(spec: FaultSpec): readonly string[];
 
+### build/faults.d.ts#checkWindowFault
+export declare function checkWindowFault(fault: WindowFault): readonly string[];
+
 ### build/faults.d.ts#faultPlan
 export declare function faultPlan(spec: FaultSpec, seed: number | string): FaultPlan;
 
 ### build/faults.d.ts#faultPlanOf
-export declare function faultPlanOf(faults: readonly Fault[]): FaultPlan;
+export declare function faultPlanOf(faults: readonly Fault[], windows?: readonly WindowFault[]): FaultPlan;
 
 ### build/faults.d.ts#faultsOf
 export declare function faultsOf(plan: FaultPlan, connection: number): readonly Fault[];
@@ -308,3 +345,30 @@ export declare function spike(base: number, peak: number, shape: {
 
 ### build/schedule.d.ts#steps
 export declare function steps(rates: readonly number[], ms: number): Profile;
+
+### build/window.d.ts#HealthSample
+export interface HealthSample {
+  readonly at: number;
+  readonly up: boolean;
+}
+
+### build/window.d.ts#WindowLimits
+export interface WindowLimits {
+  readonly detectMs: number;
+  readonly recoverMs: number;
+}
+
+### build/window.d.ts#WindowResponse
+export interface WindowResponse {
+  readonly detectMs?: number;
+  readonly recoverMs?: number;
+  readonly detected: WindowVerdict;
+  readonly recovered: WindowVerdict;
+  readonly problems: readonly string[];
+}
+
+### build/window.d.ts#WindowVerdict
+export type WindowVerdict = "pass" | "fail" | "no read";
+
+### build/window.d.ts#windowResponse
+export declare function windowResponse(window: FaultWindow, samples: readonly HealthSample[], limits: WindowLimits): WindowResponse;

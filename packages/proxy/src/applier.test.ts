@@ -1,4 +1,4 @@
-import { type Fault, faultPlan, faultPlanOf } from "@mark1russell7/rigor-chaos";
+import { type Fault, type WindowFault, faultPlan, faultPlanOf } from "@mark1russell7/rigor-chaos";
 import { describe, expect, it } from "vitest";
 import { type Send, applierOf, splitBytes } from "./applier.ts";
 
@@ -203,5 +203,75 @@ describe("an answer", () => {
     ]);
     expect(step.answer?.at).toBe(70);
     expect(step.records.map((record) => record.kind)).toEqual(["reorder", "answer"]);
+  });
+});
+
+describe("a fault of a window", () => {
+  type LooseWindow = Omitted<WindowFault, "window" | "direction">;
+  const inWindow = (from: number, to: number, fault: LooseWindow): WindowFault => ({ window: { from, to }, direction: "up", ...fault }) as WindowFault;
+  const windowed = (opened: number, ...windows: WindowFault[]) => applierOf(faultPlanOf([], windows), 0, "up", opened);
+
+  it("occurs at its time on a connection that opened before the window, with a record of the window", () => {
+    const applier = windowed(0, inWindow(1000, 3000, { at: { ms: 0 }, kind: "reset" }));
+    expect(applier.wake).toBe(1000);
+    expect(show(applier.push(text("a"), 500).sends)).toEqual([["a", 500]]);
+    const step = applier.tick(1000);
+    expect(step.close).toEqual({ kind: "reset", at: 1000 });
+    expect(step.records).toEqual([{ index: 0, window: true, connection: 0, direction: "up", kind: "reset", at: 1000, byte: 1, frame: 1, bytes: 0 }]);
+    expect(applier.pending()).toEqual([]);
+  });
+
+  it("counts its time from the start of a connection that opens in the window", () => {
+    const applier = windowed(1500, inWindow(1000, 3000, { at: { ms: 100 }, kind: "reset" }));
+    expect(applier.wake).toBe(100);
+    expect(applier.tick(100).close?.kind).toBe("reset");
+  });
+
+  it("does not occur on a connection that opens after the window, or when it is due after the end", () => {
+    expect(windowed(3000, inWindow(1000, 3000, { at: { ms: 0 }, kind: "reset" })).wake).toBeUndefined();
+    expect(windowed(0, inWindow(1000, 3000, { at: { ms: 2000 }, kind: "reset" })).wake).toBeUndefined();
+    const late = windowed(0, inWindow(1000, 3000, { at: { ms: 0 }, kind: "reset" }));
+    // A tick that comes after the end of the window does not fire the fault.
+    expect(late.tick(3000).close).toBeUndefined();
+    expect(show(late.push(text("a"), 3001).sends)).toEqual([["a", 3001]]);
+  });
+
+  it("counts a byte point from the first byte in the window", () => {
+    const applier = windowed(500, inWindow(1000, 3000, { at: { byte: 2 }, kind: "cut" }));
+    expect(show(applier.push(text("abc"), 100).sends)).toEqual([["abc", 100]]);
+    const step = applier.push(text("defg"), 600);
+    expect(show(step.sends)).toEqual([["de", 600]]);
+    expect(step.close).toEqual({ kind: "cut", at: 600 });
+    expect(step.records[0]).toMatchObject({ window: true, byte: 5, frame: 1 });
+  });
+
+  it("drops a frame point that has no frame in the window", () => {
+    const applier = windowed(0, inWindow(100, 200, { at: { frame: 0 }, kind: "cut" }));
+    expect(show(applier.push(text("a"), 50).sends)).toEqual([["a", 50]]);
+    expect(applier.push(text("b"), 250).close).toBeUndefined();
+  });
+
+  it("splits only a frame in the window", () => {
+    const applier = windowed(0, inWindow(100, 200, { at: { ms: 50 }, kind: "split", pieces: 2, gapMs: 5 }));
+    applier.tick(150);
+    expect(show(applier.push(text("ab"), 250).sends)).toEqual([["ab", 250]]);
+    const inside = windowed(0, inWindow(100, 200, { at: { ms: 50 }, kind: "split", pieces: 2, gapMs: 5 }));
+    inside.tick(150);
+    expect(show(inside.push(text("ab"), 160).sends)).toEqual([
+      ["a", 160],
+      ["b", 165],
+    ]);
+  });
+
+  it("keeps the faults of the plan, and numbers the two lists apart", () => {
+    const plan = faultPlanOf([up({ at: { frame: 5 }, kind: "cut" })], [inWindow(0, 100, { at: { frame: 0 }, kind: "duplicate", copies: 1 })]);
+    const applier = applierOf(plan, 0, "up");
+    const step = applier.push(text("a"), 10);
+    expect(show(step.sends)).toEqual([
+      ["a", 10],
+      ["a", 10],
+    ]);
+    expect(step.records).toMatchObject([{ index: 0, window: true, kind: "duplicate" }]);
+    expect(applier.pending()).toEqual([{ index: 0, fault: plan.faults[0] }]);
   });
 });

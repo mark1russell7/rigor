@@ -85,6 +85,38 @@ for (const offset of sweepPoints(6000, 16, "cut-in-body")) {
 - The edges find the faults at the start and at the end of a stream. The seeded points find the faults between them.
 - The same seed gives the same points on each platform.
 
+### A window of faults
+
+A fault of a window applies to each connection that is open at a time in the window. Thus a window makes an outage or a slow period of a server. The time of a window counts in ms from the start of the plan.
+
+```ts
+import { faultPlanOf } from "@mark1russell7/rigor-chaos";
+
+// From 1 s to 4 s, the proxy resets each request at its first byte.
+const plan = faultPlanOf([], [{ window: { from: 1000, to: 4000 }, direction: "up", at: { byte: 0 }, kind: "reset" }]);
+```
+
+- The point of a window fault counts from the start of the window, or from the start of a connection that opens in the window.
+- A fault that is not due before the end of the window does not occur.
+- A plan with windows has the format `rigor-faults/2`. A reader of `rigor-faults/1` refuses it, thus it does not drop the windows with no word.
+- `checkWindowFault` gives each problem of one fault of a window.
+
+### The response to a window
+
+`windowResponse` reads a series of samples of a health signal. It gives the time to detect the window and the time to recover after it.
+
+```ts
+import { windowResponse } from "@mark1russell7/rigor-chaos";
+
+const response = windowResponse({ from: 1000, to: 4000 }, samples, { detectMs: 2000, recoverMs: 3000 });
+// response.detected and response.recovered are "pass", "fail" or "no read".
+```
+
+- The time to detect is from the start of the window to the first sample down.
+- The time to recover is from the end of the window to the first sample up after it. A detection after the end moves this start to the detection.
+- A gate that cannot read the case gives `no read`, not a pass. This occurs when the signal is not steady and up before the window, or when the samples end before the limit.
+- With no detection, the recovery has no read.
+
 ## A closed-loop record
 
 `closedLoopPlan` reads a run of a closed-loop driver that sends each `interval` ms. It puts back the sends that each stall hid, by the rule of `recordValueWithExpectedInterval` of HdrHistogram.
