@@ -1,5 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { uniformDouble } from "@mark1russell7/rigor-testkit/arbitrary";
 import { type Random, random } from "@mark1russell7/rigor-generators";
 import { type PairComparison, type PairOutcome, bradleyTerry, pairProbabilities, spearman } from "./index.ts";
 
@@ -215,7 +216,7 @@ describe("bradleyTerry: invariance", () => {
 
   it("moves each strength by the change of the prior mean, and keeps the errors and the tie parameter", () => {
     fc.assert(
-      fc.property(comparisonList(4), fc.double({ min: -5, max: 5, noNaN: true }), (comparisons, shift) => {
+      fc.property(comparisonList(4), uniformDouble({ min: -5, max: 5 }), (comparisons, shift) => {
         const fit = bradleyTerry(4, comparisons);
         const moved = bradleyTerry(4, comparisons, { priorMean: shift });
         for (let i = 0; i < 4; i++) {

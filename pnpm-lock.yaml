@@ -270,6 +270,9 @@ importers:
       '@mark1russell7/cue':
         specifier: ^2.0.0
         version: 2.1.4
+      '@mark1russell7/rigor-testkit':
+        specifier: workspace:^
+        version: link:../testkit
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.6
@@ -394,6 +397,9 @@ importers:
       '@mark1russell7/cue':
         specifier: ^2.0.0
         version: 2.1.4
+      '@mark1russell7/rigor-testkit':
+        specifier: workspace:^
+        version: link:../testkit
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.6

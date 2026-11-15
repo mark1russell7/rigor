@@ -83,6 +83,7 @@ describe("normalQuantile", () => {
   });
 
   it("goes back to p for each p of fast-check", () => {
+    // fc.double draws over the floats, not over the values, so p takes each magnitude from 1e-300 up. The tails need this.
     fc.assert(
       fc.property(fc.double({ min: 1e-300, max: 0.999, noNaN: true }), (p) => relative(normalCdf(normalQuantile(p)), p) < 1e-12),
     );

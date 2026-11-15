@@ -1,5 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { uniformDouble } from "@mark1russell7/rigor-testkit/arbitrary";
 import { PAIR_FULL_SEARCH, RATING_START_UNCERTAINTY, type RatedItem, choosePair, pairInformation, ratingUncertainty } from "./index.ts";
 
 const item = (id: string, rating: number, picks = 0, se?: number): RatedItem => ({ id, rating, picks, se });
@@ -21,7 +22,7 @@ describe("pairInformation", () => {
       fc.property(
         fc.double({ min: 800, max: 2200, noNaN: true }),
         fc.double({ min: 800, max: 2200, noNaN: true }),
-        fc.double({ min: -300, max: 300, noNaN: true }),
+        uniformDouble({ min: -300, max: 300 }),
         fc.nat(100),
         (ra, rb, shift, picks) => {
           const a = item("a", ra, picks);

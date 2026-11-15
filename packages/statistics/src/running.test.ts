@@ -1,9 +1,10 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { uniformDouble } from "@mark1russell7/rigor-testkit/arbitrary";
 import { EMPTY_RUNNING, addToRunning, mean, mergeRunning, runningMean, runningOf, runningSd, sd } from "./index.ts";
 
 // Values of one scale. The tolerance of the spread is relative to the largest magnitude, the scale of the rounding.
-const value = fc.double({ min: -1e6, max: 1e6, noNaN: true, noDefaultInfinity: true });
+const value = uniformDouble({ min: -1e6, max: 1e6 });
 const values = (minLength: number) => fc.array(value, { minLength, maxLength: 60 });
 const close = (a: number, b: number, scale: number) => Math.abs(a - b) <= 1e-9 * (1 + scale);
 const scaleOf = (xs: readonly number[]) => xs.reduce((m, x) => Math.max(m, Math.abs(x)), 0);

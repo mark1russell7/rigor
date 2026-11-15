@@ -1,5 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { uniformDouble } from "@mark1russell7/rigor-testkit/arbitrary";
 import {
   brier,
   eloExpected,
@@ -12,7 +13,7 @@ import {
   strengthToRating,
 } from "./index.ts";
 
-const strength = fc.double({ min: -20, max: 20, noNaN: true });
+const strength = uniformDouble({ min: -20, max: 20 });
 
 /* ---------- Elo ---------- */
 
@@ -29,7 +30,7 @@ describe("eloExpected", () => {
 
   it("gives a sum of 1 for the two sides, and depends only on the difference", () => {
     fc.assert(
-      fc.property(fc.double({ min: -3000, max: 3000, noNaN: true }), fc.double({ min: -3000, max: 3000, noNaN: true }), fc.double({ min: -1000, max: 1000, noNaN: true }), (ra, rb, c) => {
+      fc.property(uniformDouble({ min: -3000, max: 3000 }), uniformDouble({ min: -3000, max: 3000 }), uniformDouble({ min: -1000, max: 1000 }), (ra, rb, c) => {
         expect(eloExpected(ra, rb) + eloExpected(rb, ra)).toBeCloseTo(1, 12);
         expect(eloExpected(ra + c, rb + c)).toBeCloseTo(eloExpected(ra, rb), 9);
       }),
@@ -58,7 +59,7 @@ describe("eloUpdate", () => {
 
   it("keeps the sum of the ratings, and a score at the expected score changes nothing", () => {
     fc.assert(
-      fc.property(fc.double({ min: 0, max: 3000, noNaN: true }), fc.double({ min: 0, max: 3000, noNaN: true }), fc.constantFrom(0, 0.5, 1), (ra, rb, s) => {
+      fc.property(uniformDouble({ min: 0, max: 3000 }), uniformDouble({ min: 0, max: 3000 }), fc.constantFrom(0, 0.5, 1), (ra, rb, s) => {
         const u = eloUpdate(ra, rb, s, { k: 24 });
         expect(u.a + u.b).toBeCloseTo(ra + rb, 8);
         // A score above the expected score never lowers the rating, and one below never raises it. The move can round to 0: at a rating near 3000, k times a gap of 1e-16 is lost.
@@ -113,7 +114,7 @@ describe("glicko2Update", () => {
 
   it("raises the rating after a win and lowers it after a loss against an equal opponent", () => {
     fc.assert(
-      fc.property(fc.double({ min: 1000, max: 2000, noNaN: true }), fc.double({ min: 30, max: 350, noNaN: true }), fc.double({ min: 0.01, max: 0.2, noNaN: true }), (rating, rd, volatility) => {
+      fc.property(fc.double({ min: 1000, max: 2000, noNaN: true }), uniformDouble({ min: 30, max: 350 }), uniformDouble({ min: 0.01, max: 0.2 }), (rating, rd, volatility) => {
         const p = { rating, rd, volatility };
         const win = glicko2Update(p, [{ rating, rd: 50, score: 1 }]);
         const loss = glicko2Update(p, [{ rating, rd: 50, score: 0 }]);
@@ -159,7 +160,7 @@ describe("pairProbabilities", () => {
 
   it("gives a sum of 1, swaps with the items, and does not change when a constant goes to the two strengths", () => {
     fc.assert(
-      fc.property(strength, strength, fc.double({ min: 0, max: 50, noNaN: true }), fc.double({ min: -100, max: 100, noNaN: true }), (sa, sb, tie, c) => {
+      fc.property(strength, strength, uniformDouble({ min: 0, max: 50 }), uniformDouble({ min: -100, max: 100 }), (sa, sb, tie, c) => {
         const p = pairProbabilities(sa, sb, tie);
         expect(p.a + p.b + p.tie).toBeCloseTo(1, 12);
         const swapped = pairProbabilities(sb, sa, tie);
