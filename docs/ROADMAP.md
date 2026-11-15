@@ -6,25 +6,37 @@ This file lists the items of the roadmap of this repository. The status page of 
 
 | ID | Status | Priority | Title |
 | --- | --- | --- | --- |
-| R1 | in progress | P1 | generators 0.1.0: the seeded generator and its draws, byte-equal to each copy of mulberry32 |
-| R2 | in progress | P1 | The site: the packages, and the generator and the time verdict to try in the browser |
-| R4 | in progress | P1 | statistics 0.1.0: quantiles, bootstrap intervals, sign and permutation tests, Wilson, Holm, rank correlation, the comparison beyond the noise and Brier, equal to the bit to each copy |
-| R8 | in progress | P2 | chaos: fault injection and schedules of latency and failure, with their measures. Done: seeded fault plans in rigor-chaos 0.1.6 (#200), and rigor-proxy 0.1.0, which applies a plan to TCP, HTTP and WebSocket streams and records each fault (#201). The first npm publish of rigor-proxy waits. Open: the schedules of latency and failure, with their measures. Open-loop load profiles are in the package |
-| R9 | in progress | P2 | Sobol indices and shrinking. statistics 0.1.22 gives `sobolIndices` of a response model. Shrinking is not done |
+| R15 | in progress | P0 | chaos: faults in time windows, with the times to detect and to recover. A window fault applies to each connection that is open in the window. `windowResponse` gives the verdicts pass, fail or no read. The fault suite of alerts uses them in place of its local copy |
+| R8 | in progress | P0 | chaos: fault plans, the fault proxy, and schedules with their measures. Done: seeded fault plans (#200), the proxy for TCP, HTTP and WebSocket (#201), the answer fault (#208) and the sweep points (#211). Open: windows (R15), and schedules of latency and failure |
+| R13 | in progress | P1 | bench: the five local harnesses (Vex, packing, highways, layout-contract, typeset) use rigor-bench. The survey found 8 gaps. rigor-bench gets each gap, then each repository removes its copy |
 
 ## Next
 
 | ID | Status | Priority | Title |
 | --- | --- | --- | --- |
-| R3 | next | P1 | The first moves: each repository with a copy of mulberry32 or of a statistics function imports the package, with records that stay equal |
-| R5 | next | P1 | generators: input families with dimensions and ranges, a distribution for each dimension, stratified and Latin hypercube designs, Saltelli designs. Target date: 2026-11-16 |
+| R3 | next | P2 | The moves: each repository with a copy of mulberry32 or of a statistics function imports the package, with records that stay equal. layout-contract is done |
 | R6 | next | P2 | gates: the determinism gate (one input gives one hash), the promotion test and the performance evidence |
-| R11 | next | P2 | statistics: the fold rule, next to `sobolIndices`: a model counts when it beats the mean on each held-out fold. highways and packing call it (codeatlas CA5-P29, CA5-P36) |
-| R12 | next | P2 | bench: the k-of-n read of joint non-domination: an entry wins only when no control dominates it on k of n stated measures. Each repository keeps its thresholds (codeatlas CA5-P26) |
+| R11 | next | P2 | statistics: the fold rule, next to `sobolIndices`. A model counts when it beats the mean on each held-out fold. highways and packing use it |
+| R12 | next | P2 | bench: the k-of-n read of joint non-domination. An entry wins only when no control dominates it on k of n stated measures |
+| R14 | next | P2 | bench: the verdicts that coeval asked for. These are a verdict for each case from its rounds, a slope verdict, the bias of a case between jobs and limits from A/A records |
+| R16 | next | P2 | bench: several case modules in one run, and fixture files with a pinned hash (#115) |
+| R17 | next | P2 | bench: gate rules for holds, early stops and two commits as paired arms in one job (#55) |
+| R19 | next | P2 | Upkeep: pull requests #99 and #103, and the old worktrees of earlier sessions |
 
 ## Later
 
 | ID | Status | Priority | Title |
 | --- | --- | --- | --- |
+| R2 | later | P2 | The site: live demos of a fault plan and the proxy, next to the generator and the time verdict |
 | R7 | later | P2 | testgen: property tests on fast-check, pairwise and covering arrays, metamorphic relations |
-| R10 | later | P2 | statistics: an optional sum of the squared kernel for `uStatisticInterval`, for an empirical Bernstein bound. Parked until a consumer works at `k > 500`. `docs/CALIBRATION.md` has the read |
+| R9 | later | P2 | Shrinking of a failed input. It goes with the test generators (R7). statistics 0.1.22 has `sobolIndices` |
+| R10 | later | P3 | statistics: an optional sum of the squared kernel for `uStatisticInterval`, for an empirical Bernstein bound. It waits for a consumer at `k > 500`. `docs/CALIBRATION.md` has the read |
+| R18 | later | P3 | statistics: a moving-block bootstrap, so the interval of a mean of a correlated series is not too narrow |
+
+## Done
+
+| ID | Status | Priority | Title |
+| --- | --- | --- | --- |
+| R1 | done | P1 | generators 0.1.0: the seeded generator and its draws, equal to the byte to each copy of mulberry32. Done on 2026-10-29 |
+| R4 | done | P1 | statistics 0.1.0: quantiles, intervals and tests, equal to the bit to each copy. Done on 2026-10-29 |
+| R5 | done | P1 | generators: input families with dimensions and ranges, stratified and Latin hypercube designs, Saltelli designs (#168, #169, #170). Done on 2026-11-08 |
