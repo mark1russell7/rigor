@@ -1,0 +1,563 @@
+{
+ "source": "coeval packages/core/bench/limits.json at dcbb57b (K214, D117): the A/A statistics of 16 cases in 6 CI jobs",
+ "families": {
+  "formula": [
+   "FORMULA.SPEED formula",
+   "the same formula, with a list of reads"
+  ],
+  "reference": [
+   "a reference of five steps",
+   "a reference into a host thing with resolve",
+   "a reference through an envelope",
+   "a reference with a step document",
+   "resolve without hops, five steps"
+  ],
+  "plan": [
+   "PLAN.FOLD a record of 20 literals",
+   "PLAN.TOTAL a record of 20 literals, without folds",
+   "PLAN.FIXED a path of four steps from a fixed name",
+   "PLAN.PATH the same path, without the declaration",
+   "PLAN.FIXED a formula with a fixed name and a free name",
+   "PLAN.COMPILE-SPEED prepare"
+  ],
+  "tree": [
+   "a tree with an equation",
+   "the same tree, with a list of reads",
+   "factsOf a tree with an equation"
+  ]
+ },
+ "jobs": [
+  {
+   "job": "41574523074/1",
+   "cases": [
+    {
+     "case": "FORMULA.SPEED formula",
+     "median": 0.002092,
+     "spread": 0.025488
+    },
+    {
+     "case": "the same formula, with a list of reads",
+     "median": -0.002458,
+     "spread": 0.012351
+    },
+    {
+     "case": "a reference of five steps",
+     "median": 0.001348,
+     "spread": 0.010791
+    },
+    {
+     "case": "a reference into a host thing with resolve",
+     "median": -0.005762,
+     "spread": 0.023674
+    },
+    {
+     "case": "a reference through an envelope",
+     "median": -0.001037,
+     "spread": 0.013695
+    },
+    {
+     "case": "a reference with a step document",
+     "median": 0.005038,
+     "spread": 0.065232
+    },
+    {
+     "case": "resolve without hops, five steps",
+     "median": 0.000773,
+     "spread": 0.006316
+    },
+    {
+     "case": "PLAN.FOLD a record of 20 literals",
+     "median": -0.004955,
+     "spread": 0.0234
+    },
+    {
+     "case": "PLAN.TOTAL a record of 20 literals, without folds",
+     "median": 0.002497,
+     "spread": 0.01598
+    },
+    {
+     "case": "PLAN.FIXED a path of four steps from a fixed name",
+     "median": 0.001695,
+     "spread": 0.011251
+    },
+    {
+     "case": "PLAN.PATH the same path, without the declaration",
+     "median": 0.000099,
+     "spread": 0.016613
+    },
+    {
+     "case": "PLAN.FIXED a formula with a fixed name and a free name",
+     "median": 0.00364,
+     "spread": 0.024934
+    },
+    {
+     "case": "a tree with an equation",
+     "median": -0.005124,
+     "spread": 0.034413
+    },
+    {
+     "case": "the same tree, with a list of reads",
+     "median": 0.000828,
+     "spread": 0.029738
+    },
+    {
+     "case": "factsOf a tree with an equation",
+     "median": 0.00872,
+     "spread": 0.143055
+    },
+    {
+     "case": "PLAN.COMPILE-SPEED prepare",
+     "median": -0.004414,
+     "spread": 0.027916
+    }
+   ]
+  },
+  {
+   "job": "41574523074/2",
+   "cases": [
+    {
+     "case": "FORMULA.SPEED formula",
+     "median": 0.003487,
+     "spread": 0.016941
+    },
+    {
+     "case": "the same formula, with a list of reads",
+     "median": 0.005454,
+     "spread": 0.02256
+    },
+    {
+     "case": "a reference of five steps",
+     "median": 0.003546,
+     "spread": 0.013948
+    },
+    {
+     "case": "a reference into a host thing with resolve",
+     "median": -0.002137,
+     "spread": 0.015671
+    },
+    {
+     "case": "a reference through an envelope",
+     "median": 0.002857,
+     "spread": 0.030429
+    },
+    {
+     "case": "a reference with a step document",
+     "median": -0.003381,
+     "spread": 0.030502
+    },
+    {
+     "case": "resolve without hops, five steps",
+     "median": -0.00099,
+     "spread": 0.004779
+    },
+    {
+     "case": "PLAN.FOLD a record of 20 literals",
+     "median": 0.001691,
+     "spread": 0.035443
+    },
+    {
+     "case": "PLAN.TOTAL a record of 20 literals, without folds",
+     "median": -0.000537,
+     "spread": 0.022222
+    },
+    {
+     "case": "PLAN.FIXED a path of four steps from a fixed name",
+     "median": -0.006248,
+     "spread": 0.010593
+    },
+    {
+     "case": "PLAN.PATH the same path, without the declaration",
+     "median": 0.000314,
+     "spread": 0.020376
+    },
+    {
+     "case": "PLAN.FIXED a formula with a fixed name and a free name",
+     "median": -0.000304,
+     "spread": 0.014913
+    },
+    {
+     "case": "a tree with an equation",
+     "median": -0.00211,
+     "spread": 0.0202
+    },
+    {
+     "case": "the same tree, with a list of reads",
+     "median": -0.002507,
+     "spread": 0.093389
+    },
+    {
+     "case": "factsOf a tree with an equation",
+     "median": 0.006556,
+     "spread": 0.115486
+    },
+    {
+     "case": "PLAN.COMPILE-SPEED prepare",
+     "median": -0.003424,
+     "spread": 0.147821
+    }
+   ]
+  },
+  {
+   "job": "41579105529/1",
+   "cases": [
+    {
+     "case": "FORMULA.SPEED formula",
+     "median": -0.001077,
+     "spread": 0.016164
+    },
+    {
+     "case": "the same formula, with a list of reads",
+     "median": 0.001402,
+     "spread": 0.015006
+    },
+    {
+     "case": "a reference of five steps",
+     "median": -0.002679,
+     "spread": 0.010605
+    },
+    {
+     "case": "a reference into a host thing with resolve",
+     "median": 0.004445,
+     "spread": 0.021605
+    },
+    {
+     "case": "a reference through an envelope",
+     "median": -0.006749,
+     "spread": 0.016877
+    },
+    {
+     "case": "a reference with a step document",
+     "median": -0.005921,
+     "spread": 0.016581
+    },
+    {
+     "case": "resolve without hops, five steps",
+     "median": 0.000271,
+     "spread": 0.00767
+    },
+    {
+     "case": "PLAN.FOLD a record of 20 literals",
+     "median": -0.000727,
+     "spread": 0.035862
+    },
+    {
+     "case": "PLAN.TOTAL a record of 20 literals, without folds",
+     "median": 0.001265,
+     "spread": 0.01743
+    },
+    {
+     "case": "PLAN.FIXED a path of four steps from a fixed name",
+     "median": 0.000346,
+     "spread": 0.009569
+    },
+    {
+     "case": "PLAN.PATH the same path, without the declaration",
+     "median": -0.004502,
+     "spread": 0.024941
+    },
+    {
+     "case": "PLAN.FIXED a formula with a fixed name and a free name",
+     "median": -0.003518,
+     "spread": 0.023063
+    },
+    {
+     "case": "a tree with an equation",
+     "median": -0.002125,
+     "spread": 0.014884
+    },
+    {
+     "case": "the same tree, with a list of reads",
+     "median": 0.012513,
+     "spread": 0.027726
+    },
+    {
+     "case": "factsOf a tree with an equation",
+     "median": -0.013161,
+     "spread": 0.038417
+    },
+    {
+     "case": "PLAN.COMPILE-SPEED prepare",
+     "median": -0.004677,
+     "spread": 0.038813
+    }
+   ]
+  },
+  {
+   "job": "41579105529/2",
+   "cases": [
+    {
+     "case": "FORMULA.SPEED formula",
+     "median": 0.002724,
+     "spread": 0.012447
+    },
+    {
+     "case": "the same formula, with a list of reads",
+     "median": 0.000497,
+     "spread": 0.020952
+    },
+    {
+     "case": "a reference of five steps",
+     "median": -0.000324,
+     "spread": 0.011191
+    },
+    {
+     "case": "a reference into a host thing with resolve",
+     "median": 0.00745,
+     "spread": 0.016722
+    },
+    {
+     "case": "a reference through an envelope",
+     "median": -0.00421,
+     "spread": 0.014838
+    },
+    {
+     "case": "a reference with a step document",
+     "median": 0.004489,
+     "spread": 0.031924
+    },
+    {
+     "case": "resolve without hops, five steps",
+     "median": -0.001988,
+     "spread": 0.009256
+    },
+    {
+     "case": "PLAN.FOLD a record of 20 literals",
+     "median": -0.001578,
+     "spread": 0.015368
+    },
+    {
+     "case": "PLAN.TOTAL a record of 20 literals, without folds",
+     "median": -0.004858,
+     "spread": 0.018393
+    },
+    {
+     "case": "PLAN.FIXED a path of four steps from a fixed name",
+     "median": -0.000722,
+     "spread": 0.006667
+    },
+    {
+     "case": "PLAN.PATH the same path, without the declaration",
+     "median": 0.000713,
+     "spread": 0.011302
+    },
+    {
+     "case": "PLAN.FIXED a formula with a fixed name and a free name",
+     "median": -0.000401,
+     "spread": 0.016735
+    },
+    {
+     "case": "a tree with an equation",
+     "median": -0.010059,
+     "spread": 0.019011
+    },
+    {
+     "case": "the same tree, with a list of reads",
+     "median": -0.004084,
+     "spread": 0.025352
+    },
+    {
+     "case": "factsOf a tree with an equation",
+     "median": 0.007383,
+     "spread": 0.024054
+    },
+    {
+     "case": "PLAN.COMPILE-SPEED prepare",
+     "median": 0.006738,
+     "spread": 0.021274
+    }
+   ]
+  },
+  {
+   "job": "41580821217/1",
+   "cases": [
+    {
+     "case": "FORMULA.SPEED formula",
+     "median": -0.003136,
+     "spread": 0.031822
+    },
+    {
+     "case": "the same formula, with a list of reads",
+     "median": -0.00155,
+     "spread": 0.026243
+    },
+    {
+     "case": "a reference of five steps",
+     "median": -0.001512,
+     "spread": 0.017392
+    },
+    {
+     "case": "a reference into a host thing with resolve",
+     "median": -0.000602,
+     "spread": 0.041986
+    },
+    {
+     "case": "a reference through an envelope",
+     "median": -0.000181,
+     "spread": 0.012113
+    },
+    {
+     "case": "a reference with a step document",
+     "median": 0.003309,
+     "spread": 0.022047
+    },
+    {
+     "case": "resolve without hops, five steps",
+     "median": -0.000276,
+     "spread": 0.003868
+    },
+    {
+     "case": "PLAN.FOLD a record of 20 literals",
+     "median": -0.002291,
+     "spread": 0.01855
+    },
+    {
+     "case": "PLAN.TOTAL a record of 20 literals, without folds",
+     "median": 0.002868,
+     "spread": 0.044253
+    },
+    {
+     "case": "PLAN.FIXED a path of four steps from a fixed name",
+     "median": 0.00292,
+     "spread": 0.015626
+    },
+    {
+     "case": "PLAN.PATH the same path, without the declaration",
+     "median": -0.000013,
+     "spread": 0.015388
+    },
+    {
+     "case": "PLAN.FIXED a formula with a fixed name and a free name",
+     "median": 0.002754,
+     "spread": 0.044114
+    },
+    {
+     "case": "a tree with an equation",
+     "median": 0.000576,
+     "spread": 0.06648
+    },
+    {
+     "case": "the same tree, with a list of reads",
+     "median": -0.004589,
+     "spread": 0.035526
+    },
+    {
+     "case": "factsOf a tree with an equation",
+     "median": -0.002193,
+     "spread": 0.032199
+    },
+    {
+     "case": "PLAN.COMPILE-SPEED prepare",
+     "median": 0.00469,
+     "spread": 0.029224
+    }
+   ]
+  },
+  {
+   "job": "41580821217/2",
+   "cases": [
+    {
+     "case": "FORMULA.SPEED formula",
+     "median": 0.007779,
+     "spread": 0.019821
+    },
+    {
+     "case": "the same formula, with a list of reads",
+     "median": 0.003171,
+     "spread": 0.024477
+    },
+    {
+     "case": "a reference of five steps",
+     "median": 0.000763,
+     "spread": 0.012795
+    },
+    {
+     "case": "a reference into a host thing with resolve",
+     "median": -0.001285,
+     "spread": 0.012773
+    },
+    {
+     "case": "a reference through an envelope",
+     "median": 0.004379,
+     "spread": 0.022953
+    },
+    {
+     "case": "a reference with a step document",
+     "median": 0.002608,
+     "spread": 0.029461
+    },
+    {
+     "case": "resolve without hops, five steps",
+     "median": 0.000662,
+     "spread": 0.00513
+    },
+    {
+     "case": "PLAN.FOLD a record of 20 literals",
+     "median": 0.005984,
+     "spread": 0.012362
+    },
+    {
+     "case": "PLAN.TOTAL a record of 20 literals, without folds",
+     "median": 0.003499,
+     "spread": 0.020472
+    },
+    {
+     "case": "PLAN.FIXED a path of four steps from a fixed name",
+     "median": 0.002421,
+     "spread": 0.007577
+    },
+    {
+     "case": "PLAN.PATH the same path, without the declaration",
+     "median": -0.003537,
+     "spread": 0.015561
+    },
+    {
+     "case": "PLAN.FIXED a formula with a fixed name and a free name",
+     "median": 0.003666,
+     "spread": 0.018476
+    },
+    {
+     "case": "a tree with an equation",
+     "median": 0.005941,
+     "spread": 0.017588
+    },
+    {
+     "case": "the same tree, with a list of reads",
+     "median": 0.00081,
+     "spread": 0.020511
+    },
+    {
+     "case": "factsOf a tree with an equation",
+     "median": -0.003125,
+     "spread": 0.015947
+    },
+    {
+     "case": "PLAN.COMPILE-SPEED prepare",
+     "median": 0.002075,
+     "spread": 0.017204
+    }
+   ]
+  }
+ ],
+ "limits": {
+  "formula": {
+   "margin": 0.0149,
+   "noiseCap": 0.0475
+  },
+  "reference": {
+   "margin": 0.0149,
+   "noiseCap": 0.1089
+  },
+  "plan": {
+   "margin": 0.0149,
+   "noiseCap": 0.2752
+  },
+  "tree": {
+   "margin": 0.0218,
+   "noiseCap": 0.2656
+  }
+ },
+ "fallback": {
+  "margin": 0.0217,
+  "noiseCap": 0.2662
+ }
+}
