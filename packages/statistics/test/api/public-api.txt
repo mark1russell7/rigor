@@ -16,8 +16,10 @@ type BradleyTerrySparseOptions: build/index.d.ts#BradleyTerrySparseOptions
 type BradleyTerryStart: build/index.d.ts#BradleyTerryStart
 type CalibrationLevel: build/index.d.ts#CalibrationLevel
 type CategoricalDimension: build/index.d.ts#CategoricalDimension
+type ClassScore: build/index.d.ts#ClassScore
 type CompareOptions: build/index.d.ts#CompareOptions
 type Comparison: build/index.d.ts#Comparison
+type Confusion: build/index.d.ts#Confusion
 type ContinuousDimension: build/index.d.ts#ContinuousDimension
 type Corrected: build/index.d.ts#Corrected
 type CountInterval: build/index.d.ts#CountInterval
@@ -150,9 +152,11 @@ bradleyTerrySparse: build/index.d.ts#bradleyTerrySparse
 brier: build/index.d.ts#brier
 calibration: build/index.d.ts#calibration
 choosePair: build/index.d.ts#choosePair
+classScores: build/index.d.ts#classScores
 clopperPearson: build/index.d.ts#clopperPearson
 cohenKappa: build/index.d.ts#cohenKappa
 compareRatios: build/index.d.ts#compareRatios
+confusion: build/index.d.ts#confusion
 coverageMinSample: build/index.d.ts#coverageMinSample
 eloExpected: build/index.d.ts#eloExpected
 eloReplay: build/index.d.ts#eloReplay
@@ -293,6 +297,18 @@ interface CategoricalDimension extends ResponseDimensionBase {
   readonly levels: readonly string[];
 }
 
+### build/index.d.ts#ClassScore
+interface ClassScore<T> {
+  readonly label: T;
+  readonly support: number;
+  readonly predicted: number;
+  readonly hits: number;
+  readonly recall: number | undefined;
+  readonly recallInterval: Proportion;
+  readonly precision: number | undefined;
+  readonly f1: number | undefined;
+}
+
 ### build/index.d.ts#CompareOptions
 interface CompareOptions {
   readonly better?: "higher" | "lower";
@@ -314,6 +330,14 @@ interface Comparison {
   readonly gainInterval: Proportion;
   readonly dropShare: number;
   readonly dropInterval: Proportion;
+}
+
+### build/index.d.ts#Confusion
+interface Confusion<T> {
+  readonly labels: readonly T[];
+  readonly counts: readonly (readonly number[])[];
+  readonly n: number;
+  readonly correct: number;
 }
 
 ### build/index.d.ts#ContinuousDimension
@@ -1148,6 +1172,9 @@ export declare function calibration(forecasts: readonly Forecast[]): Calibration
 ### build/index.d.ts#choosePair
 export declare function choosePair<T extends RatedItem>(items: readonly T[], options: PairChoiceOptions<T>): PairChoice | undefined;
 
+### build/index.d.ts#classScores
+export declare function classScores<T>(table: Confusion<T>, z?: number): ClassScore<T>[];
+
 ### build/index.d.ts#clopperPearson
 export declare function clopperPearson(k: number, n: number, level?: number): Proportion;
 
@@ -1156,6 +1183,9 @@ export declare function cohenKappa<T>(a: readonly T[], b: readonly T[]): Kappa;
 
 ### build/index.d.ts#compareRatios
 export declare function compareRatios(ratios: readonly number[], options?: CompareOptions): Comparison;
+
+### build/index.d.ts#confusion
+export declare function confusion<T>(truth: readonly T[], predicted: readonly T[], labels?: readonly T[]): Confusion<T>;
 
 ### build/index.d.ts#coverageMinSample
 export declare function coverageMinSample(cells: readonly CoverageCell[], bar: CoverageBar): CoverageMinSample;
