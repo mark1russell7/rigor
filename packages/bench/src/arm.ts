@@ -27,6 +27,11 @@ export interface ArmOptions {
    * `half`, `samples - half` and `samples`, with `half` the floor of `samples / 2`. `eventProbe` of `/fresh` uses it.
    */
   readonly mark?: (sample: number) => void;
+  /**
+   * The slowdown factor of a flip test, 1 or more. The default is 1. Above 1, each sample waits in the timed part until
+   * its time is `slow` times the time of its calls. Thus the timer reads a real slowdown of this factor.
+   */
+  readonly slow?: number;
 }
 
 /** The timed samples of one arm. */
@@ -60,6 +65,7 @@ export function timeArm(run: () => unknown, options: ArmOptions): ArmTime {
   const warmMs = options.warmMs ?? 300;
   const warmSamples = options.warmSamples ?? 1;
   const now = options.now ?? (() => performance.now());
+  const slow = options.slow ?? 1;
   if (!Number.isSafeInteger(options.samples) || options.samples < 1) throw new RangeError(`timeArm: the samples are a whole number of 1 or more, not ${options.samples}.`);
   if (options.calls !== undefined && (!Number.isSafeInteger(options.calls) || options.calls < 1)) {
     throw new RangeError(`timeArm: the calls are a whole number of 1 or more, not ${options.calls}.`);
@@ -67,11 +73,16 @@ export function timeArm(run: () => unknown, options: ArmOptions): ArmTime {
   if (!(targetMs > 0 && Number.isFinite(targetMs)) || !(warmMs >= 0 && Number.isFinite(warmMs))) {
     throw new RangeError("timeArm: the target time is a finite time above 0, and the warm-up time is a finite time of 0 or more.");
   }
+  if (!(slow >= 1 && Number.isFinite(slow))) throw new RangeError(`timeArm: the slowdown factor is a finite number of 1 or more, not ${slow}.`);
   if (!Number.isSafeInteger(warmSamples) || warmSamples < 0) throw new RangeError(`timeArm: the warm samples are a whole number of 0 or more, not ${warmSamples}.`);
 
   const sample = (count: number): number => {
     const start = now();
     for (let i = 0; i < count; i++) kept = run();
+    if (slow > 1) {
+      const until = start + (now() - start) * slow;
+      while (now() < until);
+    }
     return now() - start;
   };
   const fixed = options.calls !== undefined;

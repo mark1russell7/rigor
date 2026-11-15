@@ -424,6 +424,7 @@ console.log(JSON.stringify({ ms: time.ms, calls: time.calls }));
 - The arm first operates for the warm-up time `warmMs`. Then the calls of one sample double until a sample takes `targetMs`.
 - After `warmSamples` samples that do not count, the function times `samples` samples. `ms` is the median time of one call.
 - Give `calls` of an earlier process. Then the function does not calibrate, and each process does the same work.
+- A flip test gives `slow`, for example 1.05. Each sample then waits in the timed part, so the timer reads a real slowdown of 5 %.
 - The module keeps the value of each call. Thus the engine cannot remove the work of a call.
 - With 2 samples or more, `warm` is the median of the last half of the samples over the median of the first half. A value near 1 tells that the arm was warm.
 

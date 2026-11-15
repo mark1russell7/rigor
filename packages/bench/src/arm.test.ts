@@ -95,6 +95,15 @@ describe("the timed samples of one arm", () => {
     expect(time.samples).toEqual([0.25, 0.25, 0.25, 0.25, 0.25]);
   });
 
+  it("waits in the timed part with a slowdown factor, as code that is slower by that factor", () => {
+    let t = 0;
+    // Each read of the clock takes 0.001 ms, and each call takes 0.25 ms.
+    const now = (): number => (t += 0.001);
+    const time = timeArm(() => (t += 0.25), { samples: 3, calls: 4, warmMs: 0, warmSamples: 0, slow: 3, now });
+    expect(time.ms).toBeCloseTo(0.75, 2);
+    expect(() => timeArm(() => 1, { samples: 1, slow: 0.5 })).toThrow(/slowdown factor/);
+  });
+
   it("refuses options that are not valid", () => {
     const clock = fake(1);
     expect(() => timeArm(clock.run, { samples: 0 })).toThrow(RangeError);
