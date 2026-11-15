@@ -101,6 +101,26 @@ const plan = faultPlanOf([], [{ window: { from: 1000, to: 4000 }, direction: "up
 - A plan with windows has the format `rigor-faults/2`. A reader of `rigor-faults/1` refuses it, thus it does not drop the windows with no word.
 - `checkWindowFault` gives each problem of one fault of a window.
 
+### A schedule of faults
+
+A schedule of faults changes the size or the rate of a fault over the run. It reads a profile, as a load schedule does, and gives window faults for `faultPlanOf`.
+
+```ts
+import { failureWindows, faultPlanOf, latencyWindows, ramp, spike } from "@mark1russell7/rigor-chaos";
+
+// The replies get slow: the delay goes from 0 to 2000 ms over 60 s, in steps of 1 s.
+const slow = latencyWindows(ramp(0, 2000, 60_000), { stepMs: 1000 });
+// A burst of outages: 5 failures each second for 10 s, each a reset of 200 ms, at seeded Poisson times.
+const outages = failureWindows(spike(0, 5, { before: 20_000, width: 10_000, after: 30_000 }), { action: { kind: "reset" }, widthMs: 200, seed: "drill" });
+const plan = faultPlanOf([], [...slow, ...outages]);
+```
+
+- In `latencyWindows`, the value of the profile is a delay in ms. Each step gets one `delay` window with the mean delay of the step. A step with no delay gets no window.
+- The proxy keeps the larger of two delays that overlap. A connection that opens in a step thus keeps the delay of the step for up to one step.
+- In `failureWindows`, the value of the profile is a rate of failures each second. The failures start at the times of `schedule` with Poisson arrivals.
+- Two failures that overlap make one window. The default point `{ ms: 0 }` stops each connection of a failure at once.
+- The fault of a failure can be any fault. A `reset` or a `cut` makes an outage. A `stall` makes a hang, and an `answer` makes an error reply.
+
 ### The response to a window
 
 `windowResponse` reads a series of samples of a health signal. It gives the time to detect the window and the time to recover after it.
