@@ -254,6 +254,21 @@ await server.close();
 - `stopAfter` writes only that number of parts. Then the server writes nothing more, and keeps the connection open.
 - The server sends no `date`. Thus the same script gives the same bytes on each run.
 
+### The place of a reply on the wire
+
+The record of each request has `wire`, the place of its reply in the bytes of the connection. A fault plan of `@mark1russell7/rigor-proxy` with a `byte` point uses it.
+
+| Field | Value |
+|---|---|
+| `offset` | The bytes that the server sent on the connection before the reply. |
+| `head` | The bytes of the status line and the fields, with the empty line. |
+| `body` | The bytes of the body on the wire. With `chunked`, the size lines are in this count. |
+| `whole` | True when the server sent the whole reply. |
+
+- The first byte of the body is at `offset + head` of the down direction.
+- The server sends the head alone, before the body. Thus `head` is known before the first part.
+- A test can measure the place with one request, then cut a second connection at the same place. The same script gives the same bytes.
+
 ## License
 
 MIT

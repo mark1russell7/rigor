@@ -65,6 +65,23 @@ export interface ScriptedRequest {
   readonly route: number;
   /** The position of the reply in the list of the route, or -1 when no route matches. */
   readonly reply: number;
+  /** The place of the reply in the bytes that the server sent on the connection. The server fills it in as it sends. */
+  readonly wire: ReplyWire;
+}
+
+/**
+ * The place of one reply in the bytes that the server sent on its connection. A fault plan with a `byte` point uses it:
+ * the first byte of the body is at `offset + head`. The counts come from `bytesWritten` of the socket.
+ */
+export interface ReplyWire {
+  /** The bytes that the server sent on the connection before the reply. It is -1 before the reply starts. */
+  readonly offset: number;
+  /** The bytes of the status line and the fields, with the empty line after them. */
+  readonly head: number;
+  /** The bytes of the body on the wire. With `chunked`, they include the size lines and the last chunk. */
+  readonly body: number;
+  /** True when the server sent the whole reply. False before the end, and for a reply with `stopAfter`. */
+  readonly whole: boolean;
 }
 
 /** The options of a scripted server. */
@@ -145,7 +162,7 @@ export function checkScriptedServer(options: ScriptedServerOptions): readonly st
   return out;
 }
 
-/** This function tells whether a route matches the method and the target of a request. */
+/** This function tells if a route matches the method and the target of a request. */
 function matches(route: ScriptedRoute, method: string, target: string): boolean {
   if ((route.method ?? "GET").toUpperCase() !== method.toUpperCase()) return false;
   if (route.path.includes("?")) return route.path === target;
@@ -204,9 +221,11 @@ export async function startScriptedServer(options: ScriptedServerOptions): Promi
       });
     });
 
-  const send = async (request: IncomingMessage, response: ServerResponse, reply: ScriptedReply): Promise<void> => {
+  const send = async (request: IncomingMessage, response: ServerResponse, reply: ScriptedReply, wire: { -readonly [K in keyof ReplyWire]: ReplyWire[K] }): Promise<void> => {
     await wait(reply.delayMs ?? 0);
     if (stopped || response.destroyed) return;
+    const socket = response.socket;
+    const written = (): number => socket?.bytesWritten ?? 0;
     const status = reply.status ?? 200;
     const framing = reply.framing ?? "length";
     const parts = partsOf(reply.body).map((part) => (typeof part === "string" ? Buffer.from(part, "utf8") : part));
@@ -220,7 +239,15 @@ export async function startScriptedServer(options: ScriptedServerOptions): Promi
       response.removeHeader("transfer-encoding");
       response.setHeader("connection", "close");
     }
+    wire.offset = written();
     response.writeHead(status);
+    // The head goes out alone, so its length is known before the body.
+    response.flushHeaders();
+    wire.head = written() - wire.offset;
+    response.once("finish", () => {
+      wire.body = written() - wire.offset - wire.head;
+      wire.whole = true;
+    });
     if (bodyless) {
       response.end();
       return;
@@ -233,7 +260,7 @@ export async function startScriptedServer(options: ScriptedServerOptions): Promi
       if ((parts[i] as Uint8Array).length > 0) await flush(response, parts[i] as Uint8Array);
     }
     if (count === parts.length) response.end();
-    else response.flushHeaders();
+    else wire.body = written() - wire.offset - wire.head;
   };
 
   const server = createServer((request, response) => {
@@ -245,6 +272,7 @@ export async function startScriptedServer(options: ScriptedServerOptions): Promi
       const route = routes.findIndex((candidate) => matches(candidate, method, target));
       const reply = route === -1 ? -1 : Math.min(counts[route] as number, (routes[route] as ScriptedRoute).replies.length - 1);
       if (route !== -1) counts[route] = (counts[route] as number) + 1;
+      const wire = { offset: -1, head: 0, body: 0, whole: false };
       requests.push({
         connection: numbers.get(request.socket) ?? -1,
         method,
@@ -253,9 +281,10 @@ export async function startScriptedServer(options: ScriptedServerOptions): Promi
         body: Buffer.concat(chunks).toString("utf8"),
         route,
         reply,
+        wire,
       });
       const chosen = route === -1 ? unmatched : ((routes[route] as ScriptedRoute).replies[reply] as ScriptedReply);
-      send(request, response, chosen).catch(() => response.destroy());
+      send(request, response, chosen, wire).catch(() => response.destroy());
     });
   });
   server.on("connection", (socket: Socket) => {

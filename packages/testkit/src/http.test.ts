@@ -1,7 +1,7 @@
 import { once } from "node:events";
 import { connect } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
-import { type ScriptedServer, type ScriptedServerOptions, checkScriptedReply, checkScriptedServer, startScriptedServer } from "./http.ts";
+import { FRAMINGS, type ScriptedServer, type ScriptedServerOptions, checkScriptedReply, checkScriptedServer, startScriptedServer } from "./http.ts";
 
 const servers: ScriptedServer[] = [];
 afterEach(async () => {
@@ -50,6 +50,13 @@ describe("a scripted server", () => {
       ["GET", "/alerts/active?area=KS", 0, 1],
     ]);
     expect(server.requests[0]?.fields["user-agent"]).toBe("test");
+    // The client keeps the connection, so each reply starts where the reply before it ended.
+    expect(new Set(server.requests.map((request) => request.connection)).size).toBe(1);
+    const [first, second, third] = server.requests.map((request) => request.wire);
+    expect(first?.offset).toBe(0);
+    expect(second?.offset).toBe((first?.offset ?? 0) + (first?.head ?? 0) + (first?.body ?? 0));
+    expect(third?.offset).toBe((second?.offset ?? 0) + (second?.head ?? 0) + (second?.body ?? 0));
+    expect([first?.body, second?.body, first?.whole]).toEqual([3, 4, true]);
   });
 
   it("matches the whole target for a path with a query, the method, and gives 404 to the other requests", async () => {
@@ -97,6 +104,18 @@ describe("a scripted server", () => {
     expect(close.body).toBe("abc");
   });
 
+  it("records the place of the head and the body of each reply on the wire, for each framing", async () => {
+    const server = await start({ routes: FRAMINGS.map((framing) => ({ path: `/${framing}`, replies: [{ body: ["ab", "", "c"], framing }] })) });
+    for (const [at, framing] of FRAMINGS.entries()) {
+      const raw = await exchange(server.port, `GET /${framing} HTTP/1.1\r\nhost: a\r\nconnection: close\r\n\r\n`);
+      const end = raw.indexOf("\r\n\r\n") + 4;
+      const wire = server.requests[at]?.wire;
+      expect(wire, framing).toEqual({ offset: 0, head: end, body: raw.length - end, whole: true });
+      // A byte point at offset + head cuts the reply at the first byte of its body.
+      expect(raw.slice((wire?.offset ?? 0) + (wire?.head ?? 0)), framing).toBe(framing === "chunked" ? "2\r\nab\r\n1\r\nc\r\n0\r\n\r\n" : "abc");
+    }
+  });
+
   it("writes only the parts before stopAfter, and keeps the connection open", async () => {
     const server = await start({ routes: [{ path: "/hang", replies: [{ body: ["a", "b"], stopAfter: 1 }] }] });
     const socket = connect({ port: server.port, host: "127.0.0.1" });
@@ -111,6 +130,7 @@ describe("a scripted server", () => {
     await once(socket, "close");
     expect(split(raw)).toMatchObject({ body: "a" });
     expect(split(raw).head).toContain("content-length: 2");
+    expect(server.requests[0]?.wire).toMatchObject({ offset: 0, head: raw.length - 1, body: 1, whole: false });
   });
 
   it("sends no body for 304, and gives the bytes of a part as they are", async () => {
