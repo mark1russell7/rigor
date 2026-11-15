@@ -10,12 +10,15 @@ Many engines make their own copies of these tools. The duplication atlas ([codea
 
 | Package | State | What it gives |
 | --- | --- | --- |
-| [`@mark1russell7/rigor-generators`](packages/generators) | 0.1.0 | A seeded generator (mulberry32) and its draws: integers, picks, weights, shuffles, samples, normal values and named streams. |
+| [`@mark1russell7/rigor-generators`](packages/generators) | 0.1.0 | A seeded generator (mulberry32) and its draws: integers, picks, weights, shuffles, samples, normal and Gumbel values and named streams. |
 | [`@mark1russell7/rigor-bench`](packages/bench) | 0.2.6 | The paired-time records of a bench, the order that turns each round, the time and limit verdicts against an A/A arm, and the budget verdict of one build. |
 | statistics | planned | Bootstrap intervals, paired permutation tests, Holm, Wilson, Sobol, Brier and the noise rule of 5 seeds. |
 | gates | planned | The determinism gate, the promotion test and the performance evidence of a release. |
 | testgen | planned | Property tests on fast-check, pairwise and covering arrays, metamorphic relations. |
-| [`@mark1russell7/rigor-chaos`](packages/chaos) | 0.1.0 | Open-loop load schedules from a rate profile, and a measure of latency from the planned time. Fault injection is planned. |
+| [`@mark1russell7/rigor-testkit`](packages/testkit) | new | Test helpers: the code blocks of Markdown files as test cases. Property, pairwise and metamorphic helpers come here too. |
+| [`@mark1russell7/rigor-chaos`](packages/chaos) | 0.1.6 | Open-loop load schedules from a rate profile, seeded fault plans for a proxy, and a measure of latency from the planned time. |
+| [`@mark1russell7/rigor-proxy`](packages/proxy) | new | A TCP proxy that applies a fault plan to TCP, HTTP and WebSocket streams, and records each fault. |
+| [`@mark1russell7/rigor-mutation`](packages/mutation) | 0.1.0 | Mutation tests with Stryker for each package: the Stryker config of each package or part, a score with a gate for each package, and a check of the disabled mutants. |
 
 The roadmap is in [docs/ROADMAP.md](docs/ROADMAP.md). The win test that layout-contract, packing and highways share is in [docs/WIN-TEST.md](docs/WIN-TEST.md).
 

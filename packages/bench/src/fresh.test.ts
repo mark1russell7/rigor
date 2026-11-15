@@ -57,6 +57,22 @@ describe("childLine", () => {
     expect(() => childLine('{"ms":1,"hash":3}')).toThrow(/hash is a string/);
     expect(() => childLine('{"ms":1,"skipped":""}')).toThrow(/skip/);
   });
+
+  it("reads the memory peak, the warm check and the events of a child", () => {
+    const line = { ms: 2, hash: "h", peakRss: 4096, warm: 0.98, events: { gc: [3, 1], deopt: [0, 2] }, other: "kept out" };
+    expect(childLine(JSON.stringify(line))).toEqual({ ms: 2, hash: "h", peakRss: 4096, warm: 0.98, events: { gc: [3, 1], deopt: [0, 2] } });
+    expect(childLine('{"ms":2,"events":{"gc":[0,0]}}')).toEqual({ ms: 2, events: { gc: [0, 0] } });
+    // A skip line keeps only its reason, its time and its hash.
+    expect(childLine('{"skipped":"too large","peakRss":1}')).toEqual({ skipped: "too large" });
+  });
+
+  it("refuses a bad memory peak, warm check or events", () => {
+    for (const peak of ["-1", '"1"', "null"]) expect(() => childLine(`{"ms":1,"peakRss":${peak}}`)).toThrow(/peakRss/);
+    for (const warm of ["0", "-1", '"1"']) expect(() => childLine(`{"ms":1,"warm":${warm}}`)).toThrow(/warm check/);
+    for (const events of ["[]", "{}", '{"gc":[1]}', '{"gc":[1,-1]}', '{"gc":[1,1.5]}', '{"gc":[1,1],"deopt":[1]}']) {
+      expect(() => childLine(`{"ms":1,"events":${events}}`)).toThrow(/events/);
+    }
+  });
 });
 
 describe("benchEnv", () => {
@@ -154,6 +170,32 @@ describe("freshRun", () => {
     expect(calls.length).toBe(4);
   });
 
+  it("starts each child of an arm in its folder, and names the commits of the arms in each record", async () => {
+    const folders: (string | undefined)[] = [];
+    const start: StartChild = async (argv, options) => {
+      folders.push(`${argv[0]}@${options.cwd ?? "here"}`);
+      return { stdout: '{"ms":1}\n', stderr: "", code: 0 };
+    };
+    const old = { id: "old", command: ["old"], cwd: "/base", commit: "a".repeat(40) };
+    const head = { id: "head", command: ["head"], commit: "b".repeat(40) };
+    const result = await run({ start, base: old, candidates: [head], rounds: 1, cases: ["x"], aa: "each" });
+    expect(Object.keys(result.pairs)).toEqual(["head", "old~aa", "head~aa"]);
+    expect(new Set(folders)).toEqual(new Set(["old@/base", "head@here"]));
+    expect(result.pairs["head"]![0]!.commits).toEqual({ a: "a".repeat(40), b: "b".repeat(40) });
+    expect(result.pairs["old~aa"]![0]!.commits).toEqual({ a: "a".repeat(40), b: "a".repeat(40) });
+    expect(result.pairs["head~aa"]![0]!.commits).toEqual({ a: "b".repeat(40), b: "b".repeat(40) });
+    const plain = await run({ start: fake().start, rounds: 1 });
+    expect(plain.pairs["next"]![0]!).not.toHaveProperty("commits");
+  });
+
+  it("refuses a bad aa, folder or commit", async () => {
+    const { start } = fake();
+    await expect(run({ start, aa: "all" as unknown as boolean })).rejects.toThrow(/aa is true, false or "each"/);
+    await expect(run({ start, candidates: [{ ...next, cwd: "" }] })).rejects.toThrow(/the cwd of the arm "next"/);
+    await expect(run({ start, base: { ...base, commit: "" } })).rejects.toThrow(/the commit of the arm "base"/);
+    await expect(run({ start, aa: "each", candidates: [next, { id: "next~aa", command: ["x"] }] })).rejects.toThrow(/two arms or pairs have the id/);
+  });
+
   it("removes a case that an arm skips in the first round from each pair, and starts no more children for it", async () => {
     const { start, calls } = fake((program, caseId, k) => (program === "next" && caseId === "y" && k <= 8 ? { stdout: '{"skipped":"too large"}' } : undefined));
     const result = await run({ start, roundOffset: 4 });
@@ -171,6 +213,27 @@ describe("freshRun", () => {
   it("refuses a skip after the first round of the job, with the round", async () => {
     const { start } = fake((program, caseId, k) => (program === "next" && caseId === "y" && k > 16 ? { stdout: '{"ms":1,"skipped":"too large"}' } : undefined));
     await expect(run({ start })).rejects.toThrow(/arm "next".*case "y", round 2 skipped the case after the first round/);
+  });
+
+  it("skips a case whose child takes too long in the first round, with overLimit skip", async () => {
+    const { start, calls } = fake((program, caseId) => (program === "next" && caseId === "y" ? { code: null, timedOut: true } : undefined));
+    const result = await run({ start, timeoutMs: 5000, overLimit: "skip" });
+    expect(result.skipped).toEqual([{ arm: "next", case: "y", round: 0, reason: "took more than 5000 ms" }]);
+    for (const records of Object.values(result.pairs)) {
+      expect(records.some((r) => r.case === "y")).toBe(false);
+      expect(records.filter((r) => r.case === "x").length).toBe(4);
+    }
+    expect(calls.filter((c) => c.case === "y" && c.program === "next").length).toBe(1);
+  });
+
+  it("refuses a child over the limit after the first round, with overLimit skip", async () => {
+    const { start } = fake((program, caseId, k) => (program === "next" && caseId === "y" && k > 16 ? { code: null, timedOut: true } : undefined));
+    await expect(run({ start, timeoutMs: 5000, overLimit: "skip" })).rejects.toThrow(/case "y", round 2 skipped the case after the first round of the job \("took more than 5000 ms"\)/);
+  });
+
+  it("refuses an overLimit that is not error or skip", async () => {
+    const { start } = fake();
+    await expect(run({ start, overLimit: "drop" as never })).rejects.toThrow(/overLimit is "error" or "skip", not "drop"/);
   });
 
   it("refuses a crash, a timeout and a child with no JSON line, with the arm, the case, the round and the tail of stderr", async () => {
@@ -192,6 +255,14 @@ describe("freshRun", () => {
       throw new Error("no such file");
     };
     await expect(run({ start: rejected })).rejects.toThrow(/did not start: no such file/);
+  });
+
+  it("keeps the fields of the child of each arm in the record, and no fields when no child gives one", async () => {
+    const { start } = fake((program, _caseId, k) => (program === "next" ? { stdout: `${JSON.stringify({ ms: k + 1, peakRss: 1000 + k, warm: 1 })}\n` } : undefined));
+    const result = await run({ start, rounds: 1, cases: ["x"] });
+    const [record] = result.pairs["next"]!;
+    expect(record!.fields).toEqual({ a: {}, b: { peakRss: 1000 + record!.b - 1, warm: 1 } });
+    expect(result.pairs["base~aa"]![0]).not.toHaveProperty("fields");
   });
 
   it("refuses two hashes of one arm on one case, and permits other hashes for other arms", async () => {
@@ -229,6 +300,27 @@ describe("freshRun", () => {
     await expect(freshRun({ base: missing, candidates: [], cases: ["x"], rounds: 1, env: ENV })).rejects.toThrow(/arm "missing".*failed/);
   });
 
+  it("reads a real child that times its arm with timeArm and counts its events with eventProbe", async () => {
+    const url = (file: string): string => new URL(file, import.meta.url).href;
+    const script = [
+      `const { timeArm } = await import(${JSON.stringify(url("./arm.ts"))});`,
+      `const { eventProbe, peakRss } = await import(${JSON.stringify(url("./fresh.ts"))});`,
+      "const probe = eventProbe({ deopt: true });",
+      "const time = timeArm(() => Array.from({ length: 500 }, (_, i) => ({ i })).length, { samples: 6, warmMs: 20, targetMs: 2, mark: probe.mark });",
+      "console.log(JSON.stringify({ ms: time.ms, warm: time.warm, peakRss: peakRss(), events: await probe.events(6) }));",
+    ].join("\n");
+    const node = { id: "node", command: [process.execPath, "--input-type=module", "-e", script, "--"] };
+    const result = await freshRun({ base: node, candidates: [], cases: ["x"], rounds: 1, env: ENV });
+    const [record] = result.pairs["node~aa"]!;
+    for (const arm of ["a", "b"] as const) {
+      const fields = record!.fields![arm];
+      expect(fields.peakRss).toBeGreaterThan(0);
+      expect(fields.warm).toBeGreaterThan(0);
+      expect(fields.events!.gc.every((n) => Number.isSafeInteger(n) && n >= 0)).toBe(true);
+      expect(fields.events!.deopt).toHaveLength(2);
+    }
+  });
+
   // The grandchild inherits stdout and keeps the pipe open.
   const grandchild = 'require("node:child_process").spawn(process.execPath, ["-e", "setTimeout(() => {}, 20000)"], { stdio: "inherit" }).unref();';
 
@@ -244,6 +336,15 @@ describe("freshRun", () => {
     const node = { id: "node", command: [process.execPath, "-e", `process.on("SIGTERM", () => {}); ${grandchild} setInterval(() => {}, 1000);`, "--"] };
     const t0 = performance.now();
     await expect(freshRun({ base: node, candidates: [], cases: ["x"], rounds: 1, timeoutMs: 300, env: ENV })).rejects.toThrow(/took more than 300 ms/);
+    expect(performance.now() - t0).toBeLessThan(6000);
+  }, 15000);
+
+  it("stops a child that does not end at the time limit, and skips its case, with overLimit skip", async () => {
+    const node = { id: "node", command: [process.execPath, "-e", "setInterval(() => {}, 1000);", "--"] };
+    const t0 = performance.now();
+    const result = await freshRun({ base: node, candidates: [], cases: ["x"], rounds: 2, timeoutMs: 300, overLimit: "skip", env: ENV });
+    expect(result.skipped).toEqual([{ arm: "node", case: "x", round: 0, reason: "took more than 300 ms" }]);
+    expect(result.pairs["node~aa"]).toEqual([]);
     expect(performance.now() - t0).toBeLessThan(6000);
   }, 15000);
 });

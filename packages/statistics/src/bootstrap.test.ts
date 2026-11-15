@@ -4,9 +4,11 @@ import {
   type BootstrapOptions,
   type Interval,
   bootstrap,
+  bootstrapLeastSquares,
   bootstrapMedian,
   bootstrapMedianRatio,
   bootstrapTwo,
+  holm,
   mean,
   median,
   quantile,
@@ -199,5 +201,54 @@ describe("bootstrapMedianRatio", () => {
     expect(i.low).toBe(Number.POSITIVE_INFINITY);
     expect(() => bootstrapMedianRatio([], [1])).toThrow(RangeError);
     expect(() => bootstrapMedianRatio([1], [])).toThrow(RangeError);
+  });
+});
+
+describe("the option against", () => {
+  const a = [5, 7, 6, 9, 8, 7, 6, 8];
+  const b = [4, 5, 6, 5, 4, 6, 5, 5];
+  const diff = (x: readonly number[], y: readonly number[]): number => median(x) - median(y);
+
+  it("keeps the interval of the same draws, and adds the two p", () => {
+    const plain = bootstrapTwo(a, b, diff, { runs: 500, seed: 7 });
+    const tested = bootstrapTwo(a, b, diff, { runs: 500, seed: 7, against: 0 });
+    expect({ ...tested, against: undefined, pAbove: undefined, pBelow: undefined }).toEqual(plain);
+    expect("pAbove" in plain).toBe(false);
+    expect(tested.against).toBe(0);
+    expect(tested.pAbove).toBeLessThan(0.05);
+    expect(tested.pBelow).toBeGreaterThan(0.95);
+  });
+
+  it("counts the finite runs on each side of against, with 1 added to the count and to the runs", () => {
+    const seen: number[] = [];
+    const runs = 300;
+    const i = bootstrap(a, (s) => { const v = mean(s); seen.push(v); return v; }, { runs, seed: 3, against: 7 });
+    const values = seen.slice(0, runs); // The last call is the estimate of all the data.
+    expect(i.pAbove).toBe((1 + values.filter((v) => v <= 7).length) / (runs + 1));
+    expect(i.pBelow).toBe((1 + values.filter((v) => v >= 7).length) / (runs + 1));
+  });
+
+  it("gives 1 / (finite + 1) as the smallest p, so Holm over 16 tests needs enough runs", () => {
+    const high = bootstrap([1, 2, 3], mean, { runs: 999, against: 0 });
+    expect(high.pAbove).toBe(1 / 1000);
+    expect(high.pBelow).toBe(1);
+    expect(holm(new Array<number>(16).fill(high.pAbove!))[0]!.reject).toBe(true);
+    const few = bootstrap([1, 2, 3], mean, { runs: 99, against: 0 });
+    expect(few.pAbove).toBe(1 / 100);
+    expect(holm(new Array<number>(16).fill(few.pAbove!))[0]!.reject).toBe(false);
+  });
+
+  it("gives each p as 1 with no finite run, and a p for each coefficient of a fit", () => {
+    const none = bootstrapMedianRatio([1, 2], [0, 0, 0], { runs: 20, against: 1 });
+    expect([none.finite, none.pAbove, none.pBelow]).toEqual([0, 1, 1]);
+    const x = [[1], [2], [3], [4], [5], [6]];
+    const fit = bootstrapLeastSquares(x, [2.1, 3.9, 6.2, 7.8, 10.1, 12], { runs: 200, against: 0 });
+    expect(fit.map((c) => c.against)).toEqual([0, 0]);
+    expect(fit[1]!.pAbove).toBe(1 / (fit[1]!.finite + 1));
+  });
+
+  it("throws a RangeError for an against that is not a finite number", () => {
+    expect(() => bootstrap(a, mean, { against: Number.NaN })).toThrow(RangeError);
+    expect(() => bootstrapTwo(a, b, diff, { against: Number.POSITIVE_INFINITY })).toThrow(RangeError);
   });
 });

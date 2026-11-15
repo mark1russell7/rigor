@@ -46,6 +46,14 @@ export interface LimitOptions extends BandOptions {
    * and 20 cases, 1 case can be `beyond` or `cannot decide`. The option `timeTailQ` of a promotion record is this share.
    */
   readonly share?: number;
+  /**
+   * The source of the A/A noise that widens each case. The default `"cases"` uses the band of `aaBand` over the A/A cases,
+   * with `minimum` cases or more. The value `"rounds"` uses the A/A rounds of the same case. Thus a bench of 1 case gets a verdict.
+   * The noise of a case is then the larger distance from 0 of the two ends of the interval of its A/A median.
+   * This interval is on a log scale, at `caseLevel`.
+   * A case with no A/A records cannot decide.
+   */
+  readonly aaFrom?: "cases" | "rounds";
 }
 
 /** The verdict of one case against the limit. */
@@ -54,6 +62,8 @@ export interface CaseLimit extends CaseInterval {
   readonly bound: number;
   /** The low end of the interval of the case, times the low end of the A/A band. */
   readonly floor: number;
+  /** The half width of the A/A band of the case on a log scale. It is the noise of `band` or of the A/A rounds of the case. */
+  readonly noise: number;
   readonly outcome: LimitOutcome;
 }
 
@@ -64,7 +74,7 @@ export interface LimitVerdict {
   readonly reason: string;
   readonly limit: number;
   readonly cases: readonly CaseLimit[];
-  /** The band of the A/A arm, or undefined when the A/A arm has too few cases. */
+  /** The band of the A/A arm, or undefined when the A/A arm has too few cases or the A/A noise comes from the rounds. */
   readonly band: Band | undefined;
   /** The share of the option `share`. */
   readonly share: number;
@@ -79,6 +89,7 @@ export interface LimitVerdict {
  * - The verdict is `within` when `allowed` cases or fewer are other than `within`. With the default share 1, `allowed` is 0.
  * - The verdict is `beyond` when more than `allowed` cases are `beyond`.
  * - Each other verdict is `cannot decide`, and so is an A/A arm with too few cases or a candidate with no cases.
+ * - With `aaFrom: "rounds"`, the A/A rounds of each case give its band, and the count of the A/A cases does not matter.
  */
 export function limitVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[], options: LimitOptions): LimitVerdict {
   const { limit } = options;
@@ -90,17 +101,31 @@ export function limitVerdict(candidate: readonly PairedTime[], aa: readonly Pair
   // The small term keeps a product such as 10 * (1 - 0.9) = 0.9999999999999998 from a floor of 0.
   const allowed = Math.floor(intervals.length * (1 - share) + 1e-9);
   if (intervals.length === 0) return { outcome: "cannot decide", reason: "The candidate has no cases.", limit, cases: [], band: undefined, share, allowed };
-  const aaCount = caseRatios(aa).length;
-  if (aaCount < minimum) {
-    const cases = intervals.map((c) => ({ ...c, bound: c.high, floor: c.low, outcome: "cannot decide" as const }));
-    return { outcome: "cannot decide", reason: `The A/A arm has ${aaCount} cases, and a band needs ${minimum} or more.`, limit, cases, band: undefined, share, allowed };
+  const aaFrom = options.aaFrom ?? "cases";
+  if (aaFrom !== "cases" && aaFrom !== "rounds") throw new RangeError(`limitVerdict: the A/A noise comes from "cases" or "rounds", not ${JSON.stringify(aaFrom)}.`);
+  let band: Band | undefined;
+  let noiseOf: (name: string) => number | undefined;
+  if (aaFrom === "rounds") {
+    const own = new Map(caseIntervals(aa, options.caseLevel).map((c) => [c.case, Math.max(Math.abs(Math.log(c.low)), Math.abs(Math.log(c.high)))]));
+    noiseOf = (name) => own.get(name);
+  } else {
+    const aaCount = caseRatios(aa).length;
+    if (aaCount < minimum) {
+      const cases = intervals.map((c) => ({ ...c, bound: c.high, floor: c.low, noise: 0, outcome: "cannot decide" as const }));
+      return { outcome: "cannot decide", reason: `The A/A arm has ${aaCount} cases, and a band needs ${minimum} or more.`, limit, cases, band: undefined, share, allowed };
+    }
+    const all = aaBand(aa, options);
+    band = all;
+    noiseOf = () => all.noise;
   }
-  const band = aaBand(aa, options);
   const cases = intervals.map((c): CaseLimit => {
-    const bound = c.high * band.high;
-    const floor = c.low * band.low;
+    const noise = noiseOf(c.case);
+    // A case with no A/A rounds has no noise, and thus no read.
+    if (noise === undefined) return { ...c, bound: c.high, floor: c.low, noise: 0, outcome: "cannot decide" };
+    const bound = c.high * Math.exp(noise);
+    const floor = c.low * Math.exp(-noise);
     const outcome: LimitOutcome = bound <= limit ? "within" : floor > limit ? "beyond" : "cannot decide";
-    return { ...c, bound, floor, outcome };
+    return { ...c, bound, floor, noise, outcome };
   });
   const facts = { limit, cases, band, share, allowed };
   const beyond = cases.filter((c) => c.outcome === "beyond");

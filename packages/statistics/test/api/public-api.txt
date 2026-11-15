@@ -4,38 +4,82 @@
 # and private members. The command `api-report check` compares this file with the built .d.ts files.
 # To accept a change of the API, start the build, then `api-report update`, and review the diff.
 
-## . (build/index.d.ts): 122 names
+## . (build/index.d.ts): names
 
+BRADLEY_TERRY_DENSE_LIMIT: build/index.d.ts#BRADLEY_TERRY_DENSE_LIMIT
+type BinomialSide: build/index.d.ts#BinomialSide
 type BootstrapOptions: build/index.d.ts#BootstrapOptions
+type BradleyTerryFit: build/index.d.ts#BradleyTerryFit
+type BradleyTerryOptions: build/index.d.ts#BradleyTerryOptions
+type BradleyTerrySparseFit: build/index.d.ts#BradleyTerrySparseFit
+type BradleyTerrySparseOptions: build/index.d.ts#BradleyTerrySparseOptions
+type BradleyTerryStart: build/index.d.ts#BradleyTerryStart
 type CalibrationLevel: build/index.d.ts#CalibrationLevel
 type CategoricalDimension: build/index.d.ts#CategoricalDimension
+type ClassScore: build/index.d.ts#ClassScore
 type CompareOptions: build/index.d.ts#CompareOptions
 type Comparison: build/index.d.ts#Comparison
+type Confusion: build/index.d.ts#Confusion
 type ContinuousDimension: build/index.d.ts#ContinuousDimension
 type Corrected: build/index.d.ts#Corrected
 type CountInterval: build/index.d.ts#CountInterval
+type CoverageBar: build/index.d.ts#CoverageBar
+type CoverageCell: build/index.d.ts#CoverageCell
+type CoverageMinSample: build/index.d.ts#CoverageMinSample
+type CoverageReason: build/index.d.ts#CoverageReason
+type CoverageStep: build/index.d.ts#CoverageStep
+EMPTY_RUNNING: build/index.d.ts#EMPTY_RUNNING
 type Effect: build/index.d.ts#Effect
+type EloOptions: build/index.d.ts#EloOptions
+type EloReplayOptions: build/index.d.ts#EloReplayOptions
+type EloUpdate: build/index.d.ts#EloUpdate
 type Forecast: build/index.d.ts#Forecast
+type Glicko2Game: build/index.d.ts#Glicko2Game
+type Glicko2Options: build/index.d.ts#Glicko2Options
+type Glicko2Rating: build/index.d.ts#Glicko2Rating
+type Glicko2ReplayOptions: build/index.d.ts#Glicko2ReplayOptions
 type Interval: build/index.d.ts#Interval
 KENDALL_EXACT: build/index.d.ts#KENDALL_EXACT
+type Kappa: build/index.d.ts#Kappa
 type LeastSquaresFit: build/index.d.ts#LeastSquaresFit
 type LeastSquaresOptions: build/index.d.ts#LeastSquaresOptions
+MODIFIED_Z_CUT: build/index.d.ts#MODIFIED_Z_CUT
+type MeanInterval: build/index.d.ts#MeanInterval
 type MedianInterval: build/index.d.ts#MedianInterval
 type ModeOptions: build/index.d.ts#ModeOptions
+type ModifiedZ: build/index.d.ts#ModifiedZ
+type ModifiedZOptions: build/index.d.ts#ModifiedZOptions
 type NoiseOptions: build/index.d.ts#NoiseOptions
 type NoiseState: build/index.d.ts#NoiseState
 type NoiseVerdict: build/index.d.ts#NoiseVerdict
+type OptionFloorOptions: build/index.d.ts#OptionFloorOptions
 type OrdinalDimension: build/index.d.ts#OrdinalDimension
+type OutlierSide: build/index.d.ts#OutlierSide
+PAIR_FULL_SEARCH: build/index.d.ts#PAIR_FULL_SEARCH
+type PairChoice: build/index.d.ts#PairChoice
+type PairChoiceOptions: build/index.d.ts#PairChoiceOptions
+type PairComparison: build/index.d.ts#PairComparison
+type PairOutcome: build/index.d.ts#PairOutcome
+type PairProbabilities: build/index.d.ts#PairProbabilities
 type ParsedResponseRecord: build/index.d.ts#ParsedResponseRecord
 type PermutationOptions: build/index.d.ts#PermutationOptions
 type PermutationResult: build/index.d.ts#PermutationResult
 type Proportion: build/index.d.ts#Proportion
 type QuantileInterval: build/index.d.ts#QuantileInterval
 type QuantileMethod: build/index.d.ts#QuantileMethod
+RATING_START_UNCERTAINTY: build/index.d.ts#RATING_START_UNCERTAINTY
 RESPONSE_LAMBDAS: build/index.d.ts#RESPONSE_LAMBDAS
 RESPONSE_MAX_POWER: build/index.d.ts#RESPONSE_MAX_POWER
 RESPONSE_MAX_TERMS: build/index.d.ts#RESPONSE_MAX_TERMS
 RESPONSE_RECORDS_SCHEMA: build/index.d.ts#RESPONSE_RECORDS_SCHEMA
+type RatedItem: build/index.d.ts#RatedItem
+type RatingFit: build/index.d.ts#RatingFit
+type RatingFitOptions: build/index.d.ts#RatingFitOptions
+type RatingModel: build/index.d.ts#RatingModel
+type RatingModelChoice: build/index.d.ts#RatingModelChoice
+type RatingModelOptions: build/index.d.ts#RatingModelOptions
+type RatingModelScore: build/index.d.ts#RatingModelScore
+type RatingScale: build/index.d.ts#RatingScale
 type ResponseAbsentPoint: build/index.d.ts#ResponseAbsentPoint
 type ResponseBand: build/index.d.ts#ResponseBand
 type ResponseCurvePoint: build/index.d.ts#ResponseCurvePoint
@@ -74,37 +118,82 @@ type RidgeOptions: build/index.d.ts#RidgeOptions
 type RidgeRankInput: build/index.d.ts#RidgeRankInput
 type RidgeResponseModel: build/index.d.ts#RidgeResponseModel
 type RidgeTerm: build/index.d.ts#RidgeTerm
+type RunningSummary: build/index.d.ts#RunningSummary
+SIGN_FLIP_EXACT_LIMIT: build/index.d.ts#SIGN_FLIP_EXACT_LIMIT
+SIGN_FLIP_EXACT_MAX: build/index.d.ts#SIGN_FLIP_EXACT_MAX
+type SampleTotalOptions: build/index.d.ts#SampleTotalOptions
+type SideP: build/index.d.ts#SideP
+type SignFlipOptions: build/index.d.ts#SignFlipOptions
+type SignFlipResult: build/index.d.ts#SignFlipResult
 type SmoothLaw: build/index.d.ts#SmoothLaw
 type SmoothLawScore: build/index.d.ts#SmoothLawScore
+type SobolIndex: build/index.d.ts#SobolIndex
+type SobolIndices: build/index.d.ts#SobolIndices
+type SobolOptions: build/index.d.ts#SobolOptions
 type Summary: build/index.d.ts#Summary
 type TableResponseModel: build/index.d.ts#TableResponseModel
+type TieModel: build/index.d.ts#TieModel
 type TwoSamplePermutationOptions: build/index.d.ts#TwoSamplePermutationOptions
 type TwoSamplePermutationResult: build/index.d.ts#TwoSamplePermutationResult
+type UStatisticInterval: build/index.d.ts#UStatisticInterval
+type UStatisticMean: build/index.d.ts#UStatisticMean
+type UStatisticMethod: build/index.d.ts#UStatisticMethod
+type UStatisticOptions: build/index.d.ts#UStatisticOptions
+U_STATISTIC_TIGHT_MIN_SAMPLE: build/index.d.ts#U_STATISTIC_TIGHT_MIN_SAMPLE
 Z95: build/index.d.ts#Z95
+addToRunning: build/index.d.ts#addToRunning
 bestSmoothLaw: build/index.d.ts#bestSmoothLaw
 binomialInterval: build/index.d.ts#binomialInterval
+binomialTest: build/index.d.ts#binomialTest
 bootstrap: build/index.d.ts#bootstrap
 bootstrapClusters: build/index.d.ts#bootstrapClusters
 bootstrapLeastSquares: build/index.d.ts#bootstrapLeastSquares
 bootstrapMedian: build/index.d.ts#bootstrapMedian
 bootstrapMedianRatio: build/index.d.ts#bootstrapMedianRatio
+bootstrapStrata: build/index.d.ts#bootstrapStrata
 bootstrapTwo: build/index.d.ts#bootstrapTwo
+bradleyTerry: build/index.d.ts#bradleyTerry
+bradleyTerrySparse: build/index.d.ts#bradleyTerrySparse
 brier: build/index.d.ts#brier
 calibration: build/index.d.ts#calibration
+choosePair: build/index.d.ts#choosePair
+classScores: build/index.d.ts#classScores
+clopperPearson: build/index.d.ts#clopperPearson
+cohenKappa: build/index.d.ts#cohenKappa
 compareRatios: build/index.d.ts#compareRatios
+confusion: build/index.d.ts#confusion
+coverageMinSample: build/index.d.ts#coverageMinSample
+eloExpected: build/index.d.ts#eloExpected
+eloReplay: build/index.d.ts#eloReplay
+eloUpdate: build/index.d.ts#eloUpdate
+entropy: build/index.d.ts#entropy
+fitRatings: build/index.d.ts#fitRatings
 fitResponse: build/index.d.ts#fitResponse
+glicko2Idle: build/index.d.ts#glicko2Idle
+glicko2Replay: build/index.d.ts#glicko2Replay
+glicko2Update: build/index.d.ts#glicko2Update
 heldOutError: build/index.d.ts#heldOutError
 heldOutErrorAt: build/index.d.ts#heldOutErrorAt
 holm: build/index.d.ts#holm
+informationGain: build/index.d.ts#informationGain
 kendallTau: build/index.d.ts#kendallTau
 leastSquares: build/index.d.ts#leastSquares
+logLoss: build/index.d.ts#logLoss
 mean: build/index.d.ts#mean
+meanInterval: build/index.d.ts#meanInterval
 median: build/index.d.ts#median
 medianInterval: build/index.d.ts#medianInterval
+mergeRunning: build/index.d.ts#mergeRunning
 modeCount: build/index.d.ts#modeCount
+modifiedZ: build/index.d.ts#modifiedZ
 negativeBinomialInterval: build/index.d.ts#negativeBinomialInterval
 noiseFloor: build/index.d.ts#noiseFloor
 noiseVerdict: build/index.d.ts#noiseVerdict
+normalCdf: @mark1russell7/rigor-generators#normalCdf (external)
+normalQuantile: @mark1russell7/rigor-generators#normalQuantile (external)
+optionFloor: build/index.d.ts#optionFloor
+pairInformation: build/index.d.ts#pairInformation
+pairProbabilities: build/index.d.ts#pairProbabilities
 pairedPermutation: build/index.d.ts#pairedPermutation
 parseResponseRecord: build/index.d.ts#parseResponseRecord
 partialConjunction: build/index.d.ts#partialConjunction
@@ -114,22 +203,41 @@ quantileInterval: build/index.d.ts#quantileInterval
 quantileSamples: build/index.d.ts#quantileSamples
 quantileSorted: build/index.d.ts#quantileSorted
 ranks: build/index.d.ts#ranks
+ratingToStrength: build/index.d.ts#ratingToStrength
+ratingUncertainty: build/index.d.ts#ratingUncertainty
 responseCells: build/index.d.ts#responseCells
 ridgeSolve: build/index.d.ts#ridgeSolve
+runningMean: build/index.d.ts#runningMean
+runningOf: build/index.d.ts#runningOf
+runningSd: build/index.d.ts#runningSd
+sampleTotalInterval: build/index.d.ts#sampleTotalInterval
 sd: build/index.d.ts#sd
+selectRatingModel: build/index.d.ts#selectRatingModel
+signFlipTest: build/index.d.ts#signFlipTest
 signTest: build/index.d.ts#signTest
 signTestPower: build/index.d.ts#signTestPower
 sliceResponse: build/index.d.ts#sliceResponse
 smoothLawScores: build/index.d.ts#smoothLawScores
+sobolIndices: build/index.d.ts#sobolIndices
 sorted: build/index.d.ts#sorted
 spearman: build/index.d.ts#spearman
+strengthToRating: build/index.d.ts#strengthToRating
 summarize: build/index.d.ts#summarize
 surfaceResponse: build/index.d.ts#surfaceResponse
+tQuantile: build/index.d.ts#tQuantile
 twoSamplePermutation: build/index.d.ts#twoSamplePermutation
+uStatisticInterval: build/index.d.ts#uStatisticInterval
 whenHolds: build/index.d.ts#whenHolds
 wilson: build/index.d.ts#wilson
+wilsonSampleSize: build/index.d.ts#wilsonSampleSize
 
 ## Declarations
+
+### build/index.d.ts#BRADLEY_TERRY_DENSE_LIMIT
+export declare const BRADLEY_TERRY_DENSE_LIMIT = 200;
+
+### build/index.d.ts#BinomialSide
+type BinomialSide = "less" | "greater";
 
 ### build/index.d.ts#BootstrapOptions
 interface BootstrapOptions {
@@ -138,6 +246,49 @@ interface BootstrapOptions {
   readonly seed?: number | string;
   readonly method?: QuantileMethod;
   readonly ends?: readonly [number, number];
+  readonly against?: number;
+}
+
+### build/index.d.ts#BradleyTerryFit
+interface BradleyTerryFit {
+  readonly strengths: number[];
+  readonly se: number[];
+  readonly tie: number;
+  readonly logLikelihood: number;
+  readonly iterations: number;
+  readonly converged: boolean;
+}
+
+### build/index.d.ts#BradleyTerryOptions
+interface BradleyTerryOptions {
+  readonly priorMean?: number;
+  readonly priorSd?: number;
+  readonly ties?: TieModel;
+  readonly tiePriorSd?: number;
+  readonly maxIterations?: number;
+  readonly tolerance?: number;
+  readonly start?: BradleyTerryStart;
+}
+
+### build/index.d.ts#BradleyTerrySparseFit
+interface BradleyTerrySparseFit extends BradleyTerryFit {
+  readonly se: number[];
+  readonly iterations: number;
+  readonly converged: boolean;
+  readonly bound: number;
+  readonly pairs: number;
+}
+
+### build/index.d.ts#BradleyTerrySparseOptions
+interface BradleyTerrySparseOptions extends BradleyTerryOptions {
+  readonly maxIterations?: number;
+  readonly tolerance?: number;
+}
+
+### build/index.d.ts#BradleyTerryStart
+interface BradleyTerryStart {
+  readonly strengths: readonly number[];
+  readonly tie?: number;
 }
 
 ### build/index.d.ts#CalibrationLevel
@@ -153,6 +304,18 @@ interface CalibrationLevel {
 interface CategoricalDimension extends ResponseDimensionBase {
   readonly kind: "categorical";
   readonly levels: readonly string[];
+}
+
+### build/index.d.ts#ClassScore
+interface ClassScore<T> {
+  readonly label: T;
+  readonly support: number;
+  readonly predicted: number;
+  readonly hits: number;
+  readonly recall: number | undefined;
+  readonly recallInterval: Proportion;
+  readonly precision: number | undefined;
+  readonly f1: number | undefined;
 }
 
 ### build/index.d.ts#CompareOptions
@@ -178,6 +341,14 @@ interface Comparison {
   readonly dropInterval: Proportion;
 }
 
+### build/index.d.ts#Confusion
+interface Confusion<T> {
+  readonly labels: readonly T[];
+  readonly counts: readonly (readonly number[])[];
+  readonly n: number;
+  readonly correct: number;
+}
+
 ### build/index.d.ts#ContinuousDimension
 interface ContinuousDimension extends ResponseDimensionBase {
   readonly kind: "continuous";
@@ -199,6 +370,48 @@ interface CountInterval {
   readonly coverage: number;
 }
 
+### build/index.d.ts#CoverageBar
+interface CoverageBar {
+  readonly level: number;
+  readonly alpha: number;
+  readonly pooledLow: number;
+  readonly z?: number;
+}
+
+### build/index.d.ts#CoverageCell
+interface CoverageCell {
+  readonly name: string;
+  readonly sample: number;
+  readonly hits: number;
+  readonly draws: number;
+}
+
+### build/index.d.ts#CoverageMinSample
+interface CoverageMinSample {
+  readonly minSample: number;
+  readonly blocking?: number;
+  readonly steps: readonly CoverageStep[];
+}
+
+### build/index.d.ts#CoverageReason
+type CoverageReason = "qualifies" | "cell-rejected" | "pooled-low" | "cell-rejected-and-pooled-low";
+
+### build/index.d.ts#CoverageStep
+interface CoverageStep {
+  readonly sample: number;
+  readonly cells: number;
+  readonly rejected: readonly string[];
+  readonly smallestAdjusted: number;
+  readonly hits: number;
+  readonly draws: number;
+  readonly pooled: Proportion;
+  readonly qualifies: boolean;
+  readonly reason: CoverageReason;
+}
+
+### build/index.d.ts#EMPTY_RUNNING
+export declare const EMPTY_RUNNING: RunningSummary;
+
 ### build/index.d.ts#Effect
 interface Effect {
   readonly n: number;
@@ -207,14 +420,56 @@ interface Effect {
   readonly p90: number;
 }
 
+### build/index.d.ts#EloOptions
+interface EloOptions extends RatingScale {
+  readonly k?: number;
+}
+
+### build/index.d.ts#EloReplayOptions
+interface EloReplayOptions extends EloOptions {
+  readonly start?: number;
+}
+
+### build/index.d.ts#EloUpdate
+interface EloUpdate {
+  readonly a: number;
+  readonly b: number;
+  readonly expected: number;
+}
+
 ### build/index.d.ts#Forecast
 interface Forecast {
   readonly p: number;
   readonly hit: boolean;
 }
 
+### build/index.d.ts#Glicko2Game
+interface Glicko2Game {
+  readonly rating: number;
+  readonly rd: number;
+  readonly score: number;
+}
+
+### build/index.d.ts#Glicko2Options
+interface Glicko2Options {
+  readonly tau?: number;
+  readonly tolerance?: number;
+}
+
+### build/index.d.ts#Glicko2Rating
+interface Glicko2Rating {
+  readonly rating: number;
+  readonly rd: number;
+  readonly volatility: number;
+}
+
+### build/index.d.ts#Glicko2ReplayOptions
+interface Glicko2ReplayOptions extends Glicko2Options {
+  readonly start?: Glicko2Rating;
+}
+
 ### build/index.d.ts#Interval
-interface Interval {
+interface Interval extends Partial<SideP> {
   readonly estimate: number;
   readonly low: number;
   readonly high: number;
@@ -226,6 +481,14 @@ interface Interval {
 
 ### build/index.d.ts#KENDALL_EXACT
 export declare const KENDALL_EXACT = 1500;
+
+### build/index.d.ts#Kappa
+interface Kappa {
+  readonly n: number;
+  readonly observed: number;
+  readonly chance: number;
+  readonly kappa: number | undefined;
+}
 
 ### build/index.d.ts#LeastSquaresFit
 interface LeastSquaresFit {
@@ -241,6 +504,20 @@ interface LeastSquaresOptions {
   readonly intercept?: boolean;
 }
 
+### build/index.d.ts#MODIFIED_Z_CUT
+export declare const MODIFIED_Z_CUT = 3.5;
+
+### build/index.d.ts#MeanInterval
+interface MeanInterval {
+  readonly mean: number;
+  readonly half: number;
+  readonly low: number;
+  readonly high: number;
+  readonly level: number;
+  readonly df: number;
+  readonly t: number;
+}
+
 ### build/index.d.ts#MedianInterval
 interface MedianInterval {
   readonly low: number;
@@ -253,6 +530,20 @@ interface MedianInterval {
 interface ModeOptions {
   readonly minShare?: number;
   readonly valleyRatio?: number;
+}
+
+### build/index.d.ts#ModifiedZ
+interface ModifiedZ {
+  readonly median: number;
+  readonly mad: number;
+  readonly scores: readonly number[];
+  readonly outliers: readonly number[];
+}
+
+### build/index.d.ts#ModifiedZOptions
+interface ModifiedZOptions {
+  readonly cut?: number;
+  readonly side?: OutlierSide;
 }
 
 ### build/index.d.ts#NoiseOptions
@@ -276,11 +567,59 @@ interface NoiseVerdict {
   readonly state: NoiseState;
 }
 
+### build/index.d.ts#OptionFloorOptions
+interface OptionFloorOptions {
+  readonly sigma: number;
+  readonly delta: number;
+  readonly tests: number;
+  readonly alpha?: number;
+  readonly power?: number;
+}
+
 ### build/index.d.ts#OrdinalDimension
 interface OrdinalDimension extends ResponseDimensionBase {
   readonly kind: "ordinal";
   readonly levels: readonly number[] | readonly string[];
   readonly log?: boolean;
+}
+
+### build/index.d.ts#OutlierSide
+type OutlierSide = "high" | "low" | "both";
+
+### build/index.d.ts#PAIR_FULL_SEARCH
+export declare const PAIR_FULL_SEARCH = 64;
+
+### build/index.d.ts#PairChoice
+interface PairChoice {
+  readonly a: string;
+  readonly b: string;
+  readonly information: number;
+}
+
+### build/index.d.ts#PairChoiceOptions
+interface PairChoiceOptions<T extends RatedItem = RatedItem> {
+  readonly seed: number | string;
+  readonly recent?: readonly (readonly [string, string])[];
+  readonly candidates?: number;
+  readonly information?: (a: T, b: T) => number | undefined;
+}
+
+### build/index.d.ts#PairComparison
+interface PairComparison {
+  readonly a: number;
+  readonly b: number;
+  readonly outcome: PairOutcome;
+  readonly weight?: number;
+}
+
+### build/index.d.ts#PairOutcome
+type PairOutcome = "a" | "b" | "tie";
+
+### build/index.d.ts#PairProbabilities
+interface PairProbabilities {
+  readonly a: number;
+  readonly b: number;
+  readonly tie: number;
 }
 
 ### build/index.d.ts#ParsedResponseRecord
@@ -324,6 +663,9 @@ interface QuantileInterval {
 ### build/index.d.ts#QuantileMethod
 type QuantileMethod = "linear" | "nearest-rank" | "higher";
 
+### build/index.d.ts#RATING_START_UNCERTAINTY
+export declare const RATING_START_UNCERTAINTY = 350;
+
 ### build/index.d.ts#RESPONSE_LAMBDAS
 export declare const RESPONSE_LAMBDAS: readonly number[];
 
@@ -335,6 +677,60 @@ export declare const RESPONSE_MAX_TERMS = 1024;
 
 ### build/index.d.ts#RESPONSE_RECORDS_SCHEMA
 export declare const RESPONSE_RECORDS_SCHEMA = "response-records/1";
+
+### build/index.d.ts#RatedItem
+interface RatedItem {
+  readonly id: string;
+  readonly rating: number;
+  readonly se?: number | undefined;
+  readonly picks: number;
+}
+
+### build/index.d.ts#RatingFit
+interface RatingFit {
+  readonly strengths: number[];
+  readonly se: (number | undefined)[];
+  readonly tie: number;
+}
+
+### build/index.d.ts#RatingFitOptions
+interface RatingFitOptions {
+  readonly bradleyTerry?: BradleyTerryOptions;
+  readonly denseLimit?: number;
+  readonly elo?: EloReplayOptions;
+  readonly glicko2?: Glicko2ReplayOptions;
+}
+
+### build/index.d.ts#RatingModel
+type RatingModel = "bradley-terry" | "elo" | "glicko2";
+
+### build/index.d.ts#RatingModelChoice
+interface RatingModelChoice {
+  readonly model: RatingModel;
+  readonly scores: RatingModelScore[];
+  readonly trained: number;
+  readonly tested: number;
+}
+
+### build/index.d.ts#RatingModelOptions
+interface RatingModelOptions extends RatingFitOptions {
+  readonly holdout?: number;
+  readonly minimum?: number;
+  readonly models?: readonly RatingModel[];
+}
+
+### build/index.d.ts#RatingModelScore
+interface RatingModelScore {
+  readonly model: RatingModel;
+  readonly logLoss: number;
+}
+
+### build/index.d.ts#RatingScale
+interface RatingScale {
+  readonly center?: number;
+  readonly scale?: number;
+  readonly base?: number;
+}
 
 ### build/index.d.ts#ResponseAbsentPoint
 interface ResponseAbsentPoint {
@@ -611,6 +1007,49 @@ interface RidgeTerm {
   readonly weight: number;
 }
 
+### build/index.d.ts#RunningSummary
+interface RunningSummary {
+  readonly n: number;
+  readonly sum: number;
+  readonly min: number;
+  readonly max: number;
+  readonly m2: number;
+}
+
+### build/index.d.ts#SIGN_FLIP_EXACT_LIMIT
+export declare const SIGN_FLIP_EXACT_LIMIT = 24;
+
+### build/index.d.ts#SIGN_FLIP_EXACT_MAX
+export declare const SIGN_FLIP_EXACT_MAX = 16;
+
+### build/index.d.ts#SampleTotalOptions
+interface SampleTotalOptions extends BootstrapOptions {
+  readonly population: number;
+  readonly scale?: number;
+}
+
+### build/index.d.ts#SideP
+interface SideP {
+  readonly against: number;
+  readonly pAbove: number;
+  readonly pBelow: number;
+}
+
+### build/index.d.ts#SignFlipOptions
+interface SignFlipOptions {
+  readonly exactMax?: number;
+  readonly runs?: number;
+  readonly seed?: number | string;
+}
+
+### build/index.d.ts#SignFlipResult
+interface SignFlipResult {
+  readonly observed: number;
+  readonly p: number;
+  readonly exact: boolean;
+  readonly runs: number;
+}
+
 ### build/index.d.ts#SmoothLaw
 type SmoothLaw = "uniform" | "normal" | "exponential" | "log-normal" | "pareto";
 
@@ -618,6 +1057,35 @@ type SmoothLaw = "uniform" | "normal" | "exponential" | "log-normal" | "pareto";
 interface SmoothLawScore {
   readonly law: SmoothLaw;
   readonly meanLogDensity: number;
+}
+
+### build/index.d.ts#SobolIndex
+interface SobolIndex {
+  readonly dimension: string;
+  readonly first: number;
+  readonly total: number;
+  readonly firstInterval?: Interval;
+  readonly totalInterval?: Interval;
+}
+
+### build/index.d.ts#SobolIndices
+interface SobolIndices {
+  readonly measure: string;
+  readonly scale: "measure" | "model";
+  readonly n: number;
+  readonly evaluations: number;
+  readonly seed: number;
+  readonly mean: number;
+  readonly variance: number;
+  readonly indices: readonly SobolIndex[];
+}
+
+### build/index.d.ts#SobolOptions
+interface SobolOptions {
+  readonly n?: number;
+  readonly seed?: number | string;
+  readonly scale?: "measure" | "model";
+  readonly interval?: BootstrapOptions;
 }
 
 ### build/index.d.ts#Summary
@@ -642,6 +1110,9 @@ interface TableResponseModel extends ResponseModelBase {
   readonly fallback: number;
 }
 
+### build/index.d.ts#TieModel
+type TieModel = "davidson" | "half";
+
 ### build/index.d.ts#TwoSamplePermutationOptions
 interface TwoSamplePermutationOptions {
   readonly runs?: number;
@@ -654,14 +1125,56 @@ interface TwoSamplePermutationResult extends PermutationResult {
   readonly exact: boolean;
 }
 
+### build/index.d.ts#UStatisticInterval
+interface UStatisticInterval {
+  readonly estimate: number;
+  readonly low: number;
+  readonly high: number;
+  readonly level: number;
+  readonly method: "conservative" | "tight";
+  readonly requested: UStatisticMethod;
+  readonly mean: UStatisticMean;
+  readonly subsets: number;
+  readonly standardError?: number;
+  readonly df?: number;
+}
+
+### build/index.d.ts#UStatisticMean
+interface UStatisticMean {
+  readonly estimate: number;
+  readonly low: number;
+  readonly high: number;
+}
+
+### build/index.d.ts#UStatisticMethod
+type UStatisticMethod = "conservative" | "tight" | "auto";
+
+### build/index.d.ts#UStatisticOptions
+interface UStatisticOptions {
+  readonly order: number;
+  readonly population: number;
+  readonly method: UStatisticMethod;
+  readonly level?: number;
+  readonly range?: readonly [low: number, high: number];
+}
+
+### build/index.d.ts#U_STATISTIC_TIGHT_MIN_SAMPLE
+export declare const U_STATISTIC_TIGHT_MIN_SAMPLE: number;
+
 ### build/index.d.ts#Z95
 export declare const Z95 = 1.959963984540054;
+
+### build/index.d.ts#addToRunning
+export declare function addToRunning(s: RunningSummary, value: number): RunningSummary;
 
 ### build/index.d.ts#bestSmoothLaw
 export declare function bestSmoothLaw(values: readonly number[]): SmoothLaw;
 
 ### build/index.d.ts#binomialInterval
 export declare function binomialInterval(n: number, p: number, level?: number): CountInterval;
+
+### build/index.d.ts#binomialTest
+export declare function binomialTest(k: number, n: number, p: number, side: BinomialSide): number;
 
 ### build/index.d.ts#bootstrap
 export declare function bootstrap<T>(data: readonly T[], statistic: (sample: readonly T[]) => number, options?: BootstrapOptions): Interval;
@@ -678,8 +1191,17 @@ export declare function bootstrapMedian(values: readonly number[], options?: Boo
 ### build/index.d.ts#bootstrapMedianRatio
 export declare function bootstrapMedianRatio(numerator: readonly number[], denominator: readonly number[], options?: BootstrapOptions): Interval;
 
+### build/index.d.ts#bootstrapStrata
+export declare function bootstrapStrata<T>(strata: readonly (readonly T[])[], statistic: (samples: readonly (readonly T[])[]) => number, options?: BootstrapOptions): Interval;
+
 ### build/index.d.ts#bootstrapTwo
 export declare function bootstrapTwo<A, B>(a: readonly A[], b: readonly B[], statistic: (a: readonly A[], b: readonly B[]) => number, options?: BootstrapOptions): Interval;
+
+### build/index.d.ts#bradleyTerry
+export declare function bradleyTerry(items: number, comparisons: readonly PairComparison[], options?: BradleyTerryOptions): BradleyTerryFit;
+
+### build/index.d.ts#bradleyTerrySparse
+export declare function bradleyTerrySparse(items: number, comparisons: readonly PairComparison[], options?: BradleyTerrySparseOptions): BradleyTerrySparseFit;
 
 ### build/index.d.ts#brier
 export declare function brier(forecasts: readonly Forecast[]): number;
@@ -687,11 +1209,53 @@ export declare function brier(forecasts: readonly Forecast[]): number;
 ### build/index.d.ts#calibration
 export declare function calibration(forecasts: readonly Forecast[]): CalibrationLevel[];
 
+### build/index.d.ts#choosePair
+export declare function choosePair<T extends RatedItem>(items: readonly T[], options: PairChoiceOptions<T>): PairChoice | undefined;
+
+### build/index.d.ts#classScores
+export declare function classScores<T>(table: Confusion<T>, z?: number): ClassScore<T>[];
+
+### build/index.d.ts#clopperPearson
+export declare function clopperPearson(k: number, n: number, level?: number): Proportion;
+
+### build/index.d.ts#cohenKappa
+export declare function cohenKappa<T>(a: readonly T[], b: readonly T[]): Kappa;
+
 ### build/index.d.ts#compareRatios
 export declare function compareRatios(ratios: readonly number[], options?: CompareOptions): Comparison;
 
+### build/index.d.ts#confusion
+export declare function confusion<T>(truth: readonly T[], predicted: readonly T[], labels?: readonly T[]): Confusion<T>;
+
+### build/index.d.ts#coverageMinSample
+export declare function coverageMinSample(cells: readonly CoverageCell[], bar: CoverageBar): CoverageMinSample;
+
+### build/index.d.ts#eloExpected
+export declare function eloExpected(ra: number, rb: number, options?: RatingScale): number;
+
+### build/index.d.ts#eloReplay
+export declare function eloReplay(items: number, comparisons: readonly PairComparison[], options?: EloReplayOptions): number[];
+
+### build/index.d.ts#eloUpdate
+export declare function eloUpdate(ra: number, rb: number, score: number, options?: EloOptions): EloUpdate;
+
+### build/index.d.ts#entropy
+export declare function entropy(probabilities: readonly number[]): number;
+
+### build/index.d.ts#fitRatings
+export declare function fitRatings(model: RatingModel, items: number, comparisons: readonly PairComparison[], options?: RatingFitOptions): RatingFit;
+
 ### build/index.d.ts#fitResponse
 export declare function fitResponse(data: ResponseData, options?: ResponseFitOptions): ResponseRecord;
+
+### build/index.d.ts#glicko2Idle
+export declare function glicko2Idle(player: Glicko2Rating): Glicko2Rating;
+
+### build/index.d.ts#glicko2Replay
+export declare function glicko2Replay(items: number, comparisons: readonly PairComparison[], options?: Glicko2ReplayOptions): Glicko2Rating[];
+
+### build/index.d.ts#glicko2Update
+export declare function glicko2Update(player: Glicko2Rating, games: readonly Glicko2Game[], options?: Glicko2Options): Glicko2Rating;
 
 ### build/index.d.ts#heldOutError
 export declare function heldOutError(record: Pick<ResponseRecord, "folds">, measure: string): ResponseHeldOutError;
@@ -702,14 +1266,23 @@ export declare function heldOutErrorAt(record: ResponseRecord, measure: string, 
 ### build/index.d.ts#holm
 export declare function holm(pValues: readonly number[], level?: number): Corrected[];
 
+### build/index.d.ts#informationGain
+export declare function informationGain(prior: readonly number[], likelihood: readonly (readonly number[])[]): number;
+
 ### build/index.d.ts#kendallTau
 export declare function kendallTau(a: readonly number[], b: readonly number[], seed?: number | string): number;
 
 ### build/index.d.ts#leastSquares
 export declare function leastSquares(x: readonly (readonly number[])[], y: readonly number[], options?: LeastSquaresOptions): LeastSquaresFit;
 
+### build/index.d.ts#logLoss
+export declare function logLoss(forecasts: readonly Forecast[]): number;
+
 ### build/index.d.ts#mean
 export declare function mean(values: readonly number[]): number;
+
+### build/index.d.ts#meanInterval
+export declare function meanInterval(values: readonly number[], level?: number): MeanInterval;
 
 ### build/index.d.ts#median
 export declare function median(values: readonly number[]): number;
@@ -717,8 +1290,14 @@ export declare function median(values: readonly number[]): number;
 ### build/index.d.ts#medianInterval
 export declare function medianInterval(values: readonly number[], level?: number): MedianInterval;
 
+### build/index.d.ts#mergeRunning
+export declare function mergeRunning(a: RunningSummary, b: RunningSummary): RunningSummary;
+
 ### build/index.d.ts#modeCount
 export declare function modeCount(values: readonly number[], options?: ModeOptions): number;
+
+### build/index.d.ts#modifiedZ
+export declare function modifiedZ(values: readonly number[], options?: ModifiedZOptions): ModifiedZ;
 
 ### build/index.d.ts#negativeBinomialInterval
 export declare function negativeBinomialInterval(successes: number, p: number, level?: number): CountInterval;
@@ -730,6 +1309,15 @@ export declare function noiseFloor(values: readonly number[], options?: NoiseOpt
 export declare function noiseVerdict(values: readonly number[], options?: NoiseOptions & {
   readonly better?: "higher" | "lower";
 }): NoiseVerdict;
+
+### build/index.d.ts#optionFloor
+export declare function optionFloor(options: OptionFloorOptions): number;
+
+### build/index.d.ts#pairInformation
+export declare function pairInformation(a: RatedItem, b: RatedItem, options?: RatingScale): number;
+
+### build/index.d.ts#pairProbabilities
+export declare function pairProbabilities(sa: number, sb: number, tie?: number): PairProbabilities;
 
 ### build/index.d.ts#pairedPermutation
 export declare function pairedPermutation(candidate: readonly number[], baseline: readonly number[], options?: PermutationOptions): PermutationResult;
@@ -758,14 +1346,38 @@ export declare function quantileSorted(sortedValues: readonly number[], p: numbe
 ### build/index.d.ts#ranks
 export declare function ranks(values: readonly number[]): number[];
 
+### build/index.d.ts#ratingToStrength
+export declare function ratingToStrength(rating: number, options?: RatingScale): number;
+
+### build/index.d.ts#ratingUncertainty
+export declare function ratingUncertainty(item: Pick<RatedItem, "se" | "picks">): number;
+
 ### build/index.d.ts#responseCells
 export declare function responseCells(record: Pick<ResponseRecord, "dimensions">, vary: string | readonly [string, string], steps?: number): number;
 
 ### build/index.d.ts#ridgeSolve
 export declare function ridgeSolve(gram: ArrayLike<number>, moment: ArrayLike<number>, lambda: number, options?: RidgeOptions): number[];
 
+### build/index.d.ts#runningMean
+export declare function runningMean(s: RunningSummary): number;
+
+### build/index.d.ts#runningOf
+export declare function runningOf(values: Iterable<number>): RunningSummary;
+
+### build/index.d.ts#runningSd
+export declare function runningSd(s: RunningSummary): number;
+
+### build/index.d.ts#sampleTotalInterval
+export declare function sampleTotalInterval(values: readonly number[], options: SampleTotalOptions): Interval;
+
 ### build/index.d.ts#sd
 export declare function sd(values: readonly number[]): number;
+
+### build/index.d.ts#selectRatingModel
+export declare function selectRatingModel(items: number, comparisons: readonly PairComparison[], options?: RatingModelOptions): RatingModelChoice;
+
+### build/index.d.ts#signFlipTest
+export declare function signFlipTest(terms: readonly number[], options?: SignFlipOptions): SignFlipResult;
 
 ### build/index.d.ts#signTest
 export declare function signTest(better: number, worse: number, sides?: 1 | 2): number;
@@ -779,11 +1391,17 @@ export declare function sliceResponse(record: ResponseRecord, measure: string, o
 ### build/index.d.ts#smoothLawScores
 export declare function smoothLawScores(values: readonly number[]): readonly SmoothLawScore[];
 
+### build/index.d.ts#sobolIndices
+export declare function sobolIndices(record: Pick<ResponseRecord, "dimensions" | "models">, measure: string, options?: SobolOptions): SobolIndices;
+
 ### build/index.d.ts#sorted
 export declare function sorted(values: readonly number[]): number[];
 
 ### build/index.d.ts#spearman
 export declare function spearman(a: readonly number[], b: readonly number[]): number;
+
+### build/index.d.ts#strengthToRating
+export declare function strengthToRating(strength: number, options?: RatingScale): number;
 
 ### build/index.d.ts#summarize
 export declare function summarize(values: readonly number[]): Summary;
@@ -791,11 +1409,20 @@ export declare function summarize(values: readonly number[]): Summary;
 ### build/index.d.ts#surfaceResponse
 export declare function surfaceResponse(record: ResponseRecord, measure: string, options: ResponseSurfaceOptions): ResponseSurface;
 
+### build/index.d.ts#tQuantile
+export declare function tQuantile(p: number, df: number): number;
+
 ### build/index.d.ts#twoSamplePermutation
 export declare function twoSamplePermutation(a: readonly number[], b: readonly number[], options?: TwoSamplePermutationOptions): TwoSamplePermutationResult;
+
+### build/index.d.ts#uStatisticInterval
+export declare function uStatisticInterval(totals: readonly number[], options: UStatisticOptions): UStatisticInterval;
 
 ### build/index.d.ts#whenHolds
 export declare function whenHolds(dimension: ResponseDimension, values: Readonly<Record<string, unknown>>): boolean;
 
 ### build/index.d.ts#wilson
 export declare function wilson(k: number, n: number, z?: number): Proportion;
+
+### build/index.d.ts#wilsonSampleSize
+export declare function wilsonSampleSize(target: number, expected: number, z?: number, max?: number): number | undefined;

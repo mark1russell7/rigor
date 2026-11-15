@@ -106,6 +106,16 @@ describe("fnv1a32", () => {
     expect(fnv1a32("\uD800")).toBe(55024714);
   });
 
+  it("gives the hash of the bytes of TextEncoder for utf8, with no API of the platform", () => {
+    const encoder = new TextEncoder();
+    const bytes = (s: string): number => {
+      let h = 0x811c9dc5;
+      for (const b of encoder.encode(s)) h = Math.imul(h ^ b, 0x01000193);
+      return h >>> 0;
+    };
+    for (const s of strings()) expect(fnv1a32(s)).toBe(bytes(s));
+  });
+
   it("gives the hash of the UTF-16 code units, equal to the copy of highways", () => {
     for (const s of strings()) expect(fnv1a32(s, { input: "utf16" })).toBe(units(s));
     expect(fnv1a32("", { input: "utf16" })).toBe(0x811c9dc5);
@@ -151,6 +161,18 @@ describe("seeds", () => {
     expect(seedsFrom("  ", [1, 2])).toEqual([1, 2]);
     expect(seedsFrom("17", [1, 2])).toEqual([17]);
     expect(() => seedsFrom("x", [1])).toThrow(/integer/);
+  });
+
+  it("reads a list of seeds and ranges, as the seed lists of the algebra benches", () => {
+    expect(seedsFrom("1,3,9-11", [])).toEqual([1, 3, 9, 10, 11]);
+    expect(seedsFrom(" 4 , 2-3 ,-7", [1])).toEqual([4, 2, 3, -7]);
+    expect(seedsFrom("5-5", [])).toEqual([5]);
+    expect(() => seedsFrom("5-2", [])).toThrow(RangeError);
+    expect(() => seedsFrom("x", [])).toThrow(RangeError);
+    expect(() => seedsFrom("1,,2", [])).toThrow(/empty part/);
+    expect(() => seedsFrom("1,", [])).toThrow(/empty part/);
+    expect(() => seedsFrom("0-1000000", [])).toThrow(/at most/);
+    expect(seedsFrom("0-999999", [])).toHaveLength(1_000_000);
   });
 });
 
@@ -214,6 +236,40 @@ describe("random", () => {
     const b = random("same");
     expect([a.shuffle([1, 2, 3, 4, 5]), a.normal(10, 2), a.range(-1, 1)]).toEqual([b.shuffle([1, 2, 3, 4, 5]), b.normal(10, 2), b.range(-1, 1)]);
     expect(a.seed).toBe(fnv1a32("same"));
+  });
+
+  it("gives Gumbel samples with the known mean and variance", () => {
+    const r = random("gumbel");
+    const n = 40_000;
+    const xs = draws(() => r.gumbel(2, 3), n);
+    const mean = xs.reduce((sum, x) => sum + x, 0) / n;
+    const variance = xs.reduce((sum, x) => sum + (x - mean) ** 2, 0) / (n - 1);
+    // The mean is 2 + 3γ and the variance is (π · 3)² / 6. The bounds are about 5 standard errors.
+    expect(Math.abs(mean - (2 + 3 * 0.5772156649))).toBeLessThan(0.08);
+    expect(Math.abs(variance / ((Math.PI * 3) ** 2 / 6) - 1)).toBeLessThan(0.06);
+  });
+
+  it("gives the inverse of the Gumbel CDF, a finite value at 0, and an error for a bad scale", () => {
+    expect(randomOf(() => Math.exp(-1), 0).gumbel()).toBe(0);
+    expect(randomOf(() => Math.exp(-1), 0).gumbel(5, 2)).toBe(5);
+    expect(Number.isFinite(randomOf(() => 0, 0).gumbel())).toBe(true);
+    for (const scale of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) expect(() => random(1).gumbel(0, scale)).toThrow(RangeError);
+    const a = random("same");
+    const b = random("same");
+    expect(draws(() => a.gumbel(), 5)).toEqual(draws(() => b.gumbel(), 5));
+  });
+
+  it("puts each item first with a probability in proportion to its weight (Gumbel-max)", () => {
+    const r = random("gumbel-max");
+    const weights = [1, 2, 3, 4];
+    const firsts = [0, 0, 0, 0];
+    const n = 40_000;
+    for (let i = 0; i < n; i++) {
+      const keys = weights.map((w) => Math.log(w) + r.gumbel());
+      firsts[keys.indexOf(Math.max(...keys))]! += 1;
+    }
+    // The probability of index i is weights[i] / 10. Each bound is about 6 standard errors.
+    for (const [i, count] of firsts.entries()) expect(Math.abs(count / n - (weights[i] as number) / 10)).toBeLessThan(0.015);
   });
 
   it("uses a source that you give, also for the forks", () => {
