@@ -50,13 +50,34 @@ describe("a scripted server", () => {
       ["GET", "/alerts/active?area=KS", 0, 1],
     ]);
     expect(server.requests[0]?.fields["user-agent"]).toBe("test");
-    // The client keeps the connection, so each reply starts where the reply before it ended.
-    expect(new Set(server.requests.map((request) => request.connection)).size).toBe(1);
-    const [first, second, third] = server.requests.map((request) => request.wire);
-    expect(first?.offset).toBe(0);
-    expect(second?.offset).toBe((first?.offset ?? 0) + (first?.head ?? 0) + (first?.body ?? 0));
-    expect(third?.offset).toBe((second?.offset ?? 0) + (second?.head ?? 0) + (second?.body ?? 0));
-    expect([first?.body, second?.body, first?.whole]).toEqual([3, 4, true]);
+    // The client can keep a connection or open a new one. A reply starts where the reply before it on its connection ended.
+    const ends = new Map<number, number>();
+    for (const { connection, wire } of server.requests) {
+      expect(wire.offset).toBe(ends.get(connection) ?? 0);
+      ends.set(connection, wire.offset + wire.head + wire.body);
+    }
+    expect(server.requests.map((request) => [request.wire.body, request.wire.whole])).toEqual([
+      [3, true],
+      [4, true],
+      [4, true],
+    ]);
+  });
+
+  it("gives the offset of a second reply on the same connection", async () => {
+    const server = await start({ routes: [{ path: "/a", replies: [{ body: "one" }] }] });
+    const socket = connect({ port: server.port, host: "127.0.0.1" });
+    let raw = "";
+    socket.on("data", (chunk: Buffer) => {
+      raw += chunk.toString("latin1");
+    });
+    socket.write("GET /a HTTP/1.1\r\nhost: a\r\n\r\n");
+    while (!raw.endsWith("one")) await new Promise((resolve) => setTimeout(resolve, 5));
+    socket.write("GET /a HTTP/1.1\r\nhost: a\r\nconnection: close\r\n\r\n");
+    await once(socket, "close");
+    const second = raw.indexOf("HTTP/1.1", 1);
+    expect(server.requests.map((request) => request.connection)).toEqual([0, 0]);
+    expect(server.requests[0]?.wire).toEqual({ offset: 0, head: second - 3, body: 3, whole: true });
+    expect(server.requests[1]?.wire).toMatchObject({ offset: second, head: raw.length - second - 3, body: 3, whole: true });
   });
 
   it("matches the whole target for a path with a query, the method, and gives 404 to the other requests", async () => {
