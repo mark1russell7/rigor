@@ -124,6 +124,7 @@ export {
   noiseVerdict,
 } from "./compare.ts";
 export { type OptionFloorOptions, optionFloor, tQuantile } from "./power.ts";
+export { type MeanInterval, meanInterval } from "./mean-interval.ts";
 export { normalCdf, normalQuantile } from "./normal.ts";
 export { type ModifiedZ, type ModifiedZOptions, type OutlierSide, MODIFIED_Z_CUT, modifiedZ } from "./outlier.ts";
 export {
