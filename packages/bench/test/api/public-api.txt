@@ -186,6 +186,11 @@ type RungBudget: build/index.d.ts#RungBudget
 type RungEvidence: build/index.d.ts#RungEvidence
 type RungRecord: build/index.d.ts#RungRecord
 type RungVerdict: build/index.d.ts#RungVerdict
+type SlopeOptions: build/index.d.ts#SlopeOptions
+type SlopeRound: build/index.d.ts#SlopeRound
+type SlopeRun: build/index.d.ts#SlopeRun
+type SlopeRung: build/index.d.ts#SlopeRung
+type SlopeVerdict: build/index.d.ts#SlopeVerdict
 type SpreadRead: build/index.d.ts#SpreadRead
 type TailFalseFails: build/index.d.ts#TailFalseFails
 type TailGainCase: build/index.d.ts#TailGainCase
@@ -264,9 +269,11 @@ processCaseLine: build/index.d.ts#processCaseLine
 processVerdict: build/index.d.ts#processVerdict
 resultRows: build/index.d.ts#resultRows
 resultVerdict: build/index.d.ts#resultVerdict
+roundSlope: build/index.d.ts#roundSlope
 runCost: build/index.d.ts#runCost
 runLimit: build/index.d.ts#runLimit
 rungVerdict: build/index.d.ts#rungVerdict
+slopeVerdict: build/index.d.ts#slopeVerdict
 tailFalseFails: build/index.d.ts#tailFalseFails
 tailLimitVerdict: build/index.d.ts#tailLimitVerdict
 timeArm: build/index.d.ts#timeArm
@@ -1925,6 +1932,54 @@ interface RungVerdict {
   readonly synthetic: readonly string[];
 }
 
+### build/index.d.ts#SlopeOptions
+interface SlopeOptions {
+  readonly limit: number;
+  readonly holds?: number;
+  readonly band?: number;
+  readonly interval?: "spread" | "median";
+  readonly level?: number;
+  readonly aaLevel?: number;
+  readonly minRuns?: number;
+}
+
+### build/index.d.ts#SlopeRound
+interface SlopeRound {
+  readonly run: string;
+  readonly rungs: readonly SlopeRung[];
+  readonly aa: number;
+}
+
+### build/index.d.ts#SlopeRun
+interface SlopeRun {
+  readonly run: string;
+  readonly rounds: number;
+  readonly median: number;
+  readonly aaLow: number;
+  readonly aaHigh: number;
+  readonly counts: boolean;
+}
+
+### build/index.d.ts#SlopeRung
+interface SlopeRung {
+  readonly size: number;
+  readonly value: number;
+}
+
+### build/index.d.ts#SlopeVerdict
+interface SlopeVerdict {
+  readonly outcome: LimitOutcome;
+  readonly reason: string;
+  readonly slopes: readonly number[];
+  readonly slope: number;
+  readonly low: number;
+  readonly high: number;
+  readonly runs: readonly SlopeRun[];
+  readonly limit: number;
+  readonly holds: number | undefined;
+  readonly band: number;
+}
+
 ### build/index.d.ts#SpreadRead
 interface SpreadRead {
   readonly stratum: string | undefined;
@@ -2255,6 +2310,9 @@ export declare function resultRows(content: unknown): ResultRow[];
 ### build/index.d.ts#resultVerdict
 export declare function resultVerdict(results: readonly CaseResults[], rows: ResultRows): ResultVerdict;
 
+### build/index.d.ts#roundSlope
+export declare function roundSlope(rungs: readonly SlopeRung[]): number;
+
 ### build/index.d.ts#runCost
 export declare function runCost(cells: readonly CostCells[], probes: readonly CostProbe[], options: RunCostOptions): RunCost;
 
@@ -2263,6 +2321,9 @@ export declare function runLimit(values: readonly number[], options?: RunLimitOp
 
 ### build/index.d.ts#rungVerdict
 export declare function rungVerdict(rung: Rung, record: RungRecord | undefined, options: LadderOptions): RungVerdict;
+
+### build/index.d.ts#slopeVerdict
+export declare function slopeVerdict(rounds: readonly SlopeRound[], options: SlopeOptions): SlopeVerdict;
 
 ### build/index.d.ts#tailFalseFails
 export declare function tailFalseFails(aa: readonly PairedTime[], options: TailRuleOptions): TailFalseFails;
