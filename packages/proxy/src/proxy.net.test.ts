@@ -80,7 +80,10 @@ describe("a TCP fault proxy", () => {
     await once(socket, "end");
     expect(Buffer.concat(got).toString()).toBe("hello");
     const [summary] = await closed(started);
-    expect(summary).toEqual({ connection: 0, end: "close", bytes: { up: 5, down: 5 }, missed: [] });
+    const { opened, ...rest } = summary ?? { opened: Number.NaN };
+    expect(rest).toEqual({ connection: 0, end: "close", bytes: { up: 5, down: 5 }, missed: [] });
+    // The real clock gives the time from the origin to the accept of the connection.
+    expect(opened).toBeGreaterThanOrEqual(0);
   });
 
   it("splits a frame into writes that the server reads one by one", async () => {
@@ -171,8 +174,12 @@ describe("a TCP fault proxy", () => {
     await until(() => server.reads.length === 1);
     await clock.advance(1000);
     expect((await closed(started, 1))[0]).toMatchObject({ connection: 0, opened: 0, end: "reset", missed: [] });
-    // A connection that opens in the window gets the fault at its start.
-    await client(started.port);
+    // A connection that opens in the window gets the fault at its start. The reset can come before the connect event.
+    const second = connect({ port: started.port, host: "127.0.0.1" });
+    second.on("error", () => undefined);
+    cleanups.push(() => {
+      second.destroy();
+    });
     expect((await closed(started, 2))[1]).toMatchObject({ connection: 1, opened: 1000, end: "reset" });
     await clock.advance(1000);
     const third = await client(started.port);
