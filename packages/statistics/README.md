@@ -226,6 +226,7 @@ choosePair(pool, { seed: "duel-1" });             // the next pair of a duel, th
 | `spearman`, `kendallTau`, `ranks` | The rank correlations, with mean ranks for ties. |
 | `compareRatios`, `noiseFloor`, `noiseVerdict` | The comparison with a baseline, the noise floor of the 5-seed rule with a margin of practical effect, and the state of a difference over the seeds. |
 | `optionFloor({ sigma, delta, tests, alpha, power })`, `tQuantile(p, df)` | The fewest values for each of two options, so that one test of a Bonferroni family finds a difference of `delta` with the stated power, from the Student t law. It assumes unpaired groups of equal size and equal `sigma`. The quantile of the Student t law. |
+| `meanInterval(values, level)` | The two-sided interval of the mean with the Student t law: the mean plus or minus `t * sd / sqrt(n)`. The level 0.9 uses the one-sided 0.95 quantile. |
 | `modifiedZ(values, { cut, side })` | The robust z-score of each value, `0.6745 * (value - median) / MAD`, and the outliers above the cut. The default cut 3.5 is the cut of Iglewicz and Hoaglin. |
 | `normalCdf(x)`, `normalQuantile(p)` | The distribution function of the standard normal law and its quantile (AS 241 of Wichura). They come from `rigor-generators`. Both keep their relative digits in the lower tail, to `p = 1e-300`. |
 | `modeCount(values, { minShare, valleyRatio })` | The count of the modes of a sample, from a kernel density estimate. |
