@@ -327,7 +327,7 @@ importers:
     dependencies:
       '@mark1russell7/algebra':
         specifier: ^0.8.4
-        version: 0.8.8(zod@4.6.7)
+        version: 0.8.10(zod@4.6.7)
       '@mark1russell7/rigor-chaos':
         specifier: workspace:^
         version: link:../chaos
@@ -993,8 +993,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@mark1russell7/algebra@0.8.8':
-    resolution: {integrity: sha512-lonD7fxwt+Y9iqVflkKqcwZ3GiegOaCknIrQ9Tz1vuqx8Wrr1fZX7S/3OtvdrSAFpC1ZLIA2a42rmVuKIEzTJg==}
+  '@mark1russell7/algebra@0.8.10':
+    resolution: {integrity: sha512-+BrWHJHSMF/BTOegejCY14W2/3B4gmNhrSwLxitgQF0OYb7NcaovLILnDrDjNtTFgxuuA5Gd2jtlLJprTUO5Yw==}
     engines: {node: '>=22.19'}
     peerDependencies:
       zod: ^4.1.0
@@ -3123,7 +3123,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  '@mark1russell7/algebra@0.8.8(zod@4.6.7)':
+  '@mark1russell7/algebra@0.8.10(zod@4.6.7)':
     dependencies:
       '@mark1russell7/quantity': 0.4.0(zod@4.6.7)
     optionalDependencies:
