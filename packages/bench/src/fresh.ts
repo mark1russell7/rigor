@@ -2,14 +2,15 @@
  * The fresh-process runner of a bench, for Node only. Each arm of each pair, case and round is one fresh child process.
  * The child prints one JSON line with its time. The runner keeps the order of `pairOrder`, and gives `PairedTime` records.
  */
-import { spawn } from "node:child_process";
 import { readFileSync, rmSync } from "node:fs";
 import { arch, cpus, platform, tmpdir } from "node:os";
 import { join } from "node:path";
 import { PerformanceObserver } from "node:perf_hooks";
 import { setFlagsFromString } from "node:v8";
 import { type Arm, type PairedTime, firstArm } from "./paired.ts";
-import { stopTree } from "./tree.ts";
+import { startProcess, stderrTail } from "./start.ts";
+
+export { type CheckoutArm, type CheckoutArmOptions, type RepoCommitOptions, checkoutArm, repoCommit } from "./checkout.ts";
 
 /** The computer of a run. The `cpu` is the model of the first CPU. */
 export interface BenchEnv {
@@ -218,6 +219,10 @@ export function pairOrder(pairs: number, round: number, caseIndex: number): Pair
 export interface FreshArm {
   readonly id: string;
   readonly command: readonly string[];
+  /** The folder where each child of the arm starts. The default is the folder of this process. */
+  readonly cwd?: string;
+  /** The commit of the build of the arm. Each record of a pair with this arm names it in `commits`. */
+  readonly commit?: string;
 }
 
 /** The limits of one child. */
@@ -226,6 +231,8 @@ export interface StartOptions {
   readonly timeoutMs: number;
   /** The most bytes of `stdout` or `stderr`. */
   readonly maxBuffer: number;
+  /** The folder where the child starts. The default is the folder of this process. */
+  readonly cwd?: string;
 }
 
 /** The end of one child. */
@@ -259,8 +266,11 @@ export interface FreshOptions {
    * Without it, each job repeats the first orders, and the merge removes more records.
    */
   readonly roundOffset?: number;
-  /** The value `true` adds the A/A pair (base, base) with the id `${base.id}~aa`. The default is `true`. */
-  readonly aa?: boolean;
+  /**
+   * The value `true` adds the A/A pair (base, base) with the id `${base.id}~aa`. The default is `true`.
+   * The value `"each"` also adds the A/A pair of each candidate, with the id `${id}~aa`. Two builds of a run need it.
+   */
+  readonly aa?: boolean | "each";
   /** The arguments of a case after the command of an arm. The default is `["--case", id]`. */
   readonly args?: (caseId: string) => readonly string[];
   /** The longest time of one child in milliseconds. The default is 600000 (10 minutes). */
@@ -288,6 +298,8 @@ export interface FreshRecord extends PairedTime {
   readonly env: BenchEnv;
   /** The fields of the child of each arm in addition to its time. Only a record with a child that gives a field has it. */
   readonly fields?: { readonly a: ChildFields; readonly b: ChildFields };
+  /** The commits of the arms of the pair. Only a record of a pair with an arm that names a commit has it. */
+  readonly commits?: { readonly a?: string; readonly b?: string };
 }
 
 /** A case that an arm skipped. The case is in no pair. */
@@ -310,9 +322,6 @@ export interface FreshRun {
 
 /** The suffix of the id of the A/A pair. */
 const AA_SUFFIX = "~aa";
-
-/** The longest tail of `stderr` in an error. */
-const TAIL = 2000;
 
 /**
  * This function starts each arm of each pair, case and round in a fresh child, and gives the records of each pair.
@@ -341,11 +350,18 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
     throw new RangeError("freshRun: the cases are 1 or more different strings that are not empty.");
   }
   const pairs: { id: string; a: FreshArm; b: FreshArm }[] = candidates.map((c) => ({ id: c.id, a: base, b: c }));
-  if (options.aa ?? true) pairs.push({ id: `${base.id}${AA_SUFFIX}`, a: base, b: base });
+  const aa = options.aa ?? true;
+  if (aa !== true && aa !== false && aa !== "each") throw new RangeError(`freshRun: aa is true, false or "each", not ${JSON.stringify(aa)}.`);
+  if (aa !== false) pairs.push({ id: `${base.id}${AA_SUFFIX}`, a: base, b: base });
+  if (aa === "each") for (const c of candidates) pairs.push({ id: `${c.id}${AA_SUFFIX}`, a: c, b: c });
   if (pairs.length === 0) throw new RangeError("freshRun: the run has no pairs. Give a candidate, or keep the A/A pair.");
   for (const arm of [base, ...candidates]) {
     if (typeof arm.id !== "string" || arm.id === "") throw new RangeError("freshRun: the id of an arm is a string that is not empty.");
     if (arm.command.length === 0 || arm.command.some((s) => typeof s !== "string")) throw new RangeError(`freshRun: the command of the arm ${JSON.stringify(arm.id)} is 1 or more strings.`);
+    for (const key of ["cwd", "commit"] as const) {
+      const value = arm[key];
+      if (value !== undefined && (typeof value !== "string" || value === "")) throw new RangeError(`freshRun: the ${key} of the arm ${JSON.stringify(arm.id)} is a string that is not empty.`);
+    }
   }
   const ids = new Set([base.id]);
   for (const { id } of pairs) {
@@ -373,7 +389,7 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
         for (const arm of [slot.first, slot.first === "a" ? "b" : "a"] as const) {
           const who = pair[arm];
           const where = `the arm ${JSON.stringify(who.id)} (pair ${JSON.stringify(pair.id)}, arm ${arm}) on the case ${JSON.stringify(id)}, round ${round}`;
-          const line = await child(start, [...who.command, ...args(id)], { timeoutMs, maxBuffer }, where, overLimit);
+          const line = await child(start, [...who.command, ...args(id)], { timeoutMs, maxBuffer, ...(who.cwd === undefined ? {} : { cwd: who.cwd }) }, where, overLimit);
           if (line.skipped !== undefined) {
             if (r > 0) throw new Error(`freshRun: ${where} skipped the case after the first round of the job (${JSON.stringify(line.skipped)}). A child that skips only in a later round is not deterministic.`);
             skip = { arm: who.id, case: id, round, reason: line.skipped };
@@ -391,7 +407,7 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
         }
         if (skip !== undefined) break;
         const extra = Object.keys(fields.a).length + Object.keys(fields.b).length > 0 ? { fields } : {};
-        records.push({ pair: pair.id, record: { case: id, round, first: slot.first, a: times.a!, b: times.b!, job, env, ...extra } });
+        records.push({ pair: pair.id, record: { case: id, round, first: slot.first, a: times.a!, b: times.b!, job, env, ...extra, ...commitsOf(pair) } });
       }
       if (skip !== undefined) {
         skipped.push(skip);
@@ -404,6 +420,12 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
   return { env, job, pairs: out, skipped };
 }
 
+/** This function gives the field `commits` of the records of a pair, or nothing when no arm of the pair names a commit. */
+function commitsOf(pair: { a: FreshArm; b: FreshArm }): { commits?: { a?: string; b?: string } } {
+  if (pair.a.commit === undefined && pair.b.commit === undefined) return {};
+  return { commits: { ...(pair.a.commit === undefined ? {} : { a: pair.a.commit }), ...(pair.b.commit === undefined ? {} : { b: pair.b.commit }) } };
+}
+
 /** This function starts one child and reads its JSON line. A fault gives an error that names the arm, the case, the round and the tail of `stderr`. */
 async function child(start: StartChild, argv: readonly string[], limits: StartOptions, where: string, overLimit: "error" | "skip"): Promise<ChildLine> {
   let exit: ChildExit;
@@ -413,8 +435,7 @@ async function child(start: StartChild, argv: readonly string[], limits: StartOp
     throw new Error(`freshRun: ${where} did not start: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
   }
   const fail = (why: string): Error => {
-    const tail = exit.stderr.length > TAIL ? `...${exit.stderr.slice(-TAIL)}` : exit.stderr;
-    return new Error(`freshRun: ${where} ${why}. The tail of stderr: ${tail.trim() === "" ? "(empty)" : tail.trimEnd()}`);
+    return new Error(`freshRun: ${where} ${why}. The tail of stderr: ${stderrTail(exit.stderr)}`);
   };
   if (exit.error !== undefined) throw fail(`failed: ${exit.error}`);
   if (exit.timedOut === true) {
@@ -427,83 +448,4 @@ async function child(start: StartChild, argv: readonly string[], limits: StartOp
   } catch (error) {
     throw fail(`printed no good JSON line (${error instanceof Error ? error.message : String(error)})`);
   }
-}
-
-/** The wait, in milliseconds, for the pipes of a child after its exit, and for the exit of a child after a stop. */
-const GRACE_MS = 1000;
-
-/**
- * This function starts a process with `spawn` and no shell. It stops the process and its tree at the time limit or at the output limit.
- *
- * - The promise settles at the close of the pipes, or a grace time after the exit of the child. A grandchild can keep a pipe open.
- * - A stop sends SIGTERM to the process group, and SIGKILL after the grace time. On Windows, `taskkill /T /F` stops the tree.
- */
-function startProcess(argv: readonly string[], options: StartOptions): Promise<ChildExit> {
-  return new Promise((resolve) => {
-    const [program, ...rest] = argv;
-    const windows = process.platform === "win32";
-    // On POSIX, the child leads its own process group, so a signal to the group reaches the grandchildren.
-    const proc = spawn(program!, rest, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true, detached: !windows });
-    const out: Buffer[] = [];
-    const err: Buffer[] = [];
-    let timedOut = false;
-    let settled = false;
-    let stopping = false;
-    let error: string | undefined;
-    let grace: ReturnType<typeof setTimeout> | undefined;
-    const signal = (name: NodeJS.Signals): void => stopTree(proc, name);
-    const finish = (code: number | null): void => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      clearTimeout(grace);
-      proc.stdout.destroy();
-      proc.stderr.destroy();
-      const exit: ChildExit = { stdout: Buffer.concat(out).toString("utf8"), stderr: Buffer.concat(err).toString("utf8"), code, timedOut };
-      resolve(error === undefined ? exit : { ...exit, error });
-    };
-    const stop = (): void => {
-      if (stopping) return;
-      stopping = true;
-      signal("SIGTERM");
-      clearTimeout(grace);
-      grace = setTimeout(() => {
-        if (!windows) signal("SIGKILL");
-        finish(null);
-      }, GRACE_MS);
-    };
-    const timer = setTimeout(() => {
-      timedOut = true;
-      stop();
-    }, options.timeoutMs);
-    const take = (list: Buffer[]) => {
-      let bytes = 0;
-      return (chunk: Buffer): void => {
-        bytes += chunk.length;
-        if (bytes > options.maxBuffer) {
-          error ??= `an output is more than ${options.maxBuffer} bytes`;
-          stop();
-          return;
-        }
-        list.push(chunk);
-      };
-    };
-    proc.stdout.on("data", take(out));
-    proc.stderr.on("data", take(err));
-    proc.on("error", (e) => {
-      error ??= e.message;
-      // A program that does not start gives no event close.
-      if (proc.pid === undefined) finish(null);
-    });
-    proc.on("exit", (code) => {
-      clearTimeout(timer);
-      if (stopping) return;
-      // A grandchild that holds a pipe keeps the event close away. After the grace time, the runner stops the group.
-      grace = setTimeout(() => {
-        if (!windows) signal("SIGKILL");
-        finish(code);
-      }, GRACE_MS);
-    });
-    proc.on("close", (code) => finish(code));
-  });
 }

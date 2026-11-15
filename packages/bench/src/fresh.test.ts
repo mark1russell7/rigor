@@ -170,6 +170,32 @@ describe("freshRun", () => {
     expect(calls.length).toBe(4);
   });
 
+  it("starts each child of an arm in its folder, and names the commits of the arms in each record", async () => {
+    const folders: (string | undefined)[] = [];
+    const start: StartChild = async (argv, options) => {
+      folders.push(`${argv[0]}@${options.cwd ?? "here"}`);
+      return { stdout: '{"ms":1}\n', stderr: "", code: 0 };
+    };
+    const old = { id: "old", command: ["old"], cwd: "/base", commit: "a".repeat(40) };
+    const head = { id: "head", command: ["head"], commit: "b".repeat(40) };
+    const result = await run({ start, base: old, candidates: [head], rounds: 1, cases: ["x"], aa: "each" });
+    expect(Object.keys(result.pairs)).toEqual(["head", "old~aa", "head~aa"]);
+    expect(new Set(folders)).toEqual(new Set(["old@/base", "head@here"]));
+    expect(result.pairs["head"]![0]!.commits).toEqual({ a: "a".repeat(40), b: "b".repeat(40) });
+    expect(result.pairs["old~aa"]![0]!.commits).toEqual({ a: "a".repeat(40), b: "a".repeat(40) });
+    expect(result.pairs["head~aa"]![0]!.commits).toEqual({ a: "b".repeat(40), b: "b".repeat(40) });
+    const plain = await run({ start: fake().start, rounds: 1 });
+    expect(plain.pairs["next"]![0]!).not.toHaveProperty("commits");
+  });
+
+  it("refuses a bad aa, folder or commit", async () => {
+    const { start } = fake();
+    await expect(run({ start, aa: "all" as unknown as boolean })).rejects.toThrow(/aa is true, false or "each"/);
+    await expect(run({ start, candidates: [{ ...next, cwd: "" }] })).rejects.toThrow(/the cwd of the arm "next"/);
+    await expect(run({ start, base: { ...base, commit: "" } })).rejects.toThrow(/the commit of the arm "base"/);
+    await expect(run({ start, aa: "each", candidates: [next, { id: "next~aa", command: ["x"] }] })).rejects.toThrow(/two arms or pairs have the id/);
+  });
+
   it("removes a case that an arm skips in the first round from each pair, and starts no more children for it", async () => {
     const { start, calls } = fake((program, caseId, k) => (program === "next" && caseId === "y" && k <= 8 ? { stdout: '{"skipped":"too large"}' } : undefined));
     const result = await run({ start, roundOffset: 4 });
