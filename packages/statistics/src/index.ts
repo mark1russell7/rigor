@@ -100,6 +100,7 @@ export {
   type QuantileInterval,
   binomialInterval,
   binomialTest,
+  clopperPearson,
   medianInterval,
   negativeBinomialInterval,
   quantileInterval,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { random } from "@mark1russell7/rigor-generators";
-import { binomialInterval, binomialTest, medianInterval, negativeBinomialInterval, quantileInterval, quantileSamples, signTest } from "./index.ts";
+import { binomialInterval, binomialTest, clopperPearson, medianInterval, negativeBinomialInterval, quantileInterval, quantileSamples, signTest } from "./index.ts";
 
 /* ---------- The copies in the engines, word for word, as the references of the moves ---------- */
 
@@ -323,5 +323,167 @@ describe("binomialTest", () => {
     expect(() => binomialTest(1, 10, 1.5, "less")).toThrow(/p is from 0 to 1/);
     expect(() => binomialTest(1, 10, Number.NaN, "less")).toThrow(/p is from 0 to 1/);
     expect(() => binomialTest(1, 10, 0.5, "two" as "less")).toThrow(/side is/);
+  });
+
+  it("sums a tail of more terms than a spread into Math.max holds", () => {
+    // 200 000 terms overflowed the stack when the largest log came from Math.max(...logs).
+    expect(binomialTest(3, 200_000, 1e-5, "greater")).toBeCloseTo(1 - binomialTest(2, 200_000, 1e-5, "less"), 12);
+    expect(binomialTest(0, 200_000, 1e-5, "greater")).toBe(1);
+  });
+});
+
+/** The chance of each count from 0 to n of Binomial(n, p), for the coverage by enumeration. */
+const binomialChances = (n: number, p: number): number[] => {
+  const chances: number[] = [];
+  let logChoose = 0;
+  for (let k = 0; k <= n; k++) {
+    if (k > 0) logChoose += Math.log((n - k + 1) / k);
+    chances.push(Math.exp(logChoose + k * Math.log(p) + (n - k) * Math.log1p(-p)));
+  }
+  return chances;
+};
+
+describe("clopperPearson", () => {
+  const levels = [0.5, 0.8, 0.9, 0.95, 0.99, 0.999] as const;
+
+  it("gives the closed forms at k = 0 and at k = n", () => {
+    for (const n of [1, 2, 3, 5, 10, 30, 100, 1000, 100_000]) {
+      for (const level of levels) {
+        const tail = (1 - level) / 2;
+        const none = clopperPearson(0, n, level);
+        const all = clopperPearson(n, n, level);
+        expect(none.low).toBe(0);
+        expect(all.high).toBe(1);
+        expect(Math.abs(none.high - (1 - tail ** (1 / n))), `high of 0 of ${n} at ${level}`).toBeLessThan(1e-10);
+        expect(Math.abs(all.low - tail ** (1 / n)), `low of ${n} of ${n} at ${level}`).toBeLessThan(1e-10);
+      }
+    }
+  });
+
+  it("gives the closed form of k = 1 in n = 2 from the bisection", () => {
+    // P(X <= 1) = 1 - p^2 and P(X >= 1) = 1 - (1 - p)^2 for n = 2.
+    for (const level of levels) {
+      const tail = (1 - level) / 2;
+      const { low, high } = clopperPearson(1, 2, level);
+      expect(high).toBeCloseTo(Math.sqrt(1 - tail), 14);
+      expect(low).toBeCloseTo(1 - Math.sqrt(1 - tail), 14);
+    }
+  });
+
+  it("agrees with the published intervals", () => {
+    // The intervals of binom.test of R, to 4 significant digits or more.
+    const cases = [
+      [5, 10, 0.95, 0.187086, 0.812914],
+      [1, 100, 0.95, 0.000253146, 0.0544594],
+      [0, 10, 0.95, 0, 0.308497],
+      [1, 10, 0.95, 0.00252858, 0.445016],
+      [2, 20, 0.95, 0.0123485, 0.316983],
+      [5, 10, 0.9, 0.222441, 0.777559],
+    ] as const;
+    for (const [k, n, level, low, high] of cases) {
+      const interval = clopperPearson(k, n, level);
+      expect(Math.abs(interval.low - low), `low of ${k} of ${n}`).toBeLessThanOrEqual(low * 1e-5);
+      expect(Math.abs(interval.high - high) / high, `high of ${k} of ${n}`).toBeLessThan(1e-5);
+    }
+  });
+
+  it("puts the tail (1 - level) / 2 outside each end, also near 0 with a small n", () => {
+    const cases: [number, number][] = [];
+    for (let n = 1; n <= 40; n++) for (let k = 0; k <= n; k++) cases.push([k, n]);
+    for (const n of [100, 1000, 10_000]) for (const k of [0, 1, 2, 3, n - 1, n]) cases.push([k, n]);
+    for (const level of levels) {
+      const tail = (1 - level) / 2;
+      for (const [k, n] of cases) {
+        const { low, high } = clopperPearson(k, n, level);
+        // The tail at each end is not more than the target: the bisection gives the outer double, and the closed form
+        // of the high end at k = 0 keeps its digits with expm1. The closed form of the low end at k = n is near 1, where
+        // one ulp of low moves low^n by n ulps, so it has only the 1e-9 check.
+        if (k < n) {
+          const below = binomialTest(k, n, high, "less");
+          expect(Math.abs(below / tail - 1), `P(X <= ${k}) at high of ${k} of ${n} at ${level}`).toBeLessThan(1e-9);
+          expect(below, `outer high of ${k} of ${n} at ${level}`).toBeLessThanOrEqual(tail * (1 + 1e-12));
+        }
+        if (k > 0) {
+          const above = binomialTest(k, n, low, "greater");
+          expect(Math.abs(above / tail - 1), `P(X >= ${k}) at low of ${k} of ${n} at ${level}`).toBeLessThan(1e-9);
+          if (k < n) expect(above, `outer low of ${k} of ${n} at ${level}`).toBeLessThanOrEqual(tail * (1 + 1e-12));
+        }
+      }
+    }
+  });
+
+  it("holds the estimate, grows with k, is symmetric and narrows as the level falls, for n up to 60", () => {
+    const grid = [0.5, 0.8, 0.95, 0.99];
+    for (let n = 1; n <= 60; n++) {
+      const rows = grid.map((level) => Array.from({ length: n + 1 }, (_, k) => clopperPearson(k, n, level)));
+      for (const [l, row] of rows.entries()) {
+        for (const [k, { low, high }] of row.entries()) {
+          expect(low).toBeGreaterThanOrEqual(0);
+          expect(high).toBeLessThanOrEqual(1);
+          expect(low).toBeLessThanOrEqual(k / n);
+          expect(high).toBeGreaterThanOrEqual(k / n);
+          if (k > 0 && k < n) {
+            expect(low).toBeLessThan(k / n);
+            expect(high).toBeGreaterThan(k / n);
+          }
+          const mirror = row[n - k] as { low: number; high: number };
+          expect(Math.abs(low - (1 - mirror.high)), `symmetry of ${k} of ${n}`).toBeLessThan(1e-12);
+          if (k < n) {
+            const next = row[k + 1] as { low: number; high: number };
+            expect(next.low).toBeGreaterThan(low);
+            expect(next.high).toBeGreaterThan(high);
+          }
+          if (l > 0) {
+            const lower = (rows[l - 1] as { low: number; high: number }[])[k] as { low: number; high: number };
+            expect(lower.low, `low of ${k} of ${n}`).toBeGreaterThanOrEqual(low);
+            expect(lower.high, `high of ${k} of ${n}`).toBeLessThanOrEqual(high);
+          }
+        }
+      }
+    }
+  });
+
+  it("covers each p of a grid with a chance of level or more, by exact enumeration", () => {
+    const grid = [1e-6, 1e-4, 1e-3, ...Array.from({ length: 99 }, (_, i) => (i + 0.5) / 100 + 1e-7), 0.999, 1 - 1e-4];
+    for (const n of [1, 2, 3, 5, 8, 13, 20, 30, 45, 60]) {
+      for (const level of [0.8, 0.9, 0.95, 0.99]) {
+        const intervals = Array.from({ length: n + 1 }, (_, k) => clopperPearson(k, n, level));
+        // The coverage falls just outside an end, where one count leaves the set that covers p.
+        const outside = intervals.flatMap(({ low, high }) => [low - 1e-9, high + 1e-9]).filter((p) => p > 0 && p < 1);
+        let least = 1;
+        for (const p of [...grid, ...outside]) {
+          const chances = binomialChances(n, p);
+          let coverage = 0;
+          for (const [k, { low, high }] of intervals.entries()) if (low <= p && p <= high) coverage += chances[k] as number;
+          least = Math.min(least, coverage);
+          expect(coverage, `coverage at n ${n}, p ${p}, level ${level}`).toBeGreaterThanOrEqual(level - 1e-12);
+        }
+        // When the high end of 0 is below the low end of n, the counts that cover a p just above the high end of k - 1
+        // are k to m < n. Their chance is 1 - P(X <= k - 1) - P(X > m) < 1 - (1 - level) / 2. So the interval is not wider than it must be.
+        const first = intervals[0] as { high: number };
+        const last = intervals[n] as { low: number };
+        if (first.high < last.low) expect(least, `least coverage at n ${n}, level ${level}`).toBeLessThan(level + (1 - level) / 2);
+      }
+    }
+  });
+
+  it("gives 0 to 1 for n = 0, and works for an n beyond a spread into Math.max", () => {
+    expect(clopperPearson(0, 0)).toEqual({ low: 0, high: 1 });
+    expect(clopperPearson(0, 0, 0.5)).toEqual({ low: 0, high: 1 });
+    const { low, high } = clopperPearson(3, 200_000);
+    expect(binomialTest(3, 200_000, low, "greater")).toBeCloseTo(0.025, 12);
+    expect(binomialTest(3, 200_000, high, "less")).toBeCloseTo(0.025, 12);
+  });
+
+  it("throws for a bad input", () => {
+    expect(() => clopperPearson(-1, 10)).toThrow(/clopperPearson: -1 is not a whole number/);
+    expect(() => clopperPearson(1.5, 10)).toThrow(RangeError);
+    expect(() => clopperPearson(1, Number.NaN)).toThrow(RangeError);
+    expect(() => clopperPearson(1, Number.POSITIVE_INFINITY)).toThrow(RangeError);
+    expect(() => clopperPearson(11, 10)).toThrow(/clopperPearson: k 11 is more than n 10/);
+    for (const level of [0, 1, -0.5, 1.5, Number.NaN]) {
+      expect(() => clopperPearson(1, 10, level)).toThrow(/clopperPearson: the level is more than 0 and less than 1/);
+      expect(() => clopperPearson(0, 0, level)).toThrow(RangeError);
+    }
   });
 });
