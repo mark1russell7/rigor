@@ -10,6 +10,7 @@ export {
   faultPlan,
   faultPlanOf,
   faultsOf,
+  sweepPoints,
   triggerOf,
   type AnswerFault,
   type Direction,
