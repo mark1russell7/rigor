@@ -7,10 +7,14 @@ import { arch, cpus, platform, tmpdir } from "node:os";
 import { join } from "node:path";
 import { PerformanceObserver } from "node:perf_hooks";
 import { setFlagsFromString } from "node:v8";
-import { type Arm, type PairedTime, firstArm } from "./paired.ts";
+import type { ArmProcess } from "./arm-times.ts";
+import { type FixtureFile, type FixtureHash, checkFixtures } from "./fixtures.ts";
+import { type Arm, type PairedTime, armOrder, balancedRounds, firstArm } from "./paired.ts";
 import { startProcess, stderrTail } from "./start.ts";
 
+export { type ArmProcess, type ArmTimes, armTimes } from "./arm-times.ts";
 export { type CheckoutArm, type CheckoutArmOptions, type RepoCommitOptions, checkoutArm, repoCommit } from "./checkout.ts";
+export { type FixtureFile, type FixtureHash, type FixtureOptions, checkFixtures, fixtureDifferences } from "./fixtures.ts";
 
 /** The computer of a run. The `cpu` is the model of the first CPU. */
 export interface BenchEnv {
@@ -389,7 +393,7 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
         for (const arm of [slot.first, slot.first === "a" ? "b" : "a"] as const) {
           const who = pair[arm];
           const where = `the arm ${JSON.stringify(who.id)} (pair ${JSON.stringify(pair.id)}, arm ${arm}) on the case ${JSON.stringify(id)}, round ${round}`;
-          const line = await child(start, [...who.command, ...args(id)], { timeoutMs, maxBuffer, ...(who.cwd === undefined ? {} : { cwd: who.cwd }) }, where, overLimit);
+          const line = await child(start, [...who.command, ...args(id)], { timeoutMs, maxBuffer, ...(who.cwd === undefined ? {} : { cwd: who.cwd }) }, where, overLimit, "freshRun");
           if (line.skipped !== undefined) {
             if (r > 0) throw new Error(`freshRun: ${where} skipped the case after the first round of the job (${JSON.stringify(line.skipped)}). A child that skips only in a later round is not deterministic.`);
             skip = { arm: who.id, case: id, round, reason: line.skipped };
@@ -420,6 +424,163 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
   return { env, job, pairs: out, skipped };
 }
 
+/** One arm of a run of arms: its id, the case that it times, and the argv of its child. */
+export interface CaseArm {
+  readonly id: string;
+  /** The id of the case of the arm. The child of the arm gets `args(case)` after its command. */
+  readonly case: string;
+  /** The argv of the child before the arguments of the case. The default is the `command` of the run. */
+  readonly command?: readonly string[];
+  /** The folder where each child of the arm starts. The default is the folder of this process. */
+  readonly cwd?: string;
+}
+
+/** The fixture files of a run of arms: their folder and their pinned hashes. */
+export interface ArmsFixtures {
+  readonly folder: string;
+  readonly files: readonly FixtureFile[];
+  /** The read of a file. The default is `readFileSync`. A test gives its own. */
+  readonly read?: (path: string) => Uint8Array;
+}
+
+/** The options of a run of arms. */
+export interface FreshArmsOptions {
+  /** The arms. Each arm usually times its own case. Two arms with the same case and command make an A/A pair. */
+  readonly arms: readonly CaseArm[];
+  /** The argv of the child of each arm that has no command of its own. */
+  readonly command?: readonly string[];
+  /** The arguments of a case after the command of an arm. The default is `["--case", id]`. */
+  readonly args?: (caseId: string) => readonly string[];
+  /** The ids of the two arms of the A/A pair. The two arms have the same case, command and folder. Arm `a` of each A/A record is the first id. */
+  readonly aa?: readonly [string, string];
+  /** The count of the rounds of this job. The default is `balancedRounds` of the count of arms. */
+  readonly rounds?: number;
+  /** The global round of the first round of this job. The default is 0. A run of many jobs sets it to `job * rounds`. */
+  readonly roundOffset?: number;
+  /** The fixture files. The run checks their hashes with `checkFixtures` before the first child. */
+  readonly fixtures?: ArmsFixtures;
+  /** The longest time of one child in milliseconds. The default is 600000 (10 minutes). */
+  readonly timeoutMs?: number;
+  /** The most bytes of the output of one child. The default is 16 MiB. */
+  readonly maxBuffer?: number;
+  /** The label of the job. The default is `"0"`. */
+  readonly job?: string;
+  /** The computer of the run. The default is `benchEnv()`. */
+  readonly env?: BenchEnv;
+  /** The start of a child. The default starts a process. A test gives its own. */
+  readonly start?: StartChild;
+  /** This function gets the record of each child when the child ends. A runner prints its progress with it. */
+  readonly onProcess?: (record: ArmProcess) => void;
+}
+
+/** The result of a run of arms. */
+export interface FreshArms {
+  readonly env: BenchEnv;
+  readonly job: string;
+  readonly rounds: number;
+  /** The value is `true` when `rounds` is a multiple of `balancedRounds` of the count of arms. */
+  readonly balanced: boolean;
+  /** The warnings of the run, for example a count of rounds that is not balanced. */
+  readonly warnings: readonly string[];
+  /** The record of each child, in the order of the starts. */
+  readonly processes: readonly ArmProcess[];
+  /** The A/A record of each round, with the job and the computer. `aaOrders`, `aaStats` and `poolRecords` read them. Only a run with `aa` has records. */
+  readonly aa: readonly FreshRecord[];
+  /** The hashes of the fixture files. Only a run with fixtures has them. */
+  readonly fixtures?: readonly FixtureHash[];
+}
+
+/** This function examines the options of a run of arms and gives the command of each arm. A bad option is a `RangeError`. */
+function armsCommands(options: FreshArmsOptions): Map<string, readonly string[]> {
+  const { arms } = options;
+  if (arms.length === 0) throw new RangeError("freshArms: the run has 1 or more arms.");
+  const commands = new Map<string, readonly string[]>();
+  for (const arm of arms) {
+    if (typeof arm.id !== "string" || arm.id === "") throw new RangeError("freshArms: the id of an arm is a string that is not empty.");
+    if (commands.has(arm.id)) throw new RangeError(`freshArms: two arms have the id ${JSON.stringify(arm.id)}.`);
+    if (typeof arm.case !== "string" || arm.case === "") throw new RangeError(`freshArms: the case of the arm ${JSON.stringify(arm.id)} is a string that is not empty.`);
+    if (arm.cwd !== undefined && (typeof arm.cwd !== "string" || arm.cwd === "")) throw new RangeError(`freshArms: the cwd of the arm ${JSON.stringify(arm.id)} is a string that is not empty.`);
+    const command = arm.command ?? options.command;
+    if (command === undefined || command.length === 0 || command.some((s) => typeof s !== "string")) {
+      throw new RangeError(`freshArms: the command of the arm ${JSON.stringify(arm.id)} is 1 or more strings. Give the command of the arm or of the run.`);
+    }
+    commands.set(arm.id, command);
+  }
+  if (options.aa !== undefined) {
+    const [a, b] = options.aa;
+    const left = arms.find((arm) => arm.id === a);
+    const right = arms.find((arm) => arm.id === b);
+    if (left === undefined || right === undefined || a === b) throw new RangeError(`freshArms: the A/A pair is 2 different ids of arms, not ${JSON.stringify(options.aa)}.`);
+    const same = left.case === right.case && left.cwd === right.cwd && commands.get(a)!.join("\u0000") === commands.get(b)!.join("\u0000");
+    if (!same) throw new RangeError(`freshArms: the A/A arms ${JSON.stringify(a)} and ${JSON.stringify(b)} have the same case, command and folder.`);
+  }
+  return commands;
+}
+
+/**
+ * This function starts one fresh child for each arm in each round, and gives the record of each child.
+ * - The arms of a round come in the order of `armOrder`. The default count of rounds is balanced, and another count gives a warning.
+ * - With `aa`, each round gives an A/A record. Arm `a` is the first id of `aa`, and `first` is the arm that started first.
+ * - With `fixtures`, a file that is not the pinned file stops the run before the first child.
+ * - A child that exits with an error, takes too long, prints no JSON line or skips its case is an error. A run of arms has no skips.
+ * - Two different hashes from children with the same argv and folder are an error.
+ */
+export async function freshArms(options: FreshArmsOptions): Promise<FreshArms> {
+  const commands = armsCommands(options);
+  const { arms } = options;
+  const period = balancedRounds(arms.length);
+  const rounds = options.rounds ?? period;
+  const roundOffset = options.roundOffset ?? 0;
+  const job = options.job ?? "0";
+  const timeoutMs = options.timeoutMs ?? 600_000;
+  const maxBuffer = options.maxBuffer ?? 1 << 24;
+  const args = options.args ?? ((id: string) => ["--case", id]);
+  const start = options.start ?? startProcess;
+  if (!Number.isSafeInteger(rounds) || rounds < 1) throw new RangeError(`freshArms: the rounds are a whole number of 1 or more, not ${rounds}.`);
+  if (!Number.isSafeInteger(roundOffset) || roundOffset < 0) throw new RangeError(`freshArms: the round offset is a whole number of 0 or more, not ${roundOffset}.`);
+  if (!(timeoutMs > 0) || !(maxBuffer > 0)) throw new RangeError("freshArms: the time limit and the output limit are above 0.");
+  const balanced = rounds % period === 0;
+  const warnings = balanced
+    ? []
+    : [`${rounds} rounds is not a multiple of ${period} (2 times the ${arms.length} arms), so the order of the arms is not balanced. The A/A pair can show a bias of order.`];
+  const fixtures = options.fixtures === undefined ? undefined : checkFixtures(options.fixtures.folder, options.fixtures.files, options.fixtures.read === undefined ? {} : { read: options.fixtures.read });
+
+  const env = options.env ?? benchEnv();
+  const processes: ArmProcess[] = [];
+  const hashes = new Map<string, string>();
+  const aa: FreshRecord[] = [];
+  for (let r = 0; r < rounds; r++) {
+    const round = roundOffset + r;
+    const inRound = new Map<string, ArmProcess>();
+    const order = armOrder(arms, round);
+    for (let position = 0; position < order.length; position++) {
+      const arm = order[position]!;
+      const argv = [...commands.get(arm.id)!, ...args(arm.case)];
+      const where = `the arm ${JSON.stringify(arm.id)} on the case ${JSON.stringify(arm.case)}, round ${round}`;
+      const line = await child(start, argv, { timeoutMs, maxBuffer, ...(arm.cwd === undefined ? {} : { cwd: arm.cwd }) }, where, "error", "freshArms");
+      if (line.skipped !== undefined) throw new Error(`freshArms: ${where} skipped the case (${JSON.stringify(line.skipped)}). A run of arms has no skips: remove the arm, or fix its child.`);
+      if (line.hash !== undefined) {
+        const key = `${arm.cwd ?? ""}\u0000${argv.join("\u0000")}`;
+        const known = hashes.get(key);
+        if (known !== undefined && known !== line.hash) throw new Error(`freshArms: ${where} gave the hash ${line.hash}, and an earlier child with the same argv gave ${known}.`);
+        hashes.set(key, line.hash);
+      }
+      const { ms, hash: _hash, skipped: _skipped, ...more } = line;
+      const record: ArmProcess = { arm: arm.id, case: arm.case, round, position, ms, ...(Object.keys(more).length > 0 ? { fields: more } : {}) };
+      processes.push(record);
+      inRound.set(arm.id, record);
+      options.onProcess?.(record);
+    }
+    if (options.aa !== undefined) {
+      const a = inRound.get(options.aa[0])!;
+      const b = inRound.get(options.aa[1])!;
+      const fields = a.fields !== undefined || b.fields !== undefined ? { fields: { a: a.fields ?? {}, b: b.fields ?? {} } } : {};
+      aa.push({ case: a.case, round, first: a.position < b.position ? "a" : "b", a: a.ms, b: b.ms, job, env, ...fields });
+    }
+  }
+  return { env, job, rounds, balanced, warnings, processes, aa, ...(fixtures === undefined ? {} : { fixtures }) };
+}
+
 /** This function gives the field `commits` of the records of a pair, or nothing when no arm of the pair names a commit. */
 function commitsOf(pair: { a: FreshArm; b: FreshArm }): { commits?: { a?: string; b?: string } } {
   if (pair.a.commit === undefined && pair.b.commit === undefined) return {};
@@ -427,15 +588,15 @@ function commitsOf(pair: { a: FreshArm; b: FreshArm }): { commits?: { a?: string
 }
 
 /** This function starts one child and reads its JSON line. A fault gives an error that names the arm, the case, the round and the tail of `stderr`. */
-async function child(start: StartChild, argv: readonly string[], limits: StartOptions, where: string, overLimit: "error" | "skip"): Promise<ChildLine> {
+async function child(start: StartChild, argv: readonly string[], limits: StartOptions, where: string, overLimit: "error" | "skip", runner: string): Promise<ChildLine> {
   let exit: ChildExit;
   try {
     exit = await start(argv, limits);
   } catch (error) {
-    throw new Error(`freshRun: ${where} did not start: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
+    throw new Error(`${runner}: ${where} did not start: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
   }
   const fail = (why: string): Error => {
-    return new Error(`freshRun: ${where} ${why}. The tail of stderr: ${stderrTail(exit.stderr)}`);
+    return new Error(`${runner}: ${where} ${why}. The tail of stderr: ${stderrTail(exit.stderr)}`);
   };
   if (exit.error !== undefined) throw fail(`failed: ${exit.error}`);
   if (exit.timedOut === true) {

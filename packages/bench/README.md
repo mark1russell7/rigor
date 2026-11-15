@@ -37,6 +37,9 @@ v.comparison;                                     // the cases that gain and dro
 | `runCost(cells, probes, options)` | The minutes of a bench run before it starts, on each CPU model: the cells times the calls times the time of one call. |
 | `firstArm(round, offset)` | The arm that runs first. The order turns each round, and an odd offset starts with arm `b`. |
 | `armOrder(arms, round)` | The order of any count of arms in a round. Each pair of arms has each order within 1 after each count of rounds. A report that keeps no `first` for each pair states the order that it used, so that a reader can make `first` again. |
+| `balancedRounds(arms)` | The count of rounds that balances `armOrder`: 2 times the count of arms. Each arm is then at each position 2 times. |
+| `mergeCaseModules(modules)` | The cases of a list of modules in one record, and the module of each case. Two cases with one name are an error. |
+| `moduleListGaps(files, listed)` | The modules of a folder that are not in the list, and the listed modules that are not in the folder. |
 | `checkPairedTime(record)` | The record, or a `RangeError` for a time that is not a finite number above 0. |
 | `caseRatios(records)` | The ratio of each case. It refuses 2 records of one round, and an order that did not turn. |
 | `orderSize(records)` | The count of records per first arm, the order effect, and the amount that unequal counts can move a mean. This size is a guide, because a verdict reads a median. |
@@ -62,6 +65,7 @@ v.comparison;                                     // the cases that gain and dro
 | `freezeLimits(measure, candidates, stamp, rule)` | A file of frozen limits, with the values, the commit and the date of each limit. |
 | `runLimit(values, options)` | The limit of the rule of the gate limits: the worst value of 5 runs or more plus their spread, rounded away from the values. |
 | `aaStats(aa, level)` | The A/A statistics of each case of one job: the median log ratio and the spread of the rounds. |
+| `aaOrders(aa, level)` | The A/A ratio of each case over all rounds and over the rounds of each order, with the interval of each median. |
 | `aaLimits(jobs, options)` | The margin and the noise cap of each family of cases from the A/A statistics of the jobs, and the jobs that went out. |
 | `aaLimitOf(limits, family)` | The options `margin` and `noiseCap` of `timeVerdict` for a family, or the fallback limits. |
 | `checkModelLimits(file)` | The faults of a file of frozen limits. The function computes each limit again from its values. |
@@ -93,6 +97,10 @@ v.comparison;                                     // the cases that gain and dro
 | `childLine(stdout)` | From `/fresh`: the last JSON line of a child, with its time `ms`, its `hash` and the reason of a skip. |
 | `pairOrder(pairs, round, caseIndex)` | From `/fresh`: the order of the pairs of one case in one round, and the first arm of each pair. |
 | `freshRun(options)` | From `/fresh`: the records of each pair, with each arm in its own fresh child process. |
+| `freshArms(options)` | From `/fresh`: one fresh child for each arm in each round, in the order of `armOrder`, with A/A records and fixture hashes. |
+| `armTimes(processes)` | From `/fresh`: the median, the 10th and the 90th percentiles and their ratio for each arm over its children. |
+| `checkFixtures(folder, files, options)` | From `/fresh`: the hash and the size of each fixture file, or an error that names each file that is not the pinned file. |
+| `fixtureDifferences(a, b)` | From `/fresh`: the fixture files that two records do not share with the same hash. |
 | `timeArm(run, options)` | The child side of `freshRun`: the median time of one call of one arm, over calibrated samples. |
 | `peakRss()` | From `/fresh`: the memory peak of this process in bytes, for the child line. |
 | `checkoutArm(options)` | From `/fresh`: an arm on a git worktree of a commit, built by its setup commands. |
@@ -755,6 +763,54 @@ try {
 - Each record names the commits of its arms in the field `commits`.
 - With `aa: "each"`, the run has an A/A pair of each build, because the two builds can have different noise. A gate gives `timeVerdict` the A/A records of each build. When one of the two verdicts is noisy, the run cannot decide.
 - A checkout in CI needs the history of the base commit, for example `fetch-depth: 0` of `actions/checkout`.
+
+### Many arms, one child each
+
+A bench of absolute times has one arm for each case, and one A/A pair. `freshArms` starts one fresh child for each arm in each round:
+
+```ts
+import { aaOrders, mergeCaseModules } from "@mark1russell7/rigor-bench";
+import { armTimes, freshArms } from "@mark1russell7/rigor-bench/fresh";
+
+const { cases } = mergeCaseModules(modules);      // the cases of each module of the list
+const arms = [...Object.keys(cases).map((id) => ({ id, case: id })), { id: "corpus#aa", case: "corpus" }];
+const run = await freshArms({
+  arms,
+  command: ["node", "bench/child.js"],
+  aa: ["corpus", "corpus#aa"],
+  fixtures: { folder: process.env["FONTS"]!, files: pinnedFonts }, // [{ file, sha256 }] of each font
+});
+
+armTimes(run.processes);                          // the median and the spread of each arm
+aaOrders(run.aa);                                 // the A/A ratio of all rounds and of each order
+run.fixtures;                                     // the hash of each fixture file, for the record
+```
+
+- The arms of a round come in the order of `armOrder`, not in a plain rotation. Thus each pair of arms has each order one time in each two rounds.
+- The default count of rounds is `balancedRounds` of the count of arms: 2 times the count of arms. Then each arm is at each position 2 times.
+- Another count of rounds gives a warning in `warnings`, and `balanced` is `false`. Rounds that are not balanced can give the A/A pair a bias of order.
+- Each record has the arm, the case, the round, the position in the round and the time. `onProcess` gets each record when its child ends.
+- With `aa`, each round gives one A/A record. Arm `a` is the first id of `aa`. The two arms of `aa` have the same case, command and folder.
+- `aaOrders` gives the A/A ratio of all rounds and of each order, with the interval of each median. A bias of order shows as two orders on the two sides of 1.
+- With `fixtures`, the run compares the SHA-256 of each fixture file with its pinned hash before the first child. A bad file stops the run, and the error names each bad file.
+- The result keeps the hashes. `fixtureDifferences` gives the files that two records do not share, so a comparison of two records can refuse different fixtures.
+- The fetch of the fixture files is a step of the job before the run. The owner of the files fetches them with its own tool.
+- A child that fails, takes too long, prints no JSON line or skips its case stops the run with an error. Two different hashes from children with the same argv stop it too.
+
+### A list of case modules
+
+A bench with cases in several modules keeps a list of the modules. `mergeCaseModules` merges their cases into one record, and it refuses two cases with one name. `moduleListGaps` compares the list with the folder. The test of the bench expects no gap, because a case that no run starts is not measured:
+
+```ts
+import { readdirSync } from "node:fs";
+import { moduleListGaps } from "@mark1russell7/rigor-bench";
+import { modules } from "./cases/index.ts";
+
+it("lists each module of the folder", () => {
+  const files = readdirSync(new URL("./cases/", import.meta.url)).filter((f) => f.endsWith(".ts") && f !== "index.ts" && !f.endsWith(".test.ts"));
+  expect(moduleListGaps(files, Object.keys(modules))).toEqual({ unlisted: [], missing: [] });
+});
+```
 
 ## The paired child
 

@@ -47,6 +47,17 @@ export function armOrder<T>(arms: readonly T[], round: number): readonly T[] {
   return round % 2 === 0 ? turned : turned.toReversed();
 }
 
+/**
+ * This function gives the count of rounds that balances `armOrder`: 2 times the count of arms.
+ * In each run of this many rounds, each arm is at each position 2 times.
+ * Each pair of arms also has each order the same count of times.
+ * Another count puts some arms at some positions more often. Then the A/A pair can show a bias of order.
+ */
+export function balancedRounds(arms: number): number {
+  if (!Number.isSafeInteger(arms) || arms < 1) throw new RangeError(`balancedRounds: the count of arms is a whole number of 1 or more, not ${arms}.`);
+  return 2 * arms;
+}
+
 /** This function examines one record. A time that is not a finite number above 0 is an error. */
 export function checkPairedTime(record: PairedTime): PairedTime {
   const where = `the record of the case ${JSON.stringify(record.case)}, round ${record.round}`;
