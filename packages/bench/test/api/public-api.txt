@@ -8,7 +8,9 @@
 
 type Arm: build/paired.d.ts#Arm
 type ArmModels: build/index.d.ts#ArmModels
+type ArmOptions: build/index.d.ts#ArmOptions
 type ArmPair: build/index.d.ts#ArmPair
+type ArmTime: build/index.d.ts#ArmTime
 BUDGET_LOOKS: build/index.d.ts#BUDGET_LOOKS
 type Balanced: build/index.d.ts#Balanced
 type Band: build/index.d.ts#Band
@@ -232,6 +234,7 @@ runCost: build/index.d.ts#runCost
 rungVerdict: build/index.d.ts#rungVerdict
 tailFalseFails: build/index.d.ts#tailFalseFails
 tailLimitVerdict: build/index.d.ts#tailLimitVerdict
+timeArm: build/index.d.ts#timeArm
 timeRounds: build/index.d.ts#timeRounds
 timeVerdict: build/index.d.ts#timeVerdict
 verdictMargin: build/index.d.ts#verdictMargin
@@ -457,10 +460,27 @@ interface ArmModels {
   readonly one: boolean;
 }
 
+### build/index.d.ts#ArmOptions
+interface ArmOptions {
+  readonly samples: number;
+  readonly calls?: number;
+  readonly targetMs?: number;
+  readonly warmMs?: number;
+  readonly warmSamples?: number;
+  readonly now?: () => number;
+}
+
 ### build/index.d.ts#ArmPair
 interface ArmPair {
   readonly a: string | undefined;
   readonly b: string | undefined;
+}
+
+### build/index.d.ts#ArmTime
+interface ArmTime {
+  readonly ms: number;
+  readonly calls: number;
+  readonly samples: readonly number[];
 }
 
 ### build/index.d.ts#BUDGET_LOOKS
@@ -1875,6 +1895,9 @@ export declare function tailFalseFails(aa: readonly PairedTime[], options: TailR
 
 ### build/index.d.ts#tailLimitVerdict
 export declare function tailLimitVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[], options: TailLimitOptions): TailLimitVerdict;
+
+### build/index.d.ts#timeArm
+export declare function timeArm(run: () => unknown, options: ArmOptions): ArmTime;
 
 ### build/index.d.ts#timeRounds
 export declare function timeRounds(arms: Readonly<Record<Arm, () => number>>, options: RoundsOptions): Rounds;
