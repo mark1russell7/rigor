@@ -57,6 +57,44 @@ describe("the timed samples of one arm", () => {
     expect(time.ms).toBe(0.25);
   });
 
+  it("gives the warm check: the median of the last half of the samples over the median of the first half", () => {
+    let t = 0;
+    let call = 0;
+    // Each sample has 2 calls. The calls of the samples 0 and 1 take 1 ms, the calls of the samples 2 and 3 take 0.5 ms.
+    const costs = [1, 1, 0.5, 0.5];
+    const time = timeArm(
+      () => {
+        t += costs[Math.floor(call / 2)]!;
+        call += 1;
+        return call;
+      },
+      { samples: 4, calls: 2, warmMs: 0, warmSamples: 0, now: () => t },
+    );
+    expect(time.samples).toEqual([1, 1, 0.5, 0.5]);
+    expect(time.warm).toBe(0.5);
+    expect(time.ms).toBe(0.75);
+    const one = fake(0.25);
+    expect(timeArm(one.run, { samples: 1, calls: 1, warmMs: 0, now: one.now }).warm).toBeUndefined();
+  });
+
+  it("gives the bounds of the halves to mark, outside the timed part", () => {
+    const clock = fake(0.25);
+    const marks: number[] = [];
+    const time = timeArm(clock.run, {
+      samples: 5,
+      calls: 4,
+      warmMs: 0,
+      now: clock.now,
+      mark: (sample) => {
+        marks.push(sample);
+        // The time of a mark is not in a sample.
+        clock.state.t += 100;
+      },
+    });
+    expect(marks).toEqual([0, 2, 3, 5]);
+    expect(time.samples).toEqual([0.25, 0.25, 0.25, 0.25, 0.25]);
+  });
+
   it("refuses options that are not valid", () => {
     const clock = fake(1);
     expect(() => timeArm(clock.run, { samples: 0 })).toThrow(RangeError);

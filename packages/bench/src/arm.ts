@@ -22,6 +22,11 @@ export interface ArmOptions {
   readonly warmSamples?: number;
   /** The clock in milliseconds. The default is `performance.now` of the global `performance` of Node and of each browser. */
   readonly now?: () => number;
+  /**
+   * This function gets the bounds of the halves of the counted samples, outside the timed part. Its samples are 0,
+   * `half`, `samples - half` and `samples`, with `half` the floor of `samples / 2`. `eventProbe` of `/fresh` uses it.
+   */
+  readonly mark?: (sample: number) => void;
 }
 
 /** The timed samples of one arm. */
@@ -32,6 +37,11 @@ export interface ArmTime {
   readonly calls: number;
   /** The time of one call in each counted sample, in milliseconds, in the order of the samples. */
   readonly samples: readonly number[];
+  /**
+   * The warm check: the median of the last half of the counted samples over the median of the first half. A value
+   * near 1 tells that the time did not go down in the counted samples. Only 2 samples or more give it.
+   */
+  readonly warm?: number;
 }
 
 /** The calibration stops at this count of calls, also when a sample is shorter than the target time. */
@@ -73,7 +83,15 @@ export function timeArm(run: () => unknown, options: ArmOptions): ArmTime {
   if (!fixed) while (calls < MOST_CALLS && sample(calls) < targetMs) calls *= 2;
   for (let i = 0; i < warmSamples; i++) sample(calls);
   const samples: number[] = [];
-  for (let i = 0; i < options.samples; i++) samples.push(sample(calls) / calls);
+  const half = Math.floor(options.samples / 2);
+  const bounds = new Set([0, half, options.samples - half]);
+  for (let i = 0; i < options.samples; i++) {
+    if (bounds.has(i)) options.mark?.(i);
+    samples.push(sample(calls) / calls);
+  }
+  options.mark?.(options.samples);
   if (kept === Symbol.for("rigor-bench.never")) throw new Error("timeArm: the arm gave a value that no arm gives.");
-  return { ms: median(samples), calls, samples };
+  const early = half > 0 ? median(samples.slice(0, half)) : 0;
+  const warm = early > 0 ? median(samples.slice(options.samples - half)) / early : undefined;
+  return { ms: median(samples), calls, samples, ...(warm === undefined ? {} : { warm }) };
 }
