@@ -91,7 +91,7 @@ export {
   wilson,
   wilsonSampleSize,
 } from "./tests.ts";
-export { type Kappa, cohenKappa } from "./agreement.ts";
+export { type ClassScore, type Confusion, type Kappa, classScores, cohenKappa, confusion } from "./agreement.ts";
 export { KENDALL_EXACT, kendallTau, ranks, spearman } from "./rank.ts";
 export {
   type BinomialSide,

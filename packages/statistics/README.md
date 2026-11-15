@@ -211,6 +211,8 @@ choosePair(pool, { seed: "duel-1" });             // the next pair of a duel, th
 | `wilsonSampleSize(target, expected, z, max)` | The smallest number of trials at which the Wilson lower end reaches the target, at the expected proportion. |
 | `clopperPearson(k, n, level)` | The exact Clopper-Pearson interval of a proportion. Each tail outside holds `(1 - level) / 2`, so the coverage is `level` or more at each proportion. It is wider than `wilson`. |
 | `cohenKappa(a, b)` | The agreement of two raters beyond chance (Cohen's kappa), with the observed and the chance agreement. |
+| `confusion(truth, predicted, labels)` | The confusion table of a classifier: the count of each pair of a true class and a predicted class. `labels` sets the first rows, also for a class with no items. |
+| `classScores(table, z)` | The support, the hits, the recall with its Wilson interval, the precision and the F1 score of each class of a confusion table. |
 | `medianInterval(values, level)` | The distribution-free interval of a median, from two order statistics. It gives `low`, `high`, the `rank` of `low` and the `coverage`. |
 | `quantileInterval(values, p, level)` | The distribution-free interval of a quantile, from two order statistics. A side with no rank is infinite. The values must be independent draws. |
 | `quantileSamples(p, level)` | The fewest independent values that give a quantile an upper bound. At the level 0.95: 72 values for p95, 368 for p99 and 3,688 for p99.9. |
