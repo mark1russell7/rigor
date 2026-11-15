@@ -56,6 +56,10 @@ v.comparison;                                     // the cases that gain and dro
 | `armModels(pairs)` | The CPU models of each arm of a set of pairs, and if all the reads come from one known model. |
 | `candidateLimits(reads, rule)` | The candidate limit of each case on each CPU model: the mean plus k standard deviations, from 5 reads or more. |
 | `freezeLimits(measure, candidates, stamp, rule)` | A file of frozen limits, with the values, the commit and the date of each limit. |
+| `runLimit(values, options)` | The limit of the rule of the gate limits: the worst value of 5 runs or more plus their spread, rounded away from the values. |
+| `aaStats(aa, level)` | The A/A statistics of each case of one job: the median log ratio and the spread of the rounds. |
+| `aaLimits(jobs, options)` | The margin and the noise cap of each family of cases from the A/A statistics of the jobs, and the jobs that went out. |
+| `aaLimitOf(limits, family)` | The options `margin` and `noiseCap` of `timeVerdict` for a family, or the fallback limits. |
 | `checkModelLimits(file)` | The faults of a file of frozen limits. The function computes each limit again from its values. |
 | `modelLimitRead(file, read)` | The read of one value against the frozen limit of its CPU model: `within`, `beyond` or `no read`. |
 | `limitChanges(before, after)` | The change of each limit between two files, and each looser limit that has no new reason. |
@@ -168,6 +172,30 @@ A measure, for example a p99 time, has no base arm in a PR job. So its gate comp
 - `modelLimitRead` gives `no read` for a model with no frozen limit. A `no read` is not a pass.
 
 A limit does not move by itself. When new reads go straight into the limit, a slow regression raises its own limit. So a nightly run gives only a candidate, and a change of the file goes through a pull request. `limitChanges` accepts a tighter limit, a new model and a removed model. It refuses a looser limit that has no new `reason`, for example a change of the runner image. It also refuses a change of the rule or of the measure with no new `ruleReason`.
+
+## The limits of a gate from earlier runs
+
+The rule of the gate limits: a limit is the worst value of 5 or more CI runs plus their spread (max - min), with no factor. `runLimit` gives it:
+
+```ts
+import { aaLimitOf, aaLimits, aaStats, runLimit, timeVerdict } from "@mark1russell7/rigor-bench";
+
+runLimit([1.31, 1.38, 1.37, 1.38, 1.31]).limit; // 1.45: the worst value 1.38 plus the spread 0.07
+
+const limits = aaLimits(
+  jobs.map((job) => ({ job: job.job, cases: aaStats(job.aa) })),
+  { family: familyOf, marginFloor: Math.log(1.015) },
+);
+const { margin, noiseCap } = aaLimitOf(limits, familyOf(name));
+const verdict = timeVerdict(candidate, aa, { margin, noiseCap });
+```
+
+- The limit goes away from the values at its last digit, so each run of the limit stays inside it. A measure where higher is better takes `better: "higher"`.
+- `aaStats` gives the A/A statistics of each case in one job: the median of `log(b / a)` over the rounds, and the 0.9 quantile of `abs(log(b / a))`.
+- For each family, each job gives its worst `abs(median)` and its worst spread over the cases of the family. The margin and the noise cap are `runLimit` over the jobs.
+- A job whose worst spread is far above the other jobs goes out. The test is the robust z-score of `rigor-statistics` above 3.5, on the high side. The result names each job that went out.
+- A family with fewer than 5 jobs uses the fallback limits of all cases. Fewer than 5 jobs for the fallback limits is an error.
+- Keep the A/A statistics of the jobs next to the limits. A later run then gives the limits again and compares them.
 
 ## A gate that can fail
 

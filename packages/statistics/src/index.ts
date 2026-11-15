@@ -125,6 +125,7 @@ export {
 } from "./compare.ts";
 export { type OptionFloorOptions, optionFloor, tQuantile } from "./power.ts";
 export { normalCdf, normalQuantile } from "./normal.ts";
+export { type ModifiedZ, type ModifiedZOptions, type OutlierSide, MODIFIED_Z_CUT, modifiedZ } from "./outlier.ts";
 export {
   type CoverageBar,
   type CoverageCell,

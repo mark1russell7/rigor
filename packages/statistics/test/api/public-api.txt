@@ -43,13 +43,17 @@ KENDALL_EXACT: build/index.d.ts#KENDALL_EXACT
 type Kappa: build/index.d.ts#Kappa
 type LeastSquaresFit: build/index.d.ts#LeastSquaresFit
 type LeastSquaresOptions: build/index.d.ts#LeastSquaresOptions
+MODIFIED_Z_CUT: build/index.d.ts#MODIFIED_Z_CUT
 type MedianInterval: build/index.d.ts#MedianInterval
 type ModeOptions: build/index.d.ts#ModeOptions
+type ModifiedZ: build/index.d.ts#ModifiedZ
+type ModifiedZOptions: build/index.d.ts#ModifiedZOptions
 type NoiseOptions: build/index.d.ts#NoiseOptions
 type NoiseState: build/index.d.ts#NoiseState
 type NoiseVerdict: build/index.d.ts#NoiseVerdict
 type OptionFloorOptions: build/index.d.ts#OptionFloorOptions
 type OrdinalDimension: build/index.d.ts#OrdinalDimension
+type OutlierSide: build/index.d.ts#OutlierSide
 PAIR_FULL_SEARCH: build/index.d.ts#PAIR_FULL_SEARCH
 type PairChoice: build/index.d.ts#PairChoice
 type PairChoiceOptions: build/index.d.ts#PairChoiceOptions
@@ -179,6 +183,7 @@ median: build/index.d.ts#median
 medianInterval: build/index.d.ts#medianInterval
 mergeRunning: build/index.d.ts#mergeRunning
 modeCount: build/index.d.ts#modeCount
+modifiedZ: build/index.d.ts#modifiedZ
 negativeBinomialInterval: build/index.d.ts#negativeBinomialInterval
 noiseFloor: build/index.d.ts#noiseFloor
 noiseVerdict: build/index.d.ts#noiseVerdict
@@ -497,6 +502,9 @@ interface LeastSquaresOptions {
   readonly intercept?: boolean;
 }
 
+### build/index.d.ts#MODIFIED_Z_CUT
+export declare const MODIFIED_Z_CUT = 3.5;
+
 ### build/index.d.ts#MedianInterval
 interface MedianInterval {
   readonly low: number;
@@ -509,6 +517,20 @@ interface MedianInterval {
 interface ModeOptions {
   readonly minShare?: number;
   readonly valleyRatio?: number;
+}
+
+### build/index.d.ts#ModifiedZ
+interface ModifiedZ {
+  readonly median: number;
+  readonly mad: number;
+  readonly scores: readonly number[];
+  readonly outliers: readonly number[];
+}
+
+### build/index.d.ts#ModifiedZOptions
+interface ModifiedZOptions {
+  readonly cut?: number;
+  readonly side?: OutlierSide;
 }
 
 ### build/index.d.ts#NoiseOptions
@@ -547,6 +569,9 @@ interface OrdinalDimension extends ResponseDimensionBase {
   readonly levels: readonly number[] | readonly string[];
   readonly log?: boolean;
 }
+
+### build/index.d.ts#OutlierSide
+type OutlierSide = "high" | "low" | "both";
 
 ### build/index.d.ts#PAIR_FULL_SEARCH
 export declare const PAIR_FULL_SEARCH = 64;
@@ -1254,6 +1279,9 @@ export declare function mergeRunning(a: RunningSummary, b: RunningSummary): Runn
 
 ### build/index.d.ts#modeCount
 export declare function modeCount(values: readonly number[], options?: ModeOptions): number;
+
+### build/index.d.ts#modifiedZ
+export declare function modifiedZ(values: readonly number[], options?: ModifiedZOptions): ModifiedZ;
 
 ### build/index.d.ts#negativeBinomialInterval
 export declare function negativeBinomialInterval(successes: number, p: number, level?: number): CountInterval;

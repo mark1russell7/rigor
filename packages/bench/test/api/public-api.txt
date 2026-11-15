@@ -6,6 +6,8 @@
 
 ## . (build/index.d.ts): names
 
+type AaLimitOptions: build/index.d.ts#AaLimitOptions
+type AaLimits: build/index.d.ts#AaLimits
 type Arm: build/paired.d.ts#Arm
 type ArmModels: build/index.d.ts#ArmModels
 type ArmOptions: build/index.d.ts#ArmOptions
@@ -30,6 +32,7 @@ CEILING_ONLY: build/index.d.ts#CEILING_ONLY
 CHILD_SOURCES: build/index.d.ts#CHILD_SOURCES
 type CandidateLimit: build/index.d.ts#CandidateLimit
 type CandidateStatus: build/index.d.ts#CandidateStatus
+type CaseAaStat: build/index.d.ts#CaseAaStat
 type CaseBudget: build/index.d.ts#CaseBudget
 type CaseGate: build/index.d.ts#CaseGate
 type CaseInterval: build/index.d.ts#CaseInterval
@@ -52,10 +55,12 @@ type ControlRead: build/index.d.ts#ControlRead
 type ControlRow: build/index.d.ts#ControlRow
 type CostCells: build/index.d.ts#CostCells
 type CostProbe: build/index.d.ts#CostProbe
+type DroppedJob: build/index.d.ts#DroppedJob
 type EntryCount: build/index.d.ts#EntryCount
 type FamilyCase: build/index.d.ts#FamilyCase
 type FamilyCount: build/index.d.ts#FamilyCount
 type FamilyItem: build/index.d.ts#FamilyItem
+type FamilyLimits: build/index.d.ts#FamilyLimits
 type FamilyPower: build/index.d.ts#FamilyPower
 type FamilyPowerOptions: build/index.d.ts#FamilyPowerOptions
 type FamilyRead: build/index.d.ts#FamilyRead
@@ -78,12 +83,15 @@ type GateLineWritten: build/index.d.ts#GateLineWritten
 type GateOutcome: build/index.d.ts#GateOutcome
 type GroupCounts: build/index.d.ts#GroupCounts
 type GroupFactor: build/index.d.ts#GroupFactor
+type GroupJobs: build/index.d.ts#GroupJobs
+type GroupLimits: build/index.d.ts#GroupLimits
 type GrowthOptions: build/index.d.ts#GrowthOptions
 type GrowthOutcome: build/index.d.ts#GrowthOutcome
 type GrowthRound: build/index.d.ts#GrowthRound
 type GrowthStep: build/index.d.ts#GrowthStep
 type GrowthVerdict: build/index.d.ts#GrowthVerdict
 type GuardRead: build/index.d.ts#GuardRead
+type JobAaStats: build/index.d.ts#JobAaStats
 type JobCost: build/index.d.ts#JobCost
 type JobEnv: build/index.d.ts#JobEnv
 type JobLimitVerdict: build/index.d.ts#JobLimitVerdict
@@ -161,6 +169,8 @@ type RoundsOptions: build/index.d.ts#RoundsOptions
 type RowRead: build/index.d.ts#RowRead
 type RunCost: build/index.d.ts#RunCost
 type RunCostOptions: build/index.d.ts#RunCostOptions
+type RunLimit: build/index.d.ts#RunLimit
+type RunLimitOptions: build/index.d.ts#RunLimitOptions
 type RunPairs: build/index.d.ts#RunPairs
 type Rung: build/index.d.ts#Rung
 type RungBudget: build/index.d.ts#RungBudget
@@ -189,7 +199,10 @@ type WarmVerdict: build/index.d.ts#WarmVerdict
 type WinClaim: build/index.d.ts#WinClaim
 type WorstBudget: build/index.d.ts#WorstBudget
 aaBand: build/index.d.ts#aaBand
+aaLimitOf: build/index.d.ts#aaLimitOf
+aaLimits: build/index.d.ts#aaLimits
 aaSpread: build/index.d.ts#aaSpread
+aaStats: build/index.d.ts#aaStats
 armModels: build/index.d.ts#armModels
 armOrder: build/paired.d.ts#armOrder
 armVerdicts: build/index.d.ts#armVerdicts
@@ -239,6 +252,7 @@ pooledVerdict: build/index.d.ts#pooledVerdict
 resultRows: build/index.d.ts#resultRows
 resultVerdict: build/index.d.ts#resultVerdict
 runCost: build/index.d.ts#runCost
+runLimit: build/index.d.ts#runLimit
 rungVerdict: build/index.d.ts#rungVerdict
 tailFalseFails: build/index.d.ts#tailFalseFails
 tailLimitVerdict: build/index.d.ts#tailLimitVerdict
@@ -507,6 +521,21 @@ export declare function pairOrder(pairs: number, round: number, caseIndex: numbe
 ### build/fresh.d.ts#peakRss
 export declare function peakRss(): number;
 
+### build/index.d.ts#AaLimitOptions
+interface AaLimitOptions {
+  readonly family?: (name: string) => string | undefined;
+  readonly minimum?: number;
+  readonly digits?: number;
+  readonly marginFloor?: number;
+  readonly cut?: number;
+}
+
+### build/index.d.ts#AaLimits
+interface AaLimits {
+  readonly families: Readonly<Record<string, FamilyLimits>>;
+  readonly fallback: GroupLimits;
+}
+
 ### build/index.d.ts#ArmModels
 interface ArmModels {
   readonly a: readonly string[];
@@ -653,6 +682,14 @@ interface CandidateLimit {
 
 ### build/index.d.ts#CandidateStatus
 type CandidateStatus = "limit" | "too-few" | "no-spread" | "unknown-model";
+
+### build/index.d.ts#CaseAaStat
+interface CaseAaStat {
+  readonly case: string;
+  readonly median: number;
+  readonly spread: number;
+  readonly rounds: number;
+}
 
 ### build/index.d.ts#CaseBudget
 interface CaseBudget {
@@ -821,6 +858,13 @@ interface CostProbe {
   readonly ms: number;
 }
 
+### build/index.d.ts#DroppedJob
+interface DroppedJob {
+  readonly job: string;
+  readonly spread: number;
+  readonly score: number;
+}
+
 ### build/index.d.ts#EntryCount
 interface EntryCount {
   readonly group: string;
@@ -851,6 +895,13 @@ interface FamilyItem {
   readonly case: string;
   readonly verdict: TimeVerdict | PooledVerdict;
 }
+
+### build/index.d.ts#FamilyLimits
+type FamilyLimits = (GroupLimits & {
+  readonly source: "family";
+}) | (GroupJobs & {
+  readonly source: "fallback";
+});
 
 ### build/index.d.ts#FamilyPower
 interface FamilyPower {
@@ -1004,6 +1055,19 @@ interface GroupCounts {
 ### build/index.d.ts#GroupFactor
 type GroupFactor = MeasuredFactor | NoFactor;
 
+### build/index.d.ts#GroupJobs
+interface GroupJobs {
+  readonly cases: readonly string[];
+  readonly jobs: readonly string[];
+  readonly dropped: readonly DroppedJob[];
+}
+
+### build/index.d.ts#GroupLimits
+interface GroupLimits extends GroupJobs {
+  readonly margin: RunLimit;
+  readonly noiseCap: RunLimit;
+}
+
 ### build/index.d.ts#GrowthOptions
 interface GrowthOptions {
   readonly maxGrowth: number;
@@ -1048,6 +1112,12 @@ interface GuardRead {
   readonly stratum: string | undefined;
   readonly status: ControlRead["status"];
   readonly partners: readonly PartnerRead[];
+}
+
+### build/index.d.ts#JobAaStats
+interface JobAaStats {
+  readonly job: string;
+  readonly cases: readonly CaseAaStat[];
 }
 
 ### build/index.d.ts#JobCost
@@ -1636,6 +1706,22 @@ interface RunCostOptions {
   readonly jobMinutes?: number;
 }
 
+### build/index.d.ts#RunLimit
+interface RunLimit {
+  readonly limit: number;
+  readonly worst: number;
+  readonly spread: number;
+  readonly values: readonly number[];
+}
+
+### build/index.d.ts#RunLimitOptions
+interface RunLimitOptions {
+  readonly minimum?: number;
+  readonly digits?: number;
+  readonly better?: Better;
+  readonly bound?: number;
+}
+
 ### build/index.d.ts#RunPairs
 interface RunPairs {
   readonly pairs: Readonly<Record<string, readonly PairedTime[]>>;
@@ -1869,8 +1955,21 @@ interface WorstBudget {
 ### build/index.d.ts#aaBand
 export declare function aaBand(aa: readonly PairedTime[], options?: BandOptions): Band;
 
+### build/index.d.ts#aaLimitOf
+export declare function aaLimitOf(limits: AaLimits, family: string | undefined): {
+  readonly margin: number;
+  readonly noiseCap: number;
+  readonly source: "family" | "fallback";
+};
+
+### build/index.d.ts#aaLimits
+export declare function aaLimits(jobs: readonly JobAaStats[], options?: AaLimitOptions): AaLimits;
+
 ### build/index.d.ts#aaSpread
 export declare function aaSpread(aa: readonly PairedTime[], level?: number): number;
+
+### build/index.d.ts#aaStats
+export declare function aaStats(aa: readonly PairedTime[], level?: number): CaseAaStat[];
 
 ### build/index.d.ts#armModels
 export declare function armModels(pairs: readonly ArmPair[]): ArmModels;
@@ -2003,6 +2102,9 @@ export declare function resultVerdict(results: readonly CaseResults[], rows: Res
 
 ### build/index.d.ts#runCost
 export declare function runCost(cells: readonly CostCells[], probes: readonly CostProbe[], options: RunCostOptions): RunCost;
+
+### build/index.d.ts#runLimit
+export declare function runLimit(values: readonly number[], options?: RunLimitOptions): RunLimit;
 
 ### build/index.d.ts#rungVerdict
 export declare function rungVerdict(rung: Rung, record: RungRecord | undefined, options: LadderOptions): RungVerdict;
