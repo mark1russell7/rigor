@@ -213,6 +213,8 @@ choosePair(pool, { seed: "duel-1" });             // the next pair of a duel, th
 | `cohenKappa(a, b)` | The agreement of two raters beyond chance (Cohen's kappa), with the observed and the chance agreement. |
 | `confusion(truth, predicted, labels)` | The confusion table of a classifier: the count of each pair of a true class and a predicted class. `labels` sets the first rows, also for a class with no items. |
 | `classScores(table, z)` | The support, the hits, the recall with its Wilson interval, the precision and the F1 score of each class of a confusion table. |
+| `entropy(probabilities)` | The entropy of a discrete distribution, in bits. One sure outcome gives 0, and `n` equal outcomes give `log2(n)`. |
+| `informationGain(prior, likelihood)` | The expected information gain of an observation about a discrete variable, in bits: the mutual information of the two. `likelihood[h][x]` is the probability of the outcome `x` for the value `h`. A diagnosis uses it to choose the next test. |
 | `medianInterval(values, level)` | The distribution-free interval of a median, from two order statistics. It gives `low`, `high`, the `rank` of `low` and the `coverage`. |
 | `quantileInterval(values, p, level)` | The distribution-free interval of a quantile, from two order statistics. A side with no rank is infinite. The values must be independent draws. |
 | `quantileSamples(p, level)` | The fewest independent values that give a quantile an upper bound. At the level 0.95: 72 values for p95, 368 for p99 and 3,688 for p99.9. |
