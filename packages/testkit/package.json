@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/rigor-testkit",
-  "version": "0.1.7",
-  "description": "Test helpers: the code blocks of Markdown files as test cases, model-based tests on fast-check, the propagation gate of one context id over each transport, the capture of the OpenTelemetry SDK, a scripted HTTP server for fixtures, and a check of an operation that must give a rejected promise.",
+  "version": "0.1.8",
+  "description": "Test helpers: the code blocks of Markdown files as test cases, model-based tests on fast-check, arbitraries that are uniform by value, the propagation gate of one context id over each transport, the capture of the OpenTelemetry SDK, a scripted HTTP server for fixtures, and a check of an operation that must give a rejected promise.",
   "keywords": [
     "testing",
     "markdown",
@@ -50,6 +50,11 @@
         "import": "./build/model.js",
         "default": "./build/model.js"
       },
+      "./arbitrary": {
+        "types": "./build/arbitrary.d.ts",
+        "import": "./build/arbitrary.js",
+        "default": "./build/arbitrary.js"
+      },
       "./propagation": {
         "types": "./build/propagation.d.ts",
         "import": "./build/propagation.js",
@@ -95,6 +100,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./model": "./src/model.ts",
+    "./arbitrary": "./src/arbitrary.ts",
     "./propagation": "./src/propagation.ts",
     "./otel": "./src/otel.ts",
     "./http": "./src/http.ts",
