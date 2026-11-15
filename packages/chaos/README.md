@@ -69,6 +69,22 @@ import { faultPlanOf } from "@mark1russell7/rigor-chaos";
 const plan = faultPlanOf([{ connection: 0, direction: "down", at: { frame: 0 }, kind: "answer", status: 429, fields: { "retry-after": "120" } }]);
 ```
 
+### A sweep of one fault
+
+A sweep puts one fault at a different point in each run. `sweepPoints` gives the points: the edges 0, 1 and `length - 1`, and distinct seeded points between them.
+
+```ts
+import { faultPlanOf, sweepPoints } from "@mark1russell7/rigor-chaos";
+
+// One cut in each run: in the body of an HTTP response with a head of 180 bytes and a body of 6000 bytes.
+for (const offset of sweepPoints(6000, 16, "cut-in-body")) {
+  const plan = faultPlanOf([{ connection: 0, direction: "down", at: { byte: 180 + offset }, kind: "cut" }]);
+}
+```
+
+- The edges find the faults at the start and at the end of a stream. The seeded points find the faults between them.
+- The same seed gives the same points on each platform.
+
 ## A closed-loop record
 
 `closedLoopPlan` reads a run of a closed-loop driver that sends each `interval` ms. It puts back the sends that each stall hid, by the rule of `recordValueWithExpectedInterval` of HdrHistogram.

@@ -50,6 +50,7 @@ schedule: build/schedule.d.ts#schedule
 scheduleHeld: build/measure.d.ts#scheduleHeld
 spike: build/schedule.d.ts#spike
 steps: build/schedule.d.ts#steps
+sweepPoints: build/faults.d.ts#sweepPoints
 triggerOf: build/faults.d.ts#triggerOf
 
 ## Declarations
@@ -196,6 +197,9 @@ export declare function faultPlanOf(faults: readonly Fault[]): FaultPlan;
 
 ### build/faults.d.ts#faultsOf
 export declare function faultsOf(plan: FaultPlan, connection: number): readonly Fault[];
+
+### build/faults.d.ts#sweepPoints
+export declare function sweepPoints(length: number, draws: number, seed: number | string): number[];
 
 ### build/faults.d.ts#triggerOf
 export declare function triggerOf(at: Trigger): {

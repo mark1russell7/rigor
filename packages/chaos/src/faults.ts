@@ -235,6 +235,22 @@ export function faultsOf(plan: FaultPlan, connection: number): readonly Fault[] 
   return plan.faults.filter((fault) => fault.connection === connection);
 }
 
+/**
+ * This function gives the points of a sweep of one fault over a stream of `length` units, in order. The points are
+ * the edges 0, 1 and `length - 1`, and `draws` distinct seeded points from 2 to `length - 2`. A sweep puts the fault
+ * at one point in each run. The unit is the measure of the point: bytes, frames or ms. This function throws a
+ * `RangeError` when `length` is less than `draws + 3`.
+ */
+export function sweepPoints(length: number, draws: number, seed: number | string): number[] {
+  if (!Number.isSafeInteger(length) || !Number.isSafeInteger(draws) || draws < 0 || length < draws + 3) {
+    throw new RangeError(`sweepPoints: ${String(draws)} draws need a length of ${String(draws + 3)} or more, not ${String(length)}.`);
+  }
+  const rng = random(seed);
+  const points = new Set<number>([0, 1, length - 1]);
+  while (points.size < draws + 3) points.add(rng.int(2, length - 2));
+  return [...points].sort((a, b) => a - b);
+}
+
 /** The least value of each interval. A split has 2 pieces or more, and a reorder has 2 frames or more. */
 const RANGE_LEAST: Readonly<Record<keyof FaultRanges, number>> = {
   delayMs: 1,

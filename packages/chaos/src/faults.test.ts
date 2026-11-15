@@ -11,6 +11,7 @@ import {
   faultPlan,
   faultPlanOf,
   faultsOf,
+  sweepPoints,
   triggerOf,
 } from "./faults.ts";
 
@@ -138,5 +139,43 @@ describe("an answer in a written plan", () => {
     expect(FAULT_KINDS).not.toContain("answer");
     const spec = { connections: 1, perConnection: 1, kinds: { cut: 1, answer: 1 }, within: { frame: 5 } } as unknown as FaultSpec;
     expect(checkFaultSpec(spec)).toEqual(["A spec does not draw an answer. Write each answer in a plan with faultPlanOf."]);
+  });
+});
+
+describe("the points of a sweep", () => {
+  it("gives the edges and distinct seeded points, in order and in the stream", () => {
+    const points = sweepPoints(1000, 16, "sweep");
+    expect(points).toHaveLength(19);
+    expect(points.slice(0, 2)).toEqual([0, 1]);
+    expect(points.at(-1)).toBe(999);
+    expect(new Set(points).size).toBe(19);
+    expect([...points].sort((a, b) => a - b)).toEqual(points);
+    for (const point of points.slice(2, -1)) expect(point >= 2 && point <= 998).toBe(true);
+  });
+
+  it("gives the same points for the same seed, and other points for another seed", () => {
+    expect(sweepPoints(5000, 16, "a")).toEqual(sweepPoints(5000, 16, "a"));
+    expect(sweepPoints(5000, 16, 7)).toEqual(sweepPoints(5000, 16, 7));
+    expect(sweepPoints(5000, 16, "a")).not.toEqual(sweepPoints(5000, 16, "b"));
+  });
+
+  it("gives only the edges for no draw, and each point when the draws fill the stream", () => {
+    expect(sweepPoints(10, 0, "a")).toEqual([0, 1, 9]);
+    expect(sweepPoints(3, 0, "a")).toEqual([0, 1, 2]);
+    expect(sweepPoints(8, 5, "a")).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+  });
+
+  it("refuses a stream that is too short for the draws, and a count that is not whole", () => {
+    expect(() => sweepPoints(7, 5, "a")).toThrow(RangeError);
+    expect(() => sweepPoints(2, 0, "a")).toThrow(RangeError);
+    expect(() => sweepPoints(100, -1, "a")).toThrow(RangeError);
+    expect(() => sweepPoints(100.5, 1, "a")).toThrow(RangeError);
+  });
+
+  it("gives points that a written plan takes as byte points", () => {
+    for (const offset of sweepPoints(600, 4, "plan")) {
+      const plan = faultPlanOf([{ connection: 0, direction: "down", at: { byte: 180 + offset }, kind: "cut" }]);
+      expect(checkFaultPlan(plan)).toEqual([]);
+    }
   });
 });
