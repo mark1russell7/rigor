@@ -54,7 +54,10 @@ export interface FaultProxy {
   readonly records: readonly FaultRecord[];
   /** The summaries of the connections that closed. */
   readonly connections: readonly ConnectionSummary[];
-  /** This method stops the proxy and destroys each open connection. */
+  /**
+   * This method stops the proxy and destroys each open connection. The promise resolves after each connection closes.
+   * Then `connections` has the summary of each connection, also of each connection that was open at the call.
+   */
   close(): Promise<void>;
 }
 
@@ -276,10 +279,14 @@ export async function startFaultProxy(options: ProxyOptions): Promise<FaultProxy
     port: address.port,
     records,
     connections,
-    close: () =>
-      new Promise<void>((resolve) => {
-        server.close(() => resolve());
-        for (const socket of open) socket.destroy();
-      }),
+    close: async () => {
+      // A socket emits "close" only after its handle closes, after server.close calls back. The connection gives its
+      // summary in its own "close" listener, which comes before these listeners. Thus the wait ends after each summary.
+      const sockets = [...open];
+      const socketsClosed = sockets.map((socket) => new Promise<void>((resolve) => socket.once("close", () => resolve())));
+      const serverClosed = new Promise<void>((resolve) => server.close(() => resolve()));
+      for (const socket of sockets) socket.destroy();
+      await Promise.all([serverClosed, ...socketsClosed]);
+    },
   };
 }

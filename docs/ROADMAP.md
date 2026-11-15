@@ -7,7 +7,7 @@ This file lists the items of the roadmap of this repository. The status page of 
 | ID | Status | Priority | Title |
 | --- | --- | --- | --- |
 | R8 | in progress | P0 | chaos: fault plans, the fault proxy, and schedules with their measures. Done: seeded fault plans (#200), the proxy for TCP, HTTP and WebSocket (#201), the answer fault (#208), the sweep points (#211) and the windows (#216). Open: schedules of latency and failure |
-| R13 | in progress | P1 | bench: the five local harnesses (Vex, packing, highways, layout-contract, typeset) use rigor-bench. The survey found 8 gaps. Done: `timeArm`, the child-side timer of one arm (#218), the fields of each child (#219, #220, #222), gate limits from runs and A/A records (#225), and two commits as paired arms in one job (#226). Next: a decision for each case over k processes, then each repository removes its copy |
+| R13 | in progress | P1 | bench: the five local harnesses (Vex, packing, highways, layout-contract, typeset) use rigor-bench. The survey found 8 gaps. Done: `timeArm`, the child-side timer of one arm (#218), the fields of each child (#219, #220, #222), gate limits from runs and A/A records (#225), two commits as paired arms in one job (#226), and a decision for each case over k processes with a count of slow ones (#230). Next: an in-process mode for more than 2 arms, then each repository removes its copy |
 | R7 | in progress | P2 | testgen: property tests on fast-check, pairwise and covering arrays, metamorphic relations. Done: `uniformDouble`, numbers uniform by value over a range (#227). Next: the property tests of this repository use it |
 
 ## Next
@@ -39,4 +39,4 @@ This file lists the items of the roadmap of this repository. The status page of 
 | R1 | done | P1 | generators 0.1.0: the seeded generator and its draws, equal to the byte to each copy of mulberry32. Done on 2026-10-29 |
 | R4 | done | P1 | statistics 0.1.0: quantiles, intervals and tests, equal to the bit to each copy. Done on 2026-10-29 |
 | R5 | done | P1 | generators: input families with dimensions and ranges, stratified and Latin hypercube designs, Saltelli designs (#168, #169, #170). Done on 2026-11-08 |
-| R15 | done | P0 | chaos: faults in time windows, with the times to detect and to recover. A window fault applies to each connection that is open in the window. `windowResponse` gives the verdicts pass, fail or no read. Done on 2026-11-15 (#216) |
+| R15 | done | P0 | chaos: faults in time windows, with the times to detect and to recover. A window fault applies to each connection that is open in the window. `windowResponse` gives the verdicts pass, fail or no read. Done on 2026-11-15 (#216). A fix: `close()` of the proxy gives the summary of each open connection before it resolves |
