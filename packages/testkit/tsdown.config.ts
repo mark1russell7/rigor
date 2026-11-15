@@ -2,11 +2,11 @@ import { defineConfig } from "tsdown";
 
 // The build for npm: ES modules in build/, with types. The workspace runs the source (main is src/index.ts).
 // The root entry reads and writes files, so it runs in Node. The entry propagation uses the OpenTelemetry API only.
-// The entry model uses fast-check (an optional peer dependency), so the root entry does not load it.
+// The entries model and arbitrary use fast-check (an optional peer dependency), so the root entry does not load it.
 // The entry otel uses the OpenTelemetry SDK (optional peer dependencies), so the other entries do not load it.
 // The entry http is a scripted HTTP server on node:http, with no dependency.
 export default defineConfig({
-  entry: ["src/index.ts", "src/model.ts", "src/propagation.ts", "src/otel.ts", "src/http.ts"],
+  entry: ["src/index.ts", "src/model.ts", "src/arbitrary.ts", "src/propagation.ts", "src/otel.ts", "src/http.ts"],
   outDir: "build",
   format: "esm",
   platform: "node",

@@ -4,6 +4,7 @@ Test helpers:
 
 - `markdownExamples` makes each code block of a Markdown file into a test case. Then the doc and the code cannot drift.
 - `runModel` runs model-based tests on `fast-check`, from the entry `@mark1russell7/rigor-testkit/model`.
+- `uniformDouble` draws numbers over a range, uniform by value, from the entry `@mark1russell7/rigor-testkit/arbitrary`.
 - `rejects` examines an asynchronous operation that must fail, and gives its error.
 - `propagationGate` examines one context id over each transport, from the entry `@mark1russell7/rigor-testkit/propagation`.
 
@@ -140,6 +141,24 @@ The options:
 A spy that keeps each call of each run uses memory for all the runs. Clear it with `clear`. For a property that does not use `runModel`, use the plugin of `fast-check` 4.10: `fc.assert(property, { plugins: [fc.beforeEach(() => spy.mockClear())] })`.
 
 A global plugin of `fast-check` also operates on `runModel`. Before each run, the `beforeEach` plugins run first, then `clear`, then `create`. Thus, with a global plugin that clears the spies, for example `fc.installGlobalPlugin(fc.beforeEach(() => vi.clearAllMocks()))`, `runModel` does not need `clear`.
+
+## Uniform numbers over a range
+
+`fc.double({ min, max })` draws uniformly over the floats of the range, not over its values. The floats are dense near 0. With the seed 7, only 6.6 % of the values of `fc.double({ min: -1, max: 1 })` have a size above 0.2. Thus a property over a range tests almost only the values near 0.
+
+`uniformDouble({ min, max })` draws uniformly by value. Use it in place of `fc.double` with `min` and `max`:
+
+```ts no-run
+import fc from "fast-check";
+import { uniformDouble } from "@mark1russell7/rigor-testkit/arbitrary";
+
+fc.assert(fc.property(uniformDouble({ min: -1, max: 1 }), (x) => simplify(x).ok));
+```
+
+- Approximately 1 draw in 8 is near `min`, and 1 draw in 16 is near `max`. These draws test the edges of the range. The other draws are uniform.
+- The step between two values is `(max - min) / (2^53 - 1)`. Each value is in the range.
+- A counterexample shrinks toward `min`.
+- `fc.double` with no range still has a use: it draws the special values, for example `-0`, the subnormal numbers and `Number.MAX_VALUE`.
 
 ## The propagation gate
 

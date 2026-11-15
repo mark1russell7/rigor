@@ -21,6 +21,11 @@ Step: build/model.d.ts#Step
 runModel: build/model.d.ts#runModel
 step: build/model.d.ts#step
 
+## ./arbitrary (build/arbitrary.d.ts): names
+
+UniformDoubleOptions: build/arbitrary.d.ts#UniformDoubleOptions
+uniformDouble: build/arbitrary.d.ts#uniformDouble
+
 ## ./propagation (build/propagation.d.ts): names
 
 GATE_NAMES: build/propagation.d.ts#GATE_NAMES
@@ -63,6 +68,15 @@ checkScriptedServer: build/http.d.ts#checkScriptedServer
 startScriptedServer: build/http.d.ts#startScriptedServer
 
 ## Declarations
+
+### build/arbitrary.d.ts#UniformDoubleOptions
+export interface UniformDoubleOptions {
+  readonly min: number;
+  readonly max: number;
+}
+
+### build/arbitrary.d.ts#uniformDouble
+export declare function uniformDouble(options: UniformDoubleOptions): fc.Arbitrary<number>;
 
 ### build/http.d.ts#BodyPart
 export type BodyPart = string | Uint8Array;
