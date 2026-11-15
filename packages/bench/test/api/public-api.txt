@@ -514,6 +514,7 @@ interface ArmOptions {
   readonly warmSamples?: number;
   readonly now?: () => number;
   readonly mark?: (sample: number) => void;
+  readonly slow?: number;
 }
 
 ### build/index.d.ts#ArmPair
