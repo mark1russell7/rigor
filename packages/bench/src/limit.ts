@@ -49,7 +49,8 @@ export interface LimitOptions extends BandOptions {
   /**
    * The source of the A/A noise that widens each case. The default `"cases"` uses the band of `aaBand` over the A/A cases,
    * with `minimum` cases or more. The value `"rounds"` uses the A/A rounds of the same case. Thus a bench of 1 case gets a verdict.
-   * The noise of a case is then the larger distance from 0 of an end of the interval of its A/A median on a log scale, at `caseLevel`.
+   * The noise of a case is then the larger distance from 0 of the two ends of the interval of its A/A median.
+   * This interval is on a log scale, at `caseLevel`.
    * A case with no A/A records cannot decide.
    */
   readonly aaFrom?: "cases" | "rounds";
@@ -61,7 +62,7 @@ export interface CaseLimit extends CaseInterval {
   readonly bound: number;
   /** The low end of the interval of the case, times the low end of the A/A band. */
   readonly floor: number;
-  /** The half width on a log scale of the A/A band of the case: the noise of `band`, or the noise of the A/A rounds of the case. */
+  /** The half width of the A/A band of the case on a log scale. It is the noise of `band` or of the A/A rounds of the case. */
   readonly noise: number;
   readonly outcome: LimitOutcome;
 }

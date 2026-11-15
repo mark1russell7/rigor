@@ -12,6 +12,8 @@ type Arm: build/paired.d.ts#Arm
 type ArmModels: build/index.d.ts#ArmModels
 type ArmOptions: build/index.d.ts#ArmOptions
 type ArmPair: build/index.d.ts#ArmPair
+type ArmRounds: build/index.d.ts#ArmRounds
+type ArmRoundsOptions: build/index.d.ts#ArmRoundsOptions
 type ArmTime: build/index.d.ts#ArmTime
 BUDGET_LOOKS: build/index.d.ts#BUDGET_LOOKS
 type Balanced: build/index.d.ts#Balanced
@@ -160,6 +162,7 @@ type PooledRecords: build/index.d.ts#PooledRecords
 type PooledVerdict: build/index.d.ts#PooledVerdict
 type Power: build/index.d.ts#Power
 type PowerOptions: build/index.d.ts#PowerOptions
+type ProcessArm: build/index.d.ts#ProcessArm
 type ProcessLimits: build/index.d.ts#ProcessLimits
 type ProcessOptions: build/index.d.ts#ProcessOptions
 type ProcessRead: build/index.d.ts#ProcessRead
@@ -267,6 +270,7 @@ rungVerdict: build/index.d.ts#rungVerdict
 tailFalseFails: build/index.d.ts#tailFalseFails
 tailLimitVerdict: build/index.d.ts#tailLimitVerdict
 timeArm: build/index.d.ts#timeArm
+timeArmRounds: build/index.d.ts#timeArmRounds
 timeRounds: build/index.d.ts#timeRounds
 timeVerdict: build/index.d.ts#timeVerdict
 verdictMargin: build/index.d.ts#verdictMargin
@@ -615,6 +619,27 @@ interface ArmPair {
   readonly b: string | undefined;
 }
 
+### build/index.d.ts#ArmRounds
+interface ArmRounds {
+  readonly pairs: Record<string, PairedTime[]>;
+  readonly orders: readonly (readonly string[])[];
+  readonly count: number;
+  readonly sink: number;
+}
+
+### build/index.d.ts#ArmRoundsOptions
+interface ArmRoundsOptions {
+  readonly case: string;
+  readonly base: ProcessArm;
+  readonly candidates: readonly ProcessArm[];
+  readonly rounds: number;
+  readonly offset?: number;
+  readonly aa?: boolean;
+  readonly targetMs?: number;
+  readonly warmMs?: number;
+  readonly now?: () => number;
+}
+
 ### build/index.d.ts#ArmTime
 interface ArmTime {
   readonly ms: number;
@@ -780,6 +805,7 @@ interface CaseInterval extends CaseRatio {
 interface CaseLimit extends CaseInterval {
   readonly bound: number;
   readonly floor: number;
+  readonly noise: number;
   readonly outcome: LimitOutcome;
 }
 
@@ -1346,6 +1372,7 @@ interface LimitOptions extends BandOptions {
   readonly limit: number;
   readonly caseLevel?: number;
   readonly share?: number;
+  readonly aaFrom?: "cases" | "rounds";
 }
 
 ### build/index.d.ts#LimitOutcome
@@ -1692,6 +1719,12 @@ interface PowerOptions {
   readonly trials?: number;
   readonly seed?: number | string;
   readonly verdict?: VerdictOptions;
+}
+
+### build/index.d.ts#ProcessArm
+interface ProcessArm {
+  readonly id: string;
+  readonly run: () => number;
 }
 
 ### build/index.d.ts#ProcessLimits
@@ -2239,6 +2272,9 @@ export declare function tailLimitVerdict(candidate: readonly PairedTime[], aa: r
 
 ### build/index.d.ts#timeArm
 export declare function timeArm(run: () => unknown, options: ArmOptions): ArmTime;
+
+### build/index.d.ts#timeArmRounds
+export declare function timeArmRounds(options: ArmRoundsOptions): ArmRounds;
 
 ### build/index.d.ts#timeRounds
 export declare function timeRounds(arms: Readonly<Record<Arm, () => number>>, options: RoundsOptions): Rounds;
