@@ -57,6 +57,22 @@ describe("childLine", () => {
     expect(() => childLine('{"ms":1,"hash":3}')).toThrow(/hash is a string/);
     expect(() => childLine('{"ms":1,"skipped":""}')).toThrow(/skip/);
   });
+
+  it("reads the memory peak, the warm check and the events of a child", () => {
+    const line = { ms: 2, hash: "h", peakRss: 4096, warm: 0.98, events: { gc: [3, 1], deopt: [0, 2] }, other: "kept out" };
+    expect(childLine(JSON.stringify(line))).toEqual({ ms: 2, hash: "h", peakRss: 4096, warm: 0.98, events: { gc: [3, 1], deopt: [0, 2] } });
+    expect(childLine('{"ms":2,"events":{"gc":[0,0]}}')).toEqual({ ms: 2, events: { gc: [0, 0] } });
+    // A skip line keeps only its reason, its time and its hash.
+    expect(childLine('{"skipped":"too large","peakRss":1}')).toEqual({ skipped: "too large" });
+  });
+
+  it("refuses a bad memory peak, warm check or events", () => {
+    for (const peak of ["-1", '"1"', "null"]) expect(() => childLine(`{"ms":1,"peakRss":${peak}}`)).toThrow(/peakRss/);
+    for (const warm of ["0", "-1", '"1"']) expect(() => childLine(`{"ms":1,"warm":${warm}}`)).toThrow(/warm check/);
+    for (const events of ["[]", "{}", '{"gc":[1]}', '{"gc":[1,-1]}', '{"gc":[1,1.5]}', '{"gc":[1,1],"deopt":[1]}']) {
+      expect(() => childLine(`{"ms":1,"events":${events}}`)).toThrow(/events/);
+    }
+  });
 });
 
 describe("benchEnv", () => {
@@ -215,6 +231,14 @@ describe("freshRun", () => {
     await expect(run({ start: rejected })).rejects.toThrow(/did not start: no such file/);
   });
 
+  it("keeps the fields of the child of each arm in the record, and no fields when no child gives one", async () => {
+    const { start } = fake((program, _caseId, k) => (program === "next" ? { stdout: `${JSON.stringify({ ms: k + 1, peakRss: 1000 + k, warm: 1 })}\n` } : undefined));
+    const result = await run({ start, rounds: 1, cases: ["x"] });
+    const [record] = result.pairs["next"]!;
+    expect(record!.fields).toEqual({ a: {}, b: { peakRss: 1000 + record!.b - 1, warm: 1 } });
+    expect(result.pairs["base~aa"]![0]).not.toHaveProperty("fields");
+  });
+
   it("refuses two hashes of one arm on one case, and permits other hashes for other arms", async () => {
     const hashOf = (program: string, k: number) => (program === "base" ? (k < 20 ? "h1" : "h2") : "n1");
     const start = fake((program, _c, k) => ({ stdout: JSON.stringify({ ms: 1, hash: hashOf(program, k) }) })).start;
@@ -248,6 +272,27 @@ describe("freshRun", () => {
     await expect(freshRun({ base: node, candidates: [crash], cases: ["x"], rounds: 1, aa: false, env: ENV })).rejects.toThrow(/arm "crash".*code 3.*it broke/s);
     const missing = { id: "missing", command: ["D:/no/such/program-of-rigor"] };
     await expect(freshRun({ base: missing, candidates: [], cases: ["x"], rounds: 1, env: ENV })).rejects.toThrow(/arm "missing".*failed/);
+  });
+
+  it("reads a real child that times its arm with timeArm and counts its events with eventProbe", async () => {
+    const url = (file: string): string => new URL(file, import.meta.url).href;
+    const script = [
+      `const { timeArm } = await import(${JSON.stringify(url("./arm.ts"))});`,
+      `const { eventProbe, peakRss } = await import(${JSON.stringify(url("./fresh.ts"))});`,
+      "const probe = eventProbe({ deopt: true });",
+      "const time = timeArm(() => Array.from({ length: 500 }, (_, i) => ({ i })).length, { samples: 6, warmMs: 20, targetMs: 2, mark: probe.mark });",
+      "console.log(JSON.stringify({ ms: time.ms, warm: time.warm, peakRss: peakRss(), events: await probe.events(6) }));",
+    ].join("\n");
+    const node = { id: "node", command: [process.execPath, "--input-type=module", "-e", script, "--"] };
+    const result = await freshRun({ base: node, candidates: [], cases: ["x"], rounds: 1, env: ENV });
+    const [record] = result.pairs["node~aa"]!;
+    for (const arm of ["a", "b"] as const) {
+      const fields = record!.fields![arm];
+      expect(fields.peakRss).toBeGreaterThan(0);
+      expect(fields.warm).toBeGreaterThan(0);
+      expect(fields.events!.gc.every((n) => Number.isSafeInteger(n) && n >= 0)).toBe(true);
+      expect(fields.events!.deopt).toHaveLength(2);
+    }
   });
 
   // The grandchild inherits stdout and keeps the pipe open.

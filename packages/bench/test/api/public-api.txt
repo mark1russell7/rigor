@@ -257,22 +257,29 @@ lockClosure: build/code-stamp.d.ts#lockClosure
 ## ./fresh (build/fresh.d.ts): names
 
 BenchEnv: build/fresh.d.ts#BenchEnv
+ChildEvents: build/fresh.d.ts#ChildEvents
 ChildExit: build/fresh.d.ts#ChildExit
+ChildFields: build/fresh.d.ts#ChildFields
 ChildLine: build/fresh.d.ts#ChildLine
 ChildSkip: build/fresh.d.ts#ChildSkip
 ChildTime: build/fresh.d.ts#ChildTime
+EventProbe: build/fresh.d.ts#EventProbe
 FreshArm: build/fresh.d.ts#FreshArm
 FreshOptions: build/fresh.d.ts#FreshOptions
 FreshRecord: build/fresh.d.ts#FreshRecord
 FreshRun: build/fresh.d.ts#FreshRun
 FreshSkip: build/fresh.d.ts#FreshSkip
+HalfCounts: build/fresh.d.ts#HalfCounts
 PairSlot: build/fresh.d.ts#PairSlot
+ProbeOptions: build/fresh.d.ts#ProbeOptions
 StartChild: build/fresh.d.ts#StartChild
 StartOptions: build/fresh.d.ts#StartOptions
 benchEnv: build/fresh.d.ts#benchEnv
 childLine: build/fresh.d.ts#childLine
+eventProbe: build/fresh.d.ts#eventProbe
 freshRun: build/fresh.d.ts#freshRun
 pairOrder: build/fresh.d.ts#pairOrder
+peakRss: build/fresh.d.ts#peakRss
 
 ## ./supervise (build/supervise.d.ts): names
 
@@ -355,6 +362,12 @@ export interface BenchEnv {
   readonly runner?: string;
 }
 
+### build/fresh.d.ts#ChildEvents
+export interface ChildEvents {
+  readonly gc: HalfCounts;
+  readonly deopt?: HalfCounts;
+}
+
 ### build/fresh.d.ts#ChildExit
 export interface ChildExit {
   readonly stdout: string;
@@ -362,6 +375,13 @@ export interface ChildExit {
   readonly code: number | null;
   readonly timedOut?: boolean;
   readonly error?: string;
+}
+
+### build/fresh.d.ts#ChildFields
+export interface ChildFields {
+  readonly peakRss?: number;
+  readonly warm?: number;
+  readonly events?: ChildEvents;
 }
 
 ### build/fresh.d.ts#ChildLine
@@ -375,10 +395,16 @@ export interface ChildSkip {
 }
 
 ### build/fresh.d.ts#ChildTime
-export interface ChildTime {
+export interface ChildTime extends ChildFields {
   readonly ms: number;
   readonly hash?: string;
   readonly skipped?: undefined;
+}
+
+### build/fresh.d.ts#EventProbe
+export interface EventProbe {
+  readonly mark: (sample: number) => void;
+  readonly events: (samples: number) => Promise<ChildEvents>;
 }
 
 ### build/fresh.d.ts#FreshArm
@@ -408,6 +434,10 @@ export interface FreshOptions {
 export interface FreshRecord extends PairedTime {
   readonly job: string;
   readonly env: BenchEnv;
+  readonly fields?: {
+    readonly a: ChildFields;
+    readonly b: ChildFields;
+  };
 }
 
 ### build/fresh.d.ts#FreshRun
@@ -426,10 +456,19 @@ export interface FreshSkip {
   readonly reason: string;
 }
 
+### build/fresh.d.ts#HalfCounts
+export type HalfCounts = readonly [early: number, late: number];
+
 ### build/fresh.d.ts#PairSlot
 export interface PairSlot {
   readonly pair: number;
   readonly first: Arm;
+}
+
+### build/fresh.d.ts#ProbeOptions
+export interface ProbeOptions {
+  readonly deopt?: boolean;
+  readonly dir?: string;
 }
 
 ### build/fresh.d.ts#StartChild
@@ -447,11 +486,17 @@ export declare function benchEnv(): BenchEnv;
 ### build/fresh.d.ts#childLine
 export declare function childLine(stdout: string): ChildLine;
 
+### build/fresh.d.ts#eventProbe
+export declare function eventProbe(options?: ProbeOptions): EventProbe;
+
 ### build/fresh.d.ts#freshRun
 export declare function freshRun(options: FreshOptions): Promise<FreshRun>;
 
 ### build/fresh.d.ts#pairOrder
 export declare function pairOrder(pairs: number, round: number, caseIndex: number): PairSlot[];
+
+### build/fresh.d.ts#peakRss
+export declare function peakRss(): number;
 
 ### build/index.d.ts#ArmModels
 interface ArmModels {
@@ -468,6 +513,7 @@ interface ArmOptions {
   readonly warmMs?: number;
   readonly warmSamples?: number;
   readonly now?: () => number;
+  readonly mark?: (sample: number) => void;
 }
 
 ### build/index.d.ts#ArmPair
@@ -481,6 +527,7 @@ interface ArmTime {
   readonly ms: number;
   readonly calls: number;
   readonly samples: readonly number[];
+  readonly warm?: number;
 }
 
 ### build/index.d.ts#BUDGET_LOOKS

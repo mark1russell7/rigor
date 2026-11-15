@@ -83,6 +83,8 @@ v.comparison;                                     // the cases that gain and dro
 | `pairOrder(pairs, round, caseIndex)` | From `/fresh`: the order of the pairs of one case in one round, and the first arm of each pair. |
 | `freshRun(options)` | From `/fresh`: the records of each pair, with each arm in its own fresh child process. |
 | `timeArm(run, options)` | The child side of `freshRun`: the median time of one call of one arm, over calibrated samples. |
+| `peakRss()` | From `/fresh`: the memory peak of this process in bytes, for the child line. |
+| `eventProbe(options)` | From `/fresh`: the GC events and the deopts of a child in each half of its counted samples. |
 | `pairedChild(options)` | The samples of one paired child: the base, the candidate and a copy of the base in one process, in turn. |
 | `pairedChildOrder(round, offset, steps)` | The order of the samples of a paired child: a block A B B A for each pair at each step. |
 | `childRecords(case, round, offset, order, times)` | The `PairedTime` of the candidate pair and of the A/A pair of a paired child, from the medians. |
@@ -423,6 +425,22 @@ console.log(JSON.stringify({ ms: time.ms, calls: time.calls }));
 - After `warmSamples` samples that do not count, the function times `samples` samples. `ms` is the median time of one call.
 - Give `calls` of an earlier process. Then the function does not calibrate, and each process does the same work.
 - The module keeps the value of each call. Thus the engine cannot remove the work of a call.
+- With 2 samples or more, `warm` is the median of the last half of the samples over the median of the first half. A value near 1 tells that the arm was warm.
+
+A child line can also give its memory peak, its warm check and its events. `freshRun` keeps them in the field `fields` of each record:
+
+```ts
+import { timeArm } from "@mark1russell7/rigor-bench";
+import { eventProbe, peakRss } from "@mark1russell7/rigor-bench/fresh";
+
+const probe = eventProbe({ deopt: true });
+const time = timeArm(() => kernel(input), { samples: 16, mark: probe.mark });
+console.log(JSON.stringify({ ms: time.ms, warm: time.warm, peakRss: peakRss(), events: await probe.events(16) }));
+```
+
+- `events.gc` and `events.deopt` each have two counts: the first half and the last half of the counted samples.
+- The probe counts the deopts only with `deopt: true`. Then the V8 flag `--trace-deopt` writes them to a temporary file.
+- `childLine` refuses a field that is not valid. A record has `fields` only when a child of the record gives a field.
 
 ## Read the load of a run from a control
 

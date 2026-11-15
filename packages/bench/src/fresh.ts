@@ -3,7 +3,11 @@
  * The child prints one JSON line with its time. The runner keeps the order of `pairOrder`, and gives `PairedTime` records.
  */
 import { spawn } from "node:child_process";
-import { arch, cpus, platform } from "node:os";
+import { readFileSync, rmSync } from "node:fs";
+import { arch, cpus, platform, tmpdir } from "node:os";
+import { join } from "node:path";
+import { PerformanceObserver } from "node:perf_hooks";
+import { setFlagsFromString } from "node:v8";
 import { type Arm, type PairedTime, firstArm } from "./paired.ts";
 import { stopTree } from "./tree.ts";
 
@@ -29,8 +33,29 @@ export function benchEnv(): BenchEnv {
 /** The JSON line of a child: its time in milliseconds, the hash of its output, and the reason of a skip. */
 export type ChildLine = ChildTime | ChildSkip;
 
+/** Two counts of events: in the first half and in the last half of the counted samples of a child. */
+export type HalfCounts = readonly [early: number, late: number];
+
+/** The events of a child in its counted samples. `eventProbe` gives them. */
+export interface ChildEvents {
+  /** The GC events of each half. */
+  readonly gc: HalfCounts;
+  /** The deopts of each half. Only a probe with `deopt: true` counts them. */
+  readonly deopt?: HalfCounts;
+}
+
+/** The fields of a child line in addition to its time. Each field is optional. */
+export interface ChildFields {
+  /** The memory peak of the child process in bytes. `peakRss()` gives it. */
+  readonly peakRss?: number;
+  /** The warm check of `timeArm`: the median of the last half of the samples over the median of the first half. */
+  readonly warm?: number;
+  /** The events of the counted samples. */
+  readonly events?: ChildEvents;
+}
+
 /** The result line of a child that timed the arm. */
-export interface ChildTime {
+export interface ChildTime extends ChildFields {
   readonly ms: number;
   /** The hash of the output of the arm. Two different hashes of one arm on one case are an error. */
   readonly hash?: string;
@@ -48,6 +73,7 @@ export interface ChildSkip {
 /**
  * This function reads the last line of `stdout` that starts with `{`. The time `ms` is a finite number above 0.
  * A skip line has the reason `skipped` and does not need a time. No such line, bad JSON or a bad field is an error.
+ * The fields `peakRss`, `warm` and `events` are optional. When a line has one of them, the field must be valid.
  */
 export function childLine(stdout: string): ChildLine {
   const line = stdout
@@ -69,7 +95,100 @@ export function childLine(stdout: string): ChildLine {
     return { skipped, ...(typeof ms === "number" ? { ms } : {}), ...(hash === undefined ? {} : { hash }) };
   }
   if (!(typeof ms === "number" && Number.isFinite(ms) && ms > 0)) throw new Error(`childLine: the time ms is a finite number above 0, not ${JSON.stringify(ms)}.`);
-  return { ms, ...(hash === undefined ? {} : { hash }) };
+  return { ms, ...(hash === undefined ? {} : { hash }), ...childFields(value as Record<string, unknown>) };
+}
+
+/** This function reads the optional fields of a child line. A field that is not valid is an error. */
+function childFields(value: Record<string, unknown>): ChildFields {
+  const { peakRss, warm, events } = value;
+  if (peakRss !== undefined && !(typeof peakRss === "number" && Number.isFinite(peakRss) && peakRss >= 0)) {
+    throw new Error(`childLine: the memory peak peakRss is a finite number of bytes of 0 or more, not ${JSON.stringify(peakRss)}.`);
+  }
+  if (warm !== undefined && !(typeof warm === "number" && Number.isFinite(warm) && warm > 0)) throw new Error(`childLine: the warm check is a finite number above 0, not ${JSON.stringify(warm)}.`);
+  const counts = (x: unknown): x is HalfCounts => Array.isArray(x) && x.length === 2 && x.every((n) => Number.isSafeInteger(n) && (n as number) >= 0);
+  let read: ChildEvents | undefined;
+  if (events !== undefined) {
+    const { gc, deopt } = (typeof events === "object" && events !== null && !Array.isArray(events) ? events : {}) as Record<string, unknown>;
+    if (!counts(gc) || (deopt !== undefined && !counts(deopt))) {
+      throw new Error(`childLine: the events have gc, and an optional deopt, each two whole numbers of 0 or more, not ${JSON.stringify(events)}.`);
+    }
+    read = { gc: [gc[0], gc[1]], ...(deopt === undefined ? {} : { deopt: [deopt[0], deopt[1]] as const }) };
+  }
+  return { ...(peakRss === undefined ? {} : { peakRss }), ...(warm === undefined ? {} : { warm }), ...(read === undefined ? {} : { events: read }) };
+}
+
+/** This function gives the memory peak of this process in bytes. Print it in the child line as `peakRss`. */
+export function peakRss(): number {
+  // The field maxRSS of Node is in kibibytes.
+  return process.resourceUsage().maxRSS * 1024;
+}
+
+/** The options of an event probe. */
+export interface ProbeOptions {
+  /** The value `true` also counts the deopts with the V8 flag `--trace-deopt`. The default is `false`. */
+  readonly deopt?: boolean;
+  /** The folder of the trace file of the deopts. The default is the folder of the temporary files. */
+  readonly dir?: string;
+}
+
+/** The event probe of a child. Give `mark` to `timeArm`, then read `events` after it. */
+export interface EventProbe {
+  readonly mark: (sample: number) => void;
+  /** This function gives the counts of each half of the counted samples, and stops the probe. */
+  readonly events: (samples: number) => Promise<ChildEvents>;
+}
+
+/**
+ * This function starts the event probe of a child. A `PerformanceObserver` records the start of each GC event.
+ * With `deopt: true`, the V8 flag `--trace-deopt` writes each deopt to a file of the child.
+ * Each mark records its time and the count of deopts. The read of the file is outside the time of the mark.
+ */
+export function eventProbe(options: ProbeOptions = {}): EventProbe {
+  const file = options.deopt === true ? join(options.dir ?? tmpdir(), `rigor-bench-deopt-${process.pid}.txt`) : undefined;
+  if (file !== undefined) for (const flag of ["--trace-deopt", "--redirect-code-traces", `--redirect-code-traces-to=${file}`]) setFlagsFromString(flag);
+  const gc: number[] = [];
+  const observer = new PerformanceObserver((list) => {
+    for (const entry of list.getEntries()) gc.push(entry.startTime);
+  });
+  observer.observe({ entryTypes: ["gc"] });
+  const deopts = (): number => {
+    if (file === undefined) return 0;
+    try {
+      return readFileSync(file, "utf8")
+        .split("\n")
+        .filter((line) => line.includes("[bailout (kind")).length;
+    } catch {
+      // V8 makes the file at the first deopt.
+      return 0;
+    }
+  };
+  const marks = new Map<number, { before: number; deopt: number; after: number }>();
+  return {
+    mark: (sample) => {
+      const before = performance.now();
+      const deopt = deopts();
+      marks.set(sample, { before, deopt, after: performance.now() });
+    },
+    events: async (samples) => {
+      // The observer gets the GC entries after a turn of the event loop.
+      await new Promise((done) => setTimeout(done, 10));
+      observer.disconnect();
+      if (file !== undefined) {
+        setFlagsFromString("--no-trace-deopt");
+        rmSync(file, { force: true });
+      }
+      const half = Math.floor(samples / 2);
+      const span = (from: number, to: number): [number, number] => {
+        const a = marks.get(from);
+        const b = marks.get(to);
+        if (a === undefined || b === undefined) throw new Error(`eventProbe: the probe has no mark at the sample ${a === undefined ? from : to}.`);
+        return [gc.filter((t) => t >= a.after && t < b.before).length, b.deopt - a.deopt];
+      };
+      const early = span(0, half);
+      const late = span(samples - half, samples);
+      return { gc: [early[0], late[0]], ...(file === undefined ? {} : { deopt: [early[1], late[1]] as const }) };
+    },
+  };
 }
 
 /** One slot of the order of a round: the index of the pair, and the arm of that pair that starts first. */
@@ -167,6 +286,8 @@ export interface FreshOptions {
 export interface FreshRecord extends PairedTime {
   readonly job: string;
   readonly env: BenchEnv;
+  /** The fields of the child of each arm in addition to its time. Only a record with a child that gives a field has it. */
+  readonly fields?: { readonly a: ChildFields; readonly b: ChildFields };
 }
 
 /** A case that an arm skipped. The case is in no pair. */
@@ -248,6 +369,7 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
       for (const slot of pairOrder(pairs.length, round, i)) {
         const pair = pairs[slot.pair]!;
         const times: Partial<Record<Arm, number>> = {};
+        const fields: Record<Arm, ChildFields> = { a: {}, b: {} };
         for (const arm of [slot.first, slot.first === "a" ? "b" : "a"] as const) {
           const who = pair[arm];
           const where = `the arm ${JSON.stringify(who.id)} (pair ${JSON.stringify(pair.id)}, arm ${arm}) on the case ${JSON.stringify(id)}, round ${round}`;
@@ -264,9 +386,12 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
             hashes.set(key, line.hash);
           }
           times[arm] = line.ms;
+          const { ms: _ms, hash: _hash, skipped: _skipped, ...more } = line;
+          fields[arm] = more;
         }
         if (skip !== undefined) break;
-        records.push({ pair: pair.id, record: { case: id, round, first: slot.first, a: times.a!, b: times.b!, job, env } });
+        const extra = Object.keys(fields.a).length + Object.keys(fields.b).length > 0 ? { fields } : {};
+        records.push({ pair: pair.id, record: { case: id, round, first: slot.first, a: times.a!, b: times.b!, job, env, ...extra } });
       }
       if (skip !== undefined) {
         skipped.push(skip);
