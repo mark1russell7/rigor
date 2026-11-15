@@ -78,6 +78,8 @@ v.comparison;                                     // the cases that gain and dro
 | `budgetLooksVerdict(rounds, aa, options)` | The budget verdict of a run that adds rounds to the cases with no outcome, up to a stated budget. |
 | `budgetLookSpend(looks)` | The chance of error that a list of looks spends. |
 | `timeRounds(arms, options)` | The timed rounds of one case in one process: a warm-up, a batch of at least the target time, and the order of `firstArm`. |
+| `slopeVerdict(rounds, options)` | The verdict of a slope claim from a ladder on a log-log scale, with the A/A check of each run: `within`, `beyond` or `cannot decide`. |
+| `roundSlope(rungs)` | The least-squares slope of `log value` against `log size` of one round of 3 rungs or more. |
 | `timeArmRounds(options)` | The timed rounds of one case in one process for a base and 1 or more candidates, with the order of `armOrder` and an A/A pair. |
 | `verdictPower(options)` | The share of each outcome over seeded benches with a known ratio: the power test of a rule. |
 | `familyRead(items, level)` | The reads of a family of cases as a report: Holm over the cases, each job alone, and both. Each read changes only `slower` and `faster`. |
@@ -133,6 +135,23 @@ const v = limitVerdict(records, aaRecords, { limit: 1.1, aaFrom: "rounds" });
 - A case with no A/A rounds cannot decide. The verdict has no `band`, and the field `noise` of each case gives its noise.
 
 The verdict has no correction for many cases. Each case has its own interval at the level `caseLevel`. Thus with many cases, a verdict `beyond` can come from noise only. Set `caseLevel` higher when a bench has many cases. A correction of Holm is an option for a later version.
+
+## A claim on a slope
+
+A claim, for example "the walk takes time linear in the size", needs a ladder of sizes. One ratio of two sizes cannot tell a constant factor from a power. `slopeVerdict` reads rounds of 3 rungs or more:
+
+```ts
+const rounds = [{ run: "job-0", rungs: [{ size: 1000, value: 2.1 }, { size: 2000, value: 4.3 }, { size: 4000, value: 8.4 }], aa: 1.01 }];
+const v = slopeVerdict(rounds, { limit: 1.2, holds: 1, band: 0.05 });
+```
+
+- `roundSlope` fits the slope of `log value` against `log size` in each round. A linear cost gives 1, and a square cost gives 2.
+- `aa` is the ratio of a second copy of one rung to the first copy, in the same passes. A run counts only when its A/A band contains 1.
+- The interval of the slopes reads the rounds of the counted runs. The default `"spread"` is the 5th to the 95th percentile. `interval: "median"` gives the interval of the median slope.
+- The outcome is `within` when the high end is at most `limit`. With `holds`, the interval must also meet the band `holds` plus or minus `band`.
+- The outcome is `beyond` when the low end is above `limit`, or when the interval is outside that band. `gateOf` reads the outcome.
+- The claim "at most linear" gives only `limit`. Then a slope well under 1, from a large fixed part of a call, also passes.
+- `growthVerdict` reads the growth of each step of size in each job, with no A/A check. Use it when one step can grow faster than the others. `slopeVerdict` fits one power over all rungs.
 
 ## A claim with a limit on a tail
 

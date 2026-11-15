@@ -18,7 +18,7 @@ This file lists the items of the roadmap of this repository. The status page of 
 | R6 | next | P2 | gates: the determinism gate (one input gives one hash), the promotion test and the performance evidence |
 | R11 | next | P2 | statistics: the fold rule, next to `sobolIndices`. A model counts when it beats the mean on each held-out fold. highways and packing use it |
 | R12 | next | P2 | bench: the k-of-n read of joint non-domination. An entry wins only when no control dominates it on k of n stated measures |
-| R14 | next | P2 | bench: the verdicts that coeval asked for. These are a verdict for each case from its rounds, a slope verdict and the bias of a case between jobs. Done: the timed samples in a fresh child (#218) and limits from A/A records (#225) |
+| R14 | in progress | P2 | bench: the verdicts that coeval asked for. These are a verdict for each case from its rounds, a slope verdict and the bias of a case between jobs. Done: the timed samples in a fresh child (#218), limits from A/A records (#225) and the slope verdict of a log-log ladder with the A/A check of each run (`slopeVerdict`, 0.2.48) |
 | R16 | next | P2 | bench: several case modules in one run, and fixture files with a pinned hash (#115) |
 | R17 | next | P2 | bench: gate rules for holds and early stops. Done: two commits as paired arms in one job (#226) |
 | R19 | next | P2 | Upkeep: pull requests #99 and #103, and the old worktrees of earlier sessions |
