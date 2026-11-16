@@ -19,11 +19,17 @@ type ProxyOptions: build/proxy.d.ts#ProxyOptions
 REASONS: build/answer.d.ts#REASONS
 type Send: build/applier.d.ts#Send
 type Step: build/applier.d.ts#Step
+WEBSOCKET_OPCODES: build/framers.d.ts#WEBSOCKET_OPCODES
+type WebSocketFrame: build/framers.d.ts#WebSocketFrame
+type WebSocketFrameInput: build/framers.d.ts#WebSocketFrameInput
+type WebSocketFrameRead: build/framers.d.ts#WebSocketFrameRead
 answerBytes: build/answer.d.ts#answerBytes
 applierOf: build/applier.d.ts#applierOf
 chunkFramer: build/framers.d.ts#chunkFramer
+encodeWebSocketFrame: build/framers.d.ts#encodeWebSocketFrame
 httpFramers: build/framers.d.ts#httpFramers
 readHttpHead: build/framers.d.ts#readHttpHead
+readWebSocketFrame: build/framers.d.ts#readWebSocketFrame
 splitBytes: build/applier.d.ts#splitBytes
 startFaultProxy: build/proxy.d.ts#startFaultProxy
 tcpFramers: build/framers.d.ts#tcpFramers
@@ -40,11 +46,17 @@ type HttpHead: build/framers.d.ts#HttpHead
 REASONS: build/answer.d.ts#REASONS
 type Send: build/applier.d.ts#Send
 type Step: build/applier.d.ts#Step
+WEBSOCKET_OPCODES: build/framers.d.ts#WEBSOCKET_OPCODES
+type WebSocketFrame: build/framers.d.ts#WebSocketFrame
+type WebSocketFrameInput: build/framers.d.ts#WebSocketFrameInput
+type WebSocketFrameRead: build/framers.d.ts#WebSocketFrameRead
 answerBytes: build/answer.d.ts#answerBytes
 applierOf: build/applier.d.ts#applierOf
 chunkFramer: build/framers.d.ts#chunkFramer
+encodeWebSocketFrame: build/framers.d.ts#encodeWebSocketFrame
 httpFramers: build/framers.d.ts#httpFramers
 readHttpHead: build/framers.d.ts#readHttpHead
+readWebSocketFrame: build/framers.d.ts#readWebSocketFrame
 splitBytes: build/applier.d.ts#splitBytes
 tcpFramers: build/framers.d.ts#tcpFramers
 webSocketFrameLength: build/framers.d.ts#webSocketFrameLength
@@ -126,14 +138,54 @@ export interface HttpHead {
   readonly fields: ReadonlyMap<string, string>;
 }
 
+### build/framers.d.ts#WEBSOCKET_OPCODES
+export declare const WEBSOCKET_OPCODES: {
+  readonly continuation: 0;
+  readonly text: 1;
+  readonly binary: 2;
+  readonly close: 8;
+  readonly ping: 9;
+  readonly pong: 10;
+};
+
+### build/framers.d.ts#WebSocketFrame
+export interface WebSocketFrame {
+  readonly fin: boolean;
+  readonly rsv: number;
+  readonly opcode: number;
+  readonly mask: Uint8Array | undefined;
+  readonly payload: Uint8Array;
+}
+
+### build/framers.d.ts#WebSocketFrameInput
+export interface WebSocketFrameInput {
+  readonly fin?: boolean;
+  readonly rsv?: number;
+  readonly opcode: number;
+  readonly mask?: Uint8Array | undefined;
+  readonly payload?: Uint8Array;
+}
+
+### build/framers.d.ts#WebSocketFrameRead
+export interface WebSocketFrameRead {
+  readonly frame: WebSocketFrame;
+  readonly length: number;
+}
+
 ### build/framers.d.ts#chunkFramer
 export declare function chunkFramer(): Framer;
+
+### build/framers.d.ts#encodeWebSocketFrame
+export declare function encodeWebSocketFrame(input: WebSocketFrameInput): Uint8Array;
 
 ### build/framers.d.ts#httpFramers
 export declare function httpFramers(): FramerPair;
 
 ### build/framers.d.ts#readHttpHead
 export declare function readHttpHead(head: Uint8Array): HttpHead | undefined;
+
+### build/framers.d.ts#readWebSocketFrame
+export declare function readWebSocketFrame(bytes: Uint8Array): WebSocketFrameRead | undefined | null;
 
 ### build/framers.d.ts#tcpFramers
 export declare function tcpFramers(): FramerPair;
