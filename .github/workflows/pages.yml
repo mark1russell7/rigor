@@ -79,4 +79,8 @@ jobs:
             if [ "$ok" != 1 ]; then echo "::error::The site has no /$f."; exit 1; fi
             echo "The site has /$f."
           done
-          curl -fsS "${SITE%/}/" | grep -q 'src="page.js"' || { echo "::error::The page does not load page.js."; exit 1; }
+          # The page goes to a file first. In a pipe, grep -q can exit before the last write of curl, and
+          # pipefail then fails the step on a correct page (main at b9845df).
+          page="$RUNNER_TEMP/page.html"
+          curl -fsS --retry 4 --retry-delay 10 --retry-all-errors -o "$page" "${SITE%/}/"
+          grep -q 'src="page.js"' "$page" || { echo "::error::The page does not load page.js."; exit 1; }
