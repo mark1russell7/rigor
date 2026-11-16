@@ -144,6 +144,17 @@ export interface CanonicalOptions {
    * `"suffix"` writes the digits and the letter `n`, for example `12n`. This text is not JSON, so use it only for a key.
    */
   readonly bigint?: "error" | "suffix";
+  /**
+   * The form of a `Date`, a `RegExp`, a `Map`, a `Set` and a `bigint`:
+   *
+   * - `"none"` (the default): the form of `JSON.stringify`. A `Date` gives the text of its `toJSON`.
+   *   A `RegExp`, a `Map` and a `Set` give `{}`, so two of them with other contents get the same hash.
+   * - `"typed"`: each value gets a tag with its type and its value, for example `Date(0)`, `RegExp("/a/g")`, `Map([1,"a"])`, `Set(1,2)` and `12n`.
+   *
+   * The entries of a `Map` and the items of a `Set` are in the order of their text. Thus the order of insertion does not change the form.
+   * With `"typed"`, the default of `bigint` is `"suffix"`. The text with tags is not JSON, so use it only for a key or a hash.
+   */
+  readonly tags?: "none" | "typed";
 }
 
 /**
@@ -154,12 +165,16 @@ export interface CanonicalOptions {
  * - A key with the value `undefined` is not in the form. An `undefined` in an array, or as the value, becomes `null`.
  * - An object with a method `toJSON`, for example a `Date`, gives the form of the result of that method.
  * - A function, a symbol and a cycle cause a `TypeError`.
+ * - With the option `tags: "typed"`, a `Date`, a `RegExp`, a `Map` and a `Set` get a tag with their value. The option has the forms.
  *
- * `canonicalJson(JSON.parse(canonicalJson(v)))` is equal to `canonicalJson(v)`.
+ * `canonicalJson(JSON.parse(canonicalJson(v)))` is equal to `canonicalJson(v)`, with no tags.
  */
 export function canonicalJson(value: unknown, options?: CanonicalOptions): string {
   const form = options?.form ?? "jcs";
-  const bigint = options?.bigint ?? "error";
+  const tags = options?.tags ?? "none";
+  if (tags !== "none" && tags !== "typed") throw new RangeError(`canonicalJson: tags is "none" or "typed", not ${String(tags)}.`);
+  const typed = tags === "typed";
+  const bigint = options?.bigint ?? (typed ? "suffix" : "error");
   if (form !== "jcs" && form !== "json") throw new RangeError(`canonicalJson: form is "jcs" or "json", not ${String(form)}.`);
   if (bigint !== "error" && bigint !== "suffix") throw new RangeError(`canonicalJson: bigint is "error" or "suffix", not ${String(bigint)}.`);
   const jcs = form === "jcs";
@@ -168,7 +183,26 @@ export function canonicalJson(value: unknown, options?: CanonicalOptions): strin
     if (jcs && !(s as string & { isWellFormed(): boolean }).isWellFormed()) throw new RangeError(`canonicalJson: the string ${JSON.stringify(s)} has a lone surrogate, which RFC 8785 does not allow.`);
     return JSON.stringify(s);
   };
+  // This function gives the tag of a Date, a RegExp, a Map or a Set, and undefined for each other object.
+  const tagOf = (o: object): string | undefined => {
+    if (o instanceof Date) return `Date(${o.getTime()})`;
+    if (o instanceof RegExp) return `RegExp(${text(String(o))})`;
+    if (o instanceof Map || o instanceof Set) {
+      if (open.has(o)) throw new TypeError("canonicalJson: the value has a cycle.");
+      open.add(o);
+      const parts: string[] = [];
+      if (o instanceof Map) for (const [k, item] of o) parts.push(`[${write(k, "")},${write(item, "")}]`);
+      else for (const item of o) parts.push(write(item, ""));
+      open.delete(o);
+      return `${o instanceof Map ? "Map" : "Set"}(${parts.sort().join(",")})`;
+    }
+    return undefined;
+  };
   const write = (v: unknown, key: string): string => {
+    if (typed && v !== null && typeof v === "object") {
+      const tag = tagOf(v);
+      if (tag !== undefined) return tag;
+    }
     if (v !== null && typeof v === "object" && typeof (v as { toJSON?: unknown }).toJSON === "function") v = (v as { toJSON(key: string): unknown }).toJSON(key);
     if (v === undefined || v === null) return "null";
     switch (typeof v) {

@@ -178,6 +178,7 @@ export declare function sampler(spec: DistributionSpec, r: Random): () => number
 export interface CanonicalOptions {
   readonly form?: "jcs" | "json";
   readonly bigint?: "error" | "suffix";
+  readonly tags?: "none" | "typed";
 }
 
 ### build/hash.d.ts#Sha256Options

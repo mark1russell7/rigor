@@ -346,6 +346,7 @@ FreshRecord: build/fresh.d.ts#FreshRecord
 FreshRun: build/fresh.d.ts#FreshRun
 FreshSkip: build/fresh.d.ts#FreshSkip
 HalfCounts: build/fresh.d.ts#HalfCounts
+HalfTimes: build/fresh.d.ts#HalfTimes
 PairSlot: build/fresh.d.ts#PairSlot
 ProbeOptions: build/fresh.d.ts#ProbeOptions
 type RepoCommitOptions: build/fresh.d.ts#RepoCommitOptions
@@ -503,6 +504,7 @@ interface CheckoutArmOptions {
 ### build/fresh.d.ts#ChildEvents
 export interface ChildEvents {
   readonly gc: HalfCounts;
+  readonly gcMs?: HalfTimes;
   readonly deopt?: HalfCounts;
 }
 
@@ -647,6 +649,9 @@ export interface FreshSkip {
 
 ### build/fresh.d.ts#HalfCounts
 export type HalfCounts = readonly [early: number, late: number];
+
+### build/fresh.d.ts#HalfTimes
+export type HalfTimes = readonly [early: number, late: number];
 
 ### build/fresh.d.ts#PairSlot
 export interface PairSlot {
