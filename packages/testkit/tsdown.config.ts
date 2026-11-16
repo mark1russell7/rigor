@@ -4,7 +4,8 @@ import { defineConfig } from "tsdown";
 // The root entry reads and writes files, so it runs in Node. The entry propagation uses the OpenTelemetry API only.
 // The entries model, metamorphic and arbitrary use fast-check (an optional peer dependency), so the root entry does not load it.
 // The entry otel uses the OpenTelemetry SDK (optional peer dependencies), so the other entries do not load it.
-// The entry http is a scripted HTTP server on node:http, with no dependency. The entry otlp is a stand-in collector on it.
+// The entry http is a scripted HTTP server on node:http, with no dependency. Its WebSocket routes load the frame codec of
+// rigor-proxy (an optional peer dependency) only when a script has them. The entry otlp is a stand-in collector on it.
 // The entry fakes has test fakes of browser objects, with no dependency.
 // The entry child starts a server of a test in a child process on node:child_process, with no dependency.
 // The entry stop runs a program of a test to a stop of a plan of rigor-chaos (an optional peer dependency), so the

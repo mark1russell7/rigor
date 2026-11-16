@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { type Framer, httpFramers, readHttpHead, tcpFramers, webSocketFrameLength, webSocketFramer } from "./framers.ts";
+import {
+  type Framer,
+  WEBSOCKET_OPCODES,
+  encodeWebSocketFrame,
+  httpFramers,
+  readHttpHead,
+  readWebSocketFrame,
+  tcpFramers,
+  webSocketFrameLength,
+  webSocketFramer,
+} from "./framers.ts";
 
 const text = (value: string): Uint8Array => new TextEncoder().encode(value);
 const show = (frames: readonly Uint8Array[]): string[] => frames.map((frame) => new TextDecoder("latin1").decode(frame));
@@ -61,6 +71,57 @@ describe("the WebSocket framer", () => {
     const bad = new Uint8Array([0x82, 127, 0xff, 0, 0, 0, 0, 0, 0, 0, 1, 2]);
     expect(framer.push(bad)).toEqual([bad]);
     expect(framer.push(new Uint8Array([9]))).toEqual([new Uint8Array([9])]);
+  });
+});
+
+describe("the WebSocket frame codec", () => {
+  const hello = text("Hello");
+  const bytes = (...values: number[]): Uint8Array => new Uint8Array(values);
+
+  it("reads and writes the examples of RFC 6455, section 5.7", () => {
+    const unmasked = bytes(0x81, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f);
+    const masked = bytes(0x81, 0x85, 0x37, 0xfa, 0x21, 0x3d, 0x7f, 0x9f, 0x4d, 0x51, 0x58);
+    const key = bytes(0x37, 0xfa, 0x21, 0x3d);
+    expect(encodeWebSocketFrame({ opcode: WEBSOCKET_OPCODES.text, payload: hello })).toEqual(unmasked);
+    expect(encodeWebSocketFrame({ opcode: WEBSOCKET_OPCODES.text, payload: hello, mask: key })).toEqual(masked);
+    expect(readWebSocketFrame(unmasked)).toEqual({ frame: { fin: true, rsv: 0, opcode: 1, mask: undefined, payload: hello }, length: 7 });
+    expect(readWebSocketFrame(masked)).toEqual({ frame: { fin: true, rsv: 0, opcode: 1, mask: key, payload: hello }, length: 11 });
+    const first = readWebSocketFrame(bytes(0x01, 0x03, 0x48, 0x65, 0x6c));
+    const last = readWebSocketFrame(bytes(0x80, 0x02, 0x6c, 0x6f));
+    expect([first?.frame.fin, first?.frame.opcode, last?.frame.fin, last?.frame.opcode]).toEqual([false, 1, true, 0]);
+    expect(encodeWebSocketFrame({ opcode: WEBSOCKET_OPCODES.ping, payload: hello })).toEqual(bytes(0x89, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f));
+    expect(encodeWebSocketFrame({ opcode: WEBSOCKET_OPCODES.binary, payload: new Uint8Array(256) }).subarray(0, 4)).toEqual(bytes(0x82, 0x7e, 0x01, 0x00));
+    expect(encodeWebSocketFrame({ opcode: WEBSOCKET_OPCODES.binary, payload: new Uint8Array(65_536) }).subarray(0, 10)).toEqual(bytes(0x82, 0x7f, 0, 0, 0, 0, 0, 1, 0, 0));
+  });
+
+  it("gives back each frame that it writes, for each form of the length, the bits and the mask", () => {
+    const key = bytes(1, 2, 3, 250);
+    for (const size of [0, 1, 125, 126, 65_535, 65_536, 70_000]) {
+      const payload = Uint8Array.from({ length: size }, (_, index) => (index * 31) & 0xff);
+      for (const mask of [undefined, key]) {
+        for (const [fin, rsv, opcode] of [[true, 0, 2], [false, 5, 0], [true, 7, 15]] as const) {
+          const written = encodeWebSocketFrame({ fin, rsv, opcode, mask, payload });
+          expect(webSocketFrameLength(written)).toBe(written.length);
+          expect(readWebSocketFrame(written)).toEqual({ frame: { fin, rsv, opcode, mask, payload }, length: written.length });
+        }
+      }
+    }
+  });
+
+  it("gives undefined for a part of a frame, reads only the first frame, changes no input, and refuses bad input", () => {
+    const frame = encodeWebSocketFrame({ opcode: WEBSOCKET_OPCODES.text, payload: hello, mask: bytes(9, 9, 9, 9) });
+    for (let cut = 0; cut < frame.length; cut += 1) expect(readWebSocketFrame(frame.subarray(0, cut))).toBeUndefined();
+    const two = new Uint8Array([...frame, ...encodeWebSocketFrame({ opcode: WEBSOCKET_OPCODES.close })]);
+    expect(readWebSocketFrame(two)?.length).toBe(frame.length);
+    expect(readWebSocketFrame(bytes(0x82, 127, 0xff, 0, 0, 0, 0, 0, 0, 0))).toBeNull();
+    const input = Buffer.from(frame);
+    const read = readWebSocketFrame(input);
+    expect(input).toEqual(Buffer.from(frame));
+    expect(Object.getPrototypeOf(read?.frame.payload)).toBe(Uint8Array.prototype);
+    expect(read?.frame.payload).toEqual(hello);
+    expect(() => encodeWebSocketFrame({ opcode: 16 })).toThrow(RangeError);
+    expect(() => encodeWebSocketFrame({ opcode: 1, rsv: 8 })).toThrow(RangeError);
+    expect(() => encodeWebSocketFrame({ opcode: 1, mask: bytes(1, 2, 3) })).toThrow(RangeError);
   });
 });
 

@@ -67,6 +67,8 @@ The framers (`tcpFramers`, `httpFramers`, `webSocketFramer`), the applier (`appl
 
 The entry `@mark1russell7/rigor-proxy/applier` has these parts and no module of Node.js. A browser can load it, for example to show the writes of a plan.
 
+The frame codec of RFC 6455 is also a pure part. `readWebSocketFrame` reads the first frame of some bytes, with its bits, its mask and its payload with no mask. `encodeWebSocketFrame` writes a frame, with the shortest form of the length. `WEBSOCKET_OPCODES` names the opcodes. The scripted server of `@mark1russell7/rigor-testkit/http` uses this codec for its WebSocket routes.
+
 ```ts
 import { faultPlan } from "@mark1russell7/rigor-chaos";
 import { applierOf } from "@mark1russell7/rigor-proxy/applier";

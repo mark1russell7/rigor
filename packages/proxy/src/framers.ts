@@ -121,6 +121,95 @@ export function webSocketFrameLength(bytes: Uint8Array): number | undefined | nu
   return header + (masked ? 4 : 0) + payload;
 }
 
+/** The opcodes of RFC 6455, section 5.2. The other values from 0 to 15 are reserved. */
+export const WEBSOCKET_OPCODES = { continuation: 0, text: 1, binary: 2, close: 8, ping: 9, pong: 10 } as const;
+
+/** One WebSocket frame (RFC 6455, section 5.2). */
+export interface WebSocketFrame {
+  /** This value is true for the last frame of a message. */
+  readonly fin: boolean;
+  /** The three bits RSV1, RSV2 and RSV3 as a number from 0 to 7. RSV1 is the bit of value 4. */
+  readonly rsv: number;
+  /** The opcode, from 0 to 15. */
+  readonly opcode: number;
+  /** The masking key of 4 bytes, or `undefined` for a frame with no mask. */
+  readonly mask: Uint8Array | undefined;
+  /** The payload with no mask. */
+  readonly payload: Uint8Array;
+}
+
+/** A frame that `encodeWebSocketFrame` writes. */
+export interface WebSocketFrameInput {
+  /** The default is `true`. */
+  readonly fin?: boolean;
+  /** The default is 0. */
+  readonly rsv?: number;
+  readonly opcode: number;
+  /** A masking key of 4 bytes. With no key, the frame has no mask. A client masks each frame, and a server masks no frame. */
+  readonly mask?: Uint8Array | undefined;
+  /** The payload with no mask. The default is an empty payload. */
+  readonly payload?: Uint8Array;
+}
+
+/** A frame at the start of some bytes, and the number of the bytes of the frame. */
+export interface WebSocketFrameRead {
+  readonly frame: WebSocketFrame;
+  readonly length: number;
+}
+
+/**
+ * This function reads the WebSocket frame at the start of the bytes. It gives `undefined` when the bytes do not hold the
+ * whole frame yet, and `null` for a length that is not a safe integer. The function examines no rule of the protocol.
+ * Thus a reserved opcode, a bit RSV or a fragment of a control frame comes back as it is.
+ */
+export function readWebSocketFrame(bytes: Uint8Array): WebSocketFrameRead | undefined | null {
+  const length = webSocketFrameLength(bytes);
+  if (length === undefined || length === null) return length;
+  if (bytes.length < length) return undefined;
+  const first = bytes[0] as number;
+  const second = bytes[1] as number;
+  const short = second & 0x7f;
+  const header = short === 127 ? 10 : short === 126 ? 4 : 2;
+  const masked = (second & 0x80) !== 0;
+  // A copy into a plain Uint8Array: `slice` of a Node.js Buffer gives a view, and the unmask then changes the input.
+  const mask = masked ? Uint8Array.from(bytes.subarray(header, header + 4)) : undefined;
+  const payload = Uint8Array.from(bytes.subarray(header + (masked ? 4 : 0), length));
+  if (mask !== undefined) for (let i = 0; i < payload.length; i += 1) payload[i] = (payload[i] as number) ^ (mask[i % 4] as number);
+  return { frame: { fin: (first & 0x80) !== 0, rsv: (first >> 4) & 0x07, opcode: first & 0x0f, mask, payload }, length };
+}
+
+/**
+ * This function writes one WebSocket frame, with the shortest form of the length. It throws a `RangeError` for a bad
+ * frame. The opcode is from 0 to 15, the `rsv` is from 0 to 7, and the key is 4 bytes.
+ */
+export function encodeWebSocketFrame(input: WebSocketFrameInput): Uint8Array {
+  const { opcode, rsv = 0, fin = true, mask } = input;
+  const payload = input.payload ?? new Uint8Array(0);
+  if (!Number.isInteger(opcode) || opcode < 0 || opcode > 15) throw new RangeError(`encodeWebSocketFrame: the opcode is a whole number from 0 to 15, not ${String(opcode)}.`);
+  if (!Number.isInteger(rsv) || rsv < 0 || rsv > 7) throw new RangeError(`encodeWebSocketFrame: the rsv is a whole number from 0 to 7, not ${String(rsv)}.`);
+  if (mask !== undefined && mask.length !== 4) throw new RangeError(`encodeWebSocketFrame: the mask has 4 bytes, not ${mask.length}.`);
+  const size = payload.length;
+  const header = size < 126 ? 2 : size < 65_536 ? 4 : 10;
+  const out = new Uint8Array(header + (mask === undefined ? 0 : 4) + size);
+  out[0] = (fin ? 0x80 : 0) | (rsv << 4) | opcode;
+  const flag = mask === undefined ? 0 : 0x80;
+  if (header === 2) out[1] = flag | size;
+  else if (header === 4) {
+    out[1] = flag | 126;
+    out[2] = size >> 8;
+    out[3] = size & 0xff;
+  } else {
+    out[1] = flag | 127;
+    const high = Math.floor(size / 2 ** 32);
+    for (let i = 0; i < 4; i += 1) out[2 + i] = (high >>> (24 - 8 * i)) & 0xff;
+    for (let i = 0; i < 4; i += 1) out[6 + i] = (size >>> (24 - 8 * i)) & 0xff;
+  }
+  const start = header + (mask === undefined ? 0 : 4);
+  if (mask !== undefined) out.set(mask, header);
+  for (let i = 0; i < size; i += 1) out[start + i] = mask === undefined ? (payload[i] as number) : (payload[i] as number) ^ (mask[i % 4] as number);
+  return out;
+}
+
 /** This framer gives each WebSocket frame as one frame. */
 export function webSocketFramer(): Framer {
   const queue = new ByteQueue();
