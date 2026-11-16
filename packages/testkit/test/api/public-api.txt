@@ -121,11 +121,15 @@ startChildServer: build/child.d.ts#startChildServer
 
 ## ./stop (build/stop.d.ts): names
 
+ProgressLine: build/stop.d.ts#ProgressLine
 STOP_ENV: build/stop.d.ts#STOP_ENV
+StopOrder: build/stop.d.ts#StopOrder
 StopRun: build/stop.d.ts#StopRun
 StopRunOptions: build/stop.d.ts#StopRunOptions
 countStops: build/stop.d.ts#countStops
+parseProgress: build/stop.d.ts#parseProgress
 runToStop: build/stop.d.ts#runToStop
+stopOrderOf: build/stop.d.ts#stopOrderOf
 stopPoint: build/stop.d.ts#stopPoint
 
 ## ./behavior (build/behavior.d.ts): names
@@ -761,8 +765,22 @@ export declare function propagationGate(options: PropagationGateOptions): Promis
 ### build/rejects.d.ts#rejects
 export declare function rejects(start: () => PromiseLike<unknown>, what: string): Promise<unknown>;
 
+### build/stop.d.ts#ProgressLine
+export interface ProgressLine {
+  readonly step: number;
+  readonly label?: string;
+  readonly stop?: true;
+}
+
 ### build/stop.d.ts#STOP_ENV
 export declare const STOP_ENV = "RIGOR_STOP";
+
+### build/stop.d.ts#StopOrder
+export interface StopOrder {
+  readonly progress: string;
+  readonly step?: number;
+  readonly signal?: StopSignal;
+}
 
 ### build/stop.d.ts#StopRun
 export interface StopRun {
@@ -790,8 +808,14 @@ export interface StopRunOptions {
 ### build/stop.d.ts#countStops
 export declare function countStops(options: Omit<StopRunOptions, "stop">): Promise<number>;
 
+### build/stop.d.ts#parseProgress
+export declare function parseProgress(text: string): ProgressLine[];
+
 ### build/stop.d.ts#runToStop
 export declare function runToStop(options: StopRunOptions): Promise<StopRun>;
+
+### build/stop.d.ts#stopOrderOf
+export declare function stopOrderOf(stop: Stop | undefined, progress: string): StopOrder;
 
 ### build/stop.d.ts#stopPoint
 export declare function stopPoint(label?: string): void;

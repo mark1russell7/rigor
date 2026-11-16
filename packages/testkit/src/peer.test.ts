@@ -51,7 +51,7 @@ describe("importPeer", () => {
       `try { await importPeer(() => import("@mark1russell7/no-such-peer"), "@mark1russell7/no-such-peer", "the entry"); }`,
       `catch (error) { process.stdout.write(error.message); }`,
     ].join("\n");
-    const run = spawnSync(process.execPath, ["--input-type=module", "-e", script], { encoding: "utf8" });
+    const run = spawnSync(process.execPath, ["--no-warnings", "--input-type=module", "-e", script], { encoding: "utf8" });
     expect(run.stderr).toBe("");
     expect(run.stdout).toContain("the entry needs the package @mark1russell7/no-such-peer");
   });

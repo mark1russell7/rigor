@@ -362,9 +362,15 @@ importers:
       '@mark1russell7/rigor-bench':
         specifier: workspace:*
         version: link:../bench
+      '@mark1russell7/rigor-chaos':
+        specifier: workspace:*
+        version: link:../chaos
       '@mark1russell7/rigor-generators':
         specifier: workspace:*
         version: link:../generators
+      '@mark1russell7/rigor-proxy':
+        specifier: workspace:*
+        version: link:../proxy
       '@mark1russell7/rigor-statistics':
         specifier: workspace:*
         version: link:../statistics

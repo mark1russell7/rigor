@@ -68,25 +68,73 @@ export function stopTriggerOf(at: StopTrigger): { readonly measure: "step" | "ms
   return undefined;
 }
 
+/**
+ * The parts below are for each plan of a process: the stop plan of this module and the disk plan of the module `disk`.
+ * The index of the package does not export them.
+ */
+
+/** This function gives the problem of the point of a fault of a process, or `undefined` for a valid point. */
+export function pointProblem(at: StopTrigger): string | undefined {
+  if (stopTriggerOf(at) !== undefined) return undefined;
+  return `The point has one key: step with a whole number of 0 or more, or ms with a number of 0 or more, not ${JSON.stringify(at)}.`;
+}
+
+/** This function gives the problem of the seed of a plan of a process, or `undefined` for a valid seed. */
+export function seedProblem(seed: unknown): string | undefined {
+  if (seed === null || typeof seed === "string" || (typeof seed === "number" && Number.isFinite(seed))) return undefined;
+  return `The seed is a finite number, a string or null, not ${typeof seed === "number" ? String(seed) : (JSON.stringify(seed) ?? String(seed))}.`;
+}
+
+/** This function gives each problem of the limit and the draws of the spec of a plan of a process. */
+export function pointSpecProblems(within: StopTrigger, draws: number): string[] {
+  const out: string[] = [];
+  const limit = stopTriggerOf(within);
+  if (limit === undefined || !Number.isSafeInteger(limit.value) || limit.value < 1) {
+    out.push(`The limit of the points has one key of step or ms, with a whole value of 1 or more, not ${JSON.stringify(within)}.`);
+  }
+  if (!isWhole(draws, 0)) out.push(`The draws are a whole number of 0 or more, not ${String(draws)}.`);
+  return out;
+}
+
+/**
+ * This function gives each problem of a list of choices of a spec, for example the signals of a stop spec. The list has
+ * one or more items of `all`, and each item occurs one time.
+ */
+export function choiceProblems(choices: unknown, all: readonly string[], names: { readonly one: string; readonly many: string }): string[] {
+  if (!Array.isArray(choices) || choices.length === 0 || choices.some((choice) => !all.includes(choice as string))) {
+    return [`The ${names.many} are a list of one or more of ${all.join(", ")}, not ${JSON.stringify(choices)}.`];
+  }
+  if (new Set(choices).size !== choices.length) return [`Each ${names.one} occurs one time in the list, not ${JSON.stringify(choices)}.`];
+  return [];
+}
+
+/**
+ * This function gives the points of a plan of a process from a valid limit. The points are those of `sweepPoints`. When
+ * the limit has fewer points than `draws + 3`, the plan has each point from 0 to the limit less 1.
+ */
+export function planPoints(within: StopTrigger, draws: number, seed: number | string): StopTrigger[] {
+  const limit = stopTriggerOf(within) as { readonly measure: "step" | "ms"; readonly value: number };
+  const points = limit.value < draws + 3 ? Array.from({ length: limit.value }, (_, point) => point) : sweepPoints(limit.value, draws, seed);
+  return points.map((point) => (limit.measure === "step" ? { step: point } : { ms: point }));
+}
+
 /** This function gives each problem of a stop. An empty list means that the stop is valid. */
 export function checkStop(stop: Stop): readonly string[] {
   if (typeof stop !== "object" || stop === null) return ["A stop is an object."];
   const out: string[] = [];
-  if (stopTriggerOf(stop.at) === undefined) {
-    out.push(`The point has one key: step with a whole number of 0 or more, or ms with a number of 0 or more, not ${JSON.stringify(stop.at)}.`);
-  }
+  const point = pointProblem(stop.at);
+  if (point !== undefined) out.push(point);
   if (!(STOP_SIGNALS as readonly unknown[]).includes(stop.signal)) out.push(`The signal is one of ${STOP_SIGNALS.join(", ")}, not ${String(stop.signal)}.`);
   return out;
 }
 
 /** This function gives each problem of a plan. An empty list means that the plan is valid. */
 export function checkStopPlan(plan: StopPlan): readonly string[] {
+  if (typeof plan !== "object" || plan === null) return ["A stop plan is an object."];
   const out: string[] = [];
   if (plan.format !== STOP_PLAN_FORMAT) out.push(`The format is ${STOP_PLAN_FORMAT}, not ${String(plan.format)}.`);
-  const seed: unknown = plan.seed;
-  if (!(seed === null || typeof seed === "string" || (typeof seed === "number" && Number.isFinite(seed)))) {
-    out.push(`The seed is a finite number, a string or null, not ${typeof seed === "number" ? String(seed) : (JSON.stringify(seed) ?? String(seed))}.`);
-  }
+  const seed = seedProblem(plan.seed);
+  if (seed !== undefined) out.push(seed);
   if (!Array.isArray(plan.stops)) return [...out, "The stops are a list."];
   plan.stops.forEach((stop, index) => {
     for (const problem of checkStop(stop)) out.push(`The stop ${index}: ${problem}`);
@@ -96,17 +144,7 @@ export function checkStopPlan(plan: StopPlan): readonly string[] {
 
 /** This function gives each problem of a spec. An empty list means that the spec is valid. */
 export function checkStopSpec(spec: StopSpec): readonly string[] {
-  const out: string[] = [];
-  const within = stopTriggerOf(spec.within);
-  if (within === undefined || !Number.isSafeInteger(within.value) || within.value < 1) {
-    out.push(`The limit of the points has one key of step or ms, with a whole value of 1 or more, not ${JSON.stringify(spec.within)}.`);
-  }
-  if (!isWhole(spec.draws, 0)) out.push(`The draws are a whole number of 0 or more, not ${String(spec.draws)}.`);
-  const signals: unknown = spec.signals ?? ["SIGKILL"];
-  if (!Array.isArray(signals) || signals.length === 0 || signals.some((signal) => !(STOP_SIGNALS as readonly unknown[]).includes(signal))) {
-    out.push(`The signals are a list of one or more of ${STOP_SIGNALS.join(", ")}, not ${JSON.stringify(spec.signals)}.`);
-  } else if (new Set(signals).size !== signals.length) out.push(`Each signal occurs one time in the list, not ${JSON.stringify(spec.signals)}.`);
-  return out;
+  return [...pointSpecProblems(spec.within, spec.draws), ...choiceProblems(spec.signals ?? ["SIGKILL"], STOP_SIGNALS, { one: "signal", many: "signals" })];
 }
 
 /**
@@ -129,12 +167,7 @@ export function stopPlanOf(stops: readonly Stop[]): StopPlan {
 export function stopPlan(spec: StopSpec, seed: number | string): StopPlan {
   const problems = checkStopSpec(spec);
   if (problems.length > 0) throw new RangeError(`stopPlan: ${problems.join(" ")}`);
-  const within = stopTriggerOf(spec.within) as { readonly measure: "step" | "ms"; readonly value: number };
   const signals = spec.signals ?? (["SIGKILL"] as const);
-  const points = within.value < spec.draws + 3 ? Array.from({ length: within.value }, (_, point) => point) : sweepPoints(within.value, spec.draws, seed);
-  const stops: Stop[] = [];
-  for (const point of points) {
-    for (const signal of signals) stops.push({ at: within.measure === "step" ? { step: point } : { ms: point }, signal });
-  }
+  const stops = planPoints(spec.within, spec.draws, seed).flatMap((at) => signals.map((signal): Stop => ({ at, signal })));
   return { format: STOP_PLAN_FORMAT, seed, stops };
 }
