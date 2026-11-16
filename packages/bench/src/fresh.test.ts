@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { type Arm, firstArm } from "./index.ts";
 import { type BenchEnv, type ChildExit, type FreshOptions, type StartChild, benchEnv, childLine, freshRun, pairOrder } from "./fresh.ts";
@@ -59,8 +60,8 @@ describe("childLine", () => {
   });
 
   it("reads the memory peak, the warm check and the events of a child", () => {
-    const line = { ms: 2, hash: "h", peakRss: 4096, warm: 0.98, events: { gc: [3, 1], deopt: [0, 2] }, other: "kept out" };
-    expect(childLine(JSON.stringify(line))).toEqual({ ms: 2, hash: "h", peakRss: 4096, warm: 0.98, events: { gc: [3, 1], deopt: [0, 2] } });
+    const line = { ms: 2, hash: "h", peakRss: 4096, warm: 0.98, events: { gc: [3, 1], gcMs: [1.5, 0.25], deopt: [0, 2] }, other: "kept out" };
+    expect(childLine(JSON.stringify(line))).toEqual({ ms: 2, hash: "h", peakRss: 4096, warm: 0.98, events: { gc: [3, 1], gcMs: [1.5, 0.25], deopt: [0, 2] } });
     expect(childLine('{"ms":2,"events":{"gc":[0,0]}}')).toEqual({ ms: 2, events: { gc: [0, 0] } });
     // A skip line keeps only its reason, its time and its hash.
     expect(childLine('{"skipped":"too large","peakRss":1}')).toEqual({ skipped: "too large" });
@@ -71,6 +72,9 @@ describe("childLine", () => {
     for (const warm of ["0", "-1", '"1"']) expect(() => childLine(`{"ms":1,"warm":${warm}}`)).toThrow(/warm check/);
     for (const events of ["[]", "{}", '{"gc":[1]}', '{"gc":[1,-1]}', '{"gc":[1,1.5]}', '{"gc":[1,1],"deopt":[1]}']) {
       expect(() => childLine(`{"ms":1,"events":${events}}`)).toThrow(/events/);
+    }
+    for (const gcMs of ["[1]", "[1,-0.5]", '[1,"2"]', "[1,null]", "{}"]) {
+      expect(() => childLine(`{"ms":1,"events":{"gc":[1,1],"gcMs":${gcMs}}}`)).toThrow(/GC time gcMs/);
     }
   });
 });
@@ -317,8 +321,30 @@ describe("freshRun", () => {
       expect(fields.peakRss).toBeGreaterThan(0);
       expect(fields.warm).toBeGreaterThan(0);
       expect(fields.events!.gc.every((n) => Number.isSafeInteger(n) && n >= 0)).toBe(true);
+      // A half without GC events has no GC time
+      const { gc, gcMs } = fields.events!;
+      expect(gcMs).toHaveLength(2);
+      for (const half of [0, 1]) expect(gcMs![half]! >= 0 && (gc[half]! > 0 || gcMs![half] === 0)).toBe(true);
       expect(fields.events!.deopt).toHaveLength(2);
     }
+  });
+
+  it("gives the GC time of a half that has a GC event", () => {
+    const script = [
+      `const { eventProbe } = await import(${JSON.stringify(new URL("./fresh.ts", import.meta.url).href)});`,
+      "const probe = eventProbe();",
+      "probe.mark(0);",
+      "globalThis.gc();",
+      "probe.mark(1);",
+      "probe.mark(2);",
+      "console.log(JSON.stringify({ ms: 1, events: await probe.events(2) }));",
+    ].join("\n");
+    const stdout = execFileSync(process.execPath, ["--expose-gc", "--input-type=module", "-e", script], { encoding: "utf8" });
+    const line = childLine(stdout);
+    if (line.skipped !== undefined) throw new Error("the child skipped");
+    const { gc, gcMs } = line.events!;
+    expect(gc[0]).toBeGreaterThanOrEqual(1);
+    expect(gcMs![0]).toBeGreaterThan(0);
   });
 
   // The grandchild inherits stdout and keeps the pipe open.
