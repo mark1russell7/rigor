@@ -79,6 +79,32 @@ export function parseProgress(text: string): ProgressLine[] {
   return lines;
 }
 
+/** The parts of a run that tell if its stop occurred. A harness that starts the child itself has the same parts. */
+export interface StopEvidence {
+  /** The stop of the run, or `undefined` for a complete run. */
+  readonly stop: Stop | undefined;
+  /** The lines of the progress file, from `parseProgress`. */
+  readonly lines: readonly ProgressLine[];
+  /** For a stop at a time, this value is `true` when the harness sent the signal and the send did not fail. */
+  readonly sent: boolean;
+  /** The exit of the child. */
+  readonly exit: ChildExit;
+}
+
+/**
+ * This function tells if the stop of a run occurred. For a step, the child wrote the line of the stop. For a time, the
+ * harness sent the signal, and the exit code of the child is not 0.
+ *
+ * A child can end a moment before the signal. Node reads the exit after a short time, thus the send can succeed after the
+ * end. An exit code of 0 shows that the child got to its end, so the stop did not occur.
+ */
+export function stopOccurred(evidence: StopEvidence): boolean {
+  const { stop, lines, sent, exit } = evidence;
+  if (stop === undefined) return false;
+  if (stopTriggerOf(stop.at)?.measure === "step") return lines.some((line) => line.stop === true);
+  return sent && exit.code !== 0;
+}
+
 /** This function tells if a value from a progress file has the shape of `ProgressLine`, with a whole step of 0 or more. */
 function isProgressLine(value: unknown): value is ProgressLine {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
@@ -168,7 +194,8 @@ export interface StopRun {
   readonly exit: ChildExit;
   /**
    * This value is `true` when the stop occurred. For a step, the child got to the step. For a time, the signal went to the
-   * child before its end. A child that ends first gives `false`.
+   * child before its end. A child that ends first gives `false`. A child with an exit code of 0 also gives `false` for a
+   * time, because the child got to its end. `stopOccurred` has the rule.
    */
   readonly stopped: boolean;
   /** The number of the stop points that the child got to. */
@@ -264,7 +291,7 @@ export async function runToStop(options: StopRunOptions): Promise<StopRun> {
 
     const lines = await progressLines(progress);
     const last = lines.at(-1);
-    const stopped = trigger?.measure === "step" ? lines.some((line) => line.stop === true) : sent;
+    const stopped = stopOccurred({ stop, lines, sent, exit });
     return { stop, exit, stopped, steps: lines.length, lastStep: last?.step, lastLabel: last?.label, stdout, stderr, ms };
   } finally {
     // On Windows, a file that a process held a moment ago can refuse a removal
