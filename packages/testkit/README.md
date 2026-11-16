@@ -7,6 +7,7 @@ Test helpers:
 - `uniformDouble` draws numbers over a range, uniform by value, from the entry `@mark1russell7/rigor-testkit/arbitrary`.
 - `rejects` examines an asynchronous operation that must fail, and gives its error.
 - `propagationGate` examines one context id over each transport, from the entry `@mark1russell7/rigor-testkit/propagation`.
+- `startChildServer` starts a server of a test in a child process on the port 0, and reads the port that the child got. It is in the entry `@mark1russell7/rigor-testkit/child`.
 
 ```sh
 npm install --save-dev @mark1russell7/rigor-testkit
@@ -287,6 +288,44 @@ The record of each request has `wire`, the place of its reply in the bytes of th
 - The first byte of the body is at `offset + head` of the down direction.
 - The server sends the head alone, before the body. Thus `head` is known before the first part.
 - A test can measure the place with one request, then cut a second connection at the same place. The same script gives the same bytes.
+
+## A server in a child process
+
+The entry `@mark1russell7/rigor-testkit/child` starts a server of a test in a child process. The child listens on the port 0 and reports the port that it got. The test reads that port. It uses only `node:child_process` and `node:fs`.
+
+Do not pick a free port, close it and give it to a child. Another process can take the port before the child listens. With the port 0, the system gives the port at the listen.
+
+```ts no-run
+import { childServerGroup } from "@mark1russell7/rigor-testkit/child";
+
+const children = childServerGroup();
+afterEach(() => children.stopAll());
+
+const server = await children.start({
+  command: process.execPath,
+  args: ["server.js", "--port", "0"],
+  report: { from: "stdout", pattern: /^listening on (\d+)$/ },
+});
+const response = await fetch(`http://localhost:${server.port}/health`);
+```
+
+### The report of the port
+
+| `report.from` | The child reports its port | The fixture reads it |
+|---|---|---|
+| `stdout` (the default) | In a line of its standard output. | It tests each complete line with `pattern`. The first group is the port. The default pattern `PORT_LINE` matches a line with only the port. |
+| `file` | In a ready file at `path`. | It reads the file each `pollMs`. `portOfText` gives the port of a number alone or of a JSON object with a field `port`. |
+| `poll` | In a place that the test knows, for example a lockfile with the process id of the child. | It starts `read(child)` each `pollMs` until the function gives a port. |
+
+### The rules
+
+- `startChildServer` starts the child with no shell. The promise gives the port when the child reports it.
+- The promise rejects with a `ChildServerError` when the child ends, does not start, or reports a number that is not a port.
+- It also rejects when the child reports no port in `timeoutMs` (10 000 by default), or when `signal` aborts.
+- Before it rejects, the fixture stops the child. The error holds the process id, the exit and the last output of the child.
+- `stop()` sends `SIGTERM`, then `SIGKILL` after `stopGraceMs` (2 000 by default). Each call gives the same promise.
+- `childServerGroup()` keeps each child that it starts. `stopAll()` stops them, for the end of each test.
+- `output()` gives the last 256 KiB of the standard output and the standard error of the child.
 
 ## License
 
