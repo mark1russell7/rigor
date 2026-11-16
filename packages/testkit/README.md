@@ -395,6 +395,12 @@ db.exec("COMMIT");
 stopPoint("after the commit");
 ```
 
+The entry `/stop` imports `@mark1russell7/rigor-chaos`. Install it next to this package. The other entries do not load it:
+
+```sh
+npm install --save-dev @mark1russell7/rigor-chaos
+```
+
 ```ts
 // The test
 import { stopPlan } from "@mark1russell7/rigor-chaos";
