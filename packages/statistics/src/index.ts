@@ -14,6 +14,13 @@ export {
   bootstrapTwo,
   sampleTotalInterval,
 } from "./bootstrap.ts";
+export {
+  type BlockBootstrapOptions,
+  type BlockInterval,
+  blockLength,
+  bootstrapMovingBlock,
+  bootstrapMovingBlockLeastSquares,
+} from "./moving-block.ts";
 export { type ModeOptions, type SmoothLaw, type SmoothLawScore, bestSmoothLaw, modeCount, smoothLawScores } from "./distribution.ts";
 export { type LeastSquaresFit, type LeastSquaresOptions, leastSquares } from "./regression.ts";
 export { type RidgeOptions, ridgeSolve } from "./ridge.ts";

@@ -8,6 +8,8 @@
 
 BRADLEY_TERRY_DENSE_LIMIT: build/index.d.ts#BRADLEY_TERRY_DENSE_LIMIT
 type BinomialSide: build/index.d.ts#BinomialSide
+type BlockBootstrapOptions: build/index.d.ts#BlockBootstrapOptions
+type BlockInterval: build/index.d.ts#BlockInterval
 type BootstrapOptions: build/index.d.ts#BootstrapOptions
 type BradleyTerryFit: build/index.d.ts#BradleyTerryFit
 type BradleyTerryOptions: build/index.d.ts#BradleyTerryOptions
@@ -151,11 +153,14 @@ addToRunning: build/index.d.ts#addToRunning
 bestSmoothLaw: build/index.d.ts#bestSmoothLaw
 binomialInterval: build/index.d.ts#binomialInterval
 binomialTest: build/index.d.ts#binomialTest
+blockLength: build/index.d.ts#blockLength
 bootstrap: build/index.d.ts#bootstrap
 bootstrapClusters: build/index.d.ts#bootstrapClusters
 bootstrapLeastSquares: build/index.d.ts#bootstrapLeastSquares
 bootstrapMedian: build/index.d.ts#bootstrapMedian
 bootstrapMedianRatio: build/index.d.ts#bootstrapMedianRatio
+bootstrapMovingBlock: build/index.d.ts#bootstrapMovingBlock
+bootstrapMovingBlockLeastSquares: build/index.d.ts#bootstrapMovingBlockLeastSquares
 bootstrapStrata: build/index.d.ts#bootstrapStrata
 bootstrapTwo: build/index.d.ts#bootstrapTwo
 bradleyTerry: build/index.d.ts#bradleyTerry
@@ -247,6 +252,18 @@ export declare const BRADLEY_TERRY_DENSE_LIMIT = 200;
 
 ### build/index.d.ts#BinomialSide
 type BinomialSide = "less" | "greater";
+
+### build/index.d.ts#BlockBootstrapOptions
+interface BlockBootstrapOptions extends BootstrapOptions {
+  readonly block?: number;
+  readonly circular?: boolean;
+}
+
+### build/index.d.ts#BlockInterval
+interface BlockInterval extends Interval {
+  readonly block: number;
+  readonly circular: boolean;
+}
 
 ### build/index.d.ts#BootstrapOptions
 interface BootstrapOptions {
@@ -1216,6 +1233,9 @@ export declare function binomialInterval(n: number, p: number, level?: number): 
 ### build/index.d.ts#binomialTest
 export declare function binomialTest(k: number, n: number, p: number, side: BinomialSide): number;
 
+### build/index.d.ts#blockLength
+export declare function blockLength(series: readonly number[]): number;
+
 ### build/index.d.ts#bootstrap
 export declare function bootstrap<T>(data: readonly T[], statistic: (sample: readonly T[]) => number, options?: BootstrapOptions): Interval;
 
@@ -1230,6 +1250,12 @@ export declare function bootstrapMedian(values: readonly number[], options?: Boo
 
 ### build/index.d.ts#bootstrapMedianRatio
 export declare function bootstrapMedianRatio(numerator: readonly number[], denominator: readonly number[], options?: BootstrapOptions): Interval;
+
+### build/index.d.ts#bootstrapMovingBlock
+export declare function bootstrapMovingBlock<T>(series: readonly T[], statistic: (sample: readonly T[]) => number, options?: BlockBootstrapOptions): BlockInterval;
+
+### build/index.d.ts#bootstrapMovingBlockLeastSquares
+export declare function bootstrapMovingBlockLeastSquares(x: readonly (readonly number[])[], y: readonly number[], options?: BlockBootstrapOptions & LeastSquaresOptions): BlockInterval[];
 
 ### build/index.d.ts#bootstrapStrata
 export declare function bootstrapStrata<T>(strata: readonly (readonly T[])[], statistic: (samples: readonly (readonly T[])[]) => number, options?: BootstrapOptions): Interval;
