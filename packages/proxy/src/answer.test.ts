@@ -14,7 +14,7 @@ describe("the bytes of an answer", () => {
     expect(text(answerBytes({ status: 200, body: "é" }))).toBe("HTTP/1.1 200 OK\r\ncontent-length: 2\r\nconnection: close\r\n\r\né");
   });
 
-  it("have no length for 204 and 304, and no reason for a status that Node.js does not know", () => {
+  it("have no length for 204 and 304, and no reason for a status that is not in the table", () => {
     expect(text(answerBytes({ status: 304, fields: { etag: '"v1"' } }))).toBe('HTTP/1.1 304 Not Modified\r\netag: "v1"\r\nconnection: close\r\n\r\n');
     expect(text(answerBytes({ status: 204 }))).toBe("HTTP/1.1 204 No Content\r\nconnection: close\r\n\r\n");
     expect(text(answerBytes({ status: 599 }))).toBe("HTTP/1.1 599 \r\ncontent-length: 0\r\nconnection: close\r\n\r\n");

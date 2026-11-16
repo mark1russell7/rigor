@@ -27,7 +27,7 @@ This file lists the items of the roadmap of this repository. The status page of 
 
 | ID | Status | Priority | Title |
 | --- | --- | --- | --- |
-| R2 | later | P2 | The site: live demos of a fault plan and the proxy, next to the generator and the time verdict |
+| R2 | active | P2 | The site: live demos of a fault plan and the proxy, next to the generator and the time verdict. Step 1: the entry `rigor-proxy/applier` with no module of Node.js, so the page can load the applier (proxy 0.3.2) |
 | R9 | done | P2 | Sobol indices and shrinking. statistics 0.1.22 has `sobolIndices`. Done on 2026-11-15: `shrinkPoint` and `shrinkPointAsync` shrink a failed point of an input family toward the target of each dimension (generators 0.1.18) |
 | R10 | later | P3 | statistics: an optional sum of the squared kernel for `uStatisticInterval`, for an empirical Bernstein bound. It waits for a consumer at `k > 500`. `docs/CALIBRATION.md` has the read |
 | R18 | done | P3 | statistics: a moving-block bootstrap, so the interval of a mean of a correlated series is not too narrow. Done on 2026-11-15: `bootstrapMovingBlock`, `bootstrapMovingBlockLeastSquares` with a circular form, and `blockLength` of Politis and White (statistics 0.2.8) |

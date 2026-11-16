@@ -1,9 +1,9 @@
 import { defineConfig } from "tsdown";
 
 // The build for npm: ES modules in build/, with types. The workspace runs the source (main is src/index.ts).
-// The proxy uses node:net, so it runs in Node.
+// The proxy uses node:net, so it runs in Node. The entry applier imports no module of Node.js, so a browser can load it.
 export default defineConfig({
-  entry: ["src/index.ts"],
+  entry: ["src/index.ts", "src/applier-entry.ts"],
   outDir: "build",
   format: "esm",
   platform: "node",
