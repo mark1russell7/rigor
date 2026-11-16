@@ -21,6 +21,29 @@ Step: build/model.d.ts#Step
 runModel: build/model.d.ts#runModel
 step: build/model.d.ts#step
 
+## ./metamorphic (build/metamorphic.d.ts): names
+
+CheckRelationsOptions: build/metamorphic.d.ts#CheckRelationsOptions
+ComposeOptions: build/metamorphic.d.ts#ComposeOptions
+EquivariantOptions: build/metamorphic.d.ts#EquivariantOptions
+EquivariantRelation: build/metamorphic.d.ts#EquivariantRelation
+InvariantOptions: build/metamorphic.d.ts#InvariantOptions
+PermutationOptions: build/metamorphic.d.ts#PermutationOptions
+Relation: build/metamorphic.d.ts#Relation
+RelationCase: build/metamorphic.d.ts#RelationCase
+RelationVerdict: build/metamorphic.d.ts#RelationVerdict
+Tolerance: build/metamorphic.d.ts#Tolerance
+checkRelations: build/metamorphic.d.ts#checkRelations
+checkRelationsAsync: build/metamorphic.d.ts#checkRelationsAsync
+composeRelations: build/metamorphic.d.ts#composeRelations
+equivariant: build/metamorphic.d.ts#equivariant
+invariant: build/metamorphic.d.ts#invariant
+permutationInvariant: build/metamorphic.d.ts#permutationInvariant
+relationCases: build/metamorphic.d.ts#relationCases
+relationProperty: build/metamorphic.d.ts#relationProperty
+relationPropertyAsync: build/metamorphic.d.ts#relationPropertyAsync
+withinTolerance: build/metamorphic.d.ts#withinTolerance
+
 ## ./arbitrary (build/arbitrary.d.ts): names
 
 UniformDoubleOptions: build/arbitrary.d.ts#UniformDoubleOptions
@@ -329,6 +352,94 @@ export declare function mapImports(code: string, imports: Readonly<Record<string
 
 ### build/markdown-examples.d.ts#markdownExamples
 export declare function markdownExamples(files: readonly string[], options?: MarkdownExampleOptions): MarkdownExample[];
+
+### build/metamorphic.d.ts#CheckRelationsOptions
+export interface CheckRelationsOptions<I = unknown> {
+  numRuns?: number;
+  parameters?: fc.Parameters<[RelationCase<I, unknown>]>;
+}
+
+### build/metamorphic.d.ts#ComposeOptions
+export interface ComposeOptions<O> {
+  equal?: (a: O, b: O) => boolean;
+}
+
+### build/metamorphic.d.ts#EquivariantOptions
+export interface EquivariantOptions<I, O, P> {
+  param: fc.Arbitrary<P> | ((input: I) => fc.Arbitrary<P>);
+  change: (input: I, param: P) => I;
+  map: (output: O, param: P) => O;
+  equal?: (a: O, b: O) => boolean;
+}
+
+### build/metamorphic.d.ts#EquivariantRelation
+export interface EquivariantRelation<I, O, P> extends Relation<I, O, P> {
+  map(output: O, param: P): O;
+  equal(a: O, b: O): boolean;
+}
+
+### build/metamorphic.d.ts#InvariantOptions
+export type InvariantOptions<I, O, P> = Omit<EquivariantOptions<I, O, P>, "map">;
+
+### build/metamorphic.d.ts#PermutationOptions
+export interface PermutationOptions<O> {
+  name?: string;
+  equal?: (a: O, b: O) => boolean;
+}
+
+### build/metamorphic.d.ts#Relation
+export interface Relation<I, O, P> {
+  readonly name: string;
+  readonly param: fc.Arbitrary<P> | ((input: I) => fc.Arbitrary<P>);
+  change(input: I, param: P): I;
+  holds(source: O, followUp: O, test: RelationCase<I, P>): RelationVerdict;
+}
+
+### build/metamorphic.d.ts#RelationCase
+export interface RelationCase<I, P> {
+  readonly input: I;
+  readonly param: P;
+  readonly followUp: I;
+}
+
+### build/metamorphic.d.ts#RelationVerdict
+export type RelationVerdict = boolean | string;
+
+### build/metamorphic.d.ts#Tolerance
+export interface Tolerance {
+  absolute?: number;
+  relative?: number;
+}
+
+### build/metamorphic.d.ts#checkRelations
+export declare function checkRelations<I, O>(f: (input: I) => O, relations: readonly Relation<I, O, unknown>[], inputs: fc.Arbitrary<I>, options?: CheckRelationsOptions<I>): void;
+
+### build/metamorphic.d.ts#checkRelationsAsync
+export declare function checkRelationsAsync<I, O>(f: (input: I) => Promise<O> | O, relations: readonly Relation<I, O, unknown>[], inputs: fc.Arbitrary<I>, options?: CheckRelationsOptions<I>): Promise<void>;
+
+### build/metamorphic.d.ts#composeRelations
+export declare function composeRelations<I, O, P, Q>(first: EquivariantRelation<I, O, P>, second: EquivariantRelation<I, O, Q>, options?: ComposeOptions<O>): EquivariantRelation<I, O, readonly [P, Q]>;
+
+### build/metamorphic.d.ts#equivariant
+export declare function equivariant<I, O, P>(name: string, options: EquivariantOptions<I, O, P>): EquivariantRelation<I, O, P>;
+
+### build/metamorphic.d.ts#invariant
+export declare function invariant<I, O, P>(name: string, options: InvariantOptions<I, O, P>): EquivariantRelation<I, O, P>;
+
+### build/metamorphic.d.ts#permutationInvariant
+export declare function permutationInvariant<T, O>(options?: PermutationOptions<O>): EquivariantRelation<readonly T[], O, readonly number[]>;
+
+### build/metamorphic.d.ts#relationCases
+export declare function relationCases<I, O, P>(relation: Relation<I, O, P>, inputs: fc.Arbitrary<I>): fc.Arbitrary<RelationCase<I, P>>;
+
+### build/metamorphic.d.ts#relationProperty
+export declare function relationProperty<I, O, P>(f: (input: I) => O, relation: Relation<I, O, P>, inputs: fc.Arbitrary<I>): fc.IPropertyWithHooks<[RelationCase<I, P>]>;
+
+### build/metamorphic.d.ts#relationPropertyAsync
+export declare function relationPropertyAsync<I, O, P>(f: (input: I) => Promise<O> | O, relation: Relation<I, O, P>, inputs: fc.Arbitrary<I>): fc.IAsyncPropertyWithHooks<[RelationCase<I, P>]>;
+
+### build/metamorphic.d.ts#withinTolerance
+export declare function withinTolerance(tolerance?: Tolerance): (a: unknown, b: unknown) => boolean;
 
 ### build/model.d.ts#RunModelOptions
 export interface RunModelOptions<S, M> {

@@ -4,6 +4,7 @@ Test helpers:
 
 - `markdownExamples` makes each code block of a Markdown file into a test case. Then the doc and the code cannot drift.
 - `runModel` runs model-based tests on `fast-check`, from the entry `@mark1russell7/rigor-testkit/model`.
+- `checkRelations` examines the metamorphic relations of a function on random inputs, from the entry `@mark1russell7/rigor-testkit/metamorphic`.
 - `uniformDouble` draws numbers over a range, uniform by value, from the entry `@mark1russell7/rigor-testkit/arbitrary`.
 - `rejects` examines an asynchronous operation that must fail, and gives its error.
 - `propagationGate` examines one context id over each transport, from the entry `@mark1russell7/rigor-testkit/propagation`.
@@ -145,6 +146,68 @@ The options:
 A spy that keeps each call of each run uses memory for all the runs. Clear it with `clear`. For a property that does not use `runModel`, use the plugin of `fast-check` 4.10: `fc.assert(property, { plugins: [fc.beforeEach(() => spy.mockClear())] })`.
 
 A global plugin of `fast-check` also operates on `runModel`. Before each run, the `beforeEach` plugins run first, then `clear`, then `create`. Thus, with a global plugin that clears the spies, for example `fc.installGlobalPlugin(fc.beforeEach(() => vi.clearAllMocks()))`, `runModel` does not need `clear`.
+
+## Metamorphic relations
+
+A metamorphic relation tells how the output of a function changes when its input changes in a known way. For example, add `c` to each element of a list, and the mean of the list increases by `c`. A test of a relation needs no oracle of the correct output.
+
+`checkRelations(f, relations, inputs)` examines each relation on random inputs. When one or more relations do not hold, it throws one error. The error names each relation that does not hold, with its counterexample. The set of these relations helps to find the fault.
+
+The entry `@mark1russell7/rigor-testkit/metamorphic` imports `fast-check`, and no module of Node.js.
+
+```ts no-run
+import fc from "fast-check";
+import { it } from "vitest";
+import { checkRelations, composeRelations, equivariant, permutationInvariant, withinTolerance } from "@mark1russell7/rigor-testkit/metamorphic";
+
+const close = withinTolerance({ absolute: 1e-9, relative: 1e-9 });
+const shift = equivariant<readonly number[], number, number>("shift", {
+  param: fc.integer({ min: -100, max: 100 }),
+  change: (xs, c) => xs.map((x) => x + c),
+  map: (mean, c) => mean + c,
+  equal: close,
+});
+const scale = equivariant<readonly number[], number, number>("scale", {
+  param: fc.integer({ min: -5, max: 5 }),
+  change: (xs, k) => xs.map((x) => x * k),
+  map: (mean, k) => mean * k,
+  equal: close,
+});
+
+it("keeps the relations of a mean", () => {
+  const lists: fc.Arbitrary<readonly number[]> = fc.array(fc.integer({ min: -1000, max: 1000 }), { minLength: 1 });
+  const relations = [permutationInvariant<number, number>({ equal: close }), shift, scale, composeRelations(shift, scale)];
+  checkRelations(myMean, relations, lists);
+});
+```
+
+The functions:
+
+| Function | What it gives |
+| --- | --- |
+| `equivariant(name, { param, change, map, equal })` | A relation where the follow-up output is `map(f(x), p)`. |
+| `invariant(name, { param, change, equal })` | A relation where the follow-up output is equal to the source output. |
+| `permutationInvariant({ name, equal })` | The relation of a function of a multiset: a new order of the elements keeps the output. |
+| `composeRelations(first, second, { equal })` | The relation of the second change after the first change. The second change gets the follow-up inputs of the first change. |
+| `withinTolerance({ absolute, relative })` | A comparison of numbers, arrays and plain objects, with a tolerance on each number. With no tolerance, it is the default comparison. |
+| `relationCases(relation, inputs)` | The arbitrary of the cases of a relation, for a property of your own. |
+| `relationProperty(f, relation, inputs)` | The property of one relation, for `fc.assert`. `relationPropertyAsync` is for an async function. |
+| `checkRelationsAsync(f, relations, inputs)` | The same check as `checkRelations`, for an async function. |
+
+The options in braces are optional, except `param` and `change`, and `map` of `equivariant`.
+
+A relation of your own is an object with `name`, `param`, `change` and `holds`. The method `holds` gives `true` when the relation holds. It gives `false`, or a text that tells the break, when the relation does not hold.
+
+The `param` is an arbitrary, or a function that gives an arbitrary for each input. Use a function when the parameter changes with the input, for example an index in an array.
+
+### The rules
+
+- The function `f` and each `change` must not change their input. A change gives a new value.
+- `withinTolerance` accepts two numbers when both are `NaN`, or when the difference is in one of the two limits.
+- An infinite number is equal only to the same infinite number.
+- `withinTolerance` compares other objects by identity, for example a `Map` or a `Date`. Give your own `equal` for them.
+- Each relation gets its own runs. The options `numRuns` and `parameters` apply to each relation.
+- The report of a break includes the error of the break. To remove it, set `includeErrorInReport: false` in `parameters`.
 
 ## Uniform numbers over a range
 
