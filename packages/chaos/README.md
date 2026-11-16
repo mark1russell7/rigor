@@ -162,7 +162,7 @@ A disk plan tells a harness which disk fault to apply to the files of a test pro
 
 | Kind | What the disk does |
 |---|---|
-| `lose-unsynced` | A power cut: the process stops at once, and the disk loses each write of data after the last fsync of its file. The kind keeps each directory entry: a create, a rename or an unlink is durable at once. A later kind loses the entries after the last fsync of their directory. |
+| `lose-unsynced` | A power cut: the process stops at once, and the disk loses each write of data after the last fsync of its file. The kind keeps each directory entry: a new file, a rename or an unlink is durable at once. A later kind loses the entries after the last fsync of their directory. |
 
 ```ts
 import { diskPlan, diskPlanOf } from "@mark1russell7/rigor-chaos";

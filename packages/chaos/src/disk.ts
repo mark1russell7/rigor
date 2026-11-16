@@ -16,7 +16,7 @@ export const DISK_PLAN_FORMAT = "rigor-disk/1";
 
 /**
  * The kinds of the family of disk faults. `lose-unsynced` is a power cut: the process stops at once, and the disk loses
- * each write of data after the last fsync of its file. The kind keeps each directory entry: a create, a rename or an
+ * each write of data after the last fsync of its file. The kind keeps each directory entry: a new file, a rename or an
  * unlink is durable at once. A later kind loses the entries after the last fsync of their directory. A torn write and an
  * fsync error are also next kinds of the family.
  */
