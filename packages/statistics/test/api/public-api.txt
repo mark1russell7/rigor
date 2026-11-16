@@ -24,6 +24,10 @@ type Comparison: build/index.d.ts#Comparison
 type Confusion: build/index.d.ts#Confusion
 type ContinuousDimension: build/index.d.ts#ContinuousDimension
 type Corrected: build/index.d.ts#Corrected
+type CorrelationMethod: build/index.d.ts#CorrelationMethod
+type CorrelationPermutationOptions: build/index.d.ts#CorrelationPermutationOptions
+type CorrelationPermutationResult: build/index.d.ts#CorrelationPermutationResult
+type CorrelationSide: build/index.d.ts#CorrelationSide
 type CountInterval: build/index.d.ts#CountInterval
 type CoverageBar: build/index.d.ts#CoverageBar
 type CoverageCell: build/index.d.ts#CoverageCell
@@ -173,6 +177,7 @@ clopperPearson: build/index.d.ts#clopperPearson
 cohenKappa: build/index.d.ts#cohenKappa
 compareRatios: build/index.d.ts#compareRatios
 confusion: build/index.d.ts#confusion
+correlationPermutation: build/index.d.ts#correlationPermutation
 coverageMinSample: build/index.d.ts#coverageMinSample
 eloExpected: build/index.d.ts#eloExpected
 eloReplay: build/index.d.ts#eloReplay
@@ -210,6 +215,7 @@ pairProbabilities: build/index.d.ts#pairProbabilities
 pairedPermutation: build/index.d.ts#pairedPermutation
 parseResponseRecord: build/index.d.ts#parseResponseRecord
 partialConjunction: build/index.d.ts#partialConjunction
+pearson: build/index.d.ts#pearson
 poissonInterval: build/index.d.ts#poissonInterval
 predictResponse: build/index.d.ts#predictResponse
 quantile: build/index.d.ts#quantile
@@ -388,6 +394,25 @@ interface Corrected {
   readonly adjusted: number;
   readonly reject: boolean;
 }
+
+### build/index.d.ts#CorrelationMethod
+type CorrelationMethod = "pearson" | "spearman" | ((a: readonly number[], b: readonly number[]) => number);
+
+### build/index.d.ts#CorrelationPermutationOptions
+interface CorrelationPermutationOptions {
+  readonly method?: CorrelationMethod;
+  readonly side?: CorrelationSide;
+  readonly runs?: number;
+  readonly seed?: number | string;
+}
+
+### build/index.d.ts#CorrelationPermutationResult
+interface CorrelationPermutationResult extends PermutationResult {
+  readonly exact: boolean;
+}
+
+### build/index.d.ts#CorrelationSide
+type CorrelationSide = "both" | "greater" | "less";
 
 ### build/index.d.ts#CountInterval
 interface CountInterval {
@@ -1293,6 +1318,9 @@ export declare function compareRatios(ratios: readonly number[], options?: Compa
 ### build/index.d.ts#confusion
 export declare function confusion<T>(truth: readonly T[], predicted: readonly T[], labels?: readonly T[]): Confusion<T>;
 
+### build/index.d.ts#correlationPermutation
+export declare function correlationPermutation(a: readonly number[], b: readonly number[], options?: CorrelationPermutationOptions): CorrelationPermutationResult;
+
 ### build/index.d.ts#coverageMinSample
 export declare function coverageMinSample(cells: readonly CoverageCell[], bar: CoverageBar): CoverageMinSample;
 
@@ -1399,6 +1427,9 @@ export declare function parseResponseRecord(value: unknown): ParsedResponseRecor
 
 ### build/index.d.ts#partialConjunction
 export declare function partialConjunction(pValues: readonly number[], need: number): number;
+
+### build/index.d.ts#pearson
+export declare function pearson(a: readonly number[], b: readonly number[]): number;
 
 ### build/index.d.ts#poissonInterval
 export declare function poissonInterval(k: number, exposure?: number, level?: number): RateInterval;

@@ -3,8 +3,10 @@
  * predicted cost, a fast measure) orders the items as the real measure does.
  */
 import { random } from "@mark1russell7/rigor-generators";
+import { correlationOf, correlationParts } from "./correlation.ts";
 
-function samePairs(name: string, a: readonly number[], b: readonly number[]): void {
+/** This function checks that the lists have the same length and no NaN. */
+export function samePairs(name: string, a: readonly number[], b: readonly number[]): void {
   if (a.length !== b.length) throw new RangeError(`${name}: the lists have ${a.length} and ${b.length} values.`);
   for (const v of a) if (Number.isNaN(v)) throw new RangeError(`${name}: the first list has a NaN.`);
   for (const v of b) if (Number.isNaN(v)) throw new RangeError(`${name}: the second list has a NaN.`);
@@ -25,24 +27,13 @@ export function ranks(values: readonly number[]): number[] {
 
 /**
  * The Spearman rank correlation: the Pearson correlation of the ranks, with mean ranks for ties. The value is from
- * -1 to 1. When one list has no spread, the value is 0. It is equal to the copy in the backtest of highways.
+ * -1 to 1. When one list has no spread, the value is 0. It is equal to `pearson` of the ranks, and to the copy in
+ * the backtest of highways.
  */
 export function spearman(a: readonly number[], b: readonly number[]): number {
   samePairs("spearman", a, b);
-  const ra = ranks(a);
-  const rb = ranks(b);
-  const mean = (xs: readonly number[]): number => xs.reduce((s, x) => s + x, 0) / xs.length;
-  const ma = mean(ra);
-  const mb = mean(rb);
-  let num = 0;
-  let da = 0;
-  let db = 0;
-  for (let i = 0; i < ra.length; i++) {
-    num += ((ra[i] as number) - ma) * ((rb[i] as number) - mb);
-    da += ((ra[i] as number) - ma) ** 2;
-    db += ((rb[i] as number) - mb) ** 2;
-  }
-  return da === 0 || db === 0 ? 0 : num / Math.sqrt(da * db);
+  const { x, y, spread } = correlationParts(ranks(a), ranks(b));
+  return correlationOf(x, y, spread);
 }
 
 /** The largest number of values for which `kendallTau` examines each pair. Above it, a seeded sample of pairs. */
