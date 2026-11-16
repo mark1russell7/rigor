@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/rigor-testkit",
-  "version": "0.1.9",
-  "description": "Test helpers: the code blocks of Markdown files as test cases, model-based tests on fast-check, arbitraries that are uniform by value, the propagation gate of one context id over each transport, the capture of the OpenTelemetry SDK, a scripted HTTP server for fixtures, a server of a test in a child process that reports its port, and a check of an operation that must give a rejected promise.",
+  "version": "0.1.10",
+  "description": "Test helpers: the code blocks of Markdown files as test cases, model-based tests on fast-check, arbitraries that are uniform by value, the propagation gate of one context id over each transport, the capture of the OpenTelemetry SDK, a scripted HTTP server for fixtures, a stand-in OTLP collector, a fake event target, a server of a test in a child process that reports its port, and a check of an operation that must give a rejected promise.",
   "keywords": [
     "testing",
     "markdown",
@@ -16,7 +16,9 @@
     "fast-check",
     "opentelemetry",
     "propagation",
-    "baggage"
+    "baggage",
+    "otlp",
+    "fakes"
   ],
   "homepage": "https://github.com/mark1russell7/rigor/tree/main/packages/testkit#readme",
   "bugs": {
@@ -70,6 +72,16 @@
         "import": "./build/http.js",
         "default": "./build/http.js"
       },
+      "./otlp": {
+        "types": "./build/otlp.d.ts",
+        "import": "./build/otlp.js",
+        "default": "./build/otlp.js"
+      },
+      "./fakes": {
+        "types": "./build/fakes.d.ts",
+        "import": "./build/fakes.js",
+        "default": "./build/fakes.js"
+      },
       "./child": {
         "types": "./build/child.d.ts",
         "import": "./build/child.js",
@@ -109,6 +121,8 @@
     "./propagation": "./src/propagation.ts",
     "./otel": "./src/otel.ts",
     "./http": "./src/http.ts",
+    "./otlp": "./src/otlp.ts",
+    "./fakes": "./src/fakes.ts",
     "./child": "./src/child.ts",
     "./package.json": "./package.json"
   },
