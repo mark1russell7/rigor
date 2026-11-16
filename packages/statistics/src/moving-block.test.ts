@@ -198,7 +198,7 @@ describe("blockLength", () => {
   });
 
   it("is at most ceil(min(3 sqrt(n), n / 3))", () => {
-    // A step has an autocorrelation near 1 at each lag of the window. Without the cap, its length is about 725.
+    // A step has an autocorrelation near 1 at each lag of the window, so its length reaches the cap.
     const n = 40_000;
     expect(blockLength(Array.from({ length: n }, (_, i) => (i < n / 2 ? 0 : 1)))).toBe(600);
     for (const short of [2, 3, 4, 5, 6, 9, 12, 30, 100]) {
