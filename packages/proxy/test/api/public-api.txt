@@ -16,6 +16,7 @@ type FramerPair: build/framers.d.ts#FramerPair
 type HttpHead: build/framers.d.ts#HttpHead
 type Protocol: build/proxy.d.ts#Protocol
 type ProxyOptions: build/proxy.d.ts#ProxyOptions
+REASONS: build/answer.d.ts#REASONS
 type Send: build/applier.d.ts#Send
 type Step: build/applier.d.ts#Step
 answerBytes: build/answer.d.ts#answerBytes
@@ -29,7 +30,30 @@ tcpFramers: build/framers.d.ts#tcpFramers
 webSocketFrameLength: build/framers.d.ts#webSocketFrameLength
 webSocketFramer: build/framers.d.ts#webSocketFramer
 
+## ./applier (build/applier-entry.d.ts): names
+
+type Applier: build/applier.d.ts#Applier
+type FaultRecord: build/applier.d.ts#FaultRecord
+type Framer: build/framers.d.ts#Framer
+type FramerPair: build/framers.d.ts#FramerPair
+type HttpHead: build/framers.d.ts#HttpHead
+REASONS: build/answer.d.ts#REASONS
+type Send: build/applier.d.ts#Send
+type Step: build/applier.d.ts#Step
+answerBytes: build/answer.d.ts#answerBytes
+applierOf: build/applier.d.ts#applierOf
+chunkFramer: build/framers.d.ts#chunkFramer
+httpFramers: build/framers.d.ts#httpFramers
+readHttpHead: build/framers.d.ts#readHttpHead
+splitBytes: build/applier.d.ts#splitBytes
+tcpFramers: build/framers.d.ts#tcpFramers
+webSocketFrameLength: build/framers.d.ts#webSocketFrameLength
+webSocketFramer: build/framers.d.ts#webSocketFramer
+
 ## Declarations
+
+### build/answer.d.ts#REASONS
+export declare const REASONS: Readonly<Record<number, string>>;
 
 ### build/answer.d.ts#answerBytes
 export declare function answerBytes(answer: Omit<AnswerFault, "kind">): Uint8Array;

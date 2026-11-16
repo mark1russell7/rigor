@@ -65,6 +65,20 @@ An `answer` puts an HTTP/1.1 response from the plan in place of the server. The 
 
 The framers (`tcpFramers`, `httpFramers`, `webSocketFramer`), the applier (`applierOf`) and `answerBytes` read no clock and write no socket. A test gives them bytes and times, and it examines the writes that they give back.
 
+The entry `@mark1russell7/rigor-proxy/applier` has these parts and no module of Node.js. A browser can load it, for example to show the writes of a plan.
+
+```ts
+import { faultPlan } from "@mark1russell7/rigor-chaos";
+import { applierOf } from "@mark1russell7/rigor-proxy/applier";
+
+const plan = faultPlan({ connections: 1, perConnection: 2, kinds: { delay: 1, cut: 1 }, within: { frame: 8 } }, 7);
+const applier = applierOf(plan, 0, "up");
+const step = applier.push(new TextEncoder().encode("frame 0"), 0);
+// step.sends has the bytes and the time of each write. step.records has each fault that the frame started.
+```
+
+`REASONS` has the reason of each HTTP status, equal to `STATUS_CODES` of `node:http` in Node.js 24. Thus `answerBytes` gives the same bytes in each runtime.
+
 ## Tests
 
 The tests with real sockets measure time, thus only CI starts them, in the workflow `proxy-net.yml`. `pnpm test` starts only the tests of the pure parts.

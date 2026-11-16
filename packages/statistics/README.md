@@ -204,6 +204,20 @@ choosePair(pool, { seed: "duel-1" });             // the next pair of a duel, th
 
 `choosePair` chooses the next pair of a duel from a pool of rated items. A draw selects the first item with the weight `1 / (1 + picks)`. The second item is the candidate with the most `pairInformation`. A recent pair loses to each pair that is not recent. The option `information` changes the value of a pair, or forbids a pair.
 
+## A series in time order
+
+A row bootstrap draws each reading alone. For a series with autocorrelation, its interval is too narrow. The moving-block bootstrap draws blocks of readings that follow each other.
+
+```ts
+import { blockLength, bootstrapMovingBlock, mean } from "@mark1russell7/rigor-statistics";
+
+const i = bootstrapMovingBlock(series, mean, { seed: 1 }); // the block length comes from blockLength(series)
+i.low, i.high, i.block;                                      // the interval and the block length that it used
+bootstrapMovingBlock(series, mean, { block: 12, circular: true }); // a block can wrap from the end to the start
+```
+
+In the tests, the series are AR(1) with 200 readings and the slope 0.6. There, the 95% interval of the mean contains the true mean for 85% of the series. The row bootstrap contains it for 65%. The block length of a short series is too small, so the coverage is below 95%. At 800 readings, it is approximately 93%.
+
 ## The functions
 
 | Function | What it gives |
@@ -217,10 +231,13 @@ choosePair(pool, { seed: "duel-1" });             // the next pair of a duel, th
 | `bootstrapStrata(strata, statistic, options)` | A stratified bootstrap. Each run draws inside each stratum, so each sample keeps the size of each stratum. |
 | `bootstrapTwo(a, b, statistic, options)` | A bootstrap interval of a statistic of two independent samples, for example two arms of a benchmark. Each run draws all of `a`, then all of `b`. |
 | `bootstrapMedianRatio(numerator, denominator, options)` | The interval of `median(numerator) / median(denominator)`. It is the uncertainty of the ratio, not the spread of the samples. |
+| `bootstrapMovingBlock(series, statistic, options)` | A bootstrap of a series in time order. Each run draws blocks of `block` readings that follow each other, with replacement, and cuts the joined blocks to the length of the series. With `circular`, a block can wrap from the end to the start. With `block` 1, the interval is the interval of `bootstrap`. The result gives `block` and `circular`. |
+| `blockLength(series)` | The block length of a series of numbers for the moving-block bootstrap of its mean. It uses the rule of Politis and White (2004) with the correction of Patton, Politis and White (2009). The length is from 1 to `ceil(min(3 sqrt(n), n / 3))`. |
 | `sampleTotalInterval(values, { population, scale })` | The interval of the total of a population from a uniform sample of `m` of its `n` items without replacement. The deviations get the finite population correction `sqrt(1 - m / n)`. `scale` is `n / m` by default. When `m` is `n`, the interval is the estimate. For a small `m`, the interval is too narrow: at `m = 8` of `n = 40`, the coverage is 0.865. For a total over pairs, use `uStatisticInterval`. |
 | `uStatisticInterval(totals, { order, population, method, level, range })` | The interval of a total over all sets of `r` units of a population, for example the crossings of all pairs. The input is the total of each unit of a sample without replacement. The estimate is `S * C(n, r) / C(m, r)`. The method `"conservative"` uses the Hoeffding bound of a U-statistic with `floor(m / r)` draws and the `range` of the kernel. It holds at each `m`. The method `"tight"` uses the jackknife variance times `1 - m / n`, and the t quantile with `m - 1` degrees of freedom. This variance is exact for a linear kernel and larger for others. When all the totals are equal, the method `"tight"` uses the method `"conservative"`, or it throws without `range`. The result gives the `method` that it used. At `m = 8`, the coverage of `"tight"` is 0.885 to 0.915 for a skewed kernel. The method `"auto"` needs `range`. It uses `"tight"` from `m = U_STATISTIC_TIGHT_MIN_SAMPLE`. The calibration study `u-statistic-interval` sets this constant with `coverageMinSample`. Until a run of the study gives a value, it is infinite. |
 | `leastSquares(x, y, { intercept })` | The ordinary least-squares fit of `y` on the rows of `x`, with a QR decomposition. It gives the coefficients, `residualSd`, `r2`, `n` and `k`. A singular design gives NaN coefficients. |
 | `bootstrapLeastSquares(x, y, options)` | One bootstrap interval for each coefficient of `leastSquares`, from the same draws of whole rows. A singular draw does not count. |
+| `bootstrapMovingBlockLeastSquares(x, y, options)` | The moving-block form of `bootstrapLeastSquares`, for rows in time order. Without `block`, the block length is `blockLength` of the residuals of the fit of all the rows. |
 | `ridgeSolve(gram, moment, lambda, { free })` | The ridge coefficients from the normal equations `X'X` and `X'y`, with a Cholesky factorization. The `free` coefficients have no penalty. A matrix that is not positive definite gives NaN coefficients. |
 | `signTest(better, worse, sides)`, `signTestPower(n, level)` | The sign test, and the fewest wins out of `n` that the test calls significant. |
 | `pairedPermutation(candidate, baseline, options)` | The paired permutation test (random sign flips). It uses the size of each difference. |
