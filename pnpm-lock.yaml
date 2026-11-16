@@ -168,7 +168,7 @@ importers:
     devDependencies:
       '@mark1russell7/api-report':
         specifier: ^0.5.0
-        version: 0.5.7
+        version: 0.5.8
       '@mark1russell7/boundaries':
         specifier: ^0.2.0
         version: 0.2.1(@swc/core@1.16.22)(dependency-cruiser@18.7.2)
@@ -176,8 +176,8 @@ importers:
         specifier: ^0.11.2
         version: 0.11.2(zod@4.6.7)
       '@mark1russell7/conventions':
-        specifier: ^0.41.0
-        version: 0.41.15
+        specifier: ^0.42.6
+        version: 0.42.6
       '@mark1russell7/cue':
         specifier: ^2.0.0
         version: 2.1.4
@@ -218,8 +218,8 @@ importers:
         specifier: workspace:^
         version: link:../statistics
       '@mark1russell7/text':
-        specifier: ^0.0.10
-        version: 0.0.10
+        specifier: ^0.0.11
+        version: 0.0.11
     devDependencies:
       '@mark1russell7/cue':
         specifier: ^2.0.0
@@ -301,8 +301,8 @@ importers:
         specifier: workspace:^
         version: link:../statistics
       '@mark1russell7/text':
-        specifier: ^0.0.10
-        version: 0.0.10
+        specifier: ^0.0.11
+        version: 0.0.11
     devDependencies:
       '@mark1russell7/cue':
         specifier: ^2.0.0
@@ -333,7 +333,7 @@ importers:
     dependencies:
       '@mark1russell7/algebra':
         specifier: ^0.9.5
-        version: 0.9.5(zod@4.6.7)
+        version: 0.9.6(zod@4.6.7)
       '@mark1russell7/rigor-chaos':
         specifier: workspace:^
         version: link:../chaos
@@ -375,8 +375,8 @@ importers:
         specifier: workspace:*
         version: link:../statistics
       '@mark1russell7/text':
-        specifier: ^0.0.10
-        version: 0.0.10
+        specifier: ^0.0.11
+        version: 0.0.11
     devDependencies:
       '@mark1russell7/cue':
         specifier: ^2.0.0
@@ -1026,8 +1026,8 @@ packages:
       zod:
         optional: true
 
-  '@mark1russell7/algebra@0.9.5':
-    resolution: {integrity: sha512-wa/Hn3zFfoDBVonrI9ebSIlDm59kHxxdmfjgNjIztw3cLGFmrZg9t0yEcOtXXeE0tjgy/lI8gtsiWwMGo7w4HA==}
+  '@mark1russell7/algebra@0.9.6':
+    resolution: {integrity: sha512-FJAmXgBQTbd99es9+D4s6iit/m2nDWR1KLl5BDQWPtiNsguWzMrjqL4vMi0VIl9YKf/wTbP6yb/4r9aPF4/gng==}
     engines: {node: '>=22.19'}
     peerDependencies:
       zod: ^4.1.0
@@ -1035,8 +1035,8 @@ packages:
       zod:
         optional: true
 
-  '@mark1russell7/api-report@0.5.7':
-    resolution: {integrity: sha512-Oe69KbJhZL6GIrbEwNVIFN+Yz5XLjgEt78CrQZFX7vdeGANWuRyDCoLQaebumVuyip52WpPt19ZQU7n3Oj5WmQ==}
+  '@mark1russell7/api-report@0.5.8':
+    resolution: {integrity: sha512-HS395EG0QBs2uA4EZ8gLak2m6YMqkC8XqPagNuE36uY8F6YZmb9Xz5SEr52Gv/6fb6J8JTXpw/zfkZeDAXcdHQ==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -1056,8 +1056,8 @@ packages:
     resolution: {integrity: sha512-6JXrfvg2vMGITbc11C3POvDwbbCU7PMkFWSYdYjshJj5o0LSAMnpPsVSQySfA5G4mdYeAdJ/VfN5Yc3foJkdCQ==}
     engines: {node: '>=22.12'}
 
-  '@mark1russell7/conventions@0.41.15':
-    resolution: {integrity: sha512-MxfocF+YfdmMbG1UPZrZ17s7HyuCltJi2o488MtHiBgLy1oKrVgGZ1kSkCp0GUGkm2wgvShlhvnB9blEPYGvAg==}
+  '@mark1russell7/conventions@0.42.6':
+    resolution: {integrity: sha512-eXnwV01JOeHuHjQsNG4CXmwhwnxaSZNFqLjh7YNj81b99m++MsB64KN1096iPzKcdML2rAakWwNRQZzrOo/esQ==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -1115,8 +1115,8 @@ packages:
     engines: {node: '>=22.12'}
     hasBin: true
 
-  '@mark1russell7/text@0.0.10':
-    resolution: {integrity: sha512-ugLHCAcllSOlNZ0oz5Q8Wf3OkqfnSvwxgx8FL2gQ3EX7K1IS9oW9k2Jq77Obwa2ZtpzhNV47lJL2bGgvFVB14A==}
+  '@mark1russell7/text@0.0.11':
+    resolution: {integrity: sha512-4CxTYXlCzloFRGiEMs6veve/x5HzeEzASMVbYrbIxAEdwVsVoCzKwW7/YBqtFxBcp4Em57pn5kNIYm2SLGCvMA==}
     engines: {node: '>=22.12'}
 
   '@napi-rs/wasm-runtime@1.2.6':
@@ -3179,15 +3179,15 @@ snapshots:
     optionalDependencies:
       zod: 4.6.7
 
-  '@mark1russell7/algebra@0.9.5(zod@4.6.7)':
+  '@mark1russell7/algebra@0.9.6(zod@4.6.7)':
     dependencies:
       '@mark1russell7/quantity': 0.4.1(zod@4.6.7)
     optionalDependencies:
       zod: 4.6.7
 
-  '@mark1russell7/api-report@0.5.7':
+  '@mark1russell7/api-report@0.5.8':
     dependencies:
-      '@mark1russell7/conventions': 0.41.15
+      '@mark1russell7/conventions': 0.42.6
 
   '@mark1russell7/boundaries@0.2.1(@swc/core@1.16.22)(dependency-cruiser@18.7.2)':
     optionalDependencies:
@@ -3202,7 +3202,7 @@ snapshots:
     transitivePeerDependencies:
       - zod
 
-  '@mark1russell7/conventions@0.41.15':
+  '@mark1russell7/conventions@0.42.6':
     dependencies:
       yaml: 2.9.1
 
@@ -3242,7 +3242,7 @@ snapshots:
     dependencies:
       '@clack/prompts': 1.8.1
 
-  '@mark1russell7/text@0.0.10': {}
+  '@mark1russell7/text@0.0.11': {}
 
   '@napi-rs/wasm-runtime@1.2.6(@emnapi/core@2.0.0-beta.2)(@emnapi/runtime@2.0.0-beta.2)':
     dependencies:
