@@ -436,6 +436,9 @@ importers:
       '@mark1russell7/rigor-generators':
         specifier: workspace:^
         version: link:../generators
+      '@mark1russell7/rigor-proxy':
+        specifier: workspace:^
+        version: link:../proxy
       '@opentelemetry/api':
         specifier: ^1.9.0
         version: 1.10.0

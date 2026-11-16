@@ -1,5 +1,28 @@
 import { type IncomingMessage, type ServerResponse, createServer, validateHeaderName, validateHeaderValue } from "node:http";
 import type { AddressInfo, Socket } from "node:net";
+import { checkWebSocketRoutes, type WebSocketConnection, type WebSocketRoute } from "./websocket.ts";
+
+export {
+  type CloseStep,
+  type DestroyStep,
+  type EndStep,
+  type RawStep,
+  type ReceiveStep,
+  type ReceivedWebSocketFrame,
+  type SendStep,
+  type WebSocketConnection,
+  type WebSocketHandshake,
+  type WebSocketRoute,
+  type WebSocketSession,
+  type WebSocketStep,
+  type WebSocketWire,
+  HANDSHAKE_RESERVED_FIELDS,
+  checkWebSocketHandshake,
+  checkWebSocketRoutes,
+  checkWebSocketStep,
+  messagesOf,
+  webSocketAccept,
+} from "./websocket.ts";
 
 /**
  * A scripted HTTP/1.1 server for the fixtures of a client test. Each route has a list of replies, as data. The server
@@ -91,6 +114,11 @@ export interface ScriptedServerOptions {
   readonly unmatched?: ScriptedReply;
   /** The address of the server. The default is `127.0.0.1`, with a free port. */
   readonly listen?: { readonly host?: string; readonly port?: number };
+  /**
+   * The WebSocket routes. An upgrade request to `websocket` gets the sessions of the first route that matches it. These
+   * routes need the optional peer `@mark1russell7/rigor-proxy`. Without them, the server does not accept an upgrade.
+   */
+  readonly webSockets?: readonly WebSocketRoute[];
 }
 
 /** A scripted server that listens. */
@@ -101,6 +129,10 @@ export interface ScriptedServer {
   readonly port: number;
   /** The records of the requests, in the order that the server read them whole. */
   readonly requests: readonly ScriptedRequest[];
+  /** The URL of the server for a WebSocket client, for example `ws://127.0.0.1:41234`, with no `/` at the end. */
+  readonly webSocketUrl: string;
+  /** The records of the WebSocket connections, in the order of their upgrade requests. */
+  readonly webSockets: readonly WebSocketConnection[];
   /** This method stops the server and destroys each open connection. */
   close(): Promise<void>;
 }
@@ -159,15 +191,20 @@ export function checkScriptedServer(options: ScriptedServerOptions): readonly st
     else route.replies.forEach((reply: ScriptedReply, at: number) => out.push(...checkScriptedReply(reply).map((problem) => `The route ${index}, the reply ${at}: ${problem}`)));
   });
   if (options.unmatched !== undefined) out.push(...checkScriptedReply(options.unmatched).map((problem) => `The unmatched reply: ${problem}`));
+  if (options.webSockets !== undefined) out.push(...checkWebSocketRoutes(options.webSockets));
   return out;
+}
+
+/** This function tells if the path of a route matches the target of a request. */
+function pathMatches(path: string, target: string): boolean {
+  if (path.includes("?")) return path === target;
+  const query = target.indexOf("?");
+  return path === (query === -1 ? target : target.slice(0, query));
 }
 
 /** This function tells if a route matches the method and the target of a request. */
 function matches(route: ScriptedRoute, method: string, target: string): boolean {
-  if ((route.method ?? "GET").toUpperCase() !== method.toUpperCase()) return false;
-  if (route.path.includes("?")) return route.path === target;
-  const query = target.indexOf("?");
-  return route.path === (query === -1 ? target : target.slice(0, query));
+  return (route.method ?? "GET").toUpperCase() === method.toUpperCase() && pathMatches(route.path, target);
 }
 
 /** This function gives the fields of a request from its raw list, with lower-case names. Repeated fields are joined with a comma. */
@@ -292,6 +329,19 @@ export async function startScriptedServer(options: ScriptedServerOptions): Promi
     next += 1;
   });
   server.on("clientError", (_, socket: Socket) => socket.destroy());
+  const webSockets: WebSocketConnection[] = [];
+  // The WebSocket module loads the optional peer rigor-proxy, thus the server loads it only for WebSocket routes.
+  const host =
+    options.webSockets === undefined || options.webSockets.length === 0
+      ? undefined
+      : (await import("./websocket-server.ts")).attachWebSockets({
+          server,
+          routes: options.webSockets,
+          connections: webSockets,
+          numberOf: (socket) => numbers.get(socket) ?? -1,
+          matches: pathMatches,
+          fieldsOf,
+        });
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -301,15 +351,18 @@ export async function startScriptedServer(options: ScriptedServerOptions): Promi
     });
   });
   const address = server.address() as AddressInfo;
-  const host = address.family === "IPv6" ? `[${address.address}]` : address.address;
+  const hostname = address.family === "IPv6" ? `[${address.address}]` : address.address;
   return {
-    url: `http://${host}:${address.port}`,
+    url: `http://${hostname}:${address.port}`,
     host: address.address,
     port: address.port,
     requests,
+    webSocketUrl: `ws://${hostname}:${address.port}`,
+    webSockets,
     close: () =>
       new Promise<void>((resolve) => {
         stopped = true;
+        host?.stop();
         for (const timer of timers) clearTimeout(timer);
         timers.clear();
         server.close(() => resolve());

@@ -77,18 +77,37 @@ captureTelemetry: build/otel.d.ts#captureTelemetry
 ## ./http (build/http.d.ts): names
 
 BodyPart: build/http.d.ts#BodyPart
+type CloseStep: build/websocket.d.ts#CloseStep
+type DestroyStep: build/websocket.d.ts#DestroyStep
+type EndStep: build/websocket.d.ts#EndStep
 FRAMINGS: build/http.d.ts#FRAMINGS
 Framing: build/http.d.ts#Framing
+HANDSHAKE_RESERVED_FIELDS: build/websocket.d.ts#HANDSHAKE_RESERVED_FIELDS
 REPLY_RESERVED_FIELDS: build/http.d.ts#REPLY_RESERVED_FIELDS
+type RawStep: build/websocket.d.ts#RawStep
+type ReceiveStep: build/websocket.d.ts#ReceiveStep
+type ReceivedWebSocketFrame: build/websocket.d.ts#ReceivedWebSocketFrame
 ReplyWire: build/http.d.ts#ReplyWire
 ScriptedReply: build/http.d.ts#ScriptedReply
 ScriptedRequest: build/http.d.ts#ScriptedRequest
 ScriptedRoute: build/http.d.ts#ScriptedRoute
 ScriptedServer: build/http.d.ts#ScriptedServer
 ScriptedServerOptions: build/http.d.ts#ScriptedServerOptions
+type SendStep: build/websocket.d.ts#SendStep
+type WebSocketConnection: build/websocket.d.ts#WebSocketConnection
+type WebSocketHandshake: build/websocket.d.ts#WebSocketHandshake
+type WebSocketRoute: build/websocket.d.ts#WebSocketRoute
+type WebSocketSession: build/websocket.d.ts#WebSocketSession
+type WebSocketStep: build/websocket.d.ts#WebSocketStep
+type WebSocketWire: build/websocket.d.ts#WebSocketWire
 checkScriptedReply: build/http.d.ts#checkScriptedReply
 checkScriptedServer: build/http.d.ts#checkScriptedServer
+checkWebSocketHandshake: build/websocket.d.ts#checkWebSocketHandshake
+checkWebSocketRoutes: build/websocket.d.ts#checkWebSocketRoutes
+checkWebSocketStep: build/websocket.d.ts#checkWebSocketStep
+messagesOf: build/websocket.d.ts#messagesOf
 startScriptedServer: build/http.d.ts#startScriptedServer
+webSocketAccept: build/websocket.d.ts#webSocketAccept
 
 ## ./otlp (build/otlp.d.ts): names
 
@@ -442,6 +461,8 @@ export interface ScriptedServer {
   readonly host: string;
   readonly port: number;
   readonly requests: readonly ScriptedRequest[];
+  readonly webSocketUrl: string;
+  readonly webSockets: readonly WebSocketConnection[];
   close(): Promise<void>;
 }
 
@@ -453,6 +474,7 @@ export interface ScriptedServerOptions {
     readonly host?: string;
     readonly port?: number;
   };
+  readonly webSockets?: readonly WebSocketRoute[];
 }
 
 ### build/http.d.ts#checkScriptedReply
@@ -840,3 +862,122 @@ export declare function stopOccurred(evidence: StopEvidence): boolean;
 
 ### build/stop.d.ts#stopOrderOf
 export declare function stopOrderOf(stop: Stop | undefined, progress: string): StopOrder;
+
+### build/websocket.d.ts#CloseStep
+export interface CloseStep {
+  readonly close: {
+    readonly code?: number;
+    readonly reason?: string;
+  };
+  readonly delayMs?: number;
+}
+
+### build/websocket.d.ts#DestroyStep
+export interface DestroyStep {
+  readonly destroy: true;
+  readonly delayMs?: number;
+}
+
+### build/websocket.d.ts#EndStep
+export interface EndStep {
+  readonly end: true;
+  readonly delayMs?: number;
+}
+
+### build/websocket.d.ts#HANDSHAKE_RESERVED_FIELDS
+export declare const HANDSHAKE_RESERVED_FIELDS: readonly ["upgrade", "connection", "sec-websocket-accept", "sec-websocket-protocol", "content-length"];
+
+### build/websocket.d.ts#RawStep
+export interface RawStep {
+  readonly raw: string | Uint8Array;
+  readonly delayMs?: number;
+}
+
+### build/websocket.d.ts#ReceiveStep
+export interface ReceiveStep {
+  readonly receive: number;
+  readonly limitMs?: number;
+  readonly delayMs?: number;
+}
+
+### build/websocket.d.ts#ReceivedWebSocketFrame
+export interface ReceivedWebSocketFrame {
+  readonly at: number;
+  readonly fin: boolean;
+  readonly rsv: number;
+  readonly opcode: number;
+  readonly mask: Uint8Array | undefined;
+  readonly payload: Uint8Array;
+}
+
+### build/websocket.d.ts#SendStep
+export interface SendStep {
+  readonly send: string | Uint8Array;
+  readonly opcode?: number;
+  readonly fin?: boolean;
+  readonly rsv?: number;
+  readonly mask?: Uint8Array;
+  readonly delayMs?: number;
+}
+
+### build/websocket.d.ts#WebSocketConnection
+export interface WebSocketConnection {
+  readonly connection: number;
+  readonly target: string;
+  readonly fields: Readonly<Record<string, string>>;
+  readonly route: number;
+  readonly session: number;
+  readonly frames: readonly ReceivedWebSocketFrame[];
+  readonly wire: readonly WebSocketWire[];
+  readonly steps: number;
+  readonly invalid: boolean;
+  readonly closedAt: number | undefined;
+}
+
+### build/websocket.d.ts#WebSocketHandshake
+export interface WebSocketHandshake {
+  readonly status?: number;
+  readonly fields?: Readonly<Record<string, string>>;
+  readonly accept?: "right" | "wrong" | "none";
+  readonly protocol?: string;
+  readonly delayMs?: number;
+}
+
+### build/websocket.d.ts#WebSocketRoute
+export interface WebSocketRoute {
+  readonly path: string;
+  readonly sessions: readonly WebSocketSession[];
+}
+
+### build/websocket.d.ts#WebSocketSession
+export interface WebSocketSession {
+  readonly handshake?: WebSocketHandshake;
+  readonly steps?: readonly WebSocketStep[];
+  readonly answerPing?: boolean;
+  readonly answerClose?: boolean;
+}
+
+### build/websocket.d.ts#WebSocketStep
+export type WebSocketStep = SendStep | RawStep | ReceiveStep | CloseStep | EndStep | DestroyStep;
+
+### build/websocket.d.ts#WebSocketWire
+export interface WebSocketWire {
+  readonly step: number;
+  readonly offset: number;
+  readonly length: number;
+}
+
+### build/websocket.d.ts#checkWebSocketHandshake
+export declare function checkWebSocketHandshake(handshake: WebSocketHandshake): readonly string[];
+
+### build/websocket.d.ts#checkWebSocketRoutes
+export declare function checkWebSocketRoutes(routes: readonly WebSocketRoute[]): readonly string[];
+
+### build/websocket.d.ts#checkWebSocketStep
+export declare function checkWebSocketStep(step: WebSocketStep): readonly string[];
+
+### build/websocket.d.ts#messagesOf
+export declare function messagesOf(frames: readonly Pick<ReceivedWebSocketFrame, "fin" | "opcode" | "payload">[]): (string | Uint8Array)[];
+
+### build/websocket.d.ts#webSocketAccept
+export declare function webSocketAccept(key: string): string;

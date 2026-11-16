@@ -298,7 +298,7 @@ const report = await propagationGate({ key: "request.id", capture, transports })
 
 ## A scripted HTTP server
 
-The entry `@mark1russell7/rigor-testkit/http` gives an HTTP/1.1 server for the fixtures of a client test. Each route has a list of replies, as data. It uses only `node:http`.
+The entry `@mark1russell7/rigor-testkit/http` gives an HTTP/1.1 server for the fixtures of a client test. Each route has a list of replies, as data. It uses only `node:http`. Its WebSocket routes also need the optional peer `@mark1russell7/rigor-proxy`.
 
 ```ts no-run
 import { startScriptedServer } from "@mark1russell7/rigor-testkit/http";
@@ -355,6 +355,47 @@ The record of each request has `wire`, the place of its reply in the bytes of th
 - The first byte of the body is at `offset + head` of the down direction.
 - The server sends the head alone, before the body. Thus `head` is known before the first part.
 - A test can measure the place with one request, then cut a second connection at the same place. The same script gives the same bytes.
+
+### WebSocket routes
+
+The option `webSockets` gives WebSocket routes (RFC 6455) on the same port as the HTTP routes. Each route has a list of sessions, as data. A session is the reply to the handshake and the steps of the server. Thus a test of a client that starts with HTTP and goes to WebSocket has one server.
+
+```ts no-run
+import { messagesOf, startScriptedServer } from "@mark1russell7/rigor-testkit/http";
+
+const server = await startScriptedServer({
+  routes: [{ path: "/engine.io/", replies: [{ body: openPacket }] }],
+  webSockets: [
+    {
+      path: "/engine.io/",
+      sessions: [{ steps: [{ send: "3probe" }, { receive: 2 }, { send: "", opcode: 9 }, { close: { code: 4000, reason: "bye" } }] }],
+    },
+  ],
+});
+// The client under test uses server.url for HTTP and server.webSocketUrl for WebSocket.
+expect(messagesOf(server.webSockets[0].frames)).toEqual(["2probe", "5"]);
+await server.close();
+```
+
+These routes load the frame codec of `@mark1russell7/rigor-proxy`. Install it next to `@mark1russell7/rigor-testkit`. A server with no WebSocket routes does not load it.
+
+| Step | The server |
+|---|---|
+| `send` | Sends one frame. Text is a text frame, and bytes are a binary frame. `opcode`, `fin`, `rsv` and `mask` change the frame. |
+| `raw` | Sends the bytes as they are, for example a part of a frame. |
+| `receive` | Waits until it has this number of messages from the client, counted from the start. After `limitMs`, it goes to the next step. |
+| `close` | Sends a close frame with `code` and `reason`, or with no payload. |
+| `end` | Closes its side of the TCP connection, with no close frame. |
+| `destroy` | Resets the TCP connection. |
+
+- Each step can have `delayMs`, a time before the step. After the last step, the server keeps the connection open.
+- The sessions of a route go in their order. After the end of the list, the route gives its last session again.
+- An upgrade request that no route matches gets the status 404.
+- `handshake` changes the reply to the handshake. A `status` other than 101 refuses the connection. `accept: "wrong"` or `"none"` breaks the accept value. `protocol` sets a subprotocol.
+- The server answers a ping with a pong. It answers a close frame with a close frame and the same code, then closes the connection. `answerPing: false` and `answerClose: false` stop these answers.
+- `webSockets` holds a record of each connection: its target, the fields of its request and the frames of the client. It also holds the writes of the server and the time of the close.
+- `messagesOf` joins the frames of each message into its text or its bytes.
+- A client that sends bytes that are not a frame gets a reset. Its record has `invalid: true`.
 
 ## A stand-in OTLP collector
 
