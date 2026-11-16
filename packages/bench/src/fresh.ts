@@ -164,9 +164,10 @@ export function eventProbe(options: ProbeOptions = {}): EventProbe {
   const file = options.deopt === true ? join(options.dir ?? tmpdir(), `rigor-bench-deopt-${process.pid}.txt`) : undefined;
   if (file !== undefined) for (const flag of ["--trace-deopt", "--redirect-code-traces", `--redirect-code-traces-to=${file}`]) setFlagsFromString(flag);
   const gc: { start: number; ms: number }[] = [];
-  const observer = new PerformanceObserver((list) => {
-    for (const entry of list.getEntries()) gc.push({ start: entry.startTime, ms: entry.duration });
-  });
+  const record = (entries: readonly { readonly startTime: number; readonly duration: number }[]): void => {
+    for (const entry of entries) gc.push({ start: entry.startTime, ms: entry.duration });
+  };
+  const observer = new PerformanceObserver((list) => record(list.getEntries()));
   observer.observe({ entryTypes: ["gc"] });
   const deopts = (): number => {
     if (file === undefined) return 0;
@@ -187,8 +188,9 @@ export function eventProbe(options: ProbeOptions = {}): EventProbe {
       marks.set(sample, { before, deopt, after: performance.now() });
     },
     events: async (samples) => {
-      // The observer gets the GC entries after a turn of the event loop.
+      // The observer gets the GC entries after a turn of the event loop. takeRecords gets the entries that are still in its buffer.
       await new Promise((done) => setTimeout(done, 10));
+      record(observer.takeRecords());
       observer.disconnect();
       if (file !== undefined) {
         setFlagsFromString("--no-trace-deopt");
