@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { random } from "@mark1russell7/rigor-generators";
-import { binomialInterval, binomialTest, clopperPearson, medianInterval, negativeBinomialInterval, quantileInterval, quantileSamples, signTest } from "./index.ts";
+import {
+  binomialInterval,
+  binomialTest,
+  clopperPearson,
+  medianInterval,
+  negativeBinomialInterval,
+  poissonInterval,
+  quantileInterval,
+  quantileSamples,
+  signTest,
+} from "./index.ts";
 
 /* ---------- The copies in the engines, word for word, as the references of the moves ---------- */
 
@@ -485,5 +495,113 @@ describe("clopperPearson", () => {
       expect(() => clopperPearson(1, 10, level)).toThrow(/clopperPearson: the level is more than 0 and less than 1/);
       expect(() => clopperPearson(0, 0, level)).toThrow(RangeError);
     }
+  });
+});
+
+describe("poissonInterval", () => {
+  const levels = [0.5, 0.8, 0.9, 0.95, 0.99, 0.999] as const;
+  // The chance of each count from 0 to `to` of X ~ Poisson(mean), by the plain product, as a reference for a small mean.
+  const chances = (mean: number, to: number): number[] => {
+    const out = [Math.exp(-mean)];
+    for (let i = 1; i <= to; i++) out.push((out[i - 1]! * mean) / i);
+    return out;
+  };
+  const below = (k: number, mean: number): number => chances(mean, k).reduce((s, c) => s + c, 0);
+
+  it("gives the closed forms at k = 0 and the low end at k = 1", () => {
+    for (const level of levels) {
+      const tail = (1 - level) / 2;
+      expect(poissonInterval(0, 1, level)).toEqual({ low: 0, high: -Math.log(tail) });
+      // P(X >= 1) = 1 - e^-m, so the low end of k = 1 is -ln(1 - tail).
+      expect(poissonInterval(1, 1, level).low).toBeCloseTo(-Math.log1p(-tail), 14);
+    }
+  });
+
+  it("agrees with the published intervals", () => {
+    // The published Garwood intervals to 5 significant digits: low = qchisq(0.025, 2k) / 2, high = qchisq(0.975, 2k + 2) / 2.
+    const cases = [
+      [1, 0.025318, 5.5716],
+      [2, 0.24221, 7.2247],
+      [5, 1.6235, 11.668],
+      [10, 4.7954, 18.39],
+      [20, 12.217, 30.888],
+    ] as const;
+    for (const [k, low, high] of cases) {
+      const interval = poissonInterval(k);
+      expect(Math.abs(interval.low / low - 1), `low of ${k}`).toBeLessThan(6e-5);
+      expect(Math.abs(interval.high / high - 1), `high of ${k}`).toBeLessThan(6e-5);
+    }
+  });
+
+  it("puts each tail at (1 - level) / 2 at its end", () => {
+    for (const level of levels) {
+      const tail = (1 - level) / 2;
+      for (let k = 1; k <= 40; k++) {
+        const { low, high } = poissonInterval(k, 1, level);
+        expect(Math.abs(1 - below(k - 1, low) - tail), `low of ${k} at ${level}`).toBeLessThan(1e-12);
+        expect(Math.abs(below(k, high) - tail), `high of ${k} at ${level}`).toBeLessThan(1e-12);
+      }
+    }
+  });
+
+  it("has a coverage of the level or more at each mean", () => {
+    for (const level of [0.8, 0.95, 0.99]) {
+      const intervals = Array.from({ length: 121 }, (_, k) => poissonInterval(k, 1, level));
+      for (let mean = 0.05; mean <= 60; mean += 0.05) {
+        const coverage = chances(mean, 120).reduce((s, c, k) => (intervals[k]!.low <= mean && mean <= intervals[k]!.high ? s + c : s), 0);
+        expect(coverage, `mean ${mean} at ${level}`).toBeGreaterThanOrEqual(level - 1e-12);
+      }
+    }
+  });
+
+  it("grows with k, and gets wider with the level", () => {
+    let last = poissonInterval(0);
+    for (let k = 1; k <= 200; k++) {
+      const next = poissonInterval(k);
+      expect(next.low).toBeGreaterThan(last.low);
+      expect(next.high).toBeGreaterThan(last.high);
+      last = next;
+    }
+    for (const k of [0, 1, 7, 50]) {
+      const [narrow, wide] = [poissonInterval(k, 1, 0.9), poissonInterval(k, 1, 0.99)];
+      expect(wide.low).toBeLessThanOrEqual(narrow.low);
+      expect(wide.high).toBeGreaterThan(narrow.high);
+    }
+  });
+
+  it("divides each end by the exposure", () => {
+    for (const k of [0, 1, 3, 30]) {
+      for (const exposure of [0.5, 3, 10, 365.25]) {
+        const [one, many] = [poissonInterval(k, 1, 0.9), poissonInterval(k, exposure, 0.9)];
+        expect(many).toEqual({ low: one.low / exposure, high: one.high / exposure });
+      }
+    }
+  });
+
+  it("is the limit of n times clopperPearson", () => {
+    const n = 100_000;
+    for (const k of [0, 1, 3, 10]) {
+      const [rate, share] = [poissonInterval(k), clopperPearson(k, n)];
+      if (k > 0) expect(Math.abs((share.low * n) / rate.low - 1), `low of ${k}`).toBeLessThan(1e-3);
+      expect(Math.abs((share.high * n) / rate.high - 1), `high of ${k}`).toBeLessThan(1e-3);
+    }
+  });
+
+  it("agrees with the Wilson-Hilferty form at a large count", () => {
+    // The cube-root normal form of the quantiles of the chi-square law, near exact for a large count.
+    const z = 1.959963984540054;
+    for (const k of [1000, 10_000]) {
+      const { low, high } = poissonInterval(k);
+      const lowForm = k * (1 - 1 / (9 * k) - z / (3 * Math.sqrt(k))) ** 3;
+      const highForm = (k + 1) * (1 - 1 / (9 * (k + 1)) + z / (3 * Math.sqrt(k + 1))) ** 3;
+      expect(Math.abs(low / lowForm - 1), `low of ${k}`).toBeLessThan(1e-5);
+      expect(Math.abs(high / highForm - 1), `high of ${k}`).toBeLessThan(1e-5);
+    }
+  });
+
+  it("refuses a count that is not whole, an exposure that is not more than 0 and a level out of range", () => {
+    for (const k of [-1, 1.5, Number.NaN]) expect(() => poissonInterval(k)).toThrow(RangeError);
+    for (const exposure of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) expect(() => poissonInterval(1, exposure)).toThrow(RangeError);
+    for (const level of [0, 1, -0.5, Number.NaN]) expect(() => poissonInterval(1, 1, level)).toThrow(RangeError);
   });
 });

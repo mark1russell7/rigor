@@ -1,7 +1,8 @@
 /**
  * The intervals that come from a discrete distribution. The interval of a median or of a quantile comes from the order
  * statistics. The central interval of a count comes from a binomial or a negative binomial distribution. The exact
- * interval of a proportion comes from the two tails of a binomial distribution.
+ * interval of a proportion comes from the two tails of a binomial distribution. The exact interval of a rate comes from
+ * the two tails of a Poisson distribution.
  */
 import { sorted } from "./describe.ts";
 import type { Proportion } from "./tests.ts";
@@ -212,11 +213,11 @@ export function binomialTest(k: number, n: number, p: number, side: BinomialSide
 }
 
 /**
- * This function halves the range 0 to 1 until its ends are two adjacent doubles, and it gives the two ends. The test
- * `rootAbove(p)` is true when the root is above p. The test must be monotone in p.
+ * This function halves the range from 0 to `top` until its ends are two adjacent doubles, and it gives the two ends. The
+ * test `rootAbove(x)` is true when the root is above x. The test must be monotone in x.
  */
-function bisect(rootAbove: (p: number) => boolean): readonly [number, number] {
-  let [lo, hi] = [0, 1];
+function bisect(rootAbove: (x: number) => boolean, top = 1): readonly [number, number] {
+  let [lo, hi] = [0, top];
   for (;;) {
     const middle = lo + (hi - lo) / 2;
     if (middle <= lo || middle >= hi) return [lo, hi];
@@ -253,6 +254,81 @@ export function clopperPearson(k: number, n: number, level = 0.95): Proportion {
   const low = k === 0 ? 0 : k === n ? Math.exp(Math.log(tail) / n) : bisect((p) => binomialTest(k, n, p, "greater") < tail)[0];
   const high = k === n ? 1 : k === 0 ? -Math.expm1(Math.log(tail) / n) : bisect((p) => binomialTest(k, n, p, "less") > tail)[1];
   return { low, high };
+}
+
+/** An interval of a rate: a count of events in an exposure, for example a count of events in 10 years. */
+export interface RateInterval {
+  readonly low: number;
+  readonly high: number;
+}
+
+/** The sum of the exponentials of the logs. The sum starts from the largest term, so a small sum keeps its digits. */
+function sumOfLogs(logs: readonly number[]): number {
+  const top = logs.reduce((max, l) => Math.max(max, l), Number.NEGATIVE_INFINITY);
+  if (top === Number.NEGATIVE_INFINITY) return 0;
+  return Math.exp(top) * logs.reduce((s, l) => s + Math.exp(l - top), 0);
+}
+
+/**
+ * This function gives a tail of X ~ Poisson(mean), for a mean more than 0. The side `"less"` gives `P(X <= k)`, and the side
+ * `"greater"` gives `P(X >= k)`. The log of each factorial is a sum of logs, so the terms need no gamma function.
+ */
+function poissonTail(k: number, mean: number, side: BinomialSide): number {
+  const logMean = Math.log(mean);
+  if (side === "greater") {
+    // Up to the mean, and at k = 0, the tail is large, so 1 - P(X <= k - 1) keeps its digits. P(X <= -1) is 0.
+    if (k <= mean) return Math.max(0, 1 - poissonTail(k - 1, mean, "less"));
+    // Above the mean, the terms fall from k. The sum stops when a term is below e^-45 of the first term.
+    let logFactorial = 0;
+    for (let i = 2; i <= k; i++) logFactorial += Math.log(i);
+    const first = k * logMean - mean - logFactorial;
+    const logs: number[] = [];
+    for (let i = k, log = first; log > first - 45; i++) {
+      logs.push(log);
+      log += logMean - Math.log(i + 1);
+    }
+    return Math.min(1, sumOfLogs(logs));
+  }
+  const logs: number[] = [];
+  let logFactorial = 0;
+  for (let i = 0; i <= k; i++) {
+    if (i > 0) logFactorial += Math.log(i);
+    logs.push(i * logMean - mean - logFactorial);
+  }
+  return Math.min(1, sumOfLogs(logs));
+}
+
+/**
+ * This function gives the exact interval of a Poisson rate (Garwood, 1936): `k` events in an exposure of `exposure` units.
+ * Let X ~ Poisson(m). The high end of m is the m with P(X <= k) = (1 - level) / 2. The low end is the m with
+ * P(X >= k) = (1 - level) / 2. The function divides each end by `exposure`.
+ *
+ * The coverage of the interval is `level` or more at each rate, so a small count gets a wide interval. For k = 0, `low` is 0
+ * and `high` is -ln((1 - level) / 2) / exposure. The interval is the limit of n times `clopperPearson(k, n, level)` when n grows.
+ *
+ * For a different k, a bisection on the tails finds each end of m to two adjacent doubles. The function gives the outer
+ * double of each pair, so the bisection does not make the interval narrower. The division by `exposure` rounds to the
+ * nearest double. Each end sums a tail approximately 60 + log2(k) times, and each sum reads approximately k terms or fewer.
+ *
+ * @param k - The count of events, a whole number of 0 or more.
+ * @param exposure - The exposure of the count, for example a count of years, a finite number more than 0.
+ * @param level - The level of the interval, more than 0 and less than 1.
+ * @returns The interval of the rate, from `low` to `high`.
+ */
+export function poissonInterval(k: number, exposure = 1, level = 0.95): RateInterval {
+  whole("poissonInterval", k);
+  if (!(exposure > 0 && Number.isFinite(exposure))) {
+    throw new RangeError(`poissonInterval: the exposure is a finite number more than 0, not ${exposure}.`);
+  }
+  const tail = levelOf("poissonInterval", level);
+  if (k === 0) return { low: 0, high: -Math.log(tail) / exposure };
+  // P(X <= k) falls as m grows, so the doubling ends at a top above the high end. P(X >= k) at m = k is more than the
+  // tail, so the low end is below k and below the top too.
+  let top = k + 1;
+  while (poissonTail(k, top, "less") > tail) top *= 2;
+  const low = bisect((m) => poissonTail(k, m, "greater") < tail, top)[0];
+  const high = bisect((m) => poissonTail(k, m, "less") > tail, top)[1];
+  return { low: low / exposure, high: high / exposure };
 }
 
 /**

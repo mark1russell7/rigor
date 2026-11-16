@@ -67,6 +67,35 @@ checkScriptedReply: build/http.d.ts#checkScriptedReply
 checkScriptedServer: build/http.d.ts#checkScriptedServer
 startScriptedServer: build/http.d.ts#startScriptedServer
 
+## ./otlp (build/otlp.d.ts): names
+
+OTLP_SIGNALS: build/otlp.d.ts#OTLP_SIGNALS
+OtlpCollector: build/otlp.d.ts#OtlpCollector
+OtlpSignal: build/otlp.d.ts#OtlpSignal
+OtlpWaitOptions: build/otlp.d.ts#OtlpWaitOptions
+startOtlpCollector: build/otlp.d.ts#startOtlpCollector
+
+## ./fakes (build/fakes.d.ts): names
+
+FakeEventTarget: build/fakes.d.ts#FakeEventTarget
+FakeListener: build/fakes.d.ts#FakeListener
+FakeListenerOptions: build/fakes.d.ts#FakeListenerOptions
+FakeRegistration: build/fakes.d.ts#FakeRegistration
+createFakeEventTarget: build/fakes.d.ts#createFakeEventTarget
+
+## ./child (build/child.d.ts): names
+
+ChildExit: build/child.d.ts#ChildExit
+ChildServer: build/child.d.ts#ChildServer
+ChildServerError: build/child.d.ts#ChildServerError
+ChildServerGroup: build/child.d.ts#ChildServerGroup
+ChildServerOptions: build/child.d.ts#ChildServerOptions
+PORT_LINE: build/child.d.ts#PORT_LINE
+PortReport: build/child.d.ts#PortReport
+childServerGroup: build/child.d.ts#childServerGroup
+portOfText: build/child.d.ts#portOfText
+startChildServer: build/child.d.ts#startChildServer
+
 ## Declarations
 
 ### build/arbitrary.d.ts#UniformDoubleOptions
@@ -77,6 +106,106 @@ export interface UniformDoubleOptions {
 
 ### build/arbitrary.d.ts#uniformDouble
 export declare function uniformDouble(options: UniformDoubleOptions): fc.Arbitrary<number>;
+
+### build/child.d.ts#ChildExit
+export interface ChildExit {
+  readonly code: number | null;
+  readonly signal: NodeJS.Signals | null;
+}
+
+### build/child.d.ts#ChildServer
+export interface ChildServer {
+  readonly port: number;
+  readonly child: ChildProcess;
+  output(): string;
+  stop(): Promise<ChildExit>;
+}
+
+### build/child.d.ts#ChildServerError
+export declare class ChildServerError extends Error {
+  readonly pid: number | undefined;
+  readonly output: string;
+  readonly exit: ChildExit | undefined;
+  constructor(message: string, details: {
+    pid: number | undefined;
+    output: string;
+    exit: ChildExit | undefined;
+  }, options?: ErrorOptions);
+}
+
+### build/child.d.ts#ChildServerGroup
+export interface ChildServerGroup {
+  start(options: ChildServerOptions): Promise<ChildServer>;
+  stopAll(): Promise<void>;
+}
+
+### build/child.d.ts#ChildServerOptions
+export interface ChildServerOptions {
+  readonly command: string;
+  readonly args?: readonly string[];
+  readonly cwd?: string;
+  readonly env?: Readonly<Record<string, string | undefined>>;
+  readonly report?: PortReport;
+  readonly timeoutMs?: number;
+  readonly pollMs?: number;
+  readonly stopGraceMs?: number;
+  readonly signal?: AbortSignal;
+}
+
+### build/child.d.ts#PORT_LINE
+export declare const PORT_LINE: RegExp;
+
+### build/child.d.ts#PortReport
+export type PortReport = {
+  readonly from: "stdout";
+  readonly pattern?: RegExp;
+} | {
+  readonly from: "file";
+  readonly path: string;
+  readonly parse?: (text: string) => number | undefined;
+} | {
+  readonly from: "poll";
+  readonly read: (child: ChildProcess) => number | undefined | Promise<number | undefined>;
+};
+
+### build/child.d.ts#childServerGroup
+export declare function childServerGroup(): ChildServerGroup;
+
+### build/child.d.ts#portOfText
+export declare function portOfText(text: string): number | undefined;
+
+### build/child.d.ts#startChildServer
+export declare function startChildServer(options: ChildServerOptions): Promise<ChildServer>;
+
+### build/fakes.d.ts#FakeEventTarget
+export interface FakeEventTarget {
+  addEventListener(type: string, listener: FakeListener, options?: FakeListenerOptions): void;
+  removeEventListener(type: string, listener: FakeListener, options?: boolean | {
+    readonly capture?: boolean;
+  }): void;
+  dispatch(type: string, event?: unknown): void;
+  listeners(): FakeRegistration[];
+}
+
+### build/fakes.d.ts#FakeListener
+export type FakeListener = (event?: unknown) => void;
+
+### build/fakes.d.ts#FakeListenerOptions
+export type FakeListenerOptions = boolean | {
+  readonly capture?: boolean;
+  readonly once?: boolean;
+};
+
+### build/fakes.d.ts#FakeRegistration
+export interface FakeRegistration {
+  readonly type: string;
+  readonly listener: FakeListener;
+  readonly capture: boolean;
+  readonly once: boolean;
+}
+
+### build/fakes.d.ts#createFakeEventTarget
+export declare function createFakeEventTarget(): FakeEventTarget;
 
 ### build/http.d.ts#BodyPart
 export type BodyPart = string | Uint8Array;
@@ -260,6 +389,35 @@ export interface TelemetryCapture {
 ### build/otel.d.ts#captureTelemetry
 export declare function captureTelemetry(options?: OwnSdkCaptureOptions): OwnSdkTelemetryCapture;
 export declare function captureTelemetry(options: ExternalSdkCaptureOptions): TelemetryCapture;
+
+### build/otlp.d.ts#OTLP_SIGNALS
+export declare const OTLP_SIGNALS: readonly OtlpSignal[];
+
+### build/otlp.d.ts#OtlpCollector
+export interface OtlpCollector {
+  readonly endpoint: string;
+  exports(signal?: OtlpSignal): number;
+  unread(signal?: OtlpSignal): number;
+  counts(signal?: OtlpSignal): ReadonlyMap<string, number>;
+  names(signal?: OtlpSignal): ReadonlyMap<string, ReadonlySet<string>>;
+  missing(scopes: readonly string[], signal?: OtlpSignal): string[];
+  waitFor(scopes: readonly string[], options?: OtlpWaitOptions): Promise<string[]>;
+  close(): Promise<void>;
+}
+
+### build/otlp.d.ts#OtlpSignal
+export type OtlpSignal = "traces" | "metrics" | "logs";
+
+### build/otlp.d.ts#OtlpWaitOptions
+export interface OtlpWaitOptions {
+  readonly signal?: OtlpSignal;
+  readonly timeoutMs?: number;
+  readonly intervalMs?: number;
+  readonly poke?: () => Promise<unknown>;
+}
+
+### build/otlp.d.ts#startOtlpCollector
+export declare function startOtlpCollector(): Promise<OtlpCollector>;
 
 ### build/propagation.d.ts#GATE_NAMES
 export declare const GATE_NAMES: {

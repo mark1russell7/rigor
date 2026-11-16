@@ -100,11 +100,13 @@ export {
   type CountInterval,
   type MedianInterval,
   type QuantileInterval,
+  type RateInterval,
   binomialInterval,
   binomialTest,
   clopperPearson,
   medianInterval,
   negativeBinomialInterval,
+  poissonInterval,
   quantileInterval,
   quantileSamples,
 } from "./discrete.ts";
