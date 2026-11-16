@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { STOP_ENV, countStops, runToStop, stopPoint } from "./stop.ts";
+import { STOP_ENV, countStops, parseProgress, runToStop, stopOrderOf, stopPoint } from "./stop.ts";
 
 const stopUrl = new URL("./stop.ts", import.meta.url).href;
 const posix = process.platform !== "win32";
@@ -154,5 +154,41 @@ describe("the errors of a run", { timeout: 30_000 }, () => {
   it("does no work without the order", () => {
     expect(process.env[STOP_ENV]).toBeUndefined();
     expect(() => stopPoint("here")).not.toThrow();
+  });
+});
+
+describe("the order and the progress file for a harness that starts the child itself", { timeout: 30_000 }, () => {
+  it("puts a stop at a step into the order, and leaves a stop at a time and no stop out", () => {
+    expect(stopOrderOf({ at: { step: 3 }, signal: "SIGTERM" }, "/tmp/p.jsonl")).toEqual({ progress: "/tmp/p.jsonl", step: 3, signal: "SIGTERM" });
+    expect(stopOrderOf({ at: { ms: 40 }, signal: "SIGKILL" }, "/tmp/p.jsonl")).toEqual({ progress: "/tmp/p.jsonl" });
+    expect(stopOrderOf(undefined, "/tmp/p.jsonl")).toEqual({ progress: "/tmp/p.jsonl" });
+  });
+
+  it("throws a RangeError for a stop with problems", () => {
+    expect(() => stopOrderOf({ at: { step: -1 }, signal: "SIGKILL" }, "/tmp/p.jsonl")).toThrow(RangeError);
+  });
+
+  it("gives the order that the child reads", async () => {
+    const progress = join(folder, "progress.jsonl");
+    const order = stopOrderOf({ at: { step: 2 }, signal: "SIGKILL" }, progress);
+    const { command, args } = tenPoints();
+    const result = spawnSync(command, args, { env: { ...process.env, [STOP_ENV]: JSON.stringify(order) }, encoding: "utf8" });
+    if (posix) expect(result.signal).toBe("SIGKILL");
+    expect(await doneSteps()).toEqual([0, 1]);
+    const lines = parseProgress(await readFile(progress, "utf8"));
+    expect(lines.map((line) => line.step)).toEqual([0, 1, 2]);
+    expect(lines.at(-1)).toEqual({ step: 2, label: "write 2", stop: true });
+  });
+
+  it("reads each complete line, and ignores a last line that the child did not write completely", () => {
+    const text = `${JSON.stringify({ step: 0 })}\n${JSON.stringify({ step: 1, label: "b" })}\n{"step":2,"lab`;
+    expect(parseProgress(text)).toEqual([{ step: 0 }, { step: 1, label: "b" }]);
+    expect(parseProgress("")).toEqual([]);
+  });
+
+  it("ignores each JSON value that is not a progress line", () => {
+    const bad = ["5", "null", "[]", "{}", '"step"', '{"step":-1}', '{"step":1.5}', '{"step":"1"}', '{"step":1,"label":2}', '{"step":1,"stop":false}'];
+    const text = [...bad, JSON.stringify({ step: 3, label: "c", stop: true })].join("\n");
+    expect(parseProgress(text)).toEqual([{ step: 3, label: "c", stop: true }]);
   });
 });

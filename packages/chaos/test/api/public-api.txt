@@ -13,7 +13,13 @@ type ClosedLoopOptions: build/closed.d.ts#ClosedLoopOptions
 type ClosedLoopRun: build/closed.d.ts#ClosedLoopRun
 type Completion: build/measure.d.ts#Completion
 DEFAULT_FAULT_RANGES: build/faults.d.ts#DEFAULT_FAULT_RANGES
+DISK_FAULT_KINDS: build/disk.d.ts#DISK_FAULT_KINDS
+DISK_PLAN_FORMAT: build/disk.d.ts#DISK_PLAN_FORMAT
 type Direction: build/faults.d.ts#Direction
+type DiskFault: build/disk.d.ts#DiskFault
+type DiskFaultKind: build/disk.d.ts#DiskFaultKind
+type DiskPlan: build/disk.d.ts#DiskPlan
+type DiskSpec: build/disk.d.ts#DiskSpec
 FAULT_KINDS: build/faults.d.ts#FAULT_KINDS
 FAULT_PLAN_FORMAT: build/faults.d.ts#FAULT_PLAN_FORMAT
 type FailureOptions: build/fault-schedule.d.ts#FailureOptions
@@ -51,6 +57,9 @@ type WindowFault: build/faults.d.ts#WindowFault
 type WindowLimits: build/window.d.ts#WindowLimits
 type WindowResponse: build/window.d.ts#WindowResponse
 type WindowVerdict: build/window.d.ts#WindowVerdict
+checkDiskFault: build/disk.d.ts#checkDiskFault
+checkDiskPlan: build/disk.d.ts#checkDiskPlan
+checkDiskSpec: build/disk.d.ts#checkDiskSpec
 checkFault: build/faults.d.ts#checkFault
 checkFaultPlan: build/faults.d.ts#checkFaultPlan
 checkFaultSpec: build/faults.d.ts#checkFaultSpec
@@ -61,6 +70,8 @@ checkStopSpec: build/stops.d.ts#checkStopSpec
 checkWindowFault: build/faults.d.ts#checkWindowFault
 closedLoopPlan: build/closed.d.ts#closedLoopPlan
 constant: build/schedule.d.ts#constant
+diskPlan: build/disk.d.ts#diskPlan
+diskPlanOf: build/disk.d.ts#diskPlanOf
 expectedArrivals: build/schedule.d.ts#expectedArrivals
 failureWindows: build/fault-schedule.d.ts#failureWindows
 faultPlan: build/faults.d.ts#faultPlan
@@ -108,6 +119,50 @@ export interface LoopRequest {
 
 ### build/closed.d.ts#closedLoopPlan
 export declare function closedLoopPlan(requests: readonly LoopRequest[], options: ClosedLoopOptions): ClosedLoopRun;
+
+### build/disk.d.ts#DISK_FAULT_KINDS
+export declare const DISK_FAULT_KINDS: readonly ["lose-unsynced"];
+
+### build/disk.d.ts#DISK_PLAN_FORMAT
+export declare const DISK_PLAN_FORMAT = "rigor-disk/1";
+
+### build/disk.d.ts#DiskFault
+export interface DiskFault {
+  readonly kind: DiskFaultKind;
+  readonly at: StopTrigger;
+}
+
+### build/disk.d.ts#DiskFaultKind
+export type DiskFaultKind = (typeof DISK_FAULT_KINDS)[number];
+
+### build/disk.d.ts#DiskPlan
+export interface DiskPlan {
+  readonly format: typeof DISK_PLAN_FORMAT;
+  readonly seed: number | string | null;
+  readonly faults: readonly DiskFault[];
+}
+
+### build/disk.d.ts#DiskSpec
+export interface DiskSpec {
+  readonly within: StopTrigger;
+  readonly draws: number;
+  readonly kinds?: readonly DiskFaultKind[];
+}
+
+### build/disk.d.ts#checkDiskFault
+export declare function checkDiskFault(fault: DiskFault): readonly string[];
+
+### build/disk.d.ts#checkDiskPlan
+export declare function checkDiskPlan(plan: DiskPlan): readonly string[];
+
+### build/disk.d.ts#checkDiskSpec
+export declare function checkDiskSpec(spec: DiskSpec): readonly string[];
+
+### build/disk.d.ts#diskPlan
+export declare function diskPlan(spec: DiskSpec, seed: number | string): DiskPlan;
+
+### build/disk.d.ts#diskPlanOf
+export declare function diskPlanOf(faults: readonly DiskFault[]): DiskPlan;
 
 ### build/fault-schedule.d.ts#FailureOptions
 export interface FailureOptions {

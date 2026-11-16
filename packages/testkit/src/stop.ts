@@ -30,18 +30,62 @@ const { STOP_SIGNALS, checkStop, stopTriggerOf } = await importPeer(
 /** The name of the environment variable that tells the child its stop and the file of its progress. */
 export const STOP_ENV = "RIGOR_STOP";
 
-/** The value of `STOP_ENV`: a JSON object. Without `step`, the child records each point and does not stop. */
-interface StopOrder {
+/**
+ * The value of `STOP_ENV`: a JSON object. Without `step`, the child records each point and does not stop. A harness that
+ * starts the child itself, for example in a container, makes the order with `stopOrderOf`.
+ */
+export interface StopOrder {
   readonly progress: string;
   readonly step?: number;
   readonly signal?: StopSignal;
 }
 
-/** One line of the progress file. */
-interface ProgressLine {
+/** One line of the progress file. `parseProgress` reads the lines of a file. */
+export interface ProgressLine {
   readonly step: number;
   readonly label?: string;
   readonly stop?: true;
+}
+
+/**
+ * This function gives the order of a stop for `STOP_ENV`, with the path of the progress file in the child. A stop at a
+ * step goes into the order, and the child stops itself. A stop at a time does not: the parent sends its signal. Without a
+ * stop, the child records each point and does not stop. This function throws a `RangeError` for a stop with problems.
+ */
+export function stopOrderOf(stop: Stop | undefined, progress: string): StopOrder {
+  if (stop === undefined) return { progress };
+  const problems = checkStop(stop);
+  if (problems.length > 0) throw new RangeError(`stopOrderOf: ${problems.join(" ")}`);
+  const trigger = stopTriggerOf(stop.at);
+  return trigger?.measure === "step" ? { progress, step: trigger.value, signal: stop.signal } : { progress };
+}
+
+/**
+ * This function gives the lines of the text of a progress file, in their sequence. It ignores a line that is not JSON:
+ * the last line of a child that stopped in its write. It also ignores a value that is not a progress line.
+ */
+export function parseProgress(text: string): ProgressLine[] {
+  const lines: ProgressLine[] = [];
+  for (const line of text.split("\n")) {
+    if (line === "") continue;
+    let value: unknown;
+    try {
+      value = JSON.parse(line);
+    } catch {
+      continue; // A line that the child did not write completely
+    }
+    if (isProgressLine(value)) lines.push(value);
+  }
+  return lines;
+}
+
+/** This function tells if a value from a progress file has the shape of `ProgressLine`, with a whole step of 0 or more. */
+function isProgressLine(value: unknown): value is ProgressLine {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const line = value as Record<string, unknown>;
+  const step = line["step"];
+  if (typeof step !== "number" || !Number.isSafeInteger(step) || step < 0) return false;
+  return (line["label"] === undefined || typeof line["label"] === "string") && (line["stop"] === undefined || line["stop"] === true);
 }
 
 interface PointState {
@@ -169,8 +213,7 @@ export async function runToStop(options: StopRunOptions): Promise<StopRun> {
   const folder = await mkdtemp(join(tmpdir(), "rigor-stop-"));
   try {
     const progress = join(folder, "progress.jsonl");
-    const order: StopOrder =
-      stop !== undefined && trigger?.measure === "step" ? { progress, step: trigger.value, signal: stop.signal } : { progress };
+    const order = stopOrderOf(stop, progress);
     const started = performance.now();
     const child = spawn(options.command, options.args ?? [], {
       cwd: options.cwd,
@@ -247,21 +290,10 @@ export async function countStops(options: Omit<StopRunOptions, "stop">): Promise
 }
 
 async function progressLines(path: string): Promise<readonly ProgressLine[]> {
-  let text: string;
   try {
-    text = await readFile(path, "utf8");
+    return parseProgress(await readFile(path, "utf8"));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
     throw error;
   }
-  const lines: ProgressLine[] = [];
-  for (const line of text.split("\n")) {
-    if (line === "") continue;
-    try {
-      lines.push(JSON.parse(line) as ProgressLine);
-    } catch {
-      // A line that the child did not write completely
-    }
-  }
-  return lines;
 }
