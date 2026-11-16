@@ -13,7 +13,9 @@
   },
   "dependencies": {
     "@mark1russell7/rigor-bench": "workspace:*",
+    "@mark1russell7/rigor-chaos": "workspace:*",
     "@mark1russell7/rigor-generators": "workspace:*",
+    "@mark1russell7/rigor-proxy": "workspace:*",
     "@mark1russell7/rigor-statistics": "workspace:*",
     "@mark1russell7/text": "^0.0.6"
   },

@@ -1,12 +1,13 @@
 /**
  * node src/build.ts [--out dist]
  *
- * The build of the site: it bundles src/page.ts (with the generators and the bench) for the browser, and writes index.html.
+ * The build of the site: it bundles src/page.ts (with the generators, the bench, chaos and the applier of the proxy) for the browser, and writes index.html.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { NOISE_RANGE, RATIO_RANGE, START } from "./explorer.ts";
+import { DEMO_START, FRAME_GAP_MS, FRAMES, RECORD_HEADS } from "./fault-demo.ts";
 import { escapeAttribute as escape } from "@mark1russell7/text";
 
 /** The packages of rigor: the name, the state and what each one gives. */
@@ -24,18 +25,19 @@ export interface Versions {
   readonly chaos: string;
   readonly mutation: string;
   readonly proxy: string;
+  readonly testkit: string;
 }
 
 export function packageRows(versions: Versions): PackageRow[] {
   return [
-    { name: "@mark1russell7/rigor-generators", state: versions.generators, gives: "A seeded generator and its draws: integers, picks, weights, shuffles, samples, normal values and named streams. Next: input families, stratified and Latin hypercube designs, Saltelli designs, shrinking." },
-    { name: "@mark1russell7/rigor-statistics", state: versions.statistics, gives: "Quantiles, bootstrap intervals (also of clusters), the sign test, the paired permutation test, Wilson intervals, the Holm correction, rank correlation, the comparison with a baseline beyond the noise (the 5-seed rule), and Brier scores. Next: Sobol indices." },
-    { name: "@mark1russell7/rigor-bench", state: versions.bench, gives: "The paired-time records of a bench: the order that turns each round, the ratio of each case, and the time verdict against the band of an A/A arm. Next: a fresh process for each case, the CPU model, speed gates." },
-    { name: "rigor-gates", state: "planned", gives: "The determinism gate (one input gives one hash), the promotion test and the performance evidence of a release." },
-    { name: "rigor-testgen", state: "planned", gives: "Property tests on fast-check, pairwise and covering arrays, and metamorphic relations." },
-    { name: "@mark1russell7/rigor-chaos", state: versions.chaos, gives: "Open-loop load schedules from a rate profile, seeded fault plans for a proxy (delay, stall, cut, reset, split, reorder, duplicate), and a measure of latency from the planned time, with no coordinated omission." },
-    { name: "@mark1russell7/rigor-proxy", state: versions.proxy, gives: "A TCP proxy that applies a fault plan to TCP, HTTP and WebSocket streams, and records each fault: its time, its connection, its kind and its bytes." },
+    { name: "@mark1russell7/rigor-generators", state: versions.generators, gives: "A seeded generator and its draws: integers, picks, weights, shuffles, samples, normal values and named streams. Also input families, stratified, Latin hypercube and Saltelli designs, covering arrays, shrinking and content hashes." },
+    { name: "@mark1russell7/rigor-statistics", state: versions.statistics, gives: "Quantiles, bootstrap intervals (also of clusters and of series in time order), the sign and permutation tests, Wilson intervals, the Holm correction, rank correlation, the comparison with a baseline beyond the noise, Brier scores and Sobol indices." },
+    { name: "@mark1russell7/rigor-bench", state: versions.bench, gives: "The paired-time records of a bench: the order that turns each round, a fresh process for each arm, the CPU model, the time verdict against the band of an A/A arm, and speed gates." },
+    { name: "@mark1russell7/rigor-testkit", state: versions.testkit, gives: "Test helpers: model-based tests on fast-check, the code blocks of Markdown files as tests, the propagation gate of a context, the capture of OpenTelemetry and a scripted HTTP server. Next: metamorphic relations." },
+    { name: "@mark1russell7/rigor-chaos", state: versions.chaos, gives: "Open-loop load schedules from a rate profile, seeded fault plans for a proxy (delay, stall, cut, reset, split, reorder, duplicate, answer), faults in time windows, and a measure of latency with no coordinated omission." },
+    { name: "@mark1russell7/rigor-proxy", state: versions.proxy, gives: "A TCP proxy that applies a fault plan to TCP, HTTP and WebSocket streams, and records each fault. Its entry applier has the pure parts, for a browser." },
     { name: "@mark1russell7/rigor-mutation", state: versions.mutation, gives: "Mutation tests with Stryker for each package: the Stryker config of each package or part, a score with a gate for each package, and a check of the disabled mutants." },
+    { name: "rigor-gates", state: "planned", gives: "The determinism gate (one input gives one hash), the promotion test and the performance evidence of a release." },
   ];
 }
 
@@ -73,6 +75,36 @@ export function verdictSection(): string {
 </section>`;
 }
 
+/** The section of the fault-plan demo. The script of the page fills the chips, the counts, the diagram and the table. */
+export function faultSection(): string {
+  const group = (id: string, label: string): string =>
+    `<div class="field"><span class="field-label">${label}</span><div id="${id}" class="chips" role="group" aria-label="${label}"></div></div>`;
+  const heads = RECORD_HEADS.map((h) => `<th>${h}</th>`).join("");
+  return `<section id="faults">
+<h2>Try a fault plan</h2>
+<p>A fault plan is data. Each fault has a connection, a direction, a point and a kind. <code>faultPlan</code> of <code>rigor-chaos</code> makes the plan from a seed, and <code>applierOf</code> of <code>rigor-proxy</code> applies it to the frames of each direction.</p>
+<p>Here, each direction has ${FRAMES} frames, ${FRAME_GAP_MS} ms apart. Each line goes from a frame that the proxy reads to a write of the proxy. The proxy applies the same code to real sockets.</p>
+<div class="card">
+<div class="controls">
+${group("fx-connections", "Connections")}
+${group("fx-faults", "Faults of each connection")}
+${group("fx-directions", "Directions")}
+<div class="field seed-row"><label>Seed<input id="fx-seed" value="${escape(DEMO_START.seed)}" autocomplete="off" spellcheck="false"></label><button type="button" id="fx-next">Next seed</button></div>
+</div>
+${group("fx-kinds", "Kinds of fault")}
+<ul id="fx-counts" class="fx-counts" aria-live="polite"></ul>
+<p id="fx-summary" class="fine"></p>
+<div id="fx-chart"></div>
+<div class="legend"><span><span class="key fx-k-frame"></span>a frame reaches the proxy</span><span><span class="key fx-k-write"></span>a write of the proxy</span><span><span class="key fx-k-changed"></span>a frame that a fault changed</span><span><span class="key fx-k-lost"></span>a frame that did not go through</span><span><span class="key fx-k-pause"></span>stall: no reads</span><span><span class="key fx-k-band"></span>delay or hold of a reorder</span><span><span class="key fx-k-close"></span>cut or reset</span></div>
+<details id="fx-records"><summary>The faults of the plan (<span id="fx-record-count"></span>)</summary>
+<div class="records fx scroll-cue"><table><thead><tr>${heads}</tr></thead><tbody id="fx-record-rows"></tbody></table></div>
+</details>
+<details><summary>The plan as JSON</summary><pre class="scroll-cue fx-plan"><code id="fx-plan"></code></pre></details>
+<pre class="scroll-cue"><code id="fx-code"></code></pre>
+</div>
+</section>`;
+}
+
 export function pageHtml(rows: readonly PackageRow[], built: string, scrollCue = ""): string {
   const table = rows
     .map((r) => `<tr><td><code>${escape(r.name)}</code></td><td><span class="state${r.state === "planned" ? " later" : ""}">${escape(r.state)}</span></td><td>${escape(r.gives)}</td></tr>`)
@@ -86,9 +118,9 @@ export function pageHtml(rows: readonly PackageRow[], built: string, scrollCue =
 <meta name="description" content="Shared libraries for measured work: seeded generators, statistics, gates, test generation, chaos and load.">
 <style>
 ${scrollCue}
-:root { color-scheme: light dark; --bg: #fcfcfb; --card: #ffffff; --ink: #1d1d1b; --muted: #5f5e5a; --line: #e4e2dc; --accent: #2a78d6; --accent-soft: #e6f0fc; --expected: #1d1d1b; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #1a1a19; --card: #232321; --ink: #ecebe6; --muted: #a5a39b; --line: #3a3936; --accent: #3987e5; --accent-soft: #1f3550; --expected: #ecebe6; } }
-:root[data-theme="dark"] { --bg: #1a1a19; --card: #232321; --ink: #ecebe6; --muted: #a5a39b; --line: #3a3936; --accent: #3987e5; --accent-soft: #1f3550; --expected: #ecebe6; }
+:root { color-scheme: light dark; --bg: #fcfcfb; --card: #ffffff; --ink: #1d1d1b; --muted: #5f5e5a; --line: #e4e2dc; --accent: #2a78d6; --accent-soft: #e6f0fc; --expected: #1d1d1b; --lost: #c62f2f; --pause: #d08c00; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #1a1a19; --card: #232321; --ink: #ecebe6; --muted: #a5a39b; --line: #3a3936; --accent: #3987e5; --accent-soft: #1f3550; --expected: #ecebe6; --lost: #ec6a6a; --pause: #e8b23a; } }
+:root[data-theme="dark"] { --bg: #1a1a19; --card: #232321; --ink: #ecebe6; --muted: #a5a39b; --line: #3a3936; --accent: #3987e5; --accent-soft: #1f3550; --expected: #ecebe6; --lost: #ec6a6a; --pause: #e8b23a; }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
 header, main, footer { max-width: 960px; margin: 0 auto; padding: 0 16px; }
@@ -106,7 +138,7 @@ p { max-width: 46em; }
 label { display: block; font-size: 0.85rem; color: var(--muted); font-weight: 600; }
 input { width: 100%; font: inherit; padding: 8px 10px; margin-top: 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
 #methods, .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; }
-#methods button, .chips button, .power button { font: inherit; font-size: 0.9rem; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; }
+#methods button, .chips button, .power button, .seed-row button { font: inherit; font-size: 0.9rem; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; }
 #methods button[aria-pressed="true"], .chips button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
 .chips { margin: 4px 0 0; }
 .field { margin-bottom: 12px; }
@@ -191,6 +223,46 @@ th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color
 }
 .state { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--ink); font-size: 0.85rem; white-space: nowrap; }
 .state.later { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+#fx-chart svg { display: block; }
+.fx-head { fill: var(--ink); font-size: 13px; font-weight: 600; }
+.fx-rail { stroke: var(--line); stroke-width: 1.5; }
+.fx-flow { stroke-width: 1.3; }
+.fx-flow.same { stroke: var(--muted); opacity: 0.45; }
+.fx-flow.changed { stroke: var(--accent); }
+.fx-flow.lost { stroke: var(--lost); stroke-dasharray: 3 3; }
+.fx-wait { stroke: var(--pause); stroke-width: 3; stroke-linecap: round; }
+.fx-frame { fill: var(--muted); }
+.fx-frame.changed { fill: var(--accent); }
+.fx-frame.lost { fill: none; stroke: var(--lost); stroke-width: 2; }
+.fx-frame.on { stroke: var(--ink); stroke-width: 2; }
+.fx-write { fill: var(--ink); }
+.fx-write.lost { fill: var(--lost); opacity: 0.55; }
+.fx-pause { fill: var(--pause); opacity: 0.35; }
+.fx-delay, .fx-hold { fill: var(--accent); opacity: 0.2; }
+.fx-close { stroke: var(--lost); stroke-width: 2; }
+.fx-close.cut { stroke-dasharray: 6 3; }
+.fx-close.on { stroke-width: 3; }
+.fx-flag { stroke: var(--ink); stroke-width: 1; }
+.fx-fault { fill: var(--ink); font-size: 11px; font-weight: 600; }
+.fx-fault.on { fill: var(--accent); }
+.fx-counts { display: flex; flex-wrap: wrap; gap: 4px 20px; margin: 2px 0 0; padding: 0; list-style: none; font-size: 0.92rem; color: var(--muted); }
+.fx-counts strong { font-size: 1.4rem; color: var(--ink); margin-right: 2px; font-variant-numeric: tabular-nums; }
+.fx-counts [data-count="changed"] strong { color: var(--accent); }
+.fx-counts [data-count="lost"] strong { color: var(--lost); }
+#fx-summary { margin: 2px 0 10px; }
+.fx-pending td { color: var(--muted); font-style: italic; }
+.seed-row { display: flex; gap: 8px; align-items: flex-end; }
+.seed-row label { flex: 1; }
+.seed-row button { white-space: nowrap; margin-bottom: 1px; }
+.fx-plan { max-height: 320px; overflow-y: auto; }
+.key.fx-k-frame { width: 8px; height: 8px; background: var(--muted); }
+.key.fx-k-write { width: 6px; height: 10px; background: var(--ink); border-radius: 1px; }
+.key.fx-k-changed { height: 0; border-top: 2px solid var(--accent); background: none; border-radius: 0; }
+.key.fx-k-lost { height: 0; border-top: 2px dashed var(--lost); background: none; border-radius: 0; }
+.key.fx-k-pause { background: var(--pause); opacity: 0.5; }
+.key.fx-k-band { background: var(--accent); opacity: 0.25; }
+.key.fx-k-close { width: 0; height: 12px; border-left: 2px solid var(--lost); background: none; border-radius: 0; }
+@media (max-width: 640px) { .records.fx td::before { content: attr(data-label) ": "; color: var(--muted); } }
 footer { color: var(--muted); font-size: 0.85rem; padding-top: 24px; padding-bottom: 40px; }
 footer a, p a { color: var(--accent); }
 </style>
@@ -199,7 +271,7 @@ footer a, p a { color: var(--accent); }
 <header>
 <h1>rigor</h1>
 <p class="lead">Shared libraries for measured work: seeded generators, statistics, gates, test generation, chaos and load. Each engine moves to them one function at a time, and its records stay byte-equal.</p>
-<nav><a href="#try">Try the generator</a><a href="#verdict">Try the time verdict</a><a href="#packages">Packages</a><a href="#why">Why</a><a href="status/">Status</a><a href="releases/">Releases</a><a href="https://github.com/mark1russell7/rigor">Source</a></nav>
+<nav><a href="#try">Try the generator</a><a href="#verdict">Try the time verdict</a><a href="#faults">Try a fault plan</a><a href="#packages">Packages</a><a href="#why">Why</a><a href="status/">Status</a><a href="releases/">Releases</a><a href="https://github.com/mark1russell7/rigor">Source</a></nav>
 </header>
 <main>
 <section id="try">
@@ -221,6 +293,7 @@ footer a, p a { color: var(--accent); }
 </div>
 </section>
 ${verdictSection()}
+${faultSection()}
 <section id="packages">
 <h2>Packages</h2>
 <div class="table scroll-cue"><table>
@@ -309,7 +382,7 @@ async function main(argv: readonly string[]): Promise<number> {
     return 1;
   }
   const version = (name: string): string => (JSON.parse(readFileSync(join(here, `../${name}/package.json`), "utf8")) as { version: string }).version;
-  const rows = packageRows({ generators: version("generators"), statistics: version("statistics"), bench: version("bench"), chaos: version("chaos"), mutation: version("mutation"), proxy: version("proxy") });
+  const rows = packageRows({ generators: version("generators"), statistics: version("statistics"), bench: version("bench"), chaos: version("chaos"), mutation: version("mutation"), proxy: version("proxy"), testkit: version("testkit") });
   writeFileSync(join(out, "index.html"), pageHtml(rows, new Date().toISOString().slice(0, 10), scrollCueCss()));
   console.error(`wrote ${join(out, "index.html")} and page.js`);
   return 0;
