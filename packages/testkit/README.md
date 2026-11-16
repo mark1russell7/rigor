@@ -7,6 +7,8 @@ Test helpers:
 - `uniformDouble` draws numbers over a range, uniform by value, from the entry `@mark1russell7/rigor-testkit/arbitrary`.
 - `rejects` examines an asynchronous operation that must fail, and gives its error.
 - `propagationGate` examines one context id over each transport, from the entry `@mark1russell7/rigor-testkit/propagation`.
+- `startOtlpCollector` receives the OTLP exports of a program in another process, from the entry `@mark1russell7/rigor-testkit/otlp`.
+- `createFakeEventTarget` records the listeners of browser code in a Node test, from the entry `@mark1russell7/rigor-testkit/fakes`.
 
 ```sh
 npm install --save-dev @mark1russell7/rigor-testkit
@@ -287,6 +289,56 @@ The record of each request has `wire`, the place of its reply in the bytes of th
 - The first byte of the body is at `offset + head` of the down direction.
 - The server sends the head alone, before the body. Thus `head` is known before the first part.
 - A test can measure the place with one request, then cut a second connection at the same place. The same script gives the same bytes.
+
+## A stand-in OTLP collector
+
+The entry `@mark1russell7/rigor-testkit/otlp` gives an OTLP/HTTP collector for a check of a program in another process. The capture of the SDK cannot see into that process. It uses the scripted server of the entry `/http`, and it has no dependency.
+
+A change of the load order can break the instrumentations with no error. The service operates, and some spans are missing. A check of the service in CI finds this:
+
+```ts no-run
+import { startOtlpCollector } from "@mark1russell7/rigor-testkit/otlp";
+
+const collector = await startOtlpCollector();
+const service = spawn("node", ["server.js"], { env: { ...process.env, OTEL_EXPORTER_OTLP_ENDPOINT: collector.endpoint } });
+const missing = await collector.waitFor(["@opentelemetry/instrumentation-http", "@opentelemetry/instrumentation-pg"], {
+  poke: () => fetch("http://127.0.0.1:3000/health"),
+});
+expect(missing).toEqual([]);
+service.kill();
+await collector.close();
+```
+
+### The rules
+
+- The collector reads the paths `/v1/traces`, `/v1/metrics` and `/v1/logs`. Its reply to each export is the status 200 with the body `{}`.
+- The collector reads OTLP JSON, the default of `@opentelemetry/exporter-trace-otlp-http`. An export in protobuf or with gzip counts in `unread`, not in `counts`.
+- `counts(signal)` gives the count of the items of each scope. A scope with no name has the key `""`.
+- `names(signal)` gives the names of the spans, the names of the metrics, or the event names of the log records. A log record with no event name has a count and no name.
+- `waitFor` starts `poke`, then reads, until each scope has an item or the time ends. A poke that rejects does not stop the wait.
+- The default signal of each method is `traces`.
+
+## A fake event target
+
+The entry `@mark1russell7/rigor-testkit/fakes` gives test fakes of browser objects for tests in Node. `createFakeEventTarget` records the listeners of browser code:
+
+```ts no-run
+import { createFakeEventTarget } from "@mark1russell7/rigor-testkit/fakes";
+
+const page = createFakeEventTarget();
+const stop = trackPageLifecycle({ target: page });
+page.dispatch("pagehide", { persisted: false });
+stop();
+expect(page.listeners()).toEqual([]);
+```
+
+### The rules
+
+- `dispatch` sends the event to the capture listeners first, then to the other listeners. A browser does the same at the target.
+- A second addition with the same type, listener and phase does nothing, as in a browser. The option `true` is the same as `{ capture: true }`.
+- The target removes a listener with `once` after the listener gets one event.
+- A listener that an earlier listener removes does not get the event. A listener that an earlier listener adds gets the next event.
+- `listeners()` gives a copy of the listeners, in the order of their addition.
 
 ## License
 
