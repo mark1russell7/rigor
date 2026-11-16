@@ -132,6 +132,28 @@ runToStop: build/stop.d.ts#runToStop
 stopOrderOf: build/stop.d.ts#stopOrderOf
 stopPoint: build/stop.d.ts#stopPoint
 
+## ./behavior (build/behavior.d.ts): names
+
+BEHAVIOR_DIGEST_FORMAT: build/behavior.d.ts#BEHAVIOR_DIGEST_FORMAT
+BehaviorCheckOptions: build/behavior.d.ts#BehaviorCheckOptions
+BehaviorCheckResult: build/behavior.d.ts#BehaviorCheckResult
+BehaviorCounts: build/behavior.d.ts#BehaviorCounts
+BehaviorDesign: build/behavior.d.ts#BehaviorDesign
+BehaviorDifference: build/behavior.d.ts#BehaviorDifference
+BehaviorDigest: build/behavior.d.ts#BehaviorDigest
+BehaviorDigestOptions: build/behavior.d.ts#BehaviorDigestOptions
+BehaviorFamilyDraws: build/behavior.d.ts#BehaviorFamilyDraws
+BehaviorListDraws: build/behavior.d.ts#BehaviorListDraws
+BehaviorOutcome: build/behavior.d.ts#BehaviorOutcome
+DigestComparison: build/behavior.d.ts#DigestComparison
+DigestDifference: build/behavior.d.ts#DigestDifference
+DrawDigest: build/behavior.d.ts#DrawDigest
+behaviorCheck: build/behavior.d.ts#behaviorCheck
+behaviorDigest: build/behavior.d.ts#behaviorDigest
+behaviorDraws: build/behavior.d.ts#behaviorDraws
+behaviorForm: build/behavior.d.ts#behaviorForm
+compareDigests: build/behavior.d.ts#compareDigests
+
 ## Declarations
 
 ### build/arbitrary.d.ts#UniformDoubleOptions
@@ -142,6 +164,116 @@ export interface UniformDoubleOptions {
 
 ### build/arbitrary.d.ts#uniformDouble
 export declare function uniformDouble(options: UniformDoubleOptions): fc.Arbitrary<number>;
+
+### build/behavior.d.ts#BEHAVIOR_DIGEST_FORMAT
+export declare const BEHAVIOR_DIGEST_FORMAT = "rigor-behavior-digest/1";
+
+### build/behavior.d.ts#BehaviorCheckOptions
+export interface BehaviorCheckOptions<I> {
+  readonly equal?: (a: unknown, b: unknown) => boolean;
+  readonly copy?: (input: I) => I;
+}
+
+### build/behavior.d.ts#BehaviorCheckResult
+export interface BehaviorCheckResult<I> extends BehaviorCounts {
+  readonly firstDifference?: BehaviorDifference<I>;
+}
+
+### build/behavior.d.ts#BehaviorCounts
+export interface BehaviorCounts {
+  readonly count: number;
+  readonly equal: number;
+  readonly different: number;
+  readonly bothThrew: number;
+  readonly onlyAThrew: readonly number[];
+  readonly onlyBThrew: readonly number[];
+}
+
+### build/behavior.d.ts#BehaviorDesign
+export type BehaviorDesign = "latin" | "random";
+
+### build/behavior.d.ts#BehaviorDifference
+export interface BehaviorDifference<I> {
+  readonly index: number;
+  readonly input: I;
+  readonly a: BehaviorOutcome;
+  readonly b: BehaviorOutcome;
+}
+
+### build/behavior.d.ts#BehaviorDigest
+export interface BehaviorDigest {
+  readonly format: typeof BEHAVIOR_DIGEST_FORMAT;
+  readonly family?: string;
+  readonly seed?: number;
+  readonly design?: BehaviorDesign;
+  readonly count: number;
+  readonly draws: string;
+  readonly outputs: readonly DrawDigest[];
+}
+
+### build/behavior.d.ts#BehaviorDigestOptions
+export interface BehaviorDigestOptions<I> {
+  readonly copy?: (input: I) => I;
+}
+
+### build/behavior.d.ts#BehaviorFamilyDraws
+export interface BehaviorFamilyDraws {
+  readonly family: InputFamily;
+  readonly seed: number | string;
+  readonly count: number;
+  readonly design?: BehaviorDesign;
+}
+
+### build/behavior.d.ts#BehaviorListDraws
+export interface BehaviorListDraws<I> {
+  readonly inputs: readonly I[];
+}
+
+### build/behavior.d.ts#BehaviorOutcome
+export type BehaviorOutcome = {
+  readonly threw: false;
+  readonly value: unknown;
+} | {
+  readonly threw: true;
+  readonly error: unknown;
+};
+
+### build/behavior.d.ts#DigestComparison
+export interface DigestComparison extends BehaviorCounts {
+  readonly firstDifference?: DigestDifference;
+}
+
+### build/behavior.d.ts#DigestDifference
+export interface DigestDifference {
+  readonly index: number;
+  readonly a: DrawDigest;
+  readonly b: DrawDigest;
+}
+
+### build/behavior.d.ts#DrawDigest
+export type DrawDigest = {
+  readonly output: string;
+} | {
+  readonly threw: string;
+};
+
+### build/behavior.d.ts#behaviorCheck
+export declare function behaviorCheck(a: (input: Point) => unknown, b: (input: Point) => unknown, options: BehaviorFamilyDraws & BehaviorCheckOptions<Point>): BehaviorCheckResult<Point>;
+export declare function behaviorCheck<I>(a: (input: I) => unknown, b: (input: I) => unknown, options: BehaviorListDraws<I> & BehaviorCheckOptions<I>): BehaviorCheckResult<I>;
+
+### build/behavior.d.ts#behaviorDigest
+export declare function behaviorDigest(fn: (input: Point) => unknown, options: BehaviorFamilyDraws & BehaviorDigestOptions<Point>): BehaviorDigest;
+export declare function behaviorDigest<I>(fn: (input: I) => unknown, options: BehaviorListDraws<I> & BehaviorDigestOptions<I>): BehaviorDigest;
+
+### build/behavior.d.ts#behaviorDraws
+export declare function behaviorDraws(options: BehaviorFamilyDraws): Point[];
+export declare function behaviorDraws<I>(options: BehaviorListDraws<I>): I[];
+
+### build/behavior.d.ts#behaviorForm
+export declare function behaviorForm(value: unknown): string;
+
+### build/behavior.d.ts#compareDigests
+export declare function compareDigests(x: BehaviorDigest, y: BehaviorDigest): DigestComparison;
 
 ### build/child.d.ts#ChildExit
 export interface ChildExit {
