@@ -2,8 +2,8 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 
 /**
- * A server of a test in a child process. The child listens on the port 0 and reports the port that it got: in a line
- * of its standard output, in a ready file, or in a place that a read function finds. The fixture gives that port to the
+ * A server of a test in a child process. The child listens on the port 0 and reports the port that it got. The report is
+ * a line of its standard output, a ready file, or a place that a read function finds. The fixture gives that port to the
  * test. Thus no other process can take the port between a pick and a listen.
  */
 
@@ -118,11 +118,12 @@ export function portOfText(text: string): number | undefined {
 }
 
 /**
- * This function starts a child process and waits until the child reports its port. Give the child the port 0: it
- * then listens on a free port, and no other process can take that port before the listen.
+ * This function starts a child process and waits until the child reports its port. Give the child the port 0. Then the
+ * child listens on a free port, and no other process can take that port before the listen.
  *
- * The promise rejects with a `ChildServerError` when the child ends, does not start, reports no port in `timeoutMs`,
- * reports a number that is not a port, or when `signal` aborts. The fixture stops the child before it rejects.
+ * The promise rejects with a `ChildServerError` when the child ends or does not start, or when `signal` aborts. It also
+ * rejects when the child reports no port in `timeoutMs`, or a number that is not a port. The fixture stops the child
+ * before it rejects.
  */
 export async function startChildServer(options: ChildServerOptions): Promise<ChildServer> {
   checkOptions(options);
