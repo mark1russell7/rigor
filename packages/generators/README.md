@@ -224,7 +224,17 @@ The default form of `canonicalJson` is RFC 8785 (JCS). Three options change it:
 | --- | --- | --- |
 | `form` | `"jcs"`: `NaN`, an infinite number and a lone surrogate cause a `RangeError` | `"json"`: the form of `JSON.stringify`, so these values become `null` or an escape |
 | `bigint` | `"error"`: a `bigint` causes a `TypeError` | `"suffix"`: the digits and `n`, for example `12n`. This text is not JSON, so use it only for a key |
-| `tags` | `"none"`: the form of `JSON.stringify`. A `Date` gives its ISO text. A `RegExp`, a `Map` and a `Set` give `{}` | `"typed"`: a tag with the type and the value. This text is not JSON, so use it only for a key or a hash |
+| `tags` | `"none"`: a `Date` gives its ISO text. A `RegExp`, a `Map` and a `Set` cause a `TypeError` | `"typed"`: a tag with the type and the value. This text is not JSON, so use it only for a key or a hash |
+
+By default, `canonicalJson` refuses each object that keeps its content out of its own keys. `JSON.stringify` writes such an object as `{}`, so two of them with other contents get the same hash:
+
+- A `Map`, a `Set`, a `RegExp`, a `WeakMap`, a `WeakSet`, an `Error`, a `Promise`, an `ArrayBuffer` and a `DataView` cause a `TypeError`. Its text names the fix.
+- A `Date` gives its ISO text through its `toJSON`. A boxed `Number`, `String` or `Boolean` gives its primitive value, as in `JSON.stringify`.
+- A plain object, an array, an `arguments` object, a typed array and an instance of a class give their own enumerable keys.
+- The type of an object comes from its internal slots. Thus a value from another realm, for example from `node:vm`, gets the same form.
+- An object with its own `Symbol.toStringTag` needs a method `toJSON`. The form does not see private fields.
+
+Before 0.2.0, the default wrote these objects as `{}`. A program that hashes one of them gets a `TypeError` now. Use `tags: "typed"`, or give the object a method `toJSON`.
 
 With `tags: "typed"`, two values that differ only in a `Date`, a `RegExp`, a `Map` or a `Set` get different keys:
 

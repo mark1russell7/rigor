@@ -147,14 +147,51 @@ export interface CanonicalOptions {
   /**
    * The form of a `Date`, a `RegExp`, a `Map`, a `Set` and a `bigint`:
    *
-   * - `"none"` (the default): the form of `JSON.stringify`. A `Date` gives the text of its `toJSON`.
-   *   A `RegExp`, a `Map` and a `Set` give `{}`, so two of them with other contents get the same hash.
+   * - `"none"` (the default): a `Date` gives the text of its `toJSON`, as in `JSON.stringify`.
+   *   A `RegExp`, a `Map` and a `Set` cause a `TypeError`, because `JSON.stringify` writes them as `{}` and loses their content.
    * - `"typed"`: each value gets a tag with its type and its value, for example `Date(0)`, `RegExp("/a/g")`, `Map([1,"a"])`, `Set(1,2)` and `12n`.
    *
    * The entries of a `Map` and the items of a `Set` are in the order of their text. Thus the order of insertion does not change the form.
    * With `"typed"`, the default of `bigint` is `"suffix"`. The text with tags is not JSON, so use it only for a key or a hash.
    */
   readonly tags?: "none" | "typed";
+}
+
+/** The getter of `RegExp.prototype.source`. It causes a `TypeError` for an object with no slot of a `RegExp`. */
+const sourceOf = Object.getOwnPropertyDescriptor(RegExp.prototype, "source")!.get!;
+
+/** The getter of the `Symbol.toStringTag` of the typed arrays. It gives `undefined` for an object that is not a typed array. */
+const typedArrayName = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype) as object, Symbol.toStringTag)!.get! as (this: object) => string | undefined;
+
+/** The types that the option `tags: "typed"` writes with a tag. */
+const tagged: ReadonlySet<string> = new Set(["Date", "RegExp", "Map", "Set"]);
+
+/** This function is true for an object, and false for `null` and each primitive. */
+const isObject = (v: unknown): v is object => v !== null && typeof v === "object";
+
+/** This function gives the brand of an object: the tag of `Object.prototype.toString`. The brand is the same in each realm. */
+const brandOf = (o: object): string => Object.prototype.toString.call(o).slice(8, -1);
+
+/** This function is true when `method` accepts `o` as its `this`. Thus it tests an internal slot, the same in each realm. */
+function hasSlot(method: (...args: never[]) => unknown, o: object): boolean {
+  try {
+    Reflect.apply(method, o, []);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * This function gives the primitive value of a boxed `Number`, `String`, `Boolean` or `BigInt`, as `JSON.stringify` does.
+ * For each other object, it gives the object.
+ */
+function unboxed(o: object, brand: string): unknown {
+  if (brand === "Number" && hasSlot(Number.prototype.valueOf, o)) return Number(o);
+  if (brand === "String" && hasSlot(String.prototype.valueOf, o)) return String(o);
+  if (brand === "Boolean" && hasSlot(Boolean.prototype.valueOf, o)) return Boolean.prototype.valueOf.call(o);
+  if (brand === "BigInt" && hasSlot(BigInt.prototype.valueOf, o)) return BigInt.prototype.valueOf.call(o);
+  return o;
 }
 
 /**
@@ -164,8 +201,15 @@ export interface CanonicalOptions {
  * - The numbers and the strings have the form of `JSON.stringify`, which is the form of RFC 8785.
  * - A key with the value `undefined` is not in the form. An `undefined` in an array, or as the value, becomes `null`.
  * - An object with a method `toJSON`, for example a `Date`, gives the form of the result of that method.
+ * - A boxed `Number`, `String`, `Boolean` or `BigInt` gives the form of its primitive value, as in `JSON.stringify`.
+ * - A plain object, an array, an `arguments` object and a typed array give the form of their own enumerable keys.
+ * - Each other object causes a `TypeError`, because `JSON.stringify` writes it as `{}` and loses its content.
+ *   Examples are a `Map`, a `Set`, a `RegExp`, an `Error`, a `WeakMap` and a `Promise`.
  * - A function, a symbol and a cycle cause a `TypeError`.
  * - With the option `tags: "typed"`, a `Date`, a `RegExp`, a `Map` and a `Set` get a tag with their value. The option has the forms.
+ *
+ * The type of an object comes from `Object.prototype.toString` and from its internal slots. Thus a value from another realm gets the same form.
+ * An object with its own `Symbol.toStringTag` needs a method `toJSON`. The form does not see private fields.
  *
  * `canonicalJson(JSON.parse(canonicalJson(v)))` is equal to `canonicalJson(v)`, with no tags.
  */
@@ -184,26 +228,44 @@ export function canonicalJson(value: unknown, options?: CanonicalOptions): strin
     return JSON.stringify(s);
   };
   // This function gives the tag of a Date, a RegExp, a Map or a Set, and undefined for each other object.
+  // It tests the internal slot of each type. Thus a value from another realm gets its tag, and an object with only the name of a type does not.
   const tagOf = (o: object): string | undefined => {
-    if (o instanceof Date) return `Date(${o.getTime()})`;
-    if (o instanceof RegExp) return `RegExp(${text(String(o))})`;
-    if (o instanceof Map || o instanceof Set) {
-      if (open.has(o)) throw new TypeError("canonicalJson: the value has a cycle.");
-      open.add(o);
-      const parts: string[] = [];
-      if (o instanceof Map) for (const [k, item] of o) parts.push(`[${write(k, "")},${write(item, "")}]`);
-      else for (const item of o) parts.push(write(item, ""));
-      open.delete(o);
-      return `${o instanceof Map ? "Map" : "Set"}(${parts.sort().join(",")})`;
-    }
-    return undefined;
+    const brand = brandOf(o);
+    if (brand === "Date" && hasSlot(Date.prototype.getTime, o)) return `Date(${Date.prototype.getTime.call(o)})`;
+    if (brand === "RegExp" && hasSlot(sourceOf, o)) return `RegExp(${text(RegExp.prototype.toString.call(o))})`;
+    const map = brand === "Map" && hasSlot(Map.prototype.has, o);
+    if (!map && !(brand === "Set" && hasSlot(Set.prototype.has, o))) return undefined;
+    if (open.has(o)) throw new TypeError("canonicalJson: the value has a cycle.");
+    open.add(o);
+    const parts: string[] = [];
+    if (map) for (const [k, item] of Map.prototype.entries.call(o) as Iterable<[unknown, unknown]>) parts.push(`[${write(k, "")},${write(item, "")}]`);
+    else for (const item of Set.prototype.values.call(o) as Iterable<unknown>) parts.push(write(item, ""));
+    open.delete(o);
+    return `${map ? "Map" : "Set"}(${parts.sort().join(",")})`;
+  };
+  // This function gives the text of the TypeError for an object that keeps its content out of its own keys.
+  const lost = (brand: string): string => {
+    const fix = !typed && tagged.has(brand) ? 'Use the option tags: "typed", or give the object a method toJSON.' : "Give the object a method toJSON.";
+    return `canonicalJson: the type ${brand} has no JSON form. JSON.stringify keeps only its own keys, so two of them with other contents can get the same hash. ${fix}`;
   };
   const write = (v: unknown, key: string): string => {
-    if (typed && v !== null && typeof v === "object") {
+    if (typed && isObject(v)) {
       const tag = tagOf(v);
       if (tag !== undefined) return tag;
     }
-    if (v !== null && typeof v === "object" && typeof (v as { toJSON?: unknown }).toJSON === "function") v = (v as { toJSON(key: string): unknown }).toJSON(key);
+    if (isObject(v) && typeof (v as { toJSON?: unknown }).toJSON === "function") {
+      v = (v as { toJSON(key: string): unknown }).toJSON(key);
+      // A method toJSON can give a Map or a Set. With tags, it gets its tag.
+      if (typed && isObject(v)) {
+        const tag = tagOf(v);
+        if (tag !== undefined) return tag;
+      }
+    }
+    let brand = "Object";
+    if (isObject(v)) {
+      brand = brandOf(v);
+      if (brand !== "Object") v = unboxed(v, brand);
+    }
     if (v === undefined || v === null) return "null";
     switch (typeof v) {
       case "boolean":
@@ -223,6 +285,7 @@ export function canonicalJson(value: unknown, options?: CanonicalOptions): strin
         throw new TypeError(`canonicalJson: a ${typeof v} has no JSON form.`);
     }
     const o = v as object;
+    if (brand !== "Object" && brand !== "Arguments" && !Array.isArray(o) && typedArrayName.call(o) === undefined) throw new TypeError(lost(brand));
     if (open.has(o)) throw new TypeError("canonicalJson: the value has a cycle.");
     open.add(o);
     let out: string;
