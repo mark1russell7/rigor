@@ -6,7 +6,11 @@
 
 ## . (build/index.d.ts): names
 
+COVERING_CANDIDATES: build/covering.d.ts#COVERING_CANDIDATES
+COVERING_LIMIT: build/covering.d.ts#COVERING_LIMIT
 type CanonicalOptions: build/hash.d.ts#CanonicalOptions
+type Coverage: build/covering.d.ts#Coverage
+type CoveringOptions: build/covering.d.ts#CoveringOptions
 DIAGRAM_BOX_AREA: build/recorded.d.ts#DIAGRAM_BOX_AREA
 type Dimension: build/designs.d.ts#Dimension
 type Distribution: build/quantiles.d.ts#Distribution
@@ -24,6 +28,8 @@ type Source: build/random.d.ts#Source
 betaCdf: build/quantiles.d.ts#betaCdf
 canonicalHash: build/hash.d.ts#canonicalHash
 canonicalJson: build/hash.d.ts#canonicalJson
+coveringArray: build/covering.d.ts#coveringArray
+coveringRows: build/covering.d.ts#coveringRows
 dependsOnLibm: build/distributions.d.ts#dependsOnLibm
 deriveSeed: build/random.d.ts#deriveSeed
 distributionOf: build/quantiles.d.ts#distributionOf
@@ -46,8 +52,38 @@ seedsFrom: build/random.d.ts#seedsFrom
 sha256Hex: build/hash.d.ts#sha256Hex
 stablePick: build/random.d.ts#stablePick
 stratifiedDesign: build/designs.d.ts#stratifiedDesign
+tupleCoverage: build/covering.d.ts#tupleCoverage
 
 ## Declarations
+
+### build/covering.d.ts#COVERING_CANDIDATES
+export declare const COVERING_CANDIDATES = 50;
+
+### build/covering.d.ts#COVERING_LIMIT
+export declare const COVERING_LIMIT = 1e7;
+
+### build/covering.d.ts#Coverage
+export interface Coverage {
+  readonly tuples: number;
+  readonly covered: number;
+  readonly share: number;
+  readonly missing: readonly string[];
+}
+
+### build/covering.d.ts#CoveringOptions
+export interface CoveringOptions {
+  readonly strength?: number;
+  readonly candidates?: number;
+}
+
+### build/covering.d.ts#coveringArray
+export declare function coveringArray(levels: readonly number[], r: Random, options?: CoveringOptions): number[][];
+
+### build/covering.d.ts#coveringRows
+export declare function coveringRows<T>(dimensions: Readonly<Record<string, readonly T[]>>, r: Random, options?: CoveringOptions): Record<string, T>[];
+
+### build/covering.d.ts#tupleCoverage
+export declare function tupleCoverage(rows: readonly Readonly<Record<string, unknown>>[], dimensions: Readonly<Record<string, readonly unknown[]>>, strength?: number): Coverage;
 
 ### build/designs.d.ts#Dimension
 export interface Dimension {
