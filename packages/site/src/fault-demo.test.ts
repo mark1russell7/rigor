@@ -133,19 +133,24 @@ describe("runDemo", () => {
 
   it("stalls a direction: the proxy reads no frame of it before the end of the stall", () => {
     let paused = 0;
+    let held = 0;
     for (const run of runsOf("stall", 2)) {
       for (const lane of lanesOf(run)) {
         for (const pause of lane.pauses) {
           paused += 1;
-          // A stall at a byte or a frame fires in the read of a frame, so that one frame has its read at the start of the stall.
-          const reads = lane.frames.flatMap((frame) => (frame.read !== undefined && frame.read >= pause.from && frame.read < pause.until ? [frame.read] : []));
-          expect(reads.filter((read) => read > pause.from)).toEqual([]);
-          expect(reads.length).toBeLessThanOrEqual(1);
+          // A stall at a byte or a frame fires in a read. Each read at the start of the stall comes before it fires:
+          // the frames that waited through an earlier stall all have their read at its end.
+          for (const frame of lane.frames) {
+            if (frame.read !== undefined) expect(frame.read <= pause.from || frame.read >= pause.until).toBe(true);
+            if (frame.arrives > pause.from && frame.arrives < pause.until) held += 1;
+          }
         }
         for (const frame of lane.frames) expect(frame.read! >= frame.arrives).toBe(true);
       }
     }
     expect(paused).toBeGreaterThan(0);
+    // Some frames arrive during a stall, so the check above is not empty.
+    expect(held).toBeGreaterThan(0);
   });
 
   it("gives each fault of a connection a record or a place in the list of faults that did not occur", () => {
