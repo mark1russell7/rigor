@@ -149,7 +149,7 @@ export function permutationInvariant<T, O>(options: PermutationOptions<O> = {}):
   });
 }
 
-/** This function tells whether a value is a plain object: its prototype is `Object.prototype` or `null`. */
+/** This function tells if a value is a plain object: its prototype is `Object.prototype` or `null`. */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object" || value === null) return false;
   const prototype: unknown = Object.getPrototypeOf(value);
