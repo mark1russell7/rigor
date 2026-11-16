@@ -110,7 +110,7 @@ v.comparison;                                     // the cases that gain and dro
 | `peakRss()` | From `/fresh`: the memory peak of this process in bytes, for the child line. |
 | `checkoutArm(options)` | From `/fresh`: an arm on a git worktree of a commit, built by its setup commands. |
 | `repoCommit(ref, options)` | From `/fresh`: the full hash of the commit of a ref, for the arm of the job. |
-| `eventProbe(options)` | From `/fresh`: the GC events and the deopts of a child in each half of its counted samples. |
+| `eventProbe(options)` | From `/fresh`: the GC events, the GC time and the deopts of a child in each half of its counted samples. |
 | `caseWarms(records, arm)` | The median warm check of each case over its rounds, for one arm of the records. |
 | `warmVerdict(pairs, options)` | The warm rule of a fresh run: each pair against the A/A pair, and the steady cases. |
 | `pairedChild(options)` | The samples of one paired child: the base, the candidate and a copy of the base in one process, in turn. |
@@ -567,6 +567,7 @@ console.log(JSON.stringify({ ms: time.ms, warm: time.warm, peakRss: peakRss(), e
 ```
 
 - `events.gc` and `events.deopt` each have two counts: the first half and the last half of the counted samples.
+- `events.gcMs` has the GC time of each half in milliseconds: the sum of the durations of the GC events that start in the half.
 - The probe counts the deopts only with `deopt: true`. Then the V8 flag `--trace-deopt` writes them to a temporary file.
 - `childLine` refuses a field that is not valid. A record has `fields` only when a child of the record gives a field.
 

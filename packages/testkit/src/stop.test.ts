@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { STOP_ENV, countStops, parseProgress, runToStop, stopOrderOf, stopPoint } from "./stop.ts";
+import { STOP_ENV, countStops, parseProgress, runToStop, stopOccurred, stopOrderOf, stopPoint } from "./stop.ts";
 
 const stopUrl = new URL("./stop.ts", import.meta.url).href;
 const posix = process.platform !== "win32";
@@ -190,5 +190,39 @@ describe("the order and the progress file for a harness that starts the child it
     const bad = ["5", "null", "[]", "{}", '"step"', '{"step":-1}', '{"step":1.5}', '{"step":"1"}', '{"step":1,"label":2}', '{"step":1,"stop":false}'];
     const text = [...bad, JSON.stringify({ step: 3, label: "c", stop: true })].join("\n");
     expect(parseProgress(text)).toEqual([{ step: 3, label: "c", stop: true }]);
+  });
+});
+
+describe("stopOccurred, the rule of stopped", () => {
+  const ended = { code: 0, signal: null } as const;
+  const killed = { code: null, signal: "SIGKILL" } as const;
+  const failed = { code: 1, signal: null } as const;
+  const atStep = { at: { step: 1 }, signal: "SIGKILL" } as const;
+  const atTime = { at: { ms: 40 }, signal: "SIGKILL" } as const;
+
+  it("gives false for a run with no stop", () => {
+    expect(stopOccurred({ stop: undefined, lines: [{ step: 0 }], sent: false, exit: ended })).toBe(false);
+  });
+
+  it("gives true for a step only when the child wrote the line of the stop", () => {
+    const reached = [{ step: 0 }, { step: 1, stop: true as const }];
+    expect(stopOccurred({ stop: atStep, lines: reached, sent: false, exit: killed })).toBe(true);
+    // A program with a SIGTERM handler can end with the code 0 after the stop line, and the stop occurred.
+    expect(stopOccurred({ stop: atStep, lines: reached, sent: false, exit: ended })).toBe(true);
+    expect(stopOccurred({ stop: atStep, lines: [{ step: 0 }], sent: false, exit: ended })).toBe(false);
+  });
+
+  it("gives false for a time when the harness did not send the signal", () => {
+    expect(stopOccurred({ stop: atTime, lines: [{ step: 0 }], sent: false, exit: killed })).toBe(false);
+  });
+
+  it("gives false for a time when the send succeeded but the child ended with the code 0", () => {
+    // The race: the child ended, Node did not read its exit yet, and kill() gave true.
+    expect(stopOccurred({ stop: atTime, lines: [{ step: 0, label: "commit 11" }], sent: true, exit: ended })).toBe(false);
+  });
+
+  it("gives true for a time when the signal ended the child, or the child ended with a code that is not 0", () => {
+    expect(stopOccurred({ stop: atTime, lines: [], sent: true, exit: killed })).toBe(true);
+    expect(stopOccurred({ stop: atTime, lines: [{ step: 0 }], sent: true, exit: failed })).toBe(true);
   });
 });
