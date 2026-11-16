@@ -101,6 +101,18 @@ describe("timeArmRounds", () => {
     expect(result.orders.every((order) => order.length === 2)).toBe(true);
   });
 
+  it("times a given A/A function as the second arm of the A/A pair", () => {
+    const f = fake({ ...COSTS, copy: 0.011 });
+    const copy = f.arm("copy", 1);
+    const result = timeArmRounds({ case: "x", base: f.arm("base", 1), candidates: [f.arm("two", 2)], rounds: 6, aa: copy.run, targetMs: 10, warmMs: 0, now: f.now });
+    expect(Object.keys(result.pairs)).toEqual(["two", "base~aa"]);
+    expect(caseRatios(result.pairs["base~aa"]!)[0]!.ratio).toBeCloseTo(1.1, 9);
+    expect(result.orders.every((order) => order.length === 3)).toBe(true);
+    expect(Object.keys(armVerdicts(result, "base~aa"))).toEqual(["two"]);
+    // The calibration has 11 base batches. Each round has one batch of the base, of the candidate and of the copy.
+    expect(result.sink).toBe(2047 + 6 * 1024 * (1 + 2 + 1));
+  });
+
   it("keeps the count of the warm-up, and grows it after the warm-up to the target", () => {
     const f = fake(COSTS);
     expect(timeArmRounds({ case: "x", base: f.arm("base", 1), candidates: [f.arm("two", 2)], rounds: 1, targetMs: 10, warmMs: 5, now: f.now }).count).toBe(1024);
@@ -119,6 +131,8 @@ describe("timeArmRounds", () => {
     expect(run({ candidates: [f.arm("base~aa", 1)] })).toThrow(/not unique/);
     expect(run({ candidates: [{ id: "", run: () => 1 }] })).toThrow(/not empty/);
     expect(run({ candidates: [{ id: "c" }] })).toThrow(/no run function/);
+    expect(run({ aa: 1 })).toThrow(/true, false or a function/);
+    expect(run({ aa: null })).toThrow(/true, false or a function/);
     expect(run({ candidates: [] })).not.toThrow();
   });
 });

@@ -1,6 +1,7 @@
 /**
  * The timed rounds of one case in one process, for a base arm and one or more candidate arms. Each round times one
- * batch of each arm in the order of `armOrder`. A second batch of the base, the A/A arm, gives the noise of the order.
+ * batch of each arm in the order of `armOrder`. The A/A arm, a second batch of the base or of a second copy of its code,
+ * gives the noise of the order.
  * Each candidate makes a pair with the base, as in a fresh run. Thus `armVerdicts`, `caseRatios` and `aaStats` read
  * the records. Start this function in a fresh process for each case.
  */
@@ -24,8 +25,11 @@ export interface ArmRoundsOptions {
   readonly rounds: number;
   /** The turn of the arms before `armOrder`. Give the index of the case, so the cases start with different arms. The default is 0. */
   readonly offset?: number;
-  /** The value `true` adds the A/A pair (base, base) with the id `${base.id}~aa`. The default is `true`. */
-  readonly aa?: boolean;
+  /**
+   * The A/A pair, with the id `${base.id}~aa`. The value `true` adds the pair (base, base). A function adds the pair (base, that function).
+   * Give a second copy of the code of the base, for example from a second load of its module. The value `false` adds no pair. The default is `true`.
+   */
+  readonly aa?: boolean | (() => number);
   /** The least time in milliseconds of one batch of the base arm. The default is 10. */
   readonly targetMs?: number;
   /** The time in milliseconds of the warm-up of the arms. The default is 1000. */
@@ -58,7 +62,9 @@ function armsOf(options: ArmRoundsOptions): ProcessArm[] {
   if (!Number.isSafeInteger(rounds) || rounds < 1) throw new RangeError(`timeArmRounds: the rounds are a whole number of 1 or more, not ${rounds}.`);
   if (!Number.isSafeInteger(offset)) throw new RangeError(`timeArmRounds: the offset is a whole number, not ${offset}.`);
   if (!(targetMs > 0) || !(warmMs >= 0)) throw new RangeError("timeArmRounds: the target time is above 0, and the warm-up time is 0 or more.");
-  const arms = options.aa === false ? [base, ...candidates] : [base, ...candidates, { id: `${base.id}${AA_SUFFIX}`, run: base.run }];
+  const aa = options.aa === undefined ? true : options.aa;
+  if (typeof aa !== "boolean" && typeof aa !== "function") throw new RangeError("timeArmRounds: aa is true, false or a function.");
+  const arms = aa === false ? [base, ...candidates] : [base, ...candidates, { id: `${base.id}${AA_SUFFIX}`, run: aa === true ? base.run : aa }];
   if (arms.length < 2) throw new RangeError("timeArmRounds: a run needs 1 pair or more: give a candidate, or keep the A/A pair.");
   for (const arm of arms) {
     if (typeof arm.id !== "string" || arm.id === "") throw new RangeError("timeArmRounds: the id of each arm is a string that is not empty.");

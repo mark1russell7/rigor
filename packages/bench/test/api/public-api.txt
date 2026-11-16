@@ -776,7 +776,7 @@ interface ArmRoundsOptions {
   readonly candidates: readonly ProcessArm[];
   readonly rounds: number;
   readonly offset?: number;
-  readonly aa?: boolean;
+  readonly aa?: boolean | (() => number);
   readonly targetMs?: number;
   readonly warmMs?: number;
   readonly now?: () => number;
