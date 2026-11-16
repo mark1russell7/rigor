@@ -45,7 +45,7 @@ function packageFolders(root: string): string[] {
 /** This function gives the runtime graph of the workspace packages: each package and the workspace packages it uses. */
 function runtimeGraph(root: string): Graph {
   const manifests = packageFolders(root).map((folder) => JSON.parse(readFileSync(join(folder, "package.json"), "utf8")) as Record<string, unknown>);
-  const names = new Set(manifests.map((manifest) => String(manifest.name)));
+  const names = new Set(manifests.map((manifest) => String(manifest["name"])));
   const graph = new Map<string, string[]>();
   for (const manifest of manifests) {
     const targets = new Set<string>();
@@ -54,7 +54,7 @@ function runtimeGraph(root: string): Graph {
       if (entries === null || typeof entries !== "object") continue;
       for (const name of Object.keys(entries)) if (names.has(name)) targets.add(name);
     }
-    graph.set(String(manifest.name), [...targets].sort());
+    graph.set(String(manifest["name"]), [...targets].sort());
   }
   return new Map([...graph].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
 }
