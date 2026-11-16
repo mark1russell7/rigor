@@ -3,9 +3,17 @@ import { openSync, writeSync } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { STOP_SIGNALS, type Stop, type StopSignal, checkStop, stopTriggerOf } from "@mark1russell7/rigor-chaos";
+import type { Stop, StopSignal } from "@mark1russell7/rigor-chaos";
 import type { ChildExit } from "./child.ts";
+import { importPeer } from "./peer.ts";
 import { describeExit, outputTail, within } from "./process.ts";
+
+// rigor-chaos is an optional peer dependency. Without it, the import of this entry throws an error with the install.
+const { STOP_SIGNALS, checkStop, stopTriggerOf } = await importPeer(
+  () => import("@mark1russell7/rigor-chaos"),
+  "@mark1russell7/rigor-chaos",
+  "@mark1russell7/rigor-testkit/stop",
+);
 
 /**
  * The harness of a stop plan of `@mark1russell7/rigor-chaos`. The program of a test uses `stopPoint` at each point of

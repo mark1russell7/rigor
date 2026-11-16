@@ -401,6 +401,8 @@ The entry `/stop` imports `@mark1russell7/rigor-chaos`. Install it next to this 
 npm install --save-dev @mark1russell7/rigor-chaos
 ```
 
+Without `@mark1russell7/rigor-chaos`, the import of `/stop` throws an `Error` that gives this command. The entry loads the package with a top-level `await`, so `require()` cannot load the entry. Use `import`.
+
 ```ts
 // The test
 import { stopPlan } from "@mark1russell7/rigor-chaos";
