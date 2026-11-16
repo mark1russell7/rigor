@@ -34,10 +34,17 @@ type LoopRequest: build/closed.d.ts#LoopRequest
 type Phase: build/schedule.d.ts#Phase
 type Profile: build/schedule.d.ts#Profile
 SCHEDULE_FORMAT: build/schedule.d.ts#SCHEDULE_FORMAT
+STOP_PLAN_FORMAT: build/stops.d.ts#STOP_PLAN_FORMAT
+STOP_SIGNALS: build/stops.d.ts#STOP_SIGNALS
 type Schedule: build/schedule.d.ts#Schedule
 type ScheduleCheck: build/measure.d.ts#ScheduleCheck
 type ScheduleOptions: build/schedule.d.ts#ScheduleOptions
 type SecondSample: build/measure.d.ts#SecondSample
+type Stop: build/stops.d.ts#Stop
+type StopPlan: build/stops.d.ts#StopPlan
+type StopSignal: build/stops.d.ts#StopSignal
+type StopSpec: build/stops.d.ts#StopSpec
+type StopTrigger: build/stops.d.ts#StopTrigger
 type Trigger: build/faults.d.ts#Trigger
 WINDOW_PLAN_FORMAT: build/faults.d.ts#WINDOW_PLAN_FORMAT
 type WindowFault: build/faults.d.ts#WindowFault
@@ -48,6 +55,9 @@ checkFault: build/faults.d.ts#checkFault
 checkFaultPlan: build/faults.d.ts#checkFaultPlan
 checkFaultSpec: build/faults.d.ts#checkFaultSpec
 checkProfile: build/schedule.d.ts#checkProfile
+checkStop: build/stops.d.ts#checkStop
+checkStopPlan: build/stops.d.ts#checkStopPlan
+checkStopSpec: build/stops.d.ts#checkStopSpec
 checkWindowFault: build/faults.d.ts#checkWindowFault
 closedLoopPlan: build/closed.d.ts#closedLoopPlan
 constant: build/schedule.d.ts#constant
@@ -64,6 +74,9 @@ schedule: build/schedule.d.ts#schedule
 scheduleHeld: build/measure.d.ts#scheduleHeld
 spike: build/schedule.d.ts#spike
 steps: build/schedule.d.ts#steps
+stopPlan: build/stops.d.ts#stopPlan
+stopPlanOf: build/stops.d.ts#stopPlanOf
+stopTriggerOf: build/stops.d.ts#stopTriggerOf
 sweepPoints: build/faults.d.ts#sweepPoints
 triggerOf: build/faults.d.ts#triggerOf
 windowResponse: build/window.d.ts#windowResponse
@@ -370,6 +383,63 @@ export declare function spike(base: number, peak: number, shape: {
 
 ### build/schedule.d.ts#steps
 export declare function steps(rates: readonly number[], ms: number): Profile;
+
+### build/stops.d.ts#STOP_PLAN_FORMAT
+export declare const STOP_PLAN_FORMAT = "rigor-stops/1";
+
+### build/stops.d.ts#STOP_SIGNALS
+export declare const STOP_SIGNALS: readonly ["SIGKILL", "SIGTERM"];
+
+### build/stops.d.ts#Stop
+export interface Stop {
+  readonly at: StopTrigger;
+  readonly signal: StopSignal;
+}
+
+### build/stops.d.ts#StopPlan
+export interface StopPlan {
+  readonly format: typeof STOP_PLAN_FORMAT;
+  readonly seed: number | string | null;
+  readonly stops: readonly Stop[];
+}
+
+### build/stops.d.ts#StopSignal
+export type StopSignal = (typeof STOP_SIGNALS)[number];
+
+### build/stops.d.ts#StopSpec
+export interface StopSpec {
+  readonly within: StopTrigger;
+  readonly draws: number;
+  readonly signals?: readonly StopSignal[];
+}
+
+### build/stops.d.ts#StopTrigger
+export type StopTrigger = {
+  readonly step: number;
+} | {
+  readonly ms: number;
+};
+
+### build/stops.d.ts#checkStop
+export declare function checkStop(stop: Stop): readonly string[];
+
+### build/stops.d.ts#checkStopPlan
+export declare function checkStopPlan(plan: StopPlan): readonly string[];
+
+### build/stops.d.ts#checkStopSpec
+export declare function checkStopSpec(spec: StopSpec): readonly string[];
+
+### build/stops.d.ts#stopPlan
+export declare function stopPlan(spec: StopSpec, seed: number | string): StopPlan;
+
+### build/stops.d.ts#stopPlanOf
+export declare function stopPlanOf(stops: readonly Stop[]): StopPlan;
+
+### build/stops.d.ts#stopTriggerOf
+export declare function stopTriggerOf(at: StopTrigger): {
+  readonly measure: "step" | "ms";
+  readonly value: number;
+} | undefined;
 
 ### build/window.d.ts#HealthSample
 export interface HealthSample {

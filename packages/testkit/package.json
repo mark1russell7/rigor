@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/rigor-testkit",
-  "version": "0.1.10",
-  "description": "Test helpers: the code blocks of Markdown files as test cases, model-based tests on fast-check, arbitraries that are uniform by value, the propagation gate of one context id over each transport, the capture of the OpenTelemetry SDK, a scripted HTTP server for fixtures, a stand-in OTLP collector, a fake event target, a server of a test in a child process that reports its port, and a check of an operation that must give a rejected promise.",
+  "version": "0.1.11",
+  "description": "Test helpers: the code blocks of Markdown files as test cases, model-based tests on fast-check, arbitraries that are uniform by value, the propagation gate of one context id over each transport, the capture of the OpenTelemetry SDK, a scripted HTTP server for fixtures, a stand-in OTLP collector, a fake event target, a server of a test in a child process that reports its port, the harness of a stop plan that stops a process of a test at a step or a time, and a check of an operation that must give a rejected promise.",
   "keywords": [
     "testing",
     "markdown",
@@ -18,7 +18,9 @@
     "propagation",
     "baggage",
     "otlp",
-    "fakes"
+    "fakes",
+    "crash",
+    "stop-plan"
   ],
   "homepage": "https://github.com/mark1russell7/rigor/tree/main/packages/testkit#readme",
   "bugs": {
@@ -87,11 +89,19 @@
         "import": "./build/child.js",
         "default": "./build/child.js"
       },
+      "./stop": {
+        "types": "./build/stop.d.ts",
+        "import": "./build/stop.js",
+        "default": "./build/stop.js"
+      },
       "./package.json": "./package.json"
     }
   },
   "engines": {
     "node": ">=22"
+  },
+  "dependencies": {
+    "@mark1russell7/rigor-chaos": "workspace:^"
   },
   "scripts": {
     "build": "tsdown",
@@ -124,6 +134,7 @@
     "./otlp": "./src/otlp.ts",
     "./fakes": "./src/fakes.ts",
     "./child": "./src/child.ts",
+    "./stop": "./src/stop.ts",
     "./package.json": "./package.json"
   },
   "peerDependencies": {

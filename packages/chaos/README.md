@@ -1,6 +1,6 @@
 # @mark1russell7/rigor-chaos
 
-This package holds open-loop load schedules, the measure of latency that goes with them, and seeded fault plans for a proxy.
+This package holds open-loop load schedules and the measure of latency that goes with them. It also holds seeded fault plans for a proxy and seeded stop plans for a process of a test.
 
 A closed-loop driver waits for each reply before its next request. A stall of the target thus stops the load, and the measure shows one slow request. This is coordinated omission. An open-loop schedule fixes each arrival time before the run, and a measure counts each latency from its planned time.
 
@@ -136,6 +136,25 @@ const response = windowResponse({ from: 1000, to: 4000 }, samples, { detectMs: 2
 - The time to recover is from the end of the window to the first sample up after it. A detection after the end moves this start to the detection.
 - A gate that cannot read the case gives `no read`, not a pass. This occurs when the signal is not steady and up before the window, or when the samples end before the limit.
 - With no detection, the recovery has no read.
+
+## A stop plan
+
+A stop plan tells a harness where to stop a process of a test, with `SIGKILL` or `SIGTERM`. The test then examines the state that the process left, for example a database file after a stop in a transaction. The harness is the entry `/stop` of `@mark1russell7/rigor-testkit`.
+
+```ts
+import { stopPlan, stopPlanOf } from "@mark1russell7/rigor-chaos";
+
+// The program passes 240 stop points in a complete run. Each stop of the plan is one run.
+const plan = stopPlan({ within: { step: 240 }, draws: 16, signals: ["SIGKILL", "SIGTERM"] }, "crash-in-commit");
+
+// A stop that a person wrote: 1.5 s after the start.
+const late = stopPlanOf([{ at: { ms: 1500 }, signal: "SIGKILL" }]);
+```
+
+- A step counts the calls of the stop point in the program from 0. A time counts the ms from the start of the process.
+- The points of a plan are those of `sweepPoints`. A limit with fewer points than `draws + 3` gives each point.
+- Each point has one stop for each signal. The stops are in the order of their points, then of their signals.
+- `checkStopPlan` gives each problem of a plan from a record. `stopPlanOf` makes a plan from stops that a person wrote.
 
 ## A closed-loop record
 

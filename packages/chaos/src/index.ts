@@ -46,4 +46,19 @@ export {
   type Schedule,
   type ScheduleOptions,
 } from "./schedule.ts";
-export { windowResponse, type HealthSample, type WindowLimits, type WindowResponse, type WindowVerdict } from "./window.ts";
+export {
+  STOP_PLAN_FORMAT,
+  STOP_SIGNALS,
+  checkStop,
+  checkStopPlan,
+  checkStopSpec,
+  stopPlan,
+  stopPlanOf,
+  stopTriggerOf,
+  type Stop,
+  type StopPlan,
+  type StopSignal,
+  type StopSpec,
+  type StopTrigger,
+} from "./stops.ts";
+export { windowResponse,type HealthSample, type WindowLimits, type WindowResponse, type WindowVerdict } from "./window.ts";
