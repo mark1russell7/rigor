@@ -1,7 +1,7 @@
 import { type StopTrigger, choiceProblems, planPoints, pointProblem, pointSpecProblems, seedProblem } from "./stops.ts";
 
 /**
- * A disk plan tells a harness which fault of the disk to apply to the files of a process of a test, and at which point.
+ * A disk plan tells a harness which disk fault to apply to the files of a test process, and at which point.
  * An example is a power cut in a transaction: the disk loses each write that no fsync made durable, and the process stops.
  * Then the test examines the files that the disk kept, for example to measure the data loss of a setting of a database.
  *

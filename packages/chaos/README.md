@@ -158,7 +158,7 @@ const late = stopPlanOf([{ at: { ms: 1500 }, signal: "SIGKILL" }]);
 
 ## A disk plan
 
-A disk plan tells a harness which fault of the disk to apply to the files of a process of a test, and at which point. The test then examines the files that the disk kept. For example, it measures the data loss of each synchronous setting of a database. The disk tier of `@mark1russell7/harness` applies a plan.
+A disk plan tells a harness which disk fault to apply to the files of a test process, and at which point. The test then examines the files that the disk kept. For example, it measures the data loss of each synchronous setting of a database. The disk tier of `@mark1russell7/harness` applies a plan.
 
 | Kind | What the disk does |
 |---|---|
