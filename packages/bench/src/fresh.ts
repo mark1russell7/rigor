@@ -41,10 +41,15 @@ export type ChildLine = ChildTime | ChildSkip;
 /** Two counts of events: in the first half and in the last half of the counted samples of a child. */
 export type HalfCounts = readonly [early: number, late: number];
 
+/** Two times in milliseconds: in the first half and in the last half of the counted samples of a child. */
+export type HalfTimes = readonly [early: number, late: number];
+
 /** The events of a child in its counted samples. `eventProbe` gives them. */
 export interface ChildEvents {
   /** The GC events of each half. */
   readonly gc: HalfCounts;
+  /** The GC time of each half: the sum of the durations of its GC events. A line of an older probe has no `gcMs`. */
+  readonly gcMs?: HalfTimes;
   /** The deopts of each half. Only a probe with `deopt: true` counts them. */
   readonly deopt?: HalfCounts;
 }
@@ -111,13 +116,19 @@ function childFields(value: Record<string, unknown>): ChildFields {
   }
   if (warm !== undefined && !(typeof warm === "number" && Number.isFinite(warm) && warm > 0)) throw new Error(`childLine: the warm check is a finite number above 0, not ${JSON.stringify(warm)}.`);
   const counts = (x: unknown): x is HalfCounts => Array.isArray(x) && x.length === 2 && x.every((n) => Number.isSafeInteger(n) && (n as number) >= 0);
+  const times = (x: unknown): x is HalfTimes => Array.isArray(x) && x.length === 2 && x.every((n) => typeof n === "number" && Number.isFinite(n) && n >= 0);
   let read: ChildEvents | undefined;
   if (events !== undefined) {
-    const { gc, deopt } = (typeof events === "object" && events !== null && !Array.isArray(events) ? events : {}) as Record<string, unknown>;
+    const { gc, gcMs, deopt } = (typeof events === "object" && events !== null && !Array.isArray(events) ? events : {}) as Record<string, unknown>;
     if (!counts(gc) || (deopt !== undefined && !counts(deopt))) {
       throw new Error(`childLine: the events have gc, and an optional deopt, each two whole numbers of 0 or more, not ${JSON.stringify(events)}.`);
     }
-    read = { gc: [gc[0], gc[1]], ...(deopt === undefined ? {} : { deopt: [deopt[0], deopt[1]] as const }) };
+    if (gcMs !== undefined && !times(gcMs)) throw new Error(`childLine: the GC time gcMs of the events is two finite numbers of 0 or more, not ${JSON.stringify(gcMs)}.`);
+    read = {
+      gc: [gc[0], gc[1]],
+      ...(gcMs === undefined ? {} : { gcMs: [gcMs[0], gcMs[1]] as const }),
+      ...(deopt === undefined ? {} : { deopt: [deopt[0], deopt[1]] as const }),
+    };
   }
   return { ...(peakRss === undefined ? {} : { peakRss }), ...(warm === undefined ? {} : { warm }), ...(read === undefined ? {} : { events: read }) };
 }
@@ -139,21 +150,22 @@ export interface ProbeOptions {
 /** The event probe of a child. Give `mark` to `timeArm`, then read `events` after it. */
 export interface EventProbe {
   readonly mark: (sample: number) => void;
-  /** This function gives the counts of each half of the counted samples, and stops the probe. */
+  /** This function gives the counts and the GC time of each half of the counted samples, and stops the probe. */
   readonly events: (samples: number) => Promise<ChildEvents>;
 }
 
 /**
- * This function starts the event probe of a child. A `PerformanceObserver` records the start of each GC event.
+ * This function starts the event probe of a child. A `PerformanceObserver` records the start and the duration of each GC event.
+ * A GC event is in a half when it starts in that half. Its full duration counts in that half.
  * With `deopt: true`, the V8 flag `--trace-deopt` writes each deopt to a file of the child.
  * Each mark records its time and the count of deopts. The read of the file is outside the time of the mark.
  */
 export function eventProbe(options: ProbeOptions = {}): EventProbe {
   const file = options.deopt === true ? join(options.dir ?? tmpdir(), `rigor-bench-deopt-${process.pid}.txt`) : undefined;
   if (file !== undefined) for (const flag of ["--trace-deopt", "--redirect-code-traces", `--redirect-code-traces-to=${file}`]) setFlagsFromString(flag);
-  const gc: number[] = [];
+  const gc: { start: number; ms: number }[] = [];
   const observer = new PerformanceObserver((list) => {
-    for (const entry of list.getEntries()) gc.push(entry.startTime);
+    for (const entry of list.getEntries()) gc.push({ start: entry.startTime, ms: entry.duration });
   });
   observer.observe({ entryTypes: ["gc"] });
   const deopts = (): number => {
@@ -183,15 +195,20 @@ export function eventProbe(options: ProbeOptions = {}): EventProbe {
         rmSync(file, { force: true });
       }
       const half = Math.floor(samples / 2);
-      const span = (from: number, to: number): [number, number] => {
+      const span = (from: number, to: number): { count: number; ms: number; deopt: number } => {
         const a = marks.get(from);
         const b = marks.get(to);
         if (a === undefined || b === undefined) throw new Error(`eventProbe: the probe has no mark at the sample ${a === undefined ? from : to}.`);
-        return [gc.filter((t) => t >= a.after && t < b.before).length, b.deopt - a.deopt];
+        const inside = gc.filter((event) => event.start >= a.after && event.start < b.before);
+        return { count: inside.length, ms: inside.reduce((sum, event) => sum + event.ms, 0), deopt: b.deopt - a.deopt };
       };
       const early = span(0, half);
       const late = span(samples - half, samples);
-      return { gc: [early[0], late[0]], ...(file === undefined ? {} : { deopt: [early[1], late[1]] as const }) };
+      return {
+        gc: [early.count, late.count],
+        gcMs: [early.ms, late.ms],
+        ...(file === undefined ? {} : { deopt: [early.deopt, late.deopt] as const }),
+      };
     },
   };
 }
