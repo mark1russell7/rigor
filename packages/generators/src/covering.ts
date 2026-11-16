@@ -177,15 +177,17 @@ export function coveringArray(levels: readonly number[], r: Random, options: Cov
 
 /**
  * This function gives a covering array over named dimensions: each row has one value of each dimension. The values of a
- * dimension are its levels, in their order. The options and the draws are those of `coveringArray`.
+ * dimension are its levels, in their order. The options and the draws are those of `coveringArray`. The value of each name
+ * in a row has the type of the levels of its dimension. Thus dimensions of different types can be in one call.
  */
-export function coveringRows<T>(dimensions: Readonly<Record<string, readonly T[]>>, r: Random, options: CoveringOptions = {}): Record<string, T>[] {
+export function coveringRows<D extends Readonly<Record<string, readonly unknown[]>>>(dimensions: D, r: Random, options: CoveringOptions = {}): { [K in keyof D]: D[K][number] }[] {
   const names = Object.keys(dimensions);
+  const levels: Readonly<Record<string, readonly unknown[]>> = dimensions;
   return coveringArray(
-    names.map((name) => dimensions[name]!.length),
+    names.map((name) => levels[name]!.length),
     r,
     options,
-  ).map((row) => Object.fromEntries(names.map((name, i) => [name, dimensions[name]![row[i]!]!])));
+  ).map((row) => Object.fromEntries(names.map((name, i) => [name, levels[name]![row[i]!]])) as { [K in keyof D]: D[K][number] });
 }
 
 /**

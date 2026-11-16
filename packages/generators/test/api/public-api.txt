@@ -80,7 +80,9 @@ export interface CoveringOptions {
 export declare function coveringArray(levels: readonly number[], r: Random, options?: CoveringOptions): number[][];
 
 ### build/covering.d.ts#coveringRows
-export declare function coveringRows<T>(dimensions: Readonly<Record<string, readonly T[]>>, r: Random, options?: CoveringOptions): Record<string, T>[];
+export declare function coveringRows<D extends Readonly<Record<string, readonly unknown[]>>>(dimensions: D, r: Random, options?: CoveringOptions): {
+  [K in keyof D]: D[K][number];
+}[];
 
 ### build/covering.d.ts#tupleCoverage
 export declare function tupleCoverage(rows: readonly Readonly<Record<string, unknown>>[], dimensions: Readonly<Record<string, readonly unknown[]>>, strength?: number): Coverage;
