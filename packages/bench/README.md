@@ -529,6 +529,9 @@ const verdicts = armVerdicts(run, "loops~aa");
 
 - Each candidate makes a pair with the base. The id of the pair is the id of the candidate.
 - The A/A pair `<base>~aa` times the base a second time in each round. `aa: false` removes it.
+- A function in `aa` is the second arm of the A/A pair. Give it a second copy of the code of the base.
+- Two builds in one process are two modules. Two modules of the same code can differ in time, and the base a second time does not show it.
+- In ESM, a query on the URL of a file gives a second module of the file: `import(new URL("?copy=aa", url).href)`. Its imports stay shared.
 - Each round times one batch of each arm in the order of `armOrder`. Thus each pair has each order one time in each two rounds.
 - `offset` turns the arms before `armOrder`. Give the index of the case, so the cases start with different arms.
 - Each pair of a round uses the one base batch of that round. `orders` has the order of the batches of each round.
