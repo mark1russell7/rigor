@@ -62,19 +62,30 @@ export function stopOrderOf(stop: Stop | undefined, progress: string): StopOrder
 
 /**
  * This function gives the lines of the text of a progress file, in their sequence. It ignores a line that is not JSON:
- * the last line of a child that stopped in its write.
+ * the last line of a child that stopped in its write. It also ignores a value that is not a progress line.
  */
 export function parseProgress(text: string): ProgressLine[] {
   const lines: ProgressLine[] = [];
   for (const line of text.split("\n")) {
     if (line === "") continue;
+    let value: unknown;
     try {
-      lines.push(JSON.parse(line) as ProgressLine);
+      value = JSON.parse(line);
     } catch {
-      // A line that the child did not write completely
+      continue; // A line that the child did not write completely
     }
+    if (isProgressLine(value)) lines.push(value);
   }
   return lines;
+}
+
+/** This function tells if a value from a progress file has the shape of `ProgressLine`, with a whole step of 0 or more. */
+function isProgressLine(value: unknown): value is ProgressLine {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const line = value as Record<string, unknown>;
+  const step = line["step"];
+  if (typeof step !== "number" || !Number.isSafeInteger(step) || step < 0) return false;
+  return (line["label"] === undefined || typeof line["label"] === "string") && (line["stop"] === undefined || line["stop"] === true);
 }
 
 interface PointState {

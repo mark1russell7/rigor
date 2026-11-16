@@ -59,6 +59,7 @@ describe("the checks of a disk plan", () => {
   it("finds each problem of a plan from a record", () => {
     expect(checkDiskPlan({ format: "rigor-stops/1" as never, seed: null, faults: [] })).toHaveLength(1);
     expect(checkDiskPlan({ format: DISK_PLAN_FORMAT, seed: null, faults: {} as never })).toEqual(["The faults are a list."]);
+    for (const plan of [null, undefined, 7, "rigor-disk/1"]) expect(checkDiskPlan(plan as never)).toEqual(["A disk plan is an object."]);
     for (const seed of [7, "power-cut", null]) expect(checkDiskPlan({ format: DISK_PLAN_FORMAT, seed, faults: [] })).toEqual([]);
     for (const seed of [undefined, true, Number.NaN, { value: 7 }]) {
       expect(checkDiskPlan({ format: DISK_PLAN_FORMAT, seed: seed as never, faults: [] })).toEqual([expect.stringMatching(/^The seed is /)]);

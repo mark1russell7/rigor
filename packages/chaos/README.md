@@ -158,11 +158,11 @@ const late = stopPlanOf([{ at: { ms: 1500 }, signal: "SIGKILL" }]);
 
 ## A disk plan
 
-A disk plan tells a harness which disk fault to apply to the files of a test process, and at which point. The test then examines the files that the disk kept. For example, it measures the data loss of each synchronous setting of a database. The disk tier of `@mark1russell7/harness` applies a plan.
+A disk plan tells a harness which disk fault to apply to the files of a test process, and at which point. The test then examines the files that the disk kept. For example, it measures the data loss of each synchronous setting of a database. A harness applies a plan. The first harness is the disk tier of `@mark1russell7/harness`, in review in [mark1russell7/systems#560](https://github.com/mark1russell7/systems/pull/560).
 
 | Kind | What the disk does |
 |---|---|
-| `lose-unsynced` | A power cut: the process stops at once, and the disk loses each write after the last fsync of its file. |
+| `lose-unsynced` | A power cut: the process stops at once, and the disk loses each write of data after the last fsync of its file. The kind keeps each directory entry: a create, a rename or an unlink is durable at once. A later kind loses the entries after the last fsync of their directory. |
 
 ```ts
 import { diskPlan, diskPlanOf } from "@mark1russell7/rigor-chaos";

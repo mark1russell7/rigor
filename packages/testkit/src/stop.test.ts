@@ -185,4 +185,10 @@ describe("the order and the progress file for a harness that starts the child it
     expect(parseProgress(text)).toEqual([{ step: 0 }, { step: 1, label: "b" }]);
     expect(parseProgress("")).toEqual([]);
   });
+
+  it("ignores each JSON value that is not a progress line", () => {
+    const bad = ["5", "null", "[]", "{}", '"step"', '{"step":-1}', '{"step":1.5}', '{"step":"1"}', '{"step":1,"label":2}', '{"step":1,"stop":false}'];
+    const text = [...bad, JSON.stringify({ step: 3, label: "c", stop: true })].join("\n");
+    expect(parseProgress(text)).toEqual([{ step: 3, label: "c", stop: true }]);
+  });
 });

@@ -6,8 +6,9 @@ import { type StopTrigger, choiceProblems, planPoints, pointProblem, pointSpecPr
  * Then the test examines the files that the disk kept, for example to measure the data loss of a setting of a database.
  *
  * The faults are one family with one shape: a kind and a point. A later kind adds its own fields to this shape. The plan
- * is data, and this module has no I/O. The disk tier of `@mark1russell7/harness` applies a plan. A seed fixes the points
- * of a plan before the run, thus a record keeps the plan, and a later run applies the same faults.
+ * is data, and this module has no I/O. A harness applies a plan. The first harness is the disk tier of
+ * `@mark1russell7/harness`, in review in mark1russell7/systems#560. A seed fixes the points of a plan before the run,
+ * thus a record keeps the plan, and a later run applies the same faults.
  */
 
 /** This value is the format of a disk plan. */
@@ -15,7 +16,9 @@ export const DISK_PLAN_FORMAT = "rigor-disk/1";
 
 /**
  * The kinds of the family of disk faults. `lose-unsynced` is a power cut: the process stops at once, and the disk loses
- * each write after the last fsync of its file. A torn write and an fsync error are the next kinds of the family.
+ * each write of data after the last fsync of its file. The kind keeps each directory entry: a create, a rename or an
+ * unlink is durable at once. A later kind loses the entries after the last fsync of their directory. A torn write and an
+ * fsync error are also next kinds of the family.
  */
 export const DISK_FAULT_KINDS = ["lose-unsynced"] as const;
 
@@ -65,6 +68,7 @@ export function checkDiskFault(fault: DiskFault): readonly string[] {
 
 /** This function gives each problem of a disk plan. An empty list means that the plan is valid. */
 export function checkDiskPlan(plan: DiskPlan): readonly string[] {
+  if (typeof plan !== "object" || plan === null) return ["A disk plan is an object."];
   const out: string[] = [];
   if (plan.format !== DISK_PLAN_FORMAT) out.push(`The format is ${DISK_PLAN_FORMAT}, not ${String(plan.format)}.`);
   const seed = seedProblem(plan.seed);

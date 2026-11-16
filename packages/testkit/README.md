@@ -433,7 +433,7 @@ A harness that starts the program in a container or on a different machine does 
 
 - `stopOrderOf(stop, progress)` gives the value of `RIGOR_STOP`, with the path of the progress file in the child.
 - For a stop at a time, the order has no step. The harness sends the signal at the time.
-- `parseProgress(text)` gives the lines of the progress file. It ignores a last line that the child did not write completely.
+- `parseProgress(text)` gives the lines of the progress file. It ignores a last line that the child did not write completely. It also ignores a JSON value that is not a progress line, for example `5` or `{}`.
 - Start each child after the first stop point, or remove `STOP_ENV` from its environment. An earlier child gets the order. It writes its own steps from 0 to the same progress file, and it stops itself at the step of the stop.
 - An order that is not valid stays in the environment. Each call of `stopPoint` then throws its `RangeError`.
 - After `SIGTERM`, a program with a handler continues until its handler ends it. A handler does not keep the event loop open.

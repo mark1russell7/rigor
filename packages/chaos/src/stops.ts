@@ -130,6 +130,7 @@ export function checkStop(stop: Stop): readonly string[] {
 
 /** This function gives each problem of a plan. An empty list means that the plan is valid. */
 export function checkStopPlan(plan: StopPlan): readonly string[] {
+  if (typeof plan !== "object" || plan === null) return ["A stop plan is an object."];
   const out: string[] = [];
   if (plan.format !== STOP_PLAN_FORMAT) out.push(`The format is ${STOP_PLAN_FORMAT}, not ${String(plan.format)}.`);
   const seed = seedProblem(plan.seed);
