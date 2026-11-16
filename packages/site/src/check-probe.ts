@@ -1,5 +1,5 @@
 /**
- * The probe of the time-verdict explorer. The site check of the Pages workflow starts it in a browser at each width,
+ * The probe of the two demos of the page: the time-verdict explorer and the fault-plan demo. The site check of the Pages workflow starts it in a browser at each width,
  * before the deploy. A failed check stops the deploy.
  *
  * The site check reads this TypeScript file directly. It removes the types and the `export` line, and it starts the
@@ -60,5 +60,35 @@ click("#vx-power-run");
 const line = (): string => $("#vx-power-line")?.textContent ?? "";
 check("the power test gives the share of the true outcome", await until(() => /in \d+% of them/.test(line()), 30_000), line());
 check("the power test shows the four outcomes", $$("#vx-power .shares li").length === 4, $$("#vx-power .shares li").length);
+
+// The fault-plan demo. It starts with 2 connections and 3 faults for each connection, of each kind.
+const lanes = (): number => $$("#fx-chart .fx-lane").length;
+const frames = (): number => $$("#fx-chart .fx-frame").length;
+const count = (key: string): number => Number($(`#fx-counts [data-count="${key}"] strong`)?.textContent ?? "NaN");
+const planText = (): string => $("#fx-plan")?.textContent ?? "";
+const pressed = (): string[] => $$('#fx-kinds button[aria-pressed="true"]').map((b) => (b as HTMLElement).dataset["kind"] ?? "");
+check("the fault demo draws 2 connections of 2 directions", await until(() => lanes() === 4, 10000), lanes());
+check("the fault demo draws 10 frames of each direction", frames() === 40, frames());
+check("the counts show each frame", count("same") + count("changed") + count("lost") === 40, $("#fx-counts")?.textContent);
+check("the diagram fits in its box", width("#fx-chart svg") <= width("#fx-chart") + 1, `${width("#fx-chart svg")} in ${width("#fx-chart")}`);
+
+click('#fx-connections [data-connections="3"]');
+check("3 connections give 6 directions", await until(() => lanes() === 6), lanes());
+
+for (const b of $$("#fx-kinds button")) if ((b as HTMLElement).dataset["kind"] !== "cut") click(b);
+check("the chips of the kinds keep only cut", await until(() => pressed().join() === "cut"), pressed());
+check("a plan of cuts closes each connection", await until(() => $$("#fx-chart .fx-close").length === 3), $$("#fx-chart .fx-close").length);
+check("a cut stops frames", count("lost") > 0, $("#fx-counts")?.textContent);
+click('#fx-kinds [data-kind="cut"]');
+check("the last kind stays on", pressed().join() === "cut", pressed());
+
+click("#fx-records summary");
+check("the table shows each fault of the plan", await until(() => $$("#fx-record-rows tr").length === 9), $$("#fx-record-rows tr").length);
+
+const plan = planText();
+type("#fx-seed", "7");
+check("a new seed gives a new plan", await until(() => planText() !== plan), planText().slice(0, 80));
+click("#fx-next");
+check("the button Next seed adds 1 to the seed", await until(() => ($("#fx-seed") as HTMLInputElement | null)?.value === "8"), ($("#fx-seed") as HTMLInputElement | null)?.value);
 
 export {};

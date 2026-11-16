@@ -1,10 +1,11 @@
 /**
  * The page of the site. The pure part (the methods, the bins and the expected counts) has tests. The DOM part,
  * `start`, runs only in a browser: it reads the controls, draws, and shows the first values and a histogram.
- * The time-verdict explorer has its own files: `explorer.ts` and `explorer-view.ts`.
+ * The time-verdict explorer has its own files: `explorer.ts` and `explorer-view.ts`. The fault-plan demo has `fault-demo.ts` and `fault-view.ts`.
  */
 import { normalCdf, random, type Random } from "@mark1russell7/rigor-generators";
 import { startExplorer } from "./explorer-view.ts";
+import { startFaultDemo } from "./fault-view.ts";
 import { seedFrom } from "./seed.ts";
 
 export { seedFrom };
@@ -225,4 +226,5 @@ export function start(): void {
 if (typeof document !== "undefined") {
   start();
   startExplorer();
+  startFaultDemo();
 }
