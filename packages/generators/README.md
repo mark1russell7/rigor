@@ -143,6 +143,36 @@ The parameters of a dimension come from `r.fork("dimension:" + name)`. The same 
 
 For the mean of a sum of 3 inputs from 50 points, the Latin hypercube gives 0.00042 of the variance of the random design. A test holds the ratio below 1/1000.
 
+## Covering arrays
+
+A covering array of strength `t` has few rows, but each combination of `t` values of `t` different dimensions is in one row or more.
+The default strength is 2, so each pair of values is in a row. A test of each row then finds each fault that 2 values cause together.
+
+```ts
+import { coveringRows, random, tupleCoverage } from "@mark1russell7/rigor-generators";
+
+const dimensions = { shape: ["rect", "circle", "polygon"], count: [1, 10, 100], edges: ["none", "few", "many"], spacing: [0, 4] };
+const rows = coveringRows(dimensions, random(1).fork("pairwise"));
+// 9 rows hold the 45 pairs. The full product has 54 rows.
+tupleCoverage(rows, dimensions).share; // 1
+```
+
+- `coveringArray(levels, r, options)` gives the index of a level of each dimension. `coveringRows(dimensions, r, options)` gives the values by name.
+- The option `strength` sets `t`. With fewer dimensions than `t`, the array is the full product.
+- The algorithm is a greedy AETG. It makes `candidates` rows (the default is 50) for each row that it keeps.
+- The arrays are small, but not always the smallest. The row count is at least the product of the `t` largest counts of levels.
+- The draws come from `r`. The same dimensions, options and seed give the same rows.
+- `tupleCoverage(rows, dimensions, t)` gives the share of the combinations that some rows hold, and the list of the missing combinations. It compares the values as text.
+- More than `COVERING_LIMIT` (10 million) combinations is a `RangeError`, not a long run.
+
+### Moves from the copies
+
+| Copy | Move |
+| --- | --- |
+| `pairwise(dimensions, seed)` of `packages/joint` in `layout-contract` | `coveringRows(dimensions, random(seed).fork("pairwise"))` gives the same rows. A test holds a record of the copy. One dimension gives a row for each value, not no rows. |
+| `coverage(cells, dimensions)` of `packages/joint` in `layout-contract` | `tupleCoverage(cells, dimensions)`. The field `pairs` becomes `tuples`. A missing pair has the same key. |
+| `allPairs` and `pairsOf` of `bench/law-cover.ts` in `packing` | `tupleCoverage`. The key of a pair changes from `area:x+aspect:y` to `area=x&aspect=y`. |
+
 ## The input of `fnv1a32`
 
 The option `input` of `fnv1a32` selects the units that the hash reads. Use it to replace a local copy of FNV-1a with the same hashes.
