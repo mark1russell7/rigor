@@ -237,6 +237,7 @@ choosePair(pool, { seed: "duel-1" });             // the next pair of a duel, th
 | `medianInterval(values, level)` | The distribution-free interval of a median, from two order statistics. It gives `low`, `high`, the `rank` of `low` and the `coverage`. |
 | `quantileInterval(values, p, level)` | The distribution-free interval of a quantile, from two order statistics. A side with no rank is infinite. The values must be independent draws. |
 | `quantileSamples(p, level)` | The fewest independent values that give a quantile an upper bound. At the level 0.95: 72 values for p95, 368 for p99 and 3,688 for p99.9. |
+| `poissonInterval(k, exposure, level)` | The exact Garwood interval of a rate: `k` events in an exposure. Each tail outside holds `(1 - level) / 2`, so a small count gets a wide interval. |
 | `binomialInterval(n, p, level)`, `negativeBinomialInterval(successes, p, level)` | The central interval of a binomial count, and of a count of failures before `successes` successes. Each tail outside holds `(1 - level) / 2` or less. |
 | `holm(pValues, level)` | The Holm correction of a family of tests. |
 | `binomialTest(k, n, p, side)` | The p of the exact one-sided binomial test of `k` successes in `n` trials. The side `"less"` gives `P(X <= k)`, and `"greater"` gives `P(X >= k)`. |

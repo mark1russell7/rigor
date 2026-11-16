@@ -77,6 +77,7 @@ RESPONSE_LAMBDAS: build/index.d.ts#RESPONSE_LAMBDAS
 RESPONSE_MAX_POWER: build/index.d.ts#RESPONSE_MAX_POWER
 RESPONSE_MAX_TERMS: build/index.d.ts#RESPONSE_MAX_TERMS
 RESPONSE_RECORDS_SCHEMA: build/index.d.ts#RESPONSE_RECORDS_SCHEMA
+type RateInterval: build/index.d.ts#RateInterval
 type RatedItem: build/index.d.ts#RatedItem
 type RatingFit: build/index.d.ts#RatingFit
 type RatingFitOptions: build/index.d.ts#RatingFitOptions
@@ -204,6 +205,7 @@ pairProbabilities: build/index.d.ts#pairProbabilities
 pairedPermutation: build/index.d.ts#pairedPermutation
 parseResponseRecord: build/index.d.ts#parseResponseRecord
 partialConjunction: build/index.d.ts#partialConjunction
+poissonInterval: build/index.d.ts#poissonInterval
 predictResponse: build/index.d.ts#predictResponse
 quantile: build/index.d.ts#quantile
 quantileInterval: build/index.d.ts#quantileInterval
@@ -709,6 +711,12 @@ export declare const RESPONSE_MAX_TERMS = 1024;
 
 ### build/index.d.ts#RESPONSE_RECORDS_SCHEMA
 export declare const RESPONSE_RECORDS_SCHEMA = "response-records/1";
+
+### build/index.d.ts#RateInterval
+interface RateInterval {
+  readonly low: number;
+  readonly high: number;
+}
 
 ### build/index.d.ts#RatedItem
 interface RatedItem {
@@ -1365,6 +1373,9 @@ export declare function parseResponseRecord(value: unknown): ParsedResponseRecor
 
 ### build/index.d.ts#partialConjunction
 export declare function partialConjunction(pValues: readonly number[], need: number): number;
+
+### build/index.d.ts#poissonInterval
+export declare function poissonInterval(k: number, exposure?: number, level?: number): RateInterval;
 
 ### build/index.d.ts#predictResponse
 export declare function predictResponse(model: ResponseModel, inputs: Readonly<Record<string, ResponseInputValue>>): number;
