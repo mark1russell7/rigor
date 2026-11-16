@@ -60,11 +60,9 @@
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
   },
-  "dependencies": {
-    "@mark1russell7/rigor-testkit": "workspace:^"
-  },
   "devDependencies": {
     "@mark1russell7/cue": "^2.0.0",
+    "@mark1russell7/rigor-testkit": "workspace:^",
     "@types/node": "^26.6.5",
     "esbuild": "^0.28.2",
     "fast-check": "^4.10.2",
