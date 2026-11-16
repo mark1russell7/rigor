@@ -28,7 +28,7 @@ concurrency:
 
 jobs:
   pages:
-    uses: mark1russell7/template/.github/workflows/reusable-pages.yml@eb7f3517aa8614e338a46acd37ab0c49395be5f9 # main
+    uses: mark1russell7/template/.github/workflows/reusable-pages.yml@b563776ddfc138707b1d5b3d716594874e1010cf # main
     # The build job of the shared workflow gets only the read permissions. Only its deploy job,
     # which runs no code of the repository, writes to Pages.
     permissions:
@@ -48,6 +48,8 @@ jobs:
       roadmap: docs/ROADMAP.md
       site-check: true
       site-check-pages: /,/releases/,/status/
+      # The widths: a small phone, a common phone and a desktop.
+      site-check-widths: "360,390,1280"
       # The probe drives the time-verdict explorer. The check reads the TypeScript source and removes its types.
       site-check-probe: packages/site/src/check-probe.ts
       deploy: ${{ github.event_name != 'pull_request' }}
@@ -77,4 +79,8 @@ jobs:
             if [ "$ok" != 1 ]; then echo "::error::The site has no /$f."; exit 1; fi
             echo "The site has /$f."
           done
-          curl -fsS "${SITE%/}/" | grep -q 'src="page.js"' || { echo "::error::The page does not load page.js."; exit 1; }
+          # The page goes to a file first. In a pipe, grep -q can exit before the last write of curl, and
+          # pipefail then fails the step on a correct page (main at b9845df).
+          page="$RUNNER_TEMP/page.html"
+          curl -fsS --retry 4 --retry-delay 10 --retry-all-errors -o "$page" "${SITE%/}/"
+          grep -q 'src="page.js"' "$page" || { echo "::error::The page does not load page.js."; exit 1; }
