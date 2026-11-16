@@ -61,4 +61,4 @@ export {
   type StopSpec,
   type StopTrigger,
 } from "./stops.ts";
-export { windowResponse,type HealthSample, type WindowLimits, type WindowResponse, type WindowVerdict } from "./window.ts";
+export { windowResponse, type HealthSample, type WindowLimits, type WindowResponse, type WindowVerdict } from "./window.ts";

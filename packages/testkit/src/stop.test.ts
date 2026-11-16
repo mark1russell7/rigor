@@ -79,6 +79,20 @@ describe("a stop at a step", { timeout: 30_000 }, () => {
     expect(run.stdout.trim()).toBe("none");
     expect(run.steps).toBe(1);
   });
+
+  it("gives the order to a child that the program starts before its first stop point", async () => {
+    const child = `const { stopPoint } = await import(${JSON.stringify(stopUrl)}); stopPoint("child 0"); stopPoint("child 1");`;
+    const start = (env: string): string =>
+      `(await import("node:child_process")).execFileSync(process.execPath, ["--input-type=module", "-e", ${JSON.stringify(child)}], { env: ${env} }); stopPoint("parent 0");`;
+
+    // The two processes write their steps to one progress file, each from the step 0
+    const mixed = await runToStop(program(start("process.env")));
+    expect(mixed).toMatchObject({ exit: { code: 0 }, steps: 3, lastStep: 0, lastLabel: "parent 0" });
+
+    // A child with no STOP_ENV in its environment writes no step
+    const apart = await runToStop(program(`const env = { ...process.env }; delete env[${JSON.stringify(STOP_ENV)}]; ${start("env")}`));
+    expect(apart).toMatchObject({ exit: { code: 0 }, steps: 1, lastStep: 0, lastLabel: "parent 0" });
+  });
 });
 
 describe("a stop at a time", { timeout: 30_000 }, () => {
@@ -125,6 +139,16 @@ describe("the errors of a run", { timeout: 30_000 }, () => {
     const result = spawnSync(command, args, { env, encoding: "utf8" });
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("is not JSON");
+  });
+
+  it("throws on each call for an order that is not valid, also after a caught error", () => {
+    const { command, args } = program(
+      `let errors = 0; for (let call = 0; call < 3; call += 1) { try { stopPoint(); } catch (error) { if (error instanceof RangeError) errors += 1; } } process.stdout.write(String(errors));`,
+    );
+    const env = { ...process.env, [STOP_ENV]: JSON.stringify({ progress: join(folder, "progress.jsonl"), step: -1 }) };
+    const result = spawnSync(command, args, { env, encoding: "utf8" });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe("3");
   });
 
   it("does no work without the order", () => {

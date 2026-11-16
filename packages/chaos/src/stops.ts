@@ -83,6 +83,10 @@ export function checkStop(stop: Stop): readonly string[] {
 export function checkStopPlan(plan: StopPlan): readonly string[] {
   const out: string[] = [];
   if (plan.format !== STOP_PLAN_FORMAT) out.push(`The format is ${STOP_PLAN_FORMAT}, not ${String(plan.format)}.`);
+  const seed: unknown = plan.seed;
+  if (!(seed === null || typeof seed === "string" || (typeof seed === "number" && Number.isFinite(seed)))) {
+    out.push(`The seed is a finite number, a string or null, not ${typeof seed === "number" ? String(seed) : (JSON.stringify(seed) ?? String(seed))}.`);
+  }
   if (!Array.isArray(plan.stops)) return [...out, "The stops are a list."];
   plan.stops.forEach((stop, index) => {
     for (const problem of checkStop(stop)) out.push(`The stop ${index}: ${problem}`);

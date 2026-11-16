@@ -62,6 +62,10 @@ describe("the checks of a stop plan", () => {
   it("finds each problem of a plan from a record", () => {
     expect(checkStopPlan({ format: "rigor-stops/2" as never, seed: null, stops: [] })).toHaveLength(1);
     expect(checkStopPlan({ format: STOP_PLAN_FORMAT, seed: null, stops: {} as never })).toEqual(["The stops are a list."]);
+    for (const seed of [7, "crash", null]) expect(checkStopPlan({ format: STOP_PLAN_FORMAT, seed, stops: [] })).toEqual([]);
+    for (const seed of [undefined, true, Number.NaN, { value: 7 }]) {
+      expect(checkStopPlan({ format: STOP_PLAN_FORMAT, seed: seed as never, stops: [] })).toEqual([expect.stringMatching(/^The seed is /)]);
+    }
     const plan: StopPlan = { format: STOP_PLAN_FORMAT, seed: 1, stops: [{ at: { step: 0 }, signal: "SIGKILL" }, { at: { ms: -1 }, signal: "SIGKILL" }] };
     expect(checkStopPlan(plan)).toEqual([expect.stringMatching(/^The stop 1: /)]);
   });

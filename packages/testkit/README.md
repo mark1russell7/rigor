@@ -415,7 +415,9 @@ for (const stop of plan.stops) {
 - `stopped` is `false` when the child ends before the point of the stop.
 - `countStops` starts the program with no stop, and gives the number of its points. It rejects for an exit code that is not 0.
 - `runToStop` rejects when the child does not start, or does not end in `timeoutMs` (60 000 by default).
-- The first use of `stopPoint` removes `RIGOR_STOP` from the environment. Thus a child of the program does not stop.
+- The first use of `stopPoint` removes `RIGOR_STOP` from the environment. Thus a later child of the program does not stop.
+- Start each child after the first stop point, or remove `STOP_ENV` from its environment. An earlier child gets the order. It writes its own steps from 0 to the same progress file, and it stops itself at the step of the stop.
+- An order that is not valid stays in the environment. Each call of `stopPoint` then throws its `RangeError`.
 - After `SIGTERM`, a program with a handler continues until its handler ends it. A handler does not keep the event loop open.
 
 ### The limits

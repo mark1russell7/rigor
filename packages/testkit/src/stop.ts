@@ -48,8 +48,6 @@ let points: PointState | null | undefined;
 function openOrder(): PointState | null {
   const text = process.env[STOP_ENV];
   if (text === undefined || text === "") return null;
-  // The children of this process do not get the order
-  delete process.env[STOP_ENV];
   let order: StopOrder;
   try {
     order = JSON.parse(text) as StopOrder;
@@ -63,7 +61,11 @@ function openOrder(): PointState | null {
     throw new RangeError(`stopPoint: the step of ${STOP_ENV} is a whole number of 0 or more, not ${String(step)}.`);
   }
   if (!(STOP_SIGNALS as readonly unknown[]).includes(signal)) throw new RangeError(`stopPoint: the signal of ${STOP_ENV} is one of ${STOP_SIGNALS.join(", ")}, not ${String(signal)}.`);
-  return { fd: openSync(order.progress, "a"), stopAt: step as number | undefined, signal: signal as StopSignal, next: 0 };
+  const state: PointState = { fd: openSync(order.progress, "a"), stopAt: step as number | undefined, signal: signal as StopSignal, next: 0 };
+  // The removal comes after the checks. Thus each call with an order that is not valid throws, also after a caught error.
+  // A child that the program starts after this point does not get the order.
+  delete process.env[STOP_ENV];
+  return state;
 }
 
 /**
@@ -71,7 +73,13 @@ function openOrder(): PointState | null {
  * `STOP_ENV`, the function does no work. When the step is the step of the stop, the process sends the signal to itself.
  *
  * Each call writes the step and the label to the progress file before the signal. Thus the parent knows the last point
- * that the child got to. The first use removes `STOP_ENV` from the environment, thus a child of the program does not stop.
+ * that the child got to. The first use removes `STOP_ENV` from the environment, thus a later child of the program does not
+ * stop. An order that is not valid stays in the environment, and each call throws its `RangeError`.
+ *
+ * A child that the program starts before its first stop point gets the order. That child writes its own steps from 0 to
+ * the same progress file, and it stops itself at the step of the stop. Start each child after the first stop point, or
+ * remove `STOP_ENV` from its environment. A wrapper, for example `tsx`, needs the order for its child, so this function
+ * does not refuse it.
  *
  * After `SIGKILL`, no code of the program runs. After `SIGTERM`, a program with a handler continues until its handler
  * ends it.
