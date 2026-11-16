@@ -8,6 +8,7 @@ Test helpers:
 - `uniformDouble` draws numbers over a range, uniform by value, from the entry `@mark1russell7/rigor-testkit/arbitrary`.
 - `rejects` examines an asynchronous operation that must fail, and gives its error.
 - `propagationGate` examines one context id over each transport, from the entry `@mark1russell7/rigor-testkit/propagation`.
+- `behaviorCheck` gives two functions the same seeded inputs and compares their outputs, from the entry `@mark1russell7/rigor-testkit/behavior`.
 - `startOtlpCollector` receives the OTLP exports of a program in another process, from the entry `@mark1russell7/rigor-testkit/otlp`.
 - `createFakeEventTarget` records the listeners of browser code in a Node test, from the entry `@mark1russell7/rigor-testkit/fakes`.
 - `startChildServer` starts a server of a test in a child process on the port 0, and reads the port that the child got. It is in the entry `@mark1russell7/rigor-testkit/child`.
@@ -499,6 +500,117 @@ for (const stop of plan.stops) {
 - Only a power cut or a crash of the kernel loses the writes that are not on the disk. A test of a process stop does not examine that case.
 - On Windows, `SIGTERM` and `SIGKILL` both end the process at once. The process cannot catch `SIGTERM`. Do the tests of `SIGTERM` on Linux or macOS.
 - The signal goes only to the child. A child of the program continues after the stop.
+## A behavior check
+
+The entry `@mark1russell7/rigor-testkit/behavior` gives two functions the same seeded inputs, and compares their outputs. The result is evidence on the draws only. It is not a proof that the two functions are equal. The inputs come from an input family of `@mark1russell7/rigor-generators`, or from a list.
+
+The entry `/behavior` imports `@mark1russell7/rigor-generators`. Install it next to this package. The other entries do not load it:
+
+```sh
+npm install --save-dev @mark1russell7/rigor-generators
+```
+
+Without `@mark1russell7/rigor-generators`, the import of `/behavior` throws an `Error` that gives this command. The entry loads the package with a top-level `await`, so `require()` cannot load the entry. Use `import`.
+
+```ts no-run
+import assert from "node:assert/strict";
+import { behaviorCheck } from "@mark1russell7/rigor-testkit/behavior";
+
+const family = {
+  name: "plane",
+  dimensions: [
+    { name: "x", min: -10, max: 10 },
+    { name: "y", min: -10, max: 10 },
+  ],
+};
+const result = behaviorCheck((p) => Math.max(p.x, p.y), (p) => (p.x > p.y ? p.x : p.y), { family, seed: "max", count: 200 });
+assert.equal(result.equal, 200);
+
+const lists = behaviorCheck(localMedian, median, { inputs: [[3, 1, 2], [4, 1], [7]] });
+```
+
+| Function | What it does |
+| --- | --- |
+| `behaviorCheck(a, b, options)` | It applies `a` and `b` to each draw in this process. It gives the counts and the first difference. |
+| `behaviorDigest(fn, options)` | It applies one function to each draw, and gives the hash of each outcome as JSON data. |
+| `compareDigests(x, y)` | It compares two digests of the same draws, and gives the counts of `behaviorCheck`. |
+| `behaviorDraws(options)` | It gives the inputs of a check, in the order of the draws. |
+| `behaviorForm(value)` | It gives the stable form of a value: the text that the default equality compares. |
+
+### The draws
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `family` | | The input family. Each draw is a point with one value for each dimension, by name. |
+| `seed` | | The seed of the draws: a number, or a name. The same seed gives the same draws. |
+| `count` | | The count of draws, an integer from 1. |
+| `design` | `latin` | `latin` puts one draw in each of `count` strata of each dimension. `random` draws independent uniform points. |
+| `inputs` | | A list of inputs in place of a family. Each item is one draw. |
+| `equal` | the stable form | It tells if two outputs are equal. Use it for a tolerance. `behaviorCheck` only. |
+| `copy` | `structuredClone` | It gives a copy of an input. Each function gets its own copy, so a change to an input does not go to the other function. |
+
+- Give a family, a seed and a count, or give a list of inputs. The check refuses the two together, and a bad option, with a `RangeError`.
+- The seed gives one random stream `random(seed)`. Its fork `family` gives the parameters of the dimensions. Its fork `design` gives the unit points.
+- For one seed and two deterministic functions, the result is always the same.
+- A function takes one input. To examine a function with more parameters, give a function that spreads the point, for example `(p) => clamp(p.x, p.lo, p.hi)`.
+- The check accepts synchronous functions only. A promise has no stable form, so the default equality refuses it with a `TypeError`.
+
+### The result
+
+| Field | What it is |
+| --- | --- |
+| `count` | The count of draws. |
+| `equal` | The draws where the two functions gave equal values. |
+| `different` | The draws where the two functions gave values that are not equal. |
+| `bothThrew` | The count of draws where the two functions threw. The check does not compare the two errors. These draws are not differences. |
+| `onlyAThrew`, `onlyBThrew` | The index of each draw where only one function threw. Each of these draws is a difference. |
+| `firstDifference` | The first draw where the values are not equal, or only one function threw: its index, its input and the two outcomes. It is absent when the functions agree on each draw. |
+
+The sum of `equal`, `different`, `bothThrew` and the two lists is `count`. The two functions have the same behavior on the draws when `equal` is `count`.
+
+### The stable form
+
+The default equality compares the stable form of each output. The stable form is the canonical JSON (RFC 8785) of a tagged form. RFC 8785 has no form for some values. The tagged form writes each of them as an object with one key that starts with `$`:
+
+| Value | Tagged form | The effect |
+| --- | --- | --- |
+| `NaN`, `Infinity`, `-Infinity`, `-0` | `{"$number":"NaN"}`, `{"$number":"-0"}` and the related texts | `NaN` is equal to `NaN`. `-0` and `0` are not equal. |
+| `undefined` | `{"$undefined":true}` | `{ a: undefined }` and `{}` are not equal. A hole of an array is `undefined`. |
+| a `bigint` | `{"$bigint":"12"}` | `12n` and `12` are not equal. |
+| a string with a lone surrogate | `{"$utf16":[97,55296]}`, the code units | RFC 8785 refuses this string. The tag keeps it. |
+| a `Map`, a `Set` | `{"$map":[[key, value]]}`, `{"$set":[item]}` | The order of insertion has no effect. |
+| a `Date`, a `RegExp`, an `Error` | `{"$date":5}`, `{"$regexp":"/a/g"}`, `{"$error":{"message","name"}}` | Two errors with the same name and message are equal. |
+| a key that starts with `$` | the key with one more `$` | A plain object cannot have the form of a tag. |
+
+- An object with a method `toJSON` gives the form of the result of that method.
+- Other objects keep their own enumerable string keys, as in JSON. The form does not keep the class of an object.
+- The keys of an object have no order. The items of an array keep their order.
+- A function, a symbol, a promise and a cycle have no stable form. The check refuses them with a `TypeError`. Give `equal` for such an output.
+
+### Two repositories in two processes
+
+When the two functions are in two repositories, each repository applies its function in its own process. `behaviorDigest` gives the digest of one function, and `compareDigests` compares two digests. Thus the check needs no process runner.
+
+```ts no-run
+// In each repository, with the same options:
+import { behaviorDigest } from "@mark1russell7/rigor-testkit/behavior";
+
+process.stdout.write(JSON.stringify(behaviorDigest((p) => median(p.values), options)));
+```
+
+```ts no-run
+// After the two processes:
+import { compareDigests } from "@mark1russell7/rigor-testkit/behavior";
+
+const comparison = compareDigests(JSON.parse(local), JSON.parse(home));
+```
+
+- A digest is JSON data. It keeps the format, the family name, the 32-bit seed, the design, the count and the SHA-256 hash of the stable form of the draws.
+- For each draw, the digest keeps `{ "output": hash }`, the SHA-256 hash of the stable form of the value, or `{ "threw": class }`.
+- The class of a thrown value is the name of its constructor, for example `RangeError`. A thrown string gives `string`, and `null` gives `null`.
+- `compareDigests` refuses two digests of different draws with a `RangeError`: a different family, seed, design, count or hash of the draws.
+- The comparison has the counts of `behaviorCheck`. Its `firstDifference` has the index and the two entries of the draw, not the input. `behaviorDraws(options)` gives the input of an index.
+- The digest of a list of inputs keeps the hash of the list. Thus the inputs need a stable form.
 
 ## License
 

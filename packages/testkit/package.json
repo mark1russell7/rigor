@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/rigor-testkit",
-  "version": "0.1.13",
-  "description": "Test helpers: the code blocks of Markdown files as test cases, model-based tests on fast-check, metamorphic relations on fast-check, arbitraries that are uniform by value, the propagation gate of one context id over each transport, the capture of the OpenTelemetry SDK, a scripted HTTP server for fixtures, a stand-in OTLP collector, a fake event target, a server of a test in a child process that reports its port, the harness of a stop plan that stops a process of a test at a step or a time, and a check of an operation that must give a rejected promise.",
+  "version": "0.1.15",
+  "description": "Test helpers: the code blocks of Markdown files as test cases, model-based tests on fast-check, metamorphic relations on fast-check, arbitraries that are uniform by value, the propagation gate of one context id over each transport, the capture of the OpenTelemetry SDK, a scripted HTTP server for fixtures, a stand-in OTLP collector, a fake event target, a server of a test in a child process that reports its port, the harness of a stop plan that stops a process of a test at a step or a time, a behavior check of two functions on the same seeded inputs, and a check of an operation that must give a rejected promise.",
   "keywords": [
     "testing",
     "markdown",
@@ -20,7 +20,8 @@
     "otlp",
     "fakes",
     "crash",
-    "stop-plan"
+    "stop-plan",
+    "differential-testing"
   ],
   "homepage": "https://github.com/mark1russell7/rigor/tree/main/packages/testkit#readme",
   "bugs": {
@@ -99,6 +100,11 @@
         "import": "./build/stop.js",
         "default": "./build/stop.js"
       },
+      "./behavior": {
+        "types": "./build/behavior.d.ts",
+        "import": "./build/behavior.js",
+        "default": "./build/behavior.js"
+      },
       "./package.json": "./package.json"
     }
   },
@@ -114,6 +120,7 @@
   "devDependencies": {
     "@mark1russell7/cue": "^2.0.0",
     "@mark1russell7/rigor-chaos": "workspace:^",
+    "@mark1russell7/rigor-generators": "workspace:^",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/api-logs": "^0.223.0",
     "@opentelemetry/context-async-hooks": "^3.0.0",
@@ -139,10 +146,12 @@
     "./fakes": "./src/fakes.ts",
     "./child": "./src/child.ts",
     "./stop": "./src/stop.ts",
+    "./behavior": "./src/behavior.ts",
     "./package.json": "./package.json"
   },
   "peerDependencies": {
     "@mark1russell7/rigor-chaos": "^0.3.2",
+    "@mark1russell7/rigor-generators": "^0.1.18",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/api-logs": "^0.213.0 || ^0.223.0",
     "@opentelemetry/sdk-logs": "^0.223.0 || ^3.0.0",
@@ -152,6 +161,9 @@
   },
   "peerDependenciesMeta": {
     "@mark1russell7/rigor-chaos": {
+      "optional": true
+    },
+    "@mark1russell7/rigor-generators": {
       "optional": true
     },
     "@opentelemetry/api": {

@@ -9,8 +9,10 @@ import { defineConfig } from "tsdown";
 // The entry child starts a server of a test in a child process on node:child_process, with no dependency.
 // The entry stop runs a program of a test to a stop of a plan of rigor-chaos (an optional peer dependency), so the
 // other entries do not load it.
+// The entry behavior compares two functions on the draws of rigor-generators (an optional peer dependency), so the
+// other entries do not load it.
 export default defineConfig({
-  entry: ["src/index.ts", "src/model.ts", "src/metamorphic.ts", "src/arbitrary.ts", "src/propagation.ts", "src/otel.ts", "src/http.ts", "src/otlp.ts", "src/fakes.ts", "src/child.ts", "src/stop.ts"],
+  entry: ["src/index.ts", "src/model.ts", "src/metamorphic.ts", "src/arbitrary.ts", "src/propagation.ts", "src/otel.ts", "src/http.ts", "src/otlp.ts", "src/fakes.ts", "src/child.ts", "src/stop.ts", "src/behavior.ts"],
   outDir: "build",
   format: "esm",
   platform: "node",
