@@ -6,7 +6,7 @@
 import type { ChildExit } from "./child.ts";
 
 /** The fixtures keep this number of characters of the output of a child. */
-export const OUTPUT_LIMIT = 256 * 1024;
+export const OUTPUT_LIMIT: number = 256 * 1024;
 
 /** This function gives the text with its last `OUTPUT_LIMIT` characters, at most. */
 export function outputTail(text: string): string {
