@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/rigor-testkit",
-  "version": "0.1.12",
-  "description": "Test helpers: the code blocks of Markdown files as test cases, model-based tests on fast-check, arbitraries that are uniform by value, the propagation gate of one context id over each transport, the capture of the OpenTelemetry SDK, a scripted HTTP server for fixtures, a stand-in OTLP collector, a fake event target, a server of a test in a child process that reports its port, the harness of a stop plan that stops a process of a test at a step or a time, and a check of an operation that must give a rejected promise.",
+  "version": "0.1.13",
+  "description": "Test helpers: the code blocks of Markdown files as test cases, model-based tests on fast-check, metamorphic relations on fast-check, arbitraries that are uniform by value, the propagation gate of one context id over each transport, the capture of the OpenTelemetry SDK, a scripted HTTP server for fixtures, a stand-in OTLP collector, a fake event target, a server of a test in a child process that reports its port, the harness of a stop plan that stops a process of a test at a step or a time, and a check of an operation that must give a rejected promise.",
   "keywords": [
     "testing",
     "markdown",
@@ -53,6 +53,11 @@
         "types": "./build/model.d.ts",
         "import": "./build/model.js",
         "default": "./build/model.js"
+      },
+      "./metamorphic": {
+        "types": "./build/metamorphic.d.ts",
+        "import": "./build/metamorphic.js",
+        "default": "./build/metamorphic.js"
       },
       "./arbitrary": {
         "types": "./build/arbitrary.d.ts",
@@ -125,6 +130,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./model": "./src/model.ts",
+    "./metamorphic": "./src/metamorphic.ts",
     "./arbitrary": "./src/arbitrary.ts",
     "./propagation": "./src/propagation.ts",
     "./otel": "./src/otel.ts",
