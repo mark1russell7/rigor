@@ -121,18 +121,26 @@ startChildServer: build/child.d.ts#startChildServer
 
 ## ./stop (build/stop.d.ts): names
 
-ProgressLine: build/stop.d.ts#ProgressLine
-STOP_ENV: build/stop.d.ts#STOP_ENV
+type ProgressLine: build/stop-point.d.ts#ProgressLine
+STOP_ENV: build/stop-point.d.ts#STOP_ENV
 StopEvidence: build/stop.d.ts#StopEvidence
-StopOrder: build/stop.d.ts#StopOrder
+type StopOrder: build/stop-point.d.ts#StopOrder
 StopRun: build/stop.d.ts#StopRun
 StopRunOptions: build/stop.d.ts#StopRunOptions
 countStops: build/stop.d.ts#countStops
-parseProgress: build/stop.d.ts#parseProgress
+parseProgress: build/stop-point.d.ts#parseProgress
 runToStop: build/stop.d.ts#runToStop
 stopOccurred: build/stop.d.ts#stopOccurred
 stopOrderOf: build/stop.d.ts#stopOrderOf
-stopPoint: build/stop.d.ts#stopPoint
+stopPoint: build/stop-point.d.ts#stopPoint
+
+## ./stop-point (build/stop-point.d.ts): names
+
+ProgressLine: build/stop-point.d.ts#ProgressLine
+STOP_ENV: build/stop-point.d.ts#STOP_ENV
+StopOrder: build/stop-point.d.ts#StopOrder
+parseProgress: build/stop-point.d.ts#parseProgress
+stopPoint: build/stop-point.d.ts#stopPoint
 
 ## ./behavior (build/behavior.d.ts): names
 
@@ -767,15 +775,28 @@ export declare function propagationGate(options: PropagationGateOptions): Promis
 ### build/rejects.d.ts#rejects
 export declare function rejects(start: () => PromiseLike<unknown>, what: string): Promise<unknown>;
 
-### build/stop.d.ts#ProgressLine
+### build/stop-point.d.ts#ProgressLine
 export interface ProgressLine {
   readonly step: number;
   readonly label?: string;
   readonly stop?: true;
 }
 
-### build/stop.d.ts#STOP_ENV
+### build/stop-point.d.ts#STOP_ENV
 export declare const STOP_ENV = "RIGOR_STOP";
+
+### build/stop-point.d.ts#StopOrder
+export interface StopOrder {
+  readonly progress: string;
+  readonly step?: number;
+  readonly signal?: StopSignal;
+}
+
+### build/stop-point.d.ts#parseProgress
+export declare function parseProgress(text: string): ProgressLine[];
+
+### build/stop-point.d.ts#stopPoint
+export declare function stopPoint(label?: string): void;
 
 ### build/stop.d.ts#StopEvidence
 export interface StopEvidence {
@@ -783,13 +804,6 @@ export interface StopEvidence {
   readonly lines: readonly ProgressLine[];
   readonly sent: boolean;
   readonly exit: ChildExit;
-}
-
-### build/stop.d.ts#StopOrder
-export interface StopOrder {
-  readonly progress: string;
-  readonly step?: number;
-  readonly signal?: StopSignal;
 }
 
 ### build/stop.d.ts#StopRun
@@ -818,9 +832,6 @@ export interface StopRunOptions {
 ### build/stop.d.ts#countStops
 export declare function countStops(options: Omit<StopRunOptions, "stop">): Promise<number>;
 
-### build/stop.d.ts#parseProgress
-export declare function parseProgress(text: string): ProgressLine[];
-
 ### build/stop.d.ts#runToStop
 export declare function runToStop(options: StopRunOptions): Promise<StopRun>;
 
@@ -829,6 +840,3 @@ export declare function stopOccurred(evidence: StopEvidence): boolean;
 
 ### build/stop.d.ts#stopOrderOf
 export declare function stopOrderOf(stop: Stop | undefined, progress: string): StopOrder;
-
-### build/stop.d.ts#stopPoint
-export declare function stopPoint(label?: string): void;

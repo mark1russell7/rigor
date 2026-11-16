@@ -12,7 +12,7 @@ Test helpers:
 - `startOtlpCollector` receives the OTLP exports of a program in another process, from the entry `@mark1russell7/rigor-testkit/otlp`.
 - `createFakeEventTarget` records the listeners of browser code in a Node test, from the entry `@mark1russell7/rigor-testkit/fakes`.
 - `startChildServer` starts a server of a test in a child process on the port 0, and reads the port that the child got. It is in the entry `@mark1russell7/rigor-testkit/child`.
-- `runToStop` stops a program of a test at a step or a time of a stop plan, from the entry `@mark1russell7/rigor-testkit/stop`.
+- `runToStop` stops a program of a test at a step or a time of a stop plan, from the entry `@mark1russell7/rigor-testkit/stop`. The entry `/stop-point` has the child side, with no packages.
 
 ```sh
 npm install --save-dev @mark1russell7/rigor-testkit
@@ -503,6 +503,25 @@ A harness that starts the program in a container or on a different machine does 
 - Start each child after the first stop point, or remove `STOP_ENV` from its environment. An earlier child gets the order. It writes its own steps from 0 to the same progress file, and it stops itself at the step of the stop.
 - An order that is not valid stays in the environment. Each call of `stopPoint` then throws its `RangeError`.
 - After `SIGTERM`, a program with a handler continues until its handler ends it. A handler does not keep the event loop open.
+
+### A child with no packages
+
+The entry `@mark1russell7/rigor-testkit/stop-point` has the child side: `stopPoint`, `parseProgress`, `STOP_ENV` and the types of the order. It imports only modules of Node.js. Thus a copy of its built file works in a container with no `node_modules`:
+
+```sh
+cp node_modules/@mark1russell7/rigor-testkit/build/stop-point.js subject/
+```
+
+```js
+// The program in the container
+import { stopPoint } from "./stop-point.js";
+
+stopPoint("before the fsync");
+```
+
+- The entry `/stop` gives the same functions from the same module. Thus a program that imports the two entries has one sequence of steps.
+- The child examines only that the signal of the order is a signal of Node.js. `stopOrderOf` of `/stop` examines the signal of the plan.
+- The build stops when `build/stop-point.js` imports a module that is not a `node:` module.
 
 ### The limits
 
