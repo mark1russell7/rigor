@@ -366,7 +366,7 @@ const response = await fetch(`http://localhost:${server.port}/health`);
 
 | `report.from` | The child reports its port | The fixture reads it |
 |---|---|---|
-| `stdout` (the default) | In a line of its standard output. | It tests each complete line with `pattern`. The first group is the port. The default pattern `PORT_LINE` matches a line with only the port. |
+| `stdout` (the default) or `stderr` | In a line of its standard output or of its standard error. | It tests each complete line with `pattern`. The first group is the port. The default pattern `PORT_LINE` matches a line with only the port. |
 | `file` | In a ready file at `path`. | It reads the file each `pollMs`. `portOfText` gives the port of a number alone or of a JSON object with a field `port`. |
 | `poll` | In a place that the test knows, for example a lockfile with the process id of the child. | It starts `read(child)` each `pollMs` until the function gives a port. |
 
@@ -375,6 +375,8 @@ const response = await fetch(`http://localhost:${server.port}/health`);
 - `startChildServer` starts the child with no shell. The promise gives the port when the child reports it.
 - The promise rejects with a `ChildServerError` when the child ends, does not start, or reports a number that is not a port.
 - It also rejects when the child reports no port in `timeoutMs` (10 000 by default), or when `signal` aborts.
+- With `ready`, the promise also waits for a line of the standard output or the standard error that matches `ready`. This line can come before the port or after it.
+- Give `ready` the last line of the startup. Then `output()` holds each line of the startup when the promise gives the port.
 - Before it rejects, the fixture stops the child. The error holds the process id, the exit and the last output of the child.
 - `stop()` sends `SIGTERM`, then `SIGKILL` after `stopGraceMs` (2 000 by default). Each call gives the same promise.
 - `childServerGroup()` keeps each child that it starts. `stopAll()` stops them, for the end of each test.

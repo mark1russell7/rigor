@@ -169,12 +169,54 @@ describe("startChildServer", () => {
     expect(alive(two.child.pid)).toBe(false);
   });
 
+  it("reads the port from a line of the standard error, and skips the lines of the standard output", async () => {
+    const script = `${HTTP} console.log("80"); server.listen(0, "127.0.0.1", () => console.error(server.address().port));`;
+    const server = await children.start(node(script, { report: { from: "stderr" } }));
+    expect(server.port).not.toBe(80);
+    expect(await (await fetch(`http://127.0.0.1:${server.port}/`)).text()).toBe("ok");
+  });
+
+  it("waits for the ready line after the port, so output() holds the lines before it", async () => {
+    const script = `${HTTP} server.listen(0, "127.0.0.1", () => {
+      console.log(server.address().port);
+      setTimeout(() => { console.log("File root: /srv/files"); console.log("Press Ctrl+C to stop."); }, 100);
+    });`;
+    const server = await children.start(node(script, { ready: /^Press Ctrl\+C/ }));
+    expect(server.output()).toContain("File root: /srv/files");
+    expect(await (await fetch(`http://127.0.0.1:${server.port}/`)).text()).toBe("ok");
+  });
+
+  it("takes a ready line of the standard error that comes before the report of the port", async () => {
+    const file = join(await folder(), "ready.txt");
+    const script = `${HTTP} const fs = require("node:fs"); server.listen(0, "127.0.0.1", () => {
+      console.error("ready");
+      setTimeout(() => fs.writeFileSync(${JSON.stringify(file)}, String(server.address().port)), 100);
+    });`;
+    const server = await children.start(node(script, { report: { from: "file", path: file }, ready: /^ready$/ }));
+    expect(server.output()).toContain("ready");
+    expect(await (await fetch(`http://127.0.0.1:${server.port}/`)).text()).toBe("ok");
+  });
+
+  it("stops a child that reports its port but writes no ready line in timeoutMs, then rejects", async () => {
+    const script = `${HTTP} server.listen(0, "127.0.0.1", () => console.log(server.address().port));`;
+    const error = await failure(node(script, { ready: /^listening$/, timeoutMs: 2_000 }));
+    expect(error.message).toMatch(/reported the port \d+, but no line that matches \/\^listening\$\/ in 2000 ms/);
+    expect(alive(error.pid)).toBe(false);
+  });
+
+  it("rejects a child that ends after the report of its port and before the ready line", async () => {
+    const error = await failure(node('console.log("4100"); process.exit(5);', { ready: /^ready$/ }));
+    expect(error.message).toContain("ended before a line that matches /^ready$/");
+    expect(error.exit?.code).toBe(5);
+  });
+
   it("refuses times that are not positive, and a pattern with no group", async () => {
     const bad: Omit<ChildServerOptions, "command" | "args">[] = [{ timeoutMs: 0 }, { pollMs: -1 }, { stopGraceMs: Number.NaN }, { timeoutMs: Number.POSITIVE_INFINITY }];
     for (const options of bad) {
       await expect(startChildServer(node("", options))).rejects.toThrow(RangeError);
     }
     await expect(startChildServer(node("", { report: { from: "stdout", pattern: /port \d+/ } }))).rejects.toThrow(/no group/);
+    await expect(startChildServer(node("", { report: { from: "stderr", pattern: /port \d+/ } }))).rejects.toThrow(/no group/);
   });
 });
 

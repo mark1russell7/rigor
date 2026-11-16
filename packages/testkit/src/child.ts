@@ -1,18 +1,19 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
+import type { Readable } from "node:stream";
 import { OUTPUT_LIMIT, describeExit, outputTail, within } from "./process.ts";
 
 /**
  * A server of a test in a child process. The child listens on the port 0 and reports the port that it got. The report is
- * a line of its standard output, a ready file, or a place that a read function finds. The fixture gives that port to the
- * test. Thus no other process can take the port between a pick and a listen.
+ * a line of its standard output or standard error, a ready file, or a place that a read function finds. The fixture gives
+ * that port to the test. Thus no other process can take the port between a pick and a listen.
  */
 
 /** This is how the child reports its port. */
 export type PortReport =
   | {
-      /** The child writes a line with its port to its standard output. The line ends with a newline. */
-      readonly from: "stdout";
+      /** The child writes a line with its port to its standard output or its standard error. A newline ends the line. */
+      readonly from: "stdout" | "stderr";
       /** The first group of this pattern matches the port in one line. The default is `PORT_LINE`. */
       readonly pattern?: RegExp;
     }
@@ -42,6 +43,12 @@ export interface ChildServerOptions {
   readonly env?: Readonly<Record<string, string | undefined>>;
   /** How the child reports its port. The default is a line with only the port on the standard output. */
   readonly report?: PortReport;
+  /**
+   * The child writes a line that matches this pattern when it is ready, on its standard output or its standard error.
+   * The fixture then waits for the port and for this line. The line can come before the report of the port, or after it.
+   * Thus `output()` holds each line that the child wrote before it was ready.
+   */
+  readonly ready?: RegExp;
   /** The time in ms for the report of the port. The default is 10 000. After it, the fixture stops the child and rejects. */
   readonly timeoutMs?: number;
   /** The time in ms between two reads of a file or of a read function. The default is 20. */
@@ -121,8 +128,8 @@ export function portOfText(text: string): number | undefined {
  * child listens on a free port, and no other process can take that port before the listen.
  *
  * The promise rejects with a `ChildServerError` when the child ends or does not start, or when `signal` aborts. It also
- * rejects when the child reports no port in `timeoutMs`, or a number that is not a port. The fixture stops the child
- * before it rejects.
+ * rejects when the child reports no port or writes no `ready` line in `timeoutMs`, or reports a number that is not a
+ * port. The fixture stops the child before it rejects.
  */
 export async function startChildServer(options: ChildServerOptions): Promise<ChildServer> {
   checkOptions(options);
@@ -189,12 +196,23 @@ export async function startChildServer(options: ChildServerOptions): Promise<Chi
         void stop().then(() => reject(new ChildServerError(message, { pid: child.pid, output, exit }, cause === undefined ? undefined : { cause })));
       });
     };
-    const found = (value: number): void => {
-      if (isPort(value)) settle(() => resolve(value));
-      else fail(`The child reported ${String(value)}, which is not a port from 1 to 65535.`);
+    // The start ends when the child reported its port and, with `ready`, wrote the ready line
+    let reported: number | undefined;
+    let ready = options.ready === undefined;
+    const finish = (): void => {
+      const value = reported;
+      if (value !== undefined && ready) settle(() => resolve(value));
     };
+    const found = (value: number): void => {
+      if (reported !== undefined) return;
+      if (!isPort(value)) return fail(`The child reported ${String(value)}, which is not a port from 1 to 65535.`);
+      reported = value;
+      finish();
+    };
+    const missing = (): string =>
+      reported === undefined ? "no port" : `the port ${reported}, but no line that matches ${String(options.ready)}`;
 
-    const timer = setTimeout(() => fail(`The child reported no port in ${timeoutMs} ms.`), timeoutMs);
+    const timer = setTimeout(() => fail(`The child reported ${missing()} in ${timeoutMs} ms.`), timeoutMs);
     cleanups.push(() => clearTimeout(timer));
     const signal = options.signal;
     if (signal) {
@@ -205,23 +223,31 @@ export async function startChildServer(options: ChildServerOptions): Promise<Chi
     child.once("error", (error) => fail(`The child did not start: ${error.message}`, error));
     child.once("exit", () => {
       // The fixture waits for the end of the output, so the error holds the last lines of the child
-      void within(closed, CLOSE_WAIT_MS).then(() => fail(`The child ended before it reported a port (${describeExit(exit)}).`));
+      void within(closed, CLOSE_WAIT_MS).then(() => {
+        const before = reported === undefined ? "it reported a port" : `a line that matches ${String(options.ready)}`;
+        fail(`The child ended before ${before} (${describeExit(exit)}).`);
+      });
     });
 
+    if (options.ready !== undefined) {
+      const readyLine = withoutStateFlags(options.ready);
+      const onLine = (line: string): void => {
+        if (ready || !readyLine.test(line)) return;
+        ready = true;
+        finish();
+      };
+      cleanups.push(onLines(child.stdout, onLine), onLines(child.stderr, onLine));
+    }
+
     switch (report.from) {
-      case "stdout": {
-        const pattern = new RegExp(report.pattern?.source ?? PORT_LINE.source, (report.pattern?.flags ?? "").replace(/[gy]/g, ""));
-        let partial = "";
-        const onData = (chunk: string): void => {
-          const lines = (partial + chunk).split("\n");
-          partial = (lines.pop() ?? "").slice(-OUTPUT_LIMIT);
-          for (const line of lines) {
-            const text = pattern.exec(line.replace(/\r$/, ""))?.[1];
-            if (text !== undefined) return found(Number(text));
-          }
+      case "stdout":
+      case "stderr": {
+        const pattern = withoutStateFlags(report.pattern ?? PORT_LINE);
+        const onLine = (line: string): void => {
+          const text = pattern.exec(line)?.[1];
+          if (text !== undefined) found(Number(text));
         };
-        child.stdout.on("data", onData);
-        cleanups.push(() => child.stdout.off("data", onData));
+        cleanups.push(onLines(report.from === "stdout" ? child.stdout : child.stderr, onLine));
         break;
       }
       case "file":
@@ -276,7 +302,7 @@ function checkOptions(options: ChildServerOptions): void {
     }
   }
   const report = options.report;
-  if (report?.from === "stdout" && report.pattern !== undefined && groupCount(report.pattern) < 1) {
+  if ((report?.from === "stdout" || report?.from === "stderr") && report.pattern !== undefined && groupCount(report.pattern) < 1) {
     throw new RangeError(`startChildServer: the pattern ${String(report.pattern)} has no group for the port.`);
   }
 }
@@ -285,6 +311,26 @@ function checkOptions(options: ChildServerOptions): void {
 function groupCount(pattern: RegExp): number {
   // The empty alternative matches each text, and the match has one entry for each group
   return (new RegExp(`${pattern.source}|`).exec("")?.length ?? 1) - 1;
+}
+
+/** This function gives a copy of a pattern without the flags `g` and `y`, so that each test of a line starts at its start. */
+function withoutStateFlags(pattern: RegExp): RegExp {
+  return new RegExp(pattern.source, pattern.flags.replace(/[gy]/g, ""));
+}
+
+/**
+ * This function gives each complete line of a stream to `onLine`, without its newline and its carriage return. The
+ * function that it gives stops the reads.
+ */
+function onLines(stream: Readable, onLine: (line: string) => void): () => void {
+  let partial = "";
+  const onData = (chunk: string): void => {
+    const lines = (partial + chunk).split("\n");
+    partial = (lines.pop() ?? "").slice(-OUTPUT_LIMIT);
+    for (const line of lines) onLine(line.replace(/\r$/, ""));
+  };
+  stream.on("data", onData);
+  return () => stream.off("data", onData);
 }
 
 function fileReader(path: string, parse: (text: string) => number | undefined): () => Promise<number | undefined> {
