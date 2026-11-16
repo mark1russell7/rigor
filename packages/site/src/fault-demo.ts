@@ -2,9 +2,9 @@
  * The pure part of the fault-plan demo. `faultPlan` of `@mark1russell7/rigor-chaos` draws the plan, and `applierOf` of
  * `@mark1russell7/rigor-proxy` applies it. This module only gives frames to the applier of each direction, at their times.
  *
- * The rules of a connection come from the proxy (`proxy.ts`), because the proxy uses sockets and a browser has none:
- * a pause stops the reads of one direction, a cut ends both appliers, and a reset loses each write that waits.
- * If a second user needs these rules without sockets, they move to the entry `rigor-proxy/applier`.
+ * The rules of a connection come from the proxy (`proxy.ts`). The proxy uses sockets and a browser has none, so this
+ * module applies the same rules. A pause stops the reads of one direction. A cut ends both appliers. A reset loses each
+ * write that waits. If a second user needs these rules without sockets, they move to the entry `rigor-proxy/applier`.
  */
 import { type Direction, type Fault, type FaultKind, type FaultPlan, type FaultRanges, type FaultSpec, FAULT_KINDS, faultPlan } from "@mark1russell7/rigor-chaos";
 import { type Applier, type FaultRecord, type Step, applierOf } from "@mark1russell7/rigor-proxy/applier";

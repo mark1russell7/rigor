@@ -137,9 +137,10 @@ describe("runDemo", () => {
       for (const lane of lanesOf(run)) {
         for (const pause of lane.pauses) {
           paused += 1;
-          for (const frame of lane.frames) {
-            if (frame.arrives >= pause.from && frame.arrives < pause.until) expect(frame.read! >= pause.until).toBe(true);
-          }
+          // A stall at a byte or a frame fires in the read of a frame, so that one frame has its read at the start of the stall.
+          const reads = lane.frames.flatMap((frame) => (frame.read !== undefined && frame.read >= pause.from && frame.read < pause.until ? [frame.read] : []));
+          expect(reads.filter((read) => read > pause.from)).toEqual([]);
+          expect(reads.length).toBeLessThanOrEqual(1);
         }
         for (const frame of lane.frames) expect(frame.read! >= frame.arrives).toBe(true);
       }

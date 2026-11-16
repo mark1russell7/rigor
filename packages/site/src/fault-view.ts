@@ -1,5 +1,5 @@
 /**
- * The DOM part of the fault-plan demo, for a browser only. It reads the controls, uses `runDemo`, and draws each
+ * The DOM part of the fault-plan demo, for a browser only. It reads the controls and uses `runDemo`. It draws each
  * direction of each connection: the frames that reach the proxy, the writes of the proxy, and the faults between them.
  */
 import { type FaultKind, FAULT_KINDS } from "@mark1russell7/rigor-chaos";
@@ -121,7 +121,7 @@ function drawChart(host: HTMLElement, tip: HTMLElement, run: DemoRun): void {
   host.replaceChildren(root);
 }
 
-/** This function draws one direction: the rail of the reads, the rail of the writes, a line from each frame to each of its writes, and the faults. */
+/** This function draws one direction of a connection. It draws a rail of the reads, a rail of the writes, a line from each frame to each write, and the faults. */
 function drawLane(root: SVGElement, tip: HTMLElement, run: DemoRun, c: DemoConnection, lane: DemoLane, top: number, x: (t: number) => number): void {
   const yIn = top + H.label + H.flags;
   const yOut = yIn + H.gap;
