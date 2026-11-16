@@ -172,6 +172,9 @@ importers:
       '@mark1russell7/boundaries':
         specifier: ^0.2.0
         version: 0.2.1(@swc/core@1.16.22)(dependency-cruiser@18.7.2)
+      '@mark1russell7/collections':
+        specifier: ^0.11.2
+        version: 0.11.2
       '@mark1russell7/conventions':
         specifier: ^0.41.0
         version: 0.41.15
@@ -421,6 +424,9 @@ importers:
       '@mark1russell7/cue':
         specifier: ^2.0.0
         version: 2.1.4
+      '@mark1russell7/rigor-chaos':
+        specifier: workspace:^
+        version: link:../chaos
       '@opentelemetry/api':
         specifier: ^1.9.0
         version: 1.10.0
@@ -1025,6 +1031,10 @@ packages:
       dependency-cruiser:
         optional: true
 
+  '@mark1russell7/collections@0.11.2':
+    resolution: {integrity: sha512-6JXrfvg2vMGITbc11C3POvDwbbCU7PMkFWSYdYjshJj5o0LSAMnpPsVSQySfA5G4mdYeAdJ/VfN5Yc3foJkdCQ==}
+    engines: {node: '>=22.12'}
+
   '@mark1russell7/conventions@0.41.15':
     resolution: {integrity: sha512-MxfocF+YfdmMbG1UPZrZ17s7HyuCltJi2o488MtHiBgLy1oKrVgGZ1kSkCp0GUGkm2wgvShlhvnB9blEPYGvAg==}
     engines: {node: '>=22'}
@@ -1034,6 +1044,10 @@ packages:
     resolution: {integrity: sha512-+EEUBpLrTBcJoMIOF3C5XMVpzO7eYrermtdleEvWLGNJK9/HGPT9o6GgbsW+Vl+s3/0QrXksc0qOIUlE70HI9Q==}
     engines: {node: '>=22'}
     hasBin: true
+
+  '@mark1russell7/optional@1.2.0':
+    resolution: {integrity: sha512-vS5jF21WC/VApRv4p8afRZahcMl9cuNp03LxbVngY9nYkzq+S7Oit6ksySt2baML+tp46UF60sxnHxn1jlwtTg==}
+    engines: {node: '>=22.12'}
 
   '@mark1russell7/quantity@0.4.0':
     resolution: {integrity: sha512-TucM9+HtueZd+duKWeB3ClS3uIaS545eOF9dB+8kM7vlD0NVBIjQd4IaIzTsQabaPG3WnlPOLJuX8H8LyqrcAQ==}
@@ -3144,11 +3158,19 @@ snapshots:
       '@swc/core': 1.16.22
       dependency-cruiser: 18.7.2
 
+  '@mark1russell7/collections@0.11.2':
+    dependencies:
+      '@mark1russell7/algebra': 0.8.10(zod@4.6.7)
+      '@mark1russell7/optional': 1.2.0
+      '@mark1russell7/rigor-statistics': 0.2.5
+
   '@mark1russell7/conventions@0.41.15':
     dependencies:
       yaml: 2.9.1
 
   '@mark1russell7/cue@2.1.4': {}
+
+  '@mark1russell7/optional@1.2.0': {}
 
   '@mark1russell7/quantity@0.4.0(zod@4.6.7)':
     dependencies:

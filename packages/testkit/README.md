@@ -10,6 +10,7 @@ Test helpers:
 - `startOtlpCollector` receives the OTLP exports of a program in another process, from the entry `@mark1russell7/rigor-testkit/otlp`.
 - `createFakeEventTarget` records the listeners of browser code in a Node test, from the entry `@mark1russell7/rigor-testkit/fakes`.
 - `startChildServer` starts a server of a test in a child process on the port 0, and reads the port that the child got. It is in the entry `@mark1russell7/rigor-testkit/child`.
+- `runToStop` stops a program of a test at a step or a time of a stop plan, from the entry `@mark1russell7/rigor-testkit/stop`.
 
 ```sh
 npm install --save-dev @mark1russell7/rigor-testkit
@@ -380,6 +381,61 @@ const response = await fetch(`http://localhost:${server.port}/health`);
 - `stop()` sends `SIGTERM`, then `SIGKILL` after `stopGraceMs` (2 000 by default). Each call gives the same promise.
 - `childServerGroup()` keeps each child that it starts. `stopAll()` stops them, for the end of each test.
 - `output()` gives the last 256 KiB of the standard output and the standard error of the child.
+
+## A stop of a process
+
+The entry `@mark1russell7/rigor-testkit/stop` applies a stop plan of `@mark1russell7/rigor-chaos` to a program of a test. The program uses `stopPoint` at each point of interest. The harness stops the child at the point of a stop, and the test examines the state that the child left.
+
+```ts
+// The program of the test, in its own file
+import { stopPoint } from "@mark1russell7/rigor-testkit/stop";
+
+stopPoint("before the commit");
+db.exec("COMMIT");
+stopPoint("after the commit");
+```
+
+The entry `/stop` imports `@mark1russell7/rigor-chaos`. Install it next to this package. The other entries do not load it:
+
+```sh
+npm install --save-dev @mark1russell7/rigor-chaos
+```
+
+Without `@mark1russell7/rigor-chaos`, the import of `/stop` throws an `Error` that gives this command. The entry loads the package with a top-level `await`, so `require()` cannot load the entry. Use `import`.
+
+```ts
+// The test
+import { stopPlan } from "@mark1russell7/rigor-chaos";
+import { countStops, runToStop } from "@mark1russell7/rigor-testkit/stop";
+
+const program = { command: process.execPath, args: ["writer.ts", file] };
+const plan = stopPlan({ within: { step: await countStops(program) }, draws: 16 }, "writer");
+for (const stop of plan.stops) {
+  const run = await runToStop({ ...program, stop });
+  // Open the file, and examine it. run.lastStep and run.lastLabel tell the point of the stop.
+}
+```
+
+### The rules
+
+- Each call of `stopPoint` is the next step, from 0. Without the variable `RIGOR_STOP`, the function does no work.
+- At a stop at a step, the child writes its progress, then sends the signal to itself. Thus no work after the point runs.
+- At a stop at a time, the harness sends the signal to the child. `lastStep` is the last point before the signal.
+- A rerun with `{ step: run.lastStep }` replays the nearest point before a stop at a time.
+- `stopped` is `false` when the child ends before the point of the stop.
+- `countStops` starts the program with no stop, and gives the number of its points. It rejects for an exit code that is not 0.
+- `runToStop` rejects when the child does not start, or does not end in `timeoutMs` (60 000 by default).
+- The first use of `stopPoint` removes `RIGOR_STOP` from the environment. Thus a later child of the program does not stop.
+- Start each child after the first stop point, or remove `STOP_ENV` from its environment. An earlier child gets the order. It writes its own steps from 0 to the same progress file, and it stops itself at the step of the stop.
+- An order that is not valid stays in the environment. Each call of `stopPoint` then throws its `RangeError`.
+- After `SIGTERM`, a program with a handler continues until its handler ends it. A handler does not keep the event loop open.
+
+### The limits
+
+- A stop of a process is not a power cut. The kernel keeps each write that the process gave to it, also after `SIGKILL`.
+- Only a power cut or a crash of the kernel loses the writes that are not on the disk. A test of a process stop does not examine that case.
+- On Windows, `SIGTERM` and `SIGKILL` both end the process at once. The process cannot catch `SIGTERM`. Do the tests of `SIGTERM` on Linux or macOS.
+- The signal goes only to the child. A child of the program continues after the stop.
 
 ## License
 

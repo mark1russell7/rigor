@@ -1,6 +1,13 @@
 packages:
   - "packages/*"
 
+# The tests of generators and statistics use rigor-testkit/arbitrary, and the entry /stop of testkit depends on chaos.
+# Thus the dev edges make a cycle, and without this setting pnpm refuses to order the tasks of "pnpm -r run build".
+# Each order of the builds is safe: each package is a source package, so a build reads the src of its dependencies.
+# The runtime graph has no cycle. The script scripts/check-runtime-cycles.ts holds it, in the script check:boundaries.
+# The end of the script: a rule of conventions over the runtime graph (mark1russell7/template#364).
+ignoreWorkspaceCycles: true
+
 # Packages allowed to run install scripts. Since pnpm 11 every other package that has one fails the install.
 # A git-hosted package is approved by its repository URL, so a new commit of cue needs no new approval.
 allowBuilds:

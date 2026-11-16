@@ -1,6 +1,7 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import type { Readable } from "node:stream";
+import { OUTPUT_LIMIT, describeExit, outputTail, within } from "./process.ts";
 
 /**
  * A server of a test in a child process. The child listens on the port 0 and reports the port that it got. The report is
@@ -101,8 +102,6 @@ export class ChildServerError extends Error {
   }
 }
 
-/** The fixture keeps this number of characters of the output of a child. */
-const OUTPUT_LIMIT = 256 * 1024;
 /** The message of an error holds this number of the last characters of the output. */
 const MESSAGE_OUTPUT_LIMIT = 2_000;
 /** After the exit of a child, the fixture waits this time in ms for the end of its output. */
@@ -153,8 +152,7 @@ export async function startChildServer(options: ChildServerOptions): Promise<Chi
 
   let output = "";
   const keep = (text: string): void => {
-    output += text;
-    if (output.length > OUTPUT_LIMIT) output = output.slice(-OUTPUT_LIMIT);
+    output = outputTail(output + text);
   };
   child.stdout.setEncoding("utf8");
   child.stderr.setEncoding("utf8");
@@ -348,22 +346,4 @@ function fileReader(path: string, parse: (text: string) => number | undefined): 
 
 function isPort(value: number): boolean {
   return Number.isInteger(value) && value >= 1 && value <= 65_535;
-}
-
-function describeExit(exit: ChildExit | undefined): string {
-  if (exit?.signal) return `the signal ${exit.signal}`;
-  return `the code ${String(exit?.code)}`;
-}
-
-/** This function gives the value of a promise, or `undefined` when the promise takes more than `ms`. */
-async function within<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const late = new Promise<undefined>((resolve) => {
-    timer = setTimeout(() => resolve(undefined), ms);
-  });
-  try {
-    return await Promise.race([promise, late]);
-  } finally {
-    clearTimeout(timer);
-  }
 }
