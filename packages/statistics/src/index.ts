@@ -79,6 +79,10 @@ export { type SobolIndex, type SobolIndices, type SobolOptions, sobolIndices } f
 export { FOLD_RULE_BAR, FOLD_RULE_MIN_FOLDS, type FoldRuleOptions, type FoldVerdict, type FoldVerdictKind, foldRule, foldSkills } from "./fold-rule.ts";
 export {
   type Corrected,
+  type CorrelationMethod,
+  type CorrelationPermutationOptions,
+  type CorrelationPermutationResult,
+  type CorrelationSide,
   type PermutationOptions,
   type PermutationResult,
   type Proportion,
@@ -89,6 +93,7 @@ export {
   type TwoSamplePermutationOptions,
   type TwoSamplePermutationResult,
   Z95,
+  correlationPermutation,
   holm,
   pairedPermutation,
   partialConjunction,
@@ -101,6 +106,7 @@ export {
 } from "./tests.ts";
 export { type ClassScore, type Confusion, type Kappa, classScores, cohenKappa, confusion } from "./agreement.ts";
 export { entropy, informationGain } from "./information.ts";
+export { pearson } from "./correlation.ts";
 export { KENDALL_EXACT, kendallTau, ranks, spearman } from "./rank.ts";
 export {
   type BinomialSide,

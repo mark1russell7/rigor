@@ -1,6 +1,8 @@
 # @mark1russell7/rigor-statistics
 
-The statistics of measured work. It gives quantiles, bootstrap intervals, the sign test, the paired permutation test, Wilson and Clopper-Pearson intervals and the Holm correction. It gives the interval of a median from order statistics, and the central interval of a binomial count. It also gives least squares, rank correlation, the comparison with a baseline beyond the noise, and the Brier score and the log-loss of predictions. It rates items from pairwise results with Elo, Glicko-2 and a Bradley-Terry fit. It fits response records that a browser can evaluate from plain JSON, and it gives the Sobol indices of their models.
+The statistics of measured work. It gives quantiles, bootstrap intervals, the sign test, the paired permutation test, Wilson and Clopper-Pearson intervals and the Holm correction. It gives the interval of a median from order statistics, and the central interval of a binomial count. It also gives least squares, the Pearson and rank correlations and the permutation test of a correlation. It gives the comparison with a baseline beyond the noise, and the Brier score and the log-loss of predictions.
+
+It rates items from pairwise results with Elo, Glicko-2 and a Bradley-Terry fit. It fits response records that a browser can evaluate from plain JSON, and it gives the Sobol indices of their models.
 
 ```sh
 npm install @mark1russell7/rigor-statistics
@@ -243,6 +245,7 @@ In the tests, the series are AR(1) with 200 readings and the slope 0.6. There, t
 | `pairedPermutation(candidate, baseline, options)` | The paired permutation test (random sign flips). It uses the size of each difference. |
 | `signFlipTest(terms, options)` | The sign-flip test of a sum of terms, for example a weighted mean of differences. Up to `exactMax` terms (16), it reads each sign set, so the p is exact. |
 | `twoSamplePermutation(a, b, options)` | The two-sample permutation test (a split of the pooled values). It reads each split when their count is `runs` or less, so the p is exact. It compares groups of different sizes, and its default statistic is the difference of the medians. |
+| `correlationPermutation(a, b, options)` | The permutation test of a correlation, with a seed. The statistic is `"pearson"`, `"spearman"` or a function, for example `kendallTau`. The side is `"both"`, `"greater"` or `"less"`. When `n!` is `runs` or less, the test reads each order, so the p is exact. |
 | `wilson(k, n, z)` | The Wilson interval of a proportion. |
 | `wilsonSampleSize(target, expected, z, max)` | The smallest number of trials at which the Wilson lower end reaches the target, at the expected proportion. |
 | `clopperPearson(k, n, level)` | The exact Clopper-Pearson interval of a proportion. Each tail outside holds `(1 - level) / 2`, so the coverage is `level` or more at each proportion. It is wider than `wilson`. |
@@ -260,7 +263,8 @@ In the tests, the series are AR(1) with 200 readings and the slope 0.6. There, t
 | `binomialTest(k, n, p, side)` | The p of the exact one-sided binomial test of `k` successes in `n` trials. The side `"less"` gives `P(X <= k)`, and `"greater"` gives `P(X >= k)`. |
 | `coverageMinSample(cells, { level, alpha, pooledLow })` | The smallest sample size `m` from which an interval method keeps its level, from the hits of seeded cells. A size qualifies when the cells with a sample of that size or more pass two tests. No cell rejects `level` in `binomialTest` after `holm` at `alpha`, and the `wilson` lower end of the pooled hits is `pooledLow` or more. The set is closed upward: the result is the smallest `m` such that each size of `m` or more qualifies. `blocking` gives the largest size that fails. When the largest size fails, the result is `Infinity`. Fix the bar before the run. |
 | `partialConjunction(pValues, need)` | The p of the claim that at least `need` of these tests have a real effect. |
-| `spearman`, `kendallTau`, `ranks` | The rank correlations, with mean ranks for ties. |
+| `pearson(a, b)` | The Pearson correlation of two lists of finite numbers. A list with no spread gives 0. It keeps its value at the ends of the range of a double. |
+| `spearman`, `kendallTau`, `ranks` | The rank correlations, with mean ranks for ties. `spearman` is equal to `pearson` of the ranks, to the bit. |
 | `compareRatios`, `noiseFloor`, `noiseVerdict` | The comparison with a baseline, the noise floor of the 5-seed rule with a margin of practical effect, and the state of a difference over the seeds. |
 | `optionFloor({ sigma, delta, tests, alpha, power })`, `tQuantile(p, df)` | The fewest values for each of two options, so that one test of a Bonferroni family finds a difference of `delta` with the stated power, from the Student t law. It assumes unpaired groups of equal size and equal `sigma`. The quantile of the Student t law. |
 | `meanInterval(values, level)` | The two-sided interval of the mean with the Student t law: the mean plus or minus `t * sd / sqrt(n)`. The level 0.9 uses the one-sided 0.95 quantile. |

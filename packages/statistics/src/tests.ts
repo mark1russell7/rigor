@@ -1,9 +1,11 @@
 /**
- * The tests of a difference: the sign test, the paired permutation test, the Wilson interval of a proportion and
- * the Holm correction for several tests.
+ * The tests of a difference and of a correlation: the sign test and the permutation tests. This module also gives
+ * the Wilson interval of a proportion and the Holm correction for several tests.
  */
 import { random } from "@mark1russell7/rigor-generators";
+import { correlationOf, correlationParts, finitePairs } from "./correlation.ts";
 import { mean, median } from "./describe.ts";
+import { ranks, samePairs } from "./rank.ts";
 
 function whole(name: string, value: number): void {
   if (!Number.isSafeInteger(value) || value < 0) throw new RangeError(`${name}: ${value} is not a whole number of 0 or more.`);
@@ -351,6 +353,127 @@ export function twoSamplePermutation(a: readonly number[], b: readonly number[],
       pool[j] = held;
     }
     if (isExtreme(pool.slice(0, a.length), pool.slice(a.length))) extreme++;
+  }
+  return { observed, p: (1 + extreme) / (1 + runs), runs, exact: false };
+}
+
+/** The statistic of `correlationPermutation`: a correlation by its name, or a function of the two lists. */
+export type CorrelationMethod = "pearson" | "spearman" | ((a: readonly number[], b: readonly number[]) => number);
+
+/** The side of `correlationPermutation`. `"greater"` tests a positive correlation, and `"less"` tests a negative one. */
+export type CorrelationSide = "both" | "greater" | "less";
+
+/** The options of `correlationPermutation`. */
+export interface CorrelationPermutationOptions {
+  /** The statistic of the pairs. The default is `"pearson"`. */
+  readonly method?: CorrelationMethod;
+  /** The side of the test. The default is `"both"`. */
+  readonly side?: CorrelationSide;
+  /** The largest count of orders that the test reads, and the count of random orders above it. The default is 10 000. */
+  readonly runs?: number;
+  /** The default is 1. */
+  readonly seed?: number | string;
+}
+
+/** The result of `correlationPermutation`. */
+export interface CorrelationPermutationResult extends PermutationResult {
+  /** This field is true when the test read each order of the second list, so the p has no noise from the draws. */
+  readonly exact: boolean;
+}
+
+/** This function gives `n!`, or Infinity when the count is over `limit`. */
+function orders(n: number, limit: number): number {
+  let count = 1;
+  for (let i = 2; i <= n; i++) {
+    count *= i;
+    if (count > limit) return Number.POSITIVE_INFINITY;
+  }
+  return count;
+}
+
+/** This function gives each order of `items` to `visit`, with the method of Heap (1963). It changes `items` in place. */
+function eachOrder(items: number[], visit: (order: readonly number[]) => void): void {
+  const counters = new Array<number>(items.length).fill(0);
+  visit(items);
+  for (let i = 1; i < items.length; ) {
+    const count = counters[i] as number;
+    if (count < i) {
+      const j = i % 2 === 0 ? 0 : count;
+      const held = items[i] as number;
+      items[i] = items[j] as number;
+      items[j] = held;
+      visit(items);
+      counters[i] = count + 1;
+      i = 1;
+    } else {
+      counters[i] = 0;
+      i++;
+    }
+  }
+}
+
+/**
+ * The permutation test of a correlation. Under the null, the two lists are independent, so each order of the second
+ * list has the same chance. The statistic is `pearson`, `spearman` or a function of the two lists, for example `kendallTau`.
+ *
+ * When `n!` is `runs` or less, the test reads each order, and the p is exact. Otherwise it draws `runs` random orders,
+ * and the p is (1 + the extreme draws) / (1 + runs). A statistic within `1e-12` of the observed value counts as
+ * extreme, so rounding does not hide a tie. Above an observed value of 1, the tolerance is relative.
+ */
+export function correlationPermutation(a: readonly number[], b: readonly number[], options: CorrelationPermutationOptions = {}): CorrelationPermutationResult {
+  const method = options.method ?? "pearson";
+  const side = options.side ?? "both";
+  const runs = options.runs ?? 10_000;
+  if (method !== "pearson" && method !== "spearman" && typeof method !== "function") {
+    throw new RangeError(`correlationPermutation: method is "pearson", "spearman" or a function, not ${String(method)}.`);
+  }
+  if (side !== "both" && side !== "greater" && side !== "less") throw new RangeError(`correlationPermutation: side is "both", "greater" or "less", not ${String(side)}.`);
+  if (!Number.isSafeInteger(runs) || runs < 1) throw new RangeError(`correlationPermutation: runs is a whole number of 1 or more, not ${runs}.`);
+  let second: number[];
+  let statistic: (order: readonly number[]) => number;
+  if (typeof method === "function") {
+    if (a.length !== b.length) throw new RangeError(`correlationPermutation: the lists have ${a.length} and ${b.length} values.`);
+    second = [...b];
+    statistic = (order) => method(a, order);
+  } else {
+    if (method === "pearson") finitePairs("correlationPermutation", a, b);
+    else samePairs("correlationPermutation", a, b);
+    // The order of the second list changes neither its mean nor its spread, so each order needs one sum of products.
+    const { x, y, spread } = method === "pearson" ? correlationParts(a, b) : correlationParts(ranks(a), ranks(b));
+    second = [...y];
+    statistic = (order) => correlationOf(x, order, spread);
+  }
+  const valueOf = (order: readonly number[]): number => {
+    const value = statistic(order);
+    if (Number.isNaN(value)) throw new RangeError("correlationPermutation: the statistic of an order is NaN.");
+    return value;
+  };
+  const observed = valueOf(second);
+  const slack = 1e-12 * Math.max(1, Math.abs(observed));
+  const isExtreme =
+    side === "both"
+      ? (value: number): boolean => Math.abs(value) >= Math.abs(observed) - slack
+      : side === "greater"
+        ? (value: number): boolean => value >= observed - slack
+        : (value: number): boolean => value <= observed + slack;
+  let extreme = 0;
+  const total = orders(second.length, runs);
+  if (Number.isFinite(total)) {
+    eachOrder(second, (order) => {
+      if (isExtreme(valueOf(order))) extreme++;
+    });
+    return { observed, p: extreme / total, runs: total, exact: true };
+  }
+  const r = random(options.seed ?? 1);
+  for (let run = 0; run < runs; run++) {
+    // A full Fisher-Yates shuffle gives each order the same chance, from any order before it.
+    for (let i = second.length - 1; i > 0; i--) {
+      const j = r.below(i + 1);
+      const held = second[i] as number;
+      second[i] = second[j] as number;
+      second[j] = held;
+    }
+    if (isExtreme(valueOf(second))) extreme++;
   }
   return { observed, p: (1 + extreme) / (1 + runs), runs, exact: false };
 }
