@@ -59,7 +59,11 @@ function runtimeGraph(root: string): Graph {
   return new Map([...graph].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
 }
 
-/** This function gives one cycle of each strongly connected component with a cycle, as a path that ends at its start. */
+/**
+ * This function gives one cycle of each strongly connected component with a cycle, as a path that ends at its start.
+ * Its home is @mark1russell7/collections, which does not have it (mark1russell7/collections#138). This copy goes away with
+ * this script.
+ */
 function cycles(graph: Graph): string[][] {
   const successors = (name: string): readonly string[] => graph.get(name) ?? [];
   const out: string[][] = [];
