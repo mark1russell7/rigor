@@ -197,7 +197,7 @@ function ends(values: number[], estimate: number, s: Settings, seed: number): In
  * Each run gives the stream to `run`, which draws the samples and returns their statistic. Then `all` gives the
  * estimate. The order of the draws is the order in `run`.
  */
-function percentile(name: string, options: BootstrapOptions, run: (r: Random) => number, all: () => number): Interval {
+export function percentile(name: string, options: BootstrapOptions, run: (r: Random) => number, all: () => number): Interval {
   const s = settings(name, options);
   const r = random(options.seed ?? 1);
   const values: number[] = [];
