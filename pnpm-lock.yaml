@@ -433,6 +433,9 @@ importers:
       '@mark1russell7/rigor-chaos':
         specifier: workspace:^
         version: link:../chaos
+      '@mark1russell7/rigor-generators':
+        specifier: workspace:^
+        version: link:../generators
       '@opentelemetry/api':
         specifier: ^1.9.0
         version: 1.10.0
