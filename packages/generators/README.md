@@ -218,12 +218,26 @@ canonicalHash({ b: 1, a: 2 }) === canonicalHash({ a: 2, b: 1 }); // true
 sha256Hex("abc"); // "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
 ```
 
-The default form of `canonicalJson` is RFC 8785 (JCS). Two options change it:
+The default form of `canonicalJson` is RFC 8785 (JCS). Three options change it:
 
 | Option | The default | The other value |
 | --- | --- | --- |
 | `form` | `"jcs"`: `NaN`, an infinite number and a lone surrogate cause a `RangeError` | `"json"`: the form of `JSON.stringify`, so these values become `null` or an escape |
 | `bigint` | `"error"`: a `bigint` causes a `TypeError` | `"suffix"`: the digits and `n`, for example `12n`. This text is not JSON, so use it only for a key |
+| `tags` | `"none"`: the form of `JSON.stringify`. A `Date` gives its ISO text. A `RegExp`, a `Map` and a `Set` give `{}` | `"typed"`: a tag with the type and the value. This text is not JSON, so use it only for a key or a hash |
+
+With `tags: "typed"`, two values that differ only in a `Date`, a `RegExp`, a `Map` or a `Set` get different keys:
+
+```ts
+const typed = { tags: "typed" } as const;
+canonicalJson({ at: new Date(0), n: 12n }, typed); // '{"at":Date(0),"n":12n}'
+canonicalJson(new Map([[2, "b"], [1, "a"]]), typed); // 'Map([1,"a"],[2,"b"])'
+canonicalJson({ s: new Set(["b", "a"]), re: /a+/g }, typed); // '{"re":RegExp("/a+/g"),"s":Set("a","b")}'
+```
+
+- The entries of a `Map` and the items of a `Set` are in the order of their text. Thus the order of insertion does not change the key.
+- With `"typed"`, the default of `bigint` is `"suffix"`. An explicit `bigint: "error"` keeps the `TypeError`.
+- On a value with no `Date`, `RegExp`, `Map`, `Set` or `bigint`, the two values of `tags` give the same text.
 
 The option `input` of `sha256Hex` has the values `"utf8"` and `"wtf8"` of `fnv1a32`. The two functions use no API of Node or of the browser. `sha256Hex` is not for passwords.
 
