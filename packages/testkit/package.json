@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/rigor-testkit",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "description": "Test helpers: the code blocks of Markdown files as test cases, model-based tests on fast-check, metamorphic relations on fast-check, arbitraries that are uniform by value, the propagation gate of one context id over each transport, the capture of the OpenTelemetry SDK, a scripted HTTP server for fixtures, a stand-in OTLP collector, a fake event target, a server of a test in a child process that reports its port, the harness of a stop plan that stops a process of a test at a step or a time, a behavior check of two functions on the same seeded inputs, and a check of an operation that must give a rejected promise.",
   "keywords": [
     "testing",
@@ -100,6 +100,11 @@
         "import": "./build/stop.js",
         "default": "./build/stop.js"
       },
+      "./stop-point": {
+        "types": "./build/stop-point.d.ts",
+        "import": "./build/stop-point.js",
+        "default": "./build/stop-point.js"
+      },
       "./behavior": {
         "types": "./build/behavior.d.ts",
         "import": "./build/behavior.js",
@@ -146,6 +151,7 @@
     "./fakes": "./src/fakes.ts",
     "./child": "./src/child.ts",
     "./stop": "./src/stop.ts",
+    "./stop-point": "./src/stop-point.ts",
     "./behavior": "./src/behavior.ts",
     "./package.json": "./package.json"
   },

@@ -1,15 +1,15 @@
 import { spawn } from "node:child_process";
-import { openSync, writeSync } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Stop, StopSignal } from "@mark1russell7/rigor-chaos";
+import type { Stop } from "@mark1russell7/rigor-chaos";
 import type { ChildExit } from "./child.ts";
 import { importPeer } from "./peer.ts";
 import { describeExit, outputTail, within } from "./process.ts";
+import { STOP_ENV, parseProgress, type ProgressLine, type StopOrder } from "./stop-point.ts";
 
 // rigor-chaos is an optional peer dependency. Without it, the import of this entry throws an error with the install.
-const { STOP_SIGNALS, checkStop, stopTriggerOf } = await importPeer(
+const { checkStop, stopTriggerOf } = await importPeer(
   () => import("@mark1russell7/rigor-chaos"),
   "@mark1russell7/rigor-chaos",
   "@mark1russell7/rigor-testkit/stop",
@@ -25,27 +25,12 @@ const { STOP_SIGNALS, checkStop, stopTriggerOf } = await importPeer(
  * `SIGKILL`. Only a power cut or a crash of the kernel loses the writes that are not on the disk.
  *
  * On Windows, `SIGTERM` and `SIGKILL` both end the process at once, and the process cannot catch `SIGTERM`.
+ *
+ * The child side is also the entry `/stop-point`: `STOP_ENV`, `stopPoint` and `parseProgress`. That entry imports only
+ * modules of Node.js, so a copy of its built file works with no packages. This entry gives the same names.
  */
 
-/** The name of the environment variable that tells the child its stop and the file of its progress. */
-export const STOP_ENV = "RIGOR_STOP";
-
-/**
- * The value of `STOP_ENV`: a JSON object. Without `step`, the child records each point and does not stop. A harness that
- * starts the child itself, for example in a container, makes the order with `stopOrderOf`.
- */
-export interface StopOrder {
-  readonly progress: string;
-  readonly step?: number;
-  readonly signal?: StopSignal;
-}
-
-/** One line of the progress file. `parseProgress` reads the lines of a file. */
-export interface ProgressLine {
-  readonly step: number;
-  readonly label?: string;
-  readonly stop?: true;
-}
+export { STOP_ENV, parseProgress, stopPoint, type ProgressLine, type StopOrder } from "./stop-point.ts";
 
 /**
  * This function gives the order of a stop for `STOP_ENV`, with the path of the progress file in the child. A stop at a
@@ -58,25 +43,6 @@ export function stopOrderOf(stop: Stop | undefined, progress: string): StopOrder
   if (problems.length > 0) throw new RangeError(`stopOrderOf: ${problems.join(" ")}`);
   const trigger = stopTriggerOf(stop.at);
   return trigger?.measure === "step" ? { progress, step: trigger.value, signal: stop.signal } : { progress };
-}
-
-/**
- * This function gives the lines of the text of a progress file, in their sequence. It ignores a line that is not JSON:
- * the last line of a child that stopped in its write. It also ignores a value that is not a progress line.
- */
-export function parseProgress(text: string): ProgressLine[] {
-  const lines: ProgressLine[] = [];
-  for (const line of text.split("\n")) {
-    if (line === "") continue;
-    let value: unknown;
-    try {
-      value = JSON.parse(line);
-    } catch {
-      continue; // A line that the child did not write completely
-    }
-    if (isProgressLine(value)) lines.push(value);
-  }
-  return lines;
 }
 
 /** The parts of a run that tell if its stop occurred. A harness that starts the child itself has the same parts. */
@@ -103,74 +69,6 @@ export function stopOccurred(evidence: StopEvidence): boolean {
   if (stop === undefined) return false;
   if (stopTriggerOf(stop.at)?.measure === "step") return lines.some((line) => line.stop === true);
   return sent && exit.code !== 0;
-}
-
-/** This function tells if a value from a progress file has the shape of `ProgressLine`, with a whole step of 0 or more. */
-function isProgressLine(value: unknown): value is ProgressLine {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-  const line = value as Record<string, unknown>;
-  const step = line["step"];
-  if (typeof step !== "number" || !Number.isSafeInteger(step) || step < 0) return false;
-  return (line["label"] === undefined || typeof line["label"] === "string") && (line["stop"] === undefined || line["stop"] === true);
-}
-
-interface PointState {
-  readonly fd: number;
-  readonly stopAt: number | undefined;
-  readonly signal: StopSignal;
-  next: number;
-}
-
-let points: PointState | null | undefined;
-
-function openOrder(): PointState | null {
-  const text = process.env[STOP_ENV];
-  if (text === undefined || text === "") return null;
-  let order: StopOrder;
-  try {
-    order = JSON.parse(text) as StopOrder;
-  } catch (error) {
-    throw new RangeError(`stopPoint: the variable ${STOP_ENV} is not JSON: ${text}`, { cause: error });
-  }
-  const step: unknown = order.step;
-  const signal: unknown = order.signal ?? "SIGKILL";
-  if (typeof order.progress !== "string" || order.progress === "") throw new RangeError(`stopPoint: the variable ${STOP_ENV} has no progress file: ${text}`);
-  if (step !== undefined && !(typeof step === "number" && Number.isSafeInteger(step) && step >= 0)) {
-    throw new RangeError(`stopPoint: the step of ${STOP_ENV} is a whole number of 0 or more, not ${String(step)}.`);
-  }
-  if (!(STOP_SIGNALS as readonly unknown[]).includes(signal)) throw new RangeError(`stopPoint: the signal of ${STOP_ENV} is one of ${STOP_SIGNALS.join(", ")}, not ${String(signal)}.`);
-  const state: PointState = { fd: openSync(order.progress, "a"), stopAt: step as number | undefined, signal: signal as StopSignal, next: 0 };
-  // The removal comes after the checks. Thus each call with an order that is not valid throws, also after a caught error.
-  // A child that the program starts after this point does not get the order.
-  delete process.env[STOP_ENV];
-  return state;
-}
-
-/**
- * This function is one stop point of the program of a test. Each call is the next step, from 0. Without the variable
- * `STOP_ENV`, the function does no work. When the step is the step of the stop, the process sends the signal to itself.
- *
- * Each call writes the step and the label to the progress file before the signal. Thus the parent knows the last point
- * that the child got to. The first use removes `STOP_ENV` from the environment, thus a later child of the program does not
- * stop. An order that is not valid stays in the environment, and each call throws its `RangeError`.
- *
- * A child that the program starts before its first stop point gets the order. That child writes its own steps from 0 to
- * the same progress file, and it stops itself at the step of the stop. Start each child after the first stop point, or
- * remove `STOP_ENV` from its environment. A wrapper, for example `tsx`, needs the order for its child, so this function
- * does not refuse it.
- *
- * After `SIGKILL`, no code of the program runs. After `SIGTERM`, a program with a handler continues until its handler
- * ends it.
- */
-export function stopPoint(label?: string): void {
-  if (points === undefined) points = openOrder();
-  if (points === null) return;
-  const step = points.next;
-  points.next += 1;
-  const stops = step === points.stopAt;
-  const line: ProgressLine = { step, ...(label === undefined ? {} : { label }), ...(stops ? { stop: true as const } : {}) };
-  writeSync(points.fd, `${JSON.stringify(line)}\n`);
-  if (stops) process.kill(process.pid, points.signal);
 }
 
 /** The options of a run of a program to its stop. */
