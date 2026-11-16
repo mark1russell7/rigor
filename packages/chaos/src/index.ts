@@ -47,6 +47,19 @@ export {
   type ScheduleOptions,
 } from "./schedule.ts";
 export {
+  DISK_FAULT_KINDS,
+  DISK_PLAN_FORMAT,
+  checkDiskFault,
+  checkDiskPlan,
+  checkDiskSpec,
+  diskPlan,
+  diskPlanOf,
+  type DiskFault,
+  type DiskFaultKind,
+  type DiskPlan,
+  type DiskSpec,
+} from "./disk.ts";
+export {
   STOP_PLAN_FORMAT,
   STOP_SIGNALS,
   checkStop,

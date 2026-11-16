@@ -1,6 +1,6 @@
 # @mark1russell7/rigor-chaos
 
-This package holds open-loop load schedules and the measure of latency that goes with them. It also holds seeded fault plans for a proxy and seeded stop plans for a process of a test.
+This package holds open-loop load schedules and the measure of latency that goes with them. It also holds seeded fault plans for a proxy, and seeded stop plans and disk plans for a process of a test.
 
 A closed-loop driver waits for each reply before its next request. A stall of the target thus stops the load, and the measure shows one slow request. This is coordinated omission. An open-loop schedule fixes each arrival time before the run, and a measure counts each latency from its planned time.
 
@@ -155,6 +155,29 @@ const late = stopPlanOf([{ at: { ms: 1500 }, signal: "SIGKILL" }]);
 - The points of a plan are those of `sweepPoints`. A limit with fewer points than `draws + 3` gives each point.
 - Each point has one stop for each signal. The stops are in the order of their points, then of their signals.
 - `checkStopPlan` gives each problem of a plan from a record. `stopPlanOf` makes a plan from stops that a person wrote.
+
+## A disk plan
+
+A disk plan tells a harness which fault of the disk to apply to the files of a process of a test, and at which point. The test then examines the files that the disk kept. For example, it measures the data loss of each synchronous setting of a database. The disk tier of `@mark1russell7/harness` applies a plan.
+
+| Kind | What the disk does |
+|---|---|
+| `lose-unsynced` | A power cut: the process stops at once, and the disk loses each write after the last fsync of its file. |
+
+```ts
+import { diskPlan, diskPlanOf } from "@mark1russell7/rigor-chaos";
+
+// The program passes 240 stop points in a complete run. Each fault of the plan is one run.
+const plan = diskPlan({ within: { step: 240 }, draws: 16 }, "power-cut-in-commit");
+
+// A fault that a person wrote: 1.5 s after the start.
+const late = diskPlanOf([{ kind: "lose-unsynced", at: { ms: 1500 } }]);
+```
+
+- The faults are one family with one shape: a kind and a point. A torn write and an fsync error are the next kinds.
+- A point has the form of the point of a stop. The same spec and seed give the points of `stopPlan`.
+- Each point has one fault for each kind of the spec. The faults are in the order of their points, then of their kinds.
+- `checkDiskPlan` gives each problem of a plan from a record. `diskPlanOf` makes a plan from faults that a person wrote.
 
 ## A closed-loop record
 
