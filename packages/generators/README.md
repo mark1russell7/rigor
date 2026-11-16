@@ -234,7 +234,7 @@ By default, `canonicalJson` refuses each object that keeps its content out of it
 - The type of an object comes from its internal slots. Thus a value from another realm, for example from `node:vm`, gets the same form.
 - An object with its own `Symbol.toStringTag` needs a method `toJSON`. The form does not see private fields.
 
-Before 0.2.0, the default wrote these objects as `{}`. A program that hashes one of them gets a `TypeError` now. Use `tags: "typed"`, or give the object a method `toJSON`.
+Before 0.2.0, the default wrote these objects as `{}`. From 0.2.0, a program that hashes one of them gets a `TypeError`. Use `tags: "typed"`, or give the object a method `toJSON`.
 
 With `tags: "typed"`, two values that differ only in a `Date`, a `RegExp`, a `Map` or a `Set` get different keys:
 
