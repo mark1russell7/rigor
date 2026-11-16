@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 import { canonicalHash, canonicalJson, sha256Hex } from "./hash.ts";
 import { random, type Random } from "./random.ts";
@@ -255,12 +256,21 @@ describe("canonicalJson with the option tags", () => {
     }
   });
 
-  it("keeps the form of JSON.stringify by default, so no hash of an earlier version changes", () => {
+  it("keeps the ISO text of a Date by default, and refuses a Map, a Set and a RegExp with a text that names the option", () => {
     const d = new Date(Date.UTC(2026, 10, 8));
     expect(canonicalJson({ d })).toBe('{"d":"2026-11-08T00:00:00.000Z"}');
     expect(canonicalJson({ d }, { tags: "none" })).toBe('{"d":"2026-11-08T00:00:00.000Z"}');
-    expect(canonicalJson({ m: new Map([[1, 2]]), s: new Set([1]), re: /a/ })).toBe('{"m":{},"re":{},"s":{}}');
+    for (const v of [new Map([[1, 2]]), new Set([1]), /a/]) {
+      expect(() => canonicalJson({ v }), String(v)).toThrow(TypeError);
+      expect(() => canonicalJson({ v }), String(v)).toThrow('tags: "typed"');
+    }
     expect(() => canonicalJson({ a: 12n })).toThrow(TypeError);
+  });
+
+  it("gives the tag of a Map or a Set that a method toJSON gives", () => {
+    const holder = { toJSON: () => new Map([[1, new Set([2])]]) };
+    expect(canonicalJson({ holder }, typed)).toBe('{"holder":Map([1,Set(2)])}');
+    expect(() => canonicalJson({ holder })).toThrow(TypeError);
   });
 
   it("keeps an explicit bigint error, and refuses a cycle through a Map or a Set", () => {
@@ -305,6 +315,99 @@ describe("canonicalJson with the option tags", () => {
       const v = typedValueOf(r, 3);
       expect(canonicalJson(v, typed)).toBe(clientKey(v));
     }
+  });
+});
+
+/** A class with its content in its own keys. */
+class Point {
+  readonly x: number;
+  constructor(x: number) {
+    this.x = x;
+  }
+}
+
+/**
+ * The classes of the strict default. Each `make` gives values with other contents for other `n` of odd distance.
+ * `throws` is true for a class that keeps its content out of its own keys.
+ */
+const classes: readonly { readonly name: string; readonly make: (n: number) => unknown; readonly throws: boolean }[] = [
+  { name: "Map", make: (n) => new Map([["k", n]]), throws: true },
+  { name: "Set", make: (n) => new Set([n]), throws: true },
+  { name: "WeakMap", make: (n) => new WeakMap([[{}, n]]), throws: true },
+  { name: "WeakSet", make: (n) => new WeakSet([{ n }]), throws: true },
+  { name: "RegExp", make: (n) => new RegExp(`x${n}`), throws: true },
+  { name: "Error", make: (n) => new Error(`e${n}`), throws: true },
+  { name: "Promise", make: (n) => Promise.resolve(n), throws: true },
+  { name: "Symbol", make: (n) => Object(Symbol(`s${n}`)), throws: true },
+  { name: "ArrayBuffer", make: (n) => new Float64Array([n]).buffer, throws: true },
+  { name: "DataView", make: (n) => new DataView(new Float64Array([n]).buffer), throws: true },
+  { name: "URLSearchParams", make: (n) => new URLSearchParams({ q: String(n) }), throws: true },
+  { name: "Map Iterator", make: (n) => new Map([[n, n]]).entries(), throws: true },
+  { name: "Proxy of a Map", make: (n) => new Proxy(new Map([[n, n]]), {}), throws: true },
+  { name: "boxed BigInt", make: (n) => Object(BigInt(n)), throws: true },
+  { name: "Date", make: (n) => new Date(n), throws: false },
+  { name: "boxed Number", make: (n) => Object(n), throws: false },
+  { name: "boxed String", make: (n) => Object(`s${n}`), throws: false },
+  { name: "boxed Boolean", make: (n) => Object(n % 2 === 0), throws: false },
+  { name: "Float64Array", make: (n) => new Float64Array([n]), throws: false },
+  { name: "Int32Array", make: (n) => new Int32Array([n]), throws: false },
+  { name: "class instance", make: (n) => new Point(n), throws: false },
+  { name: "object with no prototype", make: (n) => Object.assign(Object.create(null) as object, { n }), throws: false },
+];
+
+describe("canonicalJson by default, for an object that keeps its content out of its own keys", () => {
+  it("refuses each such class, and gives other hashes to other contents of each other class (100 seeded pairs a class)", () => {
+    const r = random("canonicalJson strict default");
+    for (const { name, make, throws } of classes) {
+      for (let i = 0; i < 100; i++) {
+        const n = r.int(-1e6, 1e6);
+        const a = make(n);
+        const b = make(n + 2 * r.int(0, 500) + 1);
+        if (throws) {
+          expect(() => canonicalHash({ v: a }), name).toThrow(TypeError);
+          expect(() => canonicalHash({ v: b }), name).toThrow(TypeError);
+        } else expect(canonicalHash({ v: a }), `${name} ${String(n)}`).not.toBe(canonicalHash({ v: b }));
+      }
+    }
+  });
+
+  it("gives the form of JSON.stringify for a boxed primitive and a typed array", () => {
+    const values = [Object(1.5), Object("ab"), Object(false), new Uint8Array([3, 1]), { a: new Int16Array([-2]) }];
+    for (const v of values) expect(canonicalJson(v), String(v)).toBe(JSON.stringify(v));
+    expect(canonicalJson(Object(12n), { bigint: "suffix" })).toBe("12n");
+  });
+
+  it("names the option tags only for a type that it writes with a tag", () => {
+    const messageOf = (f: () => unknown): string => {
+      try {
+        f();
+      } catch (e) {
+        return (e as Error).message;
+      }
+      return "";
+    };
+    expect(messageOf(() => canonicalJson(new Map()))).toContain('the type Map has no JSON form');
+    expect(messageOf(() => canonicalJson(new Map()))).toContain('Use the option tags: "typed"');
+    for (const [v, options] of [[new WeakMap(), undefined], [new Error("e"), { tags: "typed" as const }], [new Map(), undefined]] as const) {
+      const message = messageOf(() => canonicalJson({ v }, options));
+      expect(message, message).toContain("a method toJSON");
+      if (!(v instanceof Map)) expect(message, message).not.toContain("tags");
+    }
+  });
+
+  it("uses the internal slots, so a value from another realm gets the same form", () => {
+    const foreign = runInNewContext('[new Map([[1, "a"]]), new Set([2]), /x/g, new Date(5), new Number(3), [4], { b: 1 }]') as unknown[];
+    expect(canonicalJson(foreign, { tags: "typed" })).toBe('[Map([1,"a"]),Set(2),RegExp("/x/g"),Date(5),3,[4],{"b":1}]');
+    expect(() => canonicalJson(foreign)).toThrow("the type Map has no JSON form");
+    expect(() => canonicalJson(runInNewContext('new Error("e")'))).toThrow(TypeError);
+  });
+
+  it("does not give a tag to an object with only the name of a type, and accepts it with a method toJSON", () => {
+    const spoof = { a: 1, [Symbol.toStringTag]: "Map" };
+    expect(() => canonicalJson(spoof)).toThrow(TypeError);
+    expect(() => canonicalJson(spoof, { tags: "typed" })).toThrow(TypeError);
+    const named = { x: 1, [Symbol.toStringTag]: "Point", toJSON: () => ({ x: 1 }) };
+    expect(canonicalJson(named)).toBe('{"x":1}');
   });
 });
 
