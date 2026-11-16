@@ -6,8 +6,9 @@ import { defineConfig } from "tsdown";
 // The entry otel uses the OpenTelemetry SDK (optional peer dependencies), so the other entries do not load it.
 // The entry http is a scripted HTTP server on node:http, with no dependency. The entry otlp is a stand-in collector on it.
 // The entry fakes has test fakes of browser objects, with no dependency.
+// The entry child starts a server of a test in a child process on node:child_process, with no dependency.
 export default defineConfig({
-  entry: ["src/index.ts", "src/model.ts", "src/arbitrary.ts", "src/propagation.ts", "src/otel.ts", "src/http.ts", "src/otlp.ts", "src/fakes.ts"],
+  entry: ["src/index.ts", "src/model.ts", "src/arbitrary.ts", "src/propagation.ts", "src/otel.ts", "src/http.ts", "src/otlp.ts", "src/fakes.ts", "src/child.ts"],
   outDir: "build",
   format: "esm",
   platform: "node",
