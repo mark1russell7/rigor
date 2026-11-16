@@ -143,6 +143,27 @@ The parameters of a dimension come from `r.fork("dimension:" + name)`. The same 
 
 For the mean of a sum of 3 inputs from 50 points, the Latin hypercube gives 0.00042 of the variance of the random design. A test holds the ratio below 1/1000.
 
+### Shrink a point that fails
+
+`shrinkPoint` finds a smaller point of a family that still fails. Give it the family, the point and a function that gives `true` for a failure:
+
+```ts
+import { shrinkPoint } from "@mark1russell7/rigor-generators";
+
+const shrunk = shrinkPoint(family, points[17]!, (point) => !check(point));
+// shrunk.point, shrunk.steps, shrunk.checks, shrunk.exhausted
+```
+
+- The target of each dimension is the value of its range nearest to 0 (`shrinkTarget`).
+- In each round, each dimension first tries its target. Then a bisection on the scale of the dimension finds the edge of the failure.
+- A bisection of a double stops within `tolerance` of the range (default `SHRINK_TOLERANCE`, 1e-6). A log dimension uses the range of its logarithm.
+- The rounds continue until no dimension moves, or until `maxChecks` checks (default `SHRINK_CHECKS`, 1000). Then `exhausted` is `true`.
+- `steps` records each move: the dimension, the value before and the value after. The keys of the point that are not dimensions stay.
+- The shrink has no random draws. The same point and the same function give the same result.
+- `shrinkPointAsync` takes a function that gives a promise, for example a check in a child process.
+
+A first point that does not fail is a `RangeError`. A value out of its range, or a value that is not an integer in an integer dimension, is also a `RangeError`.
+
 ## Covering arrays
 
 A covering array of strength `t` has few rows, but each combination of `t` values of `t` different dimensions is in one row or more.

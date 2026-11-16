@@ -62,8 +62,11 @@ function count(fn: string, name: string, value: number): void {
   if (!Number.isSafeInteger(value) || value < 1) throw new RangeError(`${fn}: ${name} is ${value}, and it must be an integer from 1.`);
 }
 
-/** This function examines a dimension and gives the map from a uniform number in [0, 1) to a value of the dimension. */
-function dimensionMap(family: string, dim: Dimension, r: Random): (u: number) => number {
+/**
+ * This function examines a dimension of a family. A range that is not finite, an integer dimension without integer ends and
+ * a bad scale are each a `RangeError`.
+ */
+export function checkDimension(family: string, dim: Dimension): void {
   const where = `${family}.${dim.name}`;
   if (!Number.isFinite(dim.min) || !Number.isFinite(dim.max) || dim.min > dim.max) {
     throw new RangeError(`${where}: the range ${dim.min} to ${dim.max} is not a finite range.`);
@@ -71,13 +74,20 @@ function dimensionMap(family: string, dim: Dimension, r: Random): (u: number) =>
   if (dim.integer === true && (!Number.isSafeInteger(dim.min) || !Number.isSafeInteger(dim.max))) {
     throw new RangeError(`${where}: an integer dimension needs integer ends, not ${dim.min} and ${dim.max}.`);
   }
+  if (dim.distribution !== undefined && dim.scale !== undefined) throw new RangeError(`${where}: a dimension with a distribution has no scale.`);
+  if (dim.scale === "log" && !(dim.min > 0)) throw new RangeError(`${where}: a log scale needs a minimum above 0, not ${dim.min}.`);
+}
+
+/** This function examines a dimension and gives the map from a uniform number in [0, 1) to a value of the dimension. */
+function dimensionMap(family: string, dim: Dimension, r: Random): (u: number) => number {
+  const where = `${family}.${dim.name}`;
+  checkDimension(family, dim);
   // An integer dimension takes the floor of a value from [min, max + 1).
   const end = dim.integer === true ? dim.max + 1 : dim.max;
   const top = dim.integer === true ? nextDown(end) : end;
   const whole = (x: number): number => (dim.integer === true ? Math.min(dim.max, Math.floor(x)) : x);
   const clamp = (x: number): number => Math.min(top, Math.max(dim.min, x));
   if (dim.distribution !== undefined) {
-    if (dim.scale !== undefined) throw new RangeError(`${where}: a dimension with a distribution has no scale.`);
     const d = distributionOf(dim.distribution, r);
     const low = d.cdf(nextDown(dim.min));
     const high = d.cdf(top);
@@ -90,7 +100,6 @@ function dimensionMap(family: string, dim: Dimension, r: Random): (u: number) =>
     };
   }
   if (dim.scale === "log") {
-    if (!(dim.min > 0)) throw new RangeError(`${where}: a log scale needs a minimum above 0, not ${dim.min}.`);
     // The form `min * exp(u * span)` gives `min` exactly at 0.
     const span = Math.log(end / dim.min);
     return (u) => whole(clamp(dim.min * Math.exp(u * span)));
@@ -99,15 +108,24 @@ function dimensionMap(family: string, dim: Dimension, r: Random): (u: number) =>
 }
 
 /**
+ * This function gives the names of the dimensions of a family. A family with no dimension is a `RangeError`. A name that
+ * is empty or not unique is also a `RangeError`.
+ */
+export function familyNames(family: InputFamily): string[] {
+  if (family.dimensions.length === 0) throw new RangeError(`${family.name}: a family needs one dimension or more.`);
+  const names = family.dimensions.map((d) => d.name);
+  const twice = names.find((n, i) => n === "" || names.indexOf(n) !== i);
+  if (twice !== undefined) throw new RangeError(`${family.name}: the dimension name "${twice}" is empty or not unique.`);
+  return names;
+}
+
+/**
  * This function gives the map from a point of the unit cube to a point of the family. Coordinate `i` gives the value of
  * dimension `i`. The parameters of each distribution come from `r.fork("dimension:" + name)` one time. Thus the
  * same seed gives the same map, and a new dimension does not change the others.
  */
 export function familyMap(family: InputFamily, r: Random): (unit: readonly number[]) => Point {
-  if (family.dimensions.length === 0) throw new RangeError(`${family.name}: a family needs one dimension or more.`);
-  const names = family.dimensions.map((d) => d.name);
-  const twice = names.find((n, i) => n === "" || names.indexOf(n) !== i);
-  if (twice !== undefined) throw new RangeError(`${family.name}: the dimension name "${twice}" is empty or not unique.`);
+  const names = familyNames(family);
   const maps = family.dimensions.map((d) => dimensionMap(family.name, d, r.fork(`dimension:${d.name}`)));
   return (unit) => {
     if (unit.length !== maps.length) throw new RangeError(`${family.name}: a point needs ${maps.length} coordinates, not ${unit.length}.`);

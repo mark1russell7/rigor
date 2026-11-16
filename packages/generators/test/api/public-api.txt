@@ -22,8 +22,13 @@ type Point: build/designs.d.ts#Point
 RECORDED_TABLES: build/recorded.d.ts#RECORDED_TABLES
 type Random: build/random.d.ts#Random
 type RecordedTable: build/recorded.d.ts#RecordedTable
+SHRINK_CHECKS: build/shrink.d.ts#SHRINK_CHECKS
+SHRINK_TOLERANCE: build/shrink.d.ts#SHRINK_TOLERANCE
 type SaltelliDesign: build/designs.d.ts#SaltelliDesign
 type Sha256Options: build/hash.d.ts#Sha256Options
+type ShrinkOptions: build/shrink.d.ts#ShrinkOptions
+type ShrinkStep: build/shrink.d.ts#ShrinkStep
+type Shrunk: build/shrink.d.ts#Shrunk
 type Source: build/random.d.ts#Source
 betaCdf: build/quantiles.d.ts#betaCdf
 canonicalHash: build/hash.d.ts#canonicalHash
@@ -50,6 +55,9 @@ sampler: build/distributions.d.ts#sampler
 seedOf: build/random.d.ts#seedOf
 seedsFrom: build/random.d.ts#seedsFrom
 sha256Hex: build/hash.d.ts#sha256Hex
+shrinkPoint: build/shrink.d.ts#shrinkPoint
+shrinkPointAsync: build/shrink.d.ts#shrinkPointAsync
+shrinkTarget: build/shrink.d.ts#shrinkTarget
 stablePick: build/random.d.ts#stablePick
 stratifiedDesign: build/designs.d.ts#stratifiedDesign
 tupleCoverage: build/covering.d.ts#tupleCoverage
@@ -279,3 +287,39 @@ export interface RecordedTable {
 
 ### build/recorded.d.ts#recordedSpec
 export declare function recordedSpec(table: RecordedTable): DistributionSpec;
+
+### build/shrink.d.ts#SHRINK_CHECKS
+export declare const SHRINK_CHECKS = 1e3;
+
+### build/shrink.d.ts#SHRINK_TOLERANCE
+export declare const SHRINK_TOLERANCE = 1e-6;
+
+### build/shrink.d.ts#ShrinkOptions
+export interface ShrinkOptions {
+  readonly maxChecks?: number;
+  readonly tolerance?: number;
+}
+
+### build/shrink.d.ts#ShrinkStep
+export interface ShrinkStep {
+  readonly dimension: string;
+  readonly from: number;
+  readonly to: number;
+}
+
+### build/shrink.d.ts#Shrunk
+export interface Shrunk {
+  readonly point: Point;
+  readonly steps: readonly ShrinkStep[];
+  readonly checks: number;
+  readonly exhausted: boolean;
+}
+
+### build/shrink.d.ts#shrinkPoint
+export declare function shrinkPoint(family: InputFamily, point: Point, fails: (point: Point) => boolean, options?: ShrinkOptions): Shrunk;
+
+### build/shrink.d.ts#shrinkPointAsync
+export declare function shrinkPointAsync(family: InputFamily, point: Point, fails: (point: Point) => boolean | Promise<boolean>, options?: ShrinkOptions): Promise<Shrunk>;
+
+### build/shrink.d.ts#shrinkTarget
+export declare function shrinkTarget(dimension: Dimension): number;
