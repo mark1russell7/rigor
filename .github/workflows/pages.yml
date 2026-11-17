@@ -11,8 +11,6 @@ on:
     workflows: [Release]
     types: [completed]
     branches: [main]
-  # A pull request builds the site and runs the site check, with no deploy.
-  pull_request:
   workflow_dispatch:
   # Each day, in case a release fails after it publishes
   schedule:
@@ -28,7 +26,7 @@ concurrency:
 
 jobs:
   pages:
-    uses: mark1russell7/template/.github/workflows/reusable-pages.yml@b563776ddfc138707b1d5b3d716594874e1010cf # main
+    uses: mark1russell7/template/.github/workflows/reusable-pages.yml@2030c7dec9485afebb504772f79f41f23bdb2df7 # main
     # The build job of the shared workflow gets only the read permissions. Only its deploy job,
     # which runs no code of the repository, writes to Pages.
     permissions:
@@ -40,19 +38,6 @@ jobs:
       statuses: read
       pages: write
       id-token: write
-    with:
-      build: node packages/site/src/build.ts --out dist
-      out: packages/site/dist
-      site-pages: true
-      site-name: rigor
-      roadmap: docs/ROADMAP.md
-      site-check: true
-      site-check-pages: /,/releases/,/status/
-      # The widths: a small phone, a common phone and a desktop.
-      site-check-widths: "360,390,1280"
-      # The probe drives the time-verdict explorer. The check reads the TypeScript source and removes its types.
-      site-check-probe: packages/site/src/check-probe.ts
-      deploy: ${{ github.event_name != 'pull_request' }}
 
   # This job examines the deployed site: the page, its script and the pages of site-pages.
   # It starts no code of the repository and reads only the public site.
