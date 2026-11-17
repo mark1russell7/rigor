@@ -294,6 +294,19 @@ describe("a scripted XMPP server", () => {
     ]);
   });
 
+  it("gives success to each login with no option accounts, and refuses each login with an empty list", async () => {
+    const answers: string[] = [];
+    for (const accounts of [undefined, []]) {
+      const server = await start({ domain: "example.org", ...(accounts === undefined ? {} : { accounts }), sessions: [{ startTls: "none" }] });
+      const client = await open(server.port);
+      client.send(HEADER);
+      await client.until(/<\/stream:features>/);
+      client.send(auth(plain("anyone", "any-password")));
+      answers.push(await client.until(/<\/failure>|<success[^>]*\/>/));
+    }
+    expect(answers).toEqual([`<success xmlns='${NS_SASL}'/>`, `<failure xmlns='${NS_SASL}'><not-authorized/></failure>`]);
+  });
+
   it("sends a stream error for a wrong domain, a stanza before the bind, bad XML, a second login and a close step", async () => {
     const server = await start({
       domain: "example.org",

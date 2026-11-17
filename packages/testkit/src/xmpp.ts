@@ -87,7 +87,8 @@ export interface XmppAccount {
 
 /**
  * The answer of the server to a login. `check` gives success when the user name and the password are an account of the
- * options. With no accounts, each login gets success. A `failure` gives this SASL failure to each login.
+ * options. With no option `accounts`, each login gets success. An empty list refuses each login. A `failure` gives this
+ * SASL failure to each login.
  */
 export type SaslAnswer = "check" | { readonly failure: string; readonly text?: string };
 
@@ -162,7 +163,10 @@ export interface XmppServerOptions {
   readonly domain: string;
   /** The key and the certificate of STARTTLS, in PEM. The function `testCertificates` makes them. */
   readonly tls?: { readonly key: string; readonly cert: string };
-  /** The accounts of the login. With no accounts, each login with SASL PLAIN gets success. */
+  /**
+   * The accounts of the login. With no option `accounts`, each login with SASL PLAIN gets success. An empty list refuses
+   * each login.
+   */
   readonly accounts?: readonly XmppAccount[];
   /** The scripts of the connections, in their order. The server gives the last script again after the end of the list. */
   readonly sessions: readonly XmppSession[];

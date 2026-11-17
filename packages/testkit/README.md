@@ -453,7 +453,8 @@ The server does the negotiation of RFC 6120 from the script of the connection. T
 
 - `startTls` of a session tells how the server offers STARTTLS. With `required` (the default), the login comes only after TLS. `optional` offers the two together. `none` offers no TLS.
 - A login with no TLS gets `encryption-required` when the mode is `required`.
-- With no `accounts`, each login with SASL PLAIN gets success. `sasl` of a session gives one SASL failure to each login.
+- With no option `accounts`, each login with SASL PLAIN gets success. An empty list refuses each login.
+- `sasl` of a session gives one SASL failure to each login.
 - The sessions go in their order, one for each connection. After the end of the list, the server gives the last session again.
 - The record of a connection keeps the user name of the login. It does not keep the password.
 

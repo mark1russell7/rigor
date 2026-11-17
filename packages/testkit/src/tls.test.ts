@@ -1,12 +1,20 @@
 import { X509Certificate, createPrivateKey } from "node:crypto";
 import { type AddressInfo, createServer } from "node:net";
 import * as tls from "node:tls";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { checkTestCertificateOptions, testCertificates, trustCertificate } from "./tls.ts";
+
+// A fill byte makes each random byte of the module equal to it. With no fill, the bytes are random.
+const random = vi.hoisted(() => ({ fill: undefined as number | undefined }));
+vi.mock("node:crypto", async (original) => {
+  const crypto = await original<typeof import("node:crypto")>();
+  return { ...crypto, randomBytes: (size: number) => (random.fill === undefined ? crypto.randomBytes(size) : Buffer.alloc(size, random.fill)) };
+});
 
 const undo: (() => void)[] = [];
 afterEach(() => {
   for (const step of undo.splice(0)) step();
+  random.fill = undefined;
 });
 
 /** This function connects a TLS client to a TLS server of the certificates, and gives the result of the handshake. */
@@ -60,6 +68,27 @@ describe("the certificates of a test", () => {
     expect(first.raw.length).toBe(second.raw.length);
   });
 
+  it("gives a serial of 16 bytes that DER permits for each first byte of the random bytes", () => {
+    const serials: string[] = [];
+    for (const fill of [0x00, 0x3f, 0x80, 0xff]) {
+      random.fill = fill;
+      const certs = testCertificates({ names: ["example.org"] });
+      // X509Certificate refuses an INTEGER with a zero byte that DER does not permit.
+      for (const text of [certs.ca, certs.cert]) serials.push(new X509Certificate(text).serialNumber);
+    }
+    expect(serials.map((serial) => serial.length)).toEqual(Array<number>(8).fill(32));
+    expect(serials.map((serial) => serial.slice(0, 4))).toEqual(["4000", "4000", "7F3F", "7F3F", "4080", "4080", "7FFF", "7FFF"]);
+  });
+
+  it("reads a validity from 1950 and up to the end of 9999", () => {
+    const from = Date.UTC(1950, 0, 1);
+    const early = new X509Certificate(testCertificates({ names: ["example.org"], from }).cert);
+    expect(early.validFromDate.getTime()).toBe(from);
+    const last = Date.UTC(9999, 11, 30);
+    const late = new X509Certificate(testCertificates({ names: ["example.org"], from: last, days: 1 }).cert);
+    expect(late.validToDate.getTime()).toBe(last + 86_400_000);
+  });
+
   it("states each problem of the options, and the function throws a RangeError for them", () => {
     expect(checkTestCertificateOptions({ names: ["example.org"] })).toEqual([]);
     expect(checkTestCertificateOptions({ names: [] })).toEqual(["The names are a list with one name or more."]);
@@ -70,6 +99,10 @@ describe("the certificates of a test", () => {
       "The from is a time in ms, not NaN.",
       "The days are a number more than 0, not 0.",
     ]);
+    expect(checkTestCertificateOptions({ names: ["example.org"], from: Date.UTC(1949, 11, 31) })).toEqual(["The from is a time from 1950-01-01 to 9999-12-31, not -631238400000."]);
+    expect(checkTestCertificateOptions({ names: ["example.org"], from: Date.UTC(10_000, 0, 1) })).toEqual(["The from is a time from 1950-01-01 to 9999-12-31, not 253402300800000."]);
+    expect(checkTestCertificateOptions({ names: ["example.org"], from: Date.UTC(9999, 11, 31), days: 2 })).toEqual(["The validity ends after 9999-12-31. Use an earlier from or fewer days."]);
+    expect(checkTestCertificateOptions({ names: ["example.org"], days: 1e9 })).toEqual(["The validity ends after 9999-12-31. Use an earlier from or fewer days."]);
     expect(() => testCertificates({ names: [] })).toThrow(RangeError);
   });
 

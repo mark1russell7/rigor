@@ -30,6 +30,9 @@ export interface TestCertificateOptions {
 
 const DAY = 86_400_000;
 const HOUR = 3_600_000;
+// The times of X.509: UTCTime from 1950 and GeneralizedTime with four digits up to 9999 (RFC 5280, section 4.1.2.5).
+const FIRST_TIME = Date.UTC(1950, 0, 1);
+const LAST_TIME = Date.UTC(9999, 11, 31, 23, 59, 59);
 
 // The object identifiers of RFC 5280 and RFC 8410.
 const ED25519 = "1.3.101.112";
@@ -118,7 +121,9 @@ interface Signed {
 function certificate(spec: Signed): Buffer {
   const algorithm = sequence(oid(ED25519));
   const serial = randomBytes(16);
-  serial[0] = (serial[0] ?? 0) & 0x7f;
+  // The first byte is from 0x40 to 0x7f. Thus the INTEGER is positive and needs no zero byte, and DER does not permit a
+  // first zero byte before a byte under 0x80. The serial has 16 bytes each time.
+  serial[0] = 0x40 | ((serial[0] ?? 0) & 0x3f);
   const body = sequence(
     element(0xa0, integer(Buffer.from([2]))),
     integer(serial),
@@ -146,8 +151,14 @@ export function checkTestCertificateOptions(options: TestCertificateOptions): re
       }
     }
   }
-  if (options.from !== undefined && !Number.isFinite(options.from)) out.push(`The from is a time in ms, not ${String(options.from)}.`);
-  if (options.days !== undefined && !(Number.isFinite(options.days) && options.days > 0)) out.push(`The days are a number more than 0, not ${String(options.days)}.`);
+  const from = options.from ?? Date.now() - HOUR;
+  const days = options.days ?? 1;
+  const fromValid = Number.isFinite(from) && from >= FIRST_TIME && from <= LAST_TIME;
+  const daysValid = Number.isFinite(days) && days > 0;
+  if (!Number.isFinite(from)) out.push(`The from is a time in ms, not ${String(from)}.`);
+  else if (!fromValid) out.push(`The from is a time from 1950-01-01 to 9999-12-31, not ${String(from)}.`);
+  if (!daysValid) out.push(`The days are a number more than 0, not ${String(days)}.`);
+  if (fromValid && daysValid && !(from + days * DAY <= LAST_TIME)) out.push("The validity ends after 9999-12-31. Use an earlier from or fewer days.");
   return out;
 }
 
@@ -201,6 +212,8 @@ export function testCertificates(options: TestCertificateOptions): TestCertifica
  * This function adds a certificate to the default authorities of `node:tls` in this process, and gives a function that
  * puts back the authorities from before. A client that takes no `ca` option, for example `@xmpp/client`, then trusts
  * the server of a test. It needs `tls.setDefaultCACertificates` of Node.js 22.19 or 24.5.
+ *
+ * Each undo function puts back the list of its call. Thus, after two calls, do the undo of the second call first.
  */
 export function trustCertificate(ca: string): () => void {
   const { getCACertificates, setDefaultCACertificates } = tls as Partial<typeof tls>;
