@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { type Arm, firstArm } from "./index.ts";
-import { type BenchEnv, type ChildExit, type FreshOptions, type StartChild, benchEnv, childLine, freshRun, pairOrder } from "./fresh.ts";
+import { type Arm, armOrder, firstArm } from "./index.ts";
+import { type BenchEnv, type ChildExit, type ChildTime, type FreshOptions, type StartChild, benchEnv, childLine, freshRun, pairOrder } from "./fresh.ts";
 
 const ENV: BenchEnv = { cpu: "test cpu", cores: 4, os: "linux", arch: "x64", node: "v24.0.0" };
 
@@ -60,11 +60,20 @@ describe("childLine", () => {
   });
 
   it("reads the memory peak, the warm check and the events of a child", () => {
-    const line = { ms: 2, hash: "h", peakRss: 4096, warm: 0.98, events: { gc: [3, 1], gcMs: [1.5, 0.25], deopt: [0, 2] }, other: "kept out" };
-    expect(childLine(JSON.stringify(line))).toEqual({ ms: 2, hash: "h", peakRss: 4096, warm: 0.98, events: { gc: [3, 1], gcMs: [1.5, 0.25], deopt: [0, 2] } });
+    const line = { ms: 2, hash: "h", peakRss: 4096, warm: 0.98, events: { gc: [3, 1], gcMs: [1.5, 0.25], deopt: [0, 2] }, other: "kept" };
+    expect(childLine(JSON.stringify(line))).toEqual({ ms: 2, hash: "h", peakRss: 4096, warm: 0.98, events: { gc: [3, 1], gcMs: [1.5, 0.25], deopt: [0, 2] }, extra: { other: "kept" } });
     expect(childLine('{"ms":2,"events":{"gc":[0,0]}}')).toEqual({ ms: 2, events: { gc: [0, 0] } });
     // A skip line keeps only its reason, its time and its hash.
     expect(childLine('{"skipped":"too large","peakRss":1}')).toEqual({ skipped: "too large" });
+  });
+
+  it("keeps each other field of a time line in extra, as an own field", () => {
+    const line = childLine('{"ms":3,"samples":[1.5,2,2.5],"batch":64,"meta":{"k":[1]},"__proto__":{"polluted":true}}') as ChildTime;
+    expect(line).toMatchObject({ ms: 3, extra: { samples: [1.5, 2, 2.5], batch: 64, meta: { k: [1] } } });
+    expect(Object.getPrototypeOf(line.extra)).toBe(Object.prototype);
+    expect(Object.hasOwn(line.extra!, "__proto__")).toBe(true);
+    expect((line.extra as Record<string, unknown>)["polluted"]).toBeUndefined();
+    expect(childLine('{"ms":3,"peakRss":1}')).not.toHaveProperty("extra");
   });
 
   it("refuses a bad memory peak, warm check or events", () => {
@@ -269,6 +278,76 @@ describe("freshRun", () => {
     expect(result.pairs["base~aa"]![0]).not.toHaveProperty("fields");
   });
 
+  it("starts one child of each arm in the order of armOrder with order arms, and the pairs share the base child", async () => {
+    const other = { id: "other", command: ["other"] };
+    const { start, calls } = fake();
+    const result = await run({ start, candidates: [next, other], order: "arms", rounds: 8 });
+    // The arms are base, next, other and base~aa: 4 children for each case and round, not 6.
+    expect(calls.length).toBe(4 * 2 * 8);
+    expect(Object.keys(result.pairs)).toEqual(["next", "other", "base~aa"]);
+    const ids = ["base", "next", "other", "base~aa"];
+    const program: Record<string, string> = { base: "base", next: "next", other: "other", "base~aa": "base" };
+    let k = 0;
+    const orders: unknown[] = [];
+    for (let round = 0; round < 8; round++) {
+      for (const [i, id] of ["x", "y"].entries()) {
+        const sequence = armOrder([...ids.slice(i), ...ids.slice(0, i)], round);
+        const ms: Record<string, number> = {};
+        for (const arm of sequence) {
+          const call = calls[k++]!;
+          expect([call.program, call.case]).toEqual([program[arm], id]);
+          ms[arm] = call.ms;
+        }
+        orders.push({ case: id, round, arms: sequence });
+        for (const pair of ["next", "other", "base~aa"]) {
+          const record = result.pairs[pair]!.find((r) => r.case === id && r.round === round);
+          const first = sequence.indexOf("base") < sequence.indexOf(pair) ? "a" : "b";
+          expect(record).toEqual({ case: id, round, first, a: ms["base"], b: ms[pair], job: "0", env: ENV });
+        }
+      }
+    }
+    expect(result.orders).toEqual(orders);
+    // 8 rounds balance 4 arms: in each case, each pair has each first arm in 4 rounds.
+    for (const records of Object.values(result.pairs)) {
+      for (const id of ["x", "y"]) expect(records.filter((r) => r.case === id && r.first === "a").length).toBe(4);
+    }
+    expect(await run({ start: fake().start, rounds: 1 })).not.toHaveProperty("orders");
+  });
+
+  it("gives each A/A copy its own child with order arms, and checks its hash with the hash of its arm", async () => {
+    const old = { id: "old", command: ["old"], commit: "a".repeat(40) };
+    const head = { id: "head", command: ["head"], commit: "b".repeat(40) };
+    const { start, calls } = fake();
+    const result = await run({ start, base: old, candidates: [head], aa: "each", order: "arms", cases: ["x"], rounds: 1 });
+    expect(calls.map((c) => c.program)).toEqual(["old", "head", "old", "head"]);
+    expect(result.orders).toEqual([{ case: "x", round: 0, arms: ["old", "head", "old~aa", "head~aa"] }]);
+    expect(result.pairs["head~aa"]).toEqual([{ case: "x", round: 0, first: "a", a: 2, b: 4, job: "0", env: ENV, commits: { a: "b".repeat(40), b: "b".repeat(40) } }]);
+    expect(result.pairs["old~aa"]![0]).toMatchObject({ first: "a", a: 1, b: 3 });
+    expect(result.pairs["head"]![0]).toMatchObject({ first: "a", a: 1, b: 2 });
+    const twoHashes = fake((program, _c, k) => ({ stdout: JSON.stringify({ ms: 1, hash: program === "old" ? `h${k}` : "n" }) })).start;
+    await expect(run({ start: twoHashes, base: old, candidates: [head], order: "arms", cases: ["x"], rounds: 1 })).rejects.toThrow(
+      /the arm "old~aa" on the case "x", round 0 gave the hash h2, and an earlier child of the arm gave h0/,
+    );
+  });
+
+  it("removes a case that an arm skips in the first round with order arms, and refuses a later skip", async () => {
+    const { start, calls } = fake((program, caseId) => (program === "next" && caseId === "y" ? { stdout: '{"skipped":"too large"}' } : undefined));
+    const result = await run({ start, order: "arms" });
+    expect(result.skipped).toEqual([{ arm: "next", case: "y", round: 0, reason: "too large" }]);
+    expect(result.orders!.map((o) => o.case)).toEqual(["x", "x", "x", "x"]);
+    for (const records of Object.values(result.pairs)) expect(records.map((r) => r.case)).toEqual(["x", "x", "x", "x"]);
+    expect(calls.filter((c) => c.case === "y").length).toBe(1);
+    const late = fake((program, caseId, k) => (program === "next" && caseId === "y" && k > 6 ? { stdout: '{"skipped":"too large"}' } : undefined)).start;
+    await expect(run({ start: late, order: "arms" })).rejects.toThrow(/the arm "next" on the case "y", round 1 skipped the case after the first round/);
+  });
+
+  it("keeps the extra fields of a child in the record of each pair, with order arms", async () => {
+    const { start } = fake((program, _c, k) => (program === "next" ? { stdout: JSON.stringify({ ms: k + 1, samples: [k], batch: 8 }) } : undefined));
+    const result = await run({ start, order: "arms", rounds: 1, cases: ["x"] });
+    expect(result.pairs["next"]![0]!.fields).toEqual({ a: {}, b: { extra: { samples: [1], batch: 8 } } });
+    expect(result.pairs["base~aa"]![0]).not.toHaveProperty("fields");
+  });
+
   it("refuses two hashes of one arm on one case, and permits other hashes for other arms", async () => {
     const hashOf = (program: string, k: number) => (program === "base" ? (k < 20 ? "h1" : "h2") : "n1");
     const start = fake((program, _c, k) => ({ stdout: JSON.stringify({ ms: 1, hash: hashOf(program, k) }) })).start;
@@ -288,6 +367,7 @@ describe("freshRun", () => {
     await expect(run({ start, candidates: [{ id: "base~aa", command: ["b"] }] })).rejects.toThrow(/two arms or pairs/);
     await expect(run({ start, candidates: [], aa: false })).rejects.toThrow(/no pairs/);
     await expect(run({ start, candidates: [{ id: "z", command: [] }] })).rejects.toThrow(/command/);
+    await expect(run({ start, order: "both" as unknown as "arms" })).rejects.toThrow(/order is "pairs" or "arms"/);
   });
 
   it("starts real child processes", async () => {

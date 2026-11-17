@@ -105,13 +105,13 @@ describe("freshArms", () => {
   });
 
   it("gives the fields of a child line, the command and the folder of an arm, and the arguments of the run", async () => {
-    const { start, calls } = fake((argv) => (argv[0] === "deno" ? { stdout: JSON.stringify({ ms: 3, peakRss: 100 }) } : undefined));
+    const { start, calls } = fake((argv) => (argv[0] === "deno" ? { stdout: JSON.stringify({ ms: 3, peakRss: 100, samples: [2.5, 3.5], batch: 4 }) } : undefined));
     const arms = [{ id: "x", case: "one", command: ["deno", "x.ts"], cwd: "/tmp/x" }, { id: "y", case: "two" }];
     const result = await freshArms({ arms, command: ["node", "y.ts"], args: (id) => [`--id=${id}`], rounds: 1, env: ENV, start });
     expect(calls.map((c) => c.argv)).toEqual([["deno", "x.ts", "--id=one"], ["node", "y.ts", "--id=two"]]);
     expect(calls[0]!.options.cwd).toBe("/tmp/x");
     expect(calls[1]!.options).not.toHaveProperty("cwd");
-    expect(result.processes[0]).toMatchObject({ arm: "x", ms: 3, fields: { peakRss: 100 } });
+    expect(result.processes[0]).toEqual({ arm: "x", case: "one", round: 0, position: 0, ms: 3, fields: { peakRss: 100, extra: { samples: [2.5, 3.5], batch: 4 } } });
     expect(result.processes[1]).not.toHaveProperty("fields");
     expect(result.aa).toEqual([]);
   });
@@ -144,11 +144,11 @@ describe("freshArms", () => {
 });
 
 describe("armTimes", () => {
-  it("gives the median, the 10th and the 90th percentiles and their ratio for each arm", () => {
+  it("gives the median, the 10th and the 90th percentiles, their ratio, the least and the greatest time of each arm", () => {
     const records = (arm: string, times: readonly number[]): ArmProcess[] => times.map((ms, round) => ({ arm, case: arm, round, position: 0, ms }));
-    const [x, y] = armTimes([...records("x", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]), ...records("y", [4, 4])]);
-    expect(x).toEqual({ arm: "x", case: "x", processes: 11, median: 6, p10: 2, p90: 10, spread: 5 });
-    expect(y).toEqual({ arm: "y", case: "y", processes: 2, median: 4, p10: 4, p90: 4, spread: 1 });
+    const [x, y] = armTimes([...records("x", [6, 2, 3, 4, 5, 1, 7, 8, 9, 11, 10]), ...records("y", [4, 4])]);
+    expect(x).toEqual({ arm: "x", case: "x", processes: 11, median: 6, p10: 2, p90: 10, spread: 5, min: 1, max: 11 });
+    expect(y).toEqual({ arm: "y", case: "y", processes: 2, median: 4, p10: 4, p90: 4, spread: 1, min: 4, max: 4 });
   });
 
   it("refuses a bad time and an arm with two cases", () => {

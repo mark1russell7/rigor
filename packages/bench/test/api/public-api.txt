@@ -326,6 +326,7 @@ type ArmTimes: build/fresh.d.ts#ArmTimes
 ArmsFixtures: build/fresh.d.ts#ArmsFixtures
 BenchEnv: build/fresh.d.ts#BenchEnv
 CaseArm: build/fresh.d.ts#CaseArm
+CaseOrder: build/fresh.d.ts#CaseOrder
 type CheckoutArm: build/fresh.d.ts#CheckoutArm
 type CheckoutArmOptions: build/fresh.d.ts#CheckoutArmOptions
 ChildEvents: build/fresh.d.ts#ChildEvents
@@ -455,6 +456,8 @@ interface ArmTimes {
   readonly p10: number;
   readonly p90: number;
   readonly spread: number;
+  readonly min: number;
+  readonly max: number;
 }
 
 ### build/fresh.d.ts#ArmsFixtures
@@ -480,6 +483,13 @@ export interface CaseArm {
   readonly case: string;
   readonly command?: readonly string[];
   readonly cwd?: string;
+}
+
+### build/fresh.d.ts#CaseOrder
+export interface CaseOrder {
+  readonly case: string;
+  readonly round: number;
+  readonly arms: readonly string[];
 }
 
 ### build/fresh.d.ts#CheckoutArm
@@ -522,6 +532,7 @@ export interface ChildFields {
   readonly peakRss?: number;
   readonly warm?: number;
   readonly events?: ChildEvents;
+  readonly extra?: Readonly<Record<string, unknown>>;
 }
 
 ### build/fresh.d.ts#ChildLine
@@ -608,6 +619,7 @@ export interface FreshOptions {
   readonly rounds: number;
   readonly roundOffset?: number;
   readonly aa?: boolean | "each";
+  readonly order?: "pairs" | "arms";
   readonly args?: (caseId: string) => readonly string[];
   readonly timeoutMs?: number;
   readonly overLimit?: "error" | "skip";
@@ -637,6 +649,7 @@ export interface FreshRun {
   readonly job: string;
   readonly pairs: Record<string, FreshRecord[]>;
   readonly skipped: FreshSkip[];
+  readonly orders?: readonly CaseOrder[];
 }
 
 ### build/fresh.d.ts#FreshSkip

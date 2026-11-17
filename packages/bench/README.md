@@ -101,9 +101,9 @@ v.comparison;                                     // the cases that gain and dro
 | `benchEnv()` | From `/fresh`: the computer of this process, with the CPU model and the runner. |
 | `childLine(stdout)` | From `/fresh`: the last JSON line of a child, with its time `ms`, its `hash` and the reason of a skip. |
 | `pairOrder(pairs, round, caseIndex)` | From `/fresh`: the order of the pairs of one case in one round, and the first arm of each pair. |
-| `freshRun(options)` | From `/fresh`: the records of each pair, with each arm in its own fresh child process. |
+| `freshRun(options)` | From `/fresh`: the records of each pair, with each arm in its own fresh child process. With `order: "arms"`, the pairs of a round share one base child. |
 | `freshArms(options)` | From `/fresh`: one fresh child for each arm in each round, in the order of `armOrder`, with A/A records and fixture hashes. |
-| `armTimes(processes)` | From `/fresh`: the median, the 10th and the 90th percentiles and their ratio for each arm over its children. |
+| `armTimes(processes)` | From `/fresh`: the median, the 10th and the 90th percentiles, their ratio, and the least and the greatest time of each arm over its children. |
 | `checkFixtures(folder, files, options)` | From `/fresh`: the hash and the size of each fixture file, or an error that names each file that is not the pinned file. |
 | `fixtureDifferences(a, b)` | From `/fresh`: the fixture files that two records do not share with the same hash. |
 | `timeArm(run, options)` | The child side of `freshRun`: the median time of one call of one arm, over calibrated samples. |
@@ -570,6 +570,7 @@ console.log(JSON.stringify({ ms: time.ms, warm: time.warm, peakRss: peakRss(), e
 - `events.gcMs` has the GC time of each half in milliseconds: the sum of the durations of the GC events that start in the half.
 - The probe counts the deopts only with `deopt: true`. Then the V8 flag `--trace-deopt` writes them to a temporary file.
 - `childLine` refuses a field that is not valid. A record has `fields` only when a child of the record gives a field.
+- A time line keeps each other field in `fields.extra`, with its JSON value. An example is the samples of a child, or its batch. The runner does not examine them.
 
 ### The warm rule
 
@@ -757,9 +758,33 @@ run.pairs["old~aa"];                              // the records of the A/A pair
 
 A run of many jobs sets `roundOffset` to `job * rounds`. Then the merged records have one record of each case and round. Without it, each job repeats the first orders, and the merge removes more records.
 
-### Why pairs, and not a rotation of all arms
+### One base child for each round
 
-A rotation of N arms turns the order of two arms only when they are N/2 apart in the rotation. For 4 arms, two arms 1 apart come in the order 3:1 over 4 rounds. Thus each pair of `freshRun` has its own two children, and the order of each pair turns each round.
+A gate that compares each candidate with one time of the base in the same round uses `order: "arms"`:
+
+```ts
+const run = await freshRun({
+  base: { id: "portfolio", command: ["node", "bench/arm.js", "--entry", "portfolio"] },
+  candidates: [rows, maxrects],
+  cases: inputs,
+  rounds: 8,                                      // balancedRounds(4): the base, 2 candidates and the A/A copy
+  order: "arms",
+});
+
+run.pairs["rows"];                                // (portfolio, rows), with the base child of each round
+run.orders;                                      // the order of the children of each case and round
+```
+
+- The arms are the base, each candidate and each A/A copy. Each arm starts one child for each case and round.
+- The order is `armOrder` of the arms, after a turn by the index of the case. Thus each pair of arms has each order one time in each two rounds.
+- Each pair gets the time of the one base child of its round. So the records of two candidates in one round share the base time, and a gate can add the times of two candidates.
+- A round of k pairs has k + 1 children. The default order `"pairs"` has 2 k children.
+- A multiple of `balancedRounds(k + 1)` rounds balances the order. A skip removes a case as in the default order.
+- `orders` keeps the order of each case and round. The field `first` of each record tells which arm of its pair started first.
+
+### Why pairs, and not a plain rotation of all arms
+
+A plain rotation of N arms turns the order of two arms only when they are N/2 apart in the rotation. For 4 arms, two arms 1 apart come in the order 3:1 over 4 rounds. Thus each pair of the default order has its own two children, and the order of each pair turns each round. The order `"arms"` uses `armOrder`, a mirrored rotation, and it does not have this fault.
 
 ### Two commits in one job
 
