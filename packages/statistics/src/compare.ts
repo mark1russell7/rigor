@@ -5,6 +5,7 @@
  * prediction states a probability, and the Brier score measures how good the stated probabilities were.
  */
 import { allEqual, median, quantileSorted, sd, sorted } from "./describe.ts";
+import { poissonBinomialOf, tailsOf } from "./discrete.ts";
 import { type Proportion, signTest, wilson } from "./tests.ts";
 
 export interface NoiseOptions {
@@ -224,4 +225,59 @@ export function calibration(forecasts: readonly Forecast[]): CalibrationLevel[] 
   return [...levels]
     .sort((a, b) => a[0] - b[0])
     .map(([stated, { n, hits }]) => ({ stated, n, hits, rate: hits / n, interval: wilson(hits, n) }));
+}
+
+/** The count of hits of many predictions, against the sum of their stated chances. */
+export interface TotalCalibration {
+  /** The count of predictions. */
+  readonly n: number;
+  /** The sum of the stated chances: the expected count of hits. */
+  readonly expected: number;
+  /** The count of hits. */
+  readonly hits: number;
+  /** The sd of the count of hits of calibrated, independent predictions: `sqrt(sum of p (1 - p))`. */
+  readonly sd: number;
+  /**
+   * The value `(hits - expected) / sd`, from the normal approximation. It is NaN when `sd` is 0. A positive value means
+   * more hits than expected, so the stated chances are too low.
+   */
+  readonly z: number;
+  /** True when `|hits - expected| <= 2 sd`. When `sd` is 0, it is true only when `hits` is equal to `expected`. */
+  readonly within2: boolean;
+  /** The exact `P(X <= hits)` of the Poisson binomial law of the stated chances. A small value means too few hits. */
+  readonly pLess: number;
+  /** The exact `P(X >= hits)` of the same law. A small value means too many hits. */
+  readonly pGreater: number;
+  /** Two times the smaller of `pLess` and `pGreater`, and not more than 1: the p of the two-sided test. */
+  readonly pTwoSided: number;
+}
+
+/**
+ * This function compares the count of hits of independent predictions with the sum of their stated chances. The value
+ * `z` comes from the normal approximation. The three p values come from the exact Poisson binomial law
+ * (`poissonBinomial`), so they are also correct for few predictions. The time grows as the square of the count of
+ * predictions. The function throws a `RangeError` for an empty list and for a chance outside 0 to 1.
+ */
+export function totalCalibration(forecasts: readonly Forecast[]): TotalCalibration {
+  checkedForecasts("totalCalibration", forecasts);
+  let [expected, variance, hits] = [0, 0, 0];
+  for (const f of forecasts) {
+    expected += f.p;
+    variance += f.p * (1 - f.p);
+    if (f.hit) hits++;
+  }
+  const spread = Math.sqrt(variance);
+  const law = poissonBinomialOf("totalCalibration", forecasts.map((f) => f.p));
+  const [pLess, pGreater] = tailsOf(law, hits);
+  return {
+    n: forecasts.length,
+    expected,
+    hits,
+    sd: spread,
+    z: spread === 0 ? Number.NaN : (hits - expected) / spread,
+    within2: Math.abs(hits - expected) <= 2 * spread,
+    pLess,
+    pGreater,
+    pTwoSided: Math.min(1, 2 * Math.min(pLess, pGreater)),
+  };
 }

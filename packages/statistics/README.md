@@ -261,6 +261,7 @@ In the tests, the series are AR(1) with 200 readings and the slope 0.6. There, t
 | `binomialInterval(n, p, level)`, `negativeBinomialInterval(successes, p, level)` | The central interval of a binomial count, and of a count of failures before `successes` successes. Each tail outside holds `(1 - level) / 2` or less. |
 | `holm(pValues, level)` | The Holm correction of a family of tests. |
 | `binomialTest(k, n, p, side)` | The p of the exact one-sided binomial test of `k` successes in `n` trials. The side `"less"` gives `P(X <= k)`, and `"greater"` gives `P(X >= k)`. |
+| `poissonBinomial(ps)`, `poissonBinomialTest(k, ps, side)` | The exact law of the count of successes of independent trials with the chances `ps`, and the p of its one-sided test. |
 | `coverageMinSample(cells, { level, alpha, pooledLow })` | The smallest sample size `m` from which an interval method keeps its level, from the hits of seeded cells. A size qualifies when the cells with a sample of that size or more pass two tests. No cell rejects `level` in `binomialTest` after `holm` at `alpha`, and the `wilson` lower end of the pooled hits is `pooledLow` or more. The set is closed upward: the result is the smallest `m` such that each size of `m` or more qualifies. `blocking` gives the largest size that fails. When the largest size fails, the result is `Infinity`. Fix the bar before the run. |
 | `partialConjunction(pValues, need)` | The p of the claim that at least `need` of these tests have a real effect. |
 | `pearson(a, b)` | The Pearson correlation of two lists of finite numbers. A list with no spread gives 0. It keeps its value at the ends of the range of a double. |
@@ -273,6 +274,7 @@ In the tests, the series are AR(1) with 200 readings and the slope 0.6. There, t
 | `modeCount(values, { minShare, valleyRatio })` | The count of the modes of a sample, from a kernel density estimate. |
 | `smoothLawScores(values)`, `bestSmoothLaw(values)` | The mean log density of the uniform, normal, exponential, log-normal and Pareto laws at their fits, and the best of them. |
 | `brier`, `calibration` | The Brier score of predictions, and the hit rate of each stated level. |
+| `totalCalibration(forecasts)` | The count of hits of independent predictions against the sum of their chances: `expected`, `hits`, `sd`, `z`, `within2`, and exact p values. |
 | `logLoss(forecasts)` | The mean log-loss of predictions, with the natural log. A p of 0 for a hit gives Infinity. |
 | `eloExpected(ra, rb, { scale, base })`, `eloUpdate(ra, rb, score, { k, scale, base })` | The expected score of the first item, and the ratings of a pair after one result. The defaults are 400, 10 and a `k` of 32. |
 | `glicko2Update(player, games, { tau, tolerance })`, `glicko2Idle(player)` | The Glicko-2 rating, RD and volatility after one rating period, and after a period with no games. The default `tau` is 0.5. |

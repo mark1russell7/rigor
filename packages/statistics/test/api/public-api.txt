@@ -145,6 +145,7 @@ type SobolOptions: build/index.d.ts#SobolOptions
 type Summary: build/index.d.ts#Summary
 type TableResponseModel: build/index.d.ts#TableResponseModel
 type TieModel: build/index.d.ts#TieModel
+type TotalCalibration: build/index.d.ts#TotalCalibration
 type TwoSamplePermutationOptions: build/index.d.ts#TwoSamplePermutationOptions
 type TwoSamplePermutationResult: build/index.d.ts#TwoSamplePermutationResult
 type UStatisticInterval: build/index.d.ts#UStatisticInterval
@@ -216,6 +217,8 @@ pairedPermutation: build/index.d.ts#pairedPermutation
 parseResponseRecord: build/index.d.ts#parseResponseRecord
 partialConjunction: build/index.d.ts#partialConjunction
 pearson: build/index.d.ts#pearson
+poissonBinomial: build/index.d.ts#poissonBinomial
+poissonBinomialTest: build/index.d.ts#poissonBinomialTest
 poissonInterval: build/index.d.ts#poissonInterval
 predictResponse: build/index.d.ts#predictResponse
 quantile: build/index.d.ts#quantile
@@ -245,6 +248,7 @@ strengthToRating: build/index.d.ts#strengthToRating
 summarize: build/index.d.ts#summarize
 surfaceResponse: build/index.d.ts#surfaceResponse
 tQuantile: build/index.d.ts#tQuantile
+totalCalibration: build/index.d.ts#totalCalibration
 twoSamplePermutation: build/index.d.ts#twoSamplePermutation
 uStatisticInterval: build/index.d.ts#uStatisticInterval
 whenHolds: build/index.d.ts#whenHolds
@@ -1195,6 +1199,19 @@ interface TableResponseModel extends ResponseModelBase {
 ### build/index.d.ts#TieModel
 type TieModel = "davidson" | "half";
 
+### build/index.d.ts#TotalCalibration
+interface TotalCalibration {
+  readonly n: number;
+  readonly expected: number;
+  readonly hits: number;
+  readonly sd: number;
+  readonly z: number;
+  readonly within2: boolean;
+  readonly pLess: number;
+  readonly pGreater: number;
+  readonly pTwoSided: number;
+}
+
 ### build/index.d.ts#TwoSamplePermutationOptions
 interface TwoSamplePermutationOptions {
   readonly runs?: number;
@@ -1431,6 +1448,12 @@ export declare function partialConjunction(pValues: readonly number[], need: num
 ### build/index.d.ts#pearson
 export declare function pearson(a: readonly number[], b: readonly number[]): number;
 
+### build/index.d.ts#poissonBinomial
+export declare function poissonBinomial(ps: readonly number[]): number[];
+
+### build/index.d.ts#poissonBinomialTest
+export declare function poissonBinomialTest(k: number, ps: readonly number[], side: BinomialSide): number;
+
 ### build/index.d.ts#poissonInterval
 export declare function poissonInterval(k: number, exposure?: number, level?: number): RateInterval;
 
@@ -1517,6 +1540,9 @@ export declare function surfaceResponse(record: ResponseRecord, measure: string,
 
 ### build/index.d.ts#tQuantile
 export declare function tQuantile(p: number, df: number): number;
+
+### build/index.d.ts#totalCalibration
+export declare function totalCalibration(forecasts: readonly Forecast[]): TotalCalibration;
 
 ### build/index.d.ts#twoSamplePermutation
 export declare function twoSamplePermutation(a: readonly number[], b: readonly number[], options?: TwoSamplePermutationOptions): TwoSamplePermutationResult;
