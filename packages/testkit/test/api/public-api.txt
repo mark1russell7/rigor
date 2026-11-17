@@ -183,6 +183,40 @@ behaviorDraws: build/behavior.d.ts#behaviorDraws
 behaviorForm: build/behavior.d.ts#behaviorForm
 compareDigests: build/behavior.d.ts#compareDigests
 
+## ./xmpp (build/xmpp.d.ts): names
+
+SASL_FAILURES: build/xmpp.d.ts#SASL_FAILURES
+START_TLS_MODES: build/xmpp.d.ts#START_TLS_MODES
+STREAM_ERRORS: build/xmpp.d.ts#STREAM_ERRORS
+SaslAnswer: build/xmpp.d.ts#SaslAnswer
+StartTls: build/xmpp.d.ts#StartTls
+XMPP_TOKENS: build/xmpp.d.ts#XMPP_TOKENS
+XmppAccount: build/xmpp.d.ts#XmppAccount
+XmppCloseStep: build/xmpp.d.ts#XmppCloseStep
+XmppConnection: build/xmpp.d.ts#XmppConnection
+XmppDestroyStep: build/xmpp.d.ts#XmppDestroyStep
+XmppEndStep: build/xmpp.d.ts#XmppEndStep
+XmppRawStep: build/xmpp.d.ts#XmppRawStep
+XmppReceiveStep: build/xmpp.d.ts#XmppReceiveStep
+XmppSendStep: build/xmpp.d.ts#XmppSendStep
+XmppServer: build/xmpp.d.ts#XmppServer
+XmppServerOptions: build/xmpp.d.ts#XmppServerOptions
+XmppSession: build/xmpp.d.ts#XmppSession
+XmppStanza: build/xmpp.d.ts#XmppStanza
+XmppStep: build/xmpp.d.ts#XmppStep
+XmppWire: build/xmpp.d.ts#XmppWire
+checkXmppServer: build/xmpp.d.ts#checkXmppServer
+checkXmppStep: build/xmpp.d.ts#checkXmppStep
+startXmppServer: build/xmpp.d.ts#startXmppServer
+
+## ./tls (build/tls.d.ts): names
+
+TestCertificateOptions: build/tls.d.ts#TestCertificateOptions
+TestCertificates: build/tls.d.ts#TestCertificates
+checkTestCertificateOptions: build/tls.d.ts#checkTestCertificateOptions
+testCertificates: build/tls.d.ts#testCertificates
+trustCertificate: build/tls.d.ts#trustCertificate
+
 ## Declarations
 
 ### build/arbitrary.d.ts#UniformDoubleOptions
@@ -863,6 +897,29 @@ export declare function stopOccurred(evidence: StopEvidence): boolean;
 ### build/stop.d.ts#stopOrderOf
 export declare function stopOrderOf(stop: Stop | undefined, progress: string): StopOrder;
 
+### build/tls.d.ts#TestCertificateOptions
+export interface TestCertificateOptions {
+  readonly names: readonly string[];
+  readonly from?: number;
+  readonly days?: number;
+}
+
+### build/tls.d.ts#TestCertificates
+export interface TestCertificates {
+  readonly ca: string;
+  readonly cert: string;
+  readonly key: string;
+}
+
+### build/tls.d.ts#checkTestCertificateOptions
+export declare function checkTestCertificateOptions(options: TestCertificateOptions): readonly string[];
+
+### build/tls.d.ts#testCertificates
+export declare function testCertificates(options: TestCertificateOptions): TestCertificates;
+
+### build/tls.d.ts#trustCertificate
+export declare function trustCertificate(ca: string): () => void;
+
 ### build/websocket.d.ts#CloseStep
 export interface CloseStep {
   readonly close: {
@@ -981,3 +1038,149 @@ export declare function messagesOf(frames: readonly Pick<ReceivedWebSocketFrame,
 
 ### build/websocket.d.ts#webSocketAccept
 export declare function webSocketAccept(key: string): string;
+
+### build/xmpp.d.ts#SASL_FAILURES
+export declare const SASL_FAILURES: readonly string[];
+
+### build/xmpp.d.ts#START_TLS_MODES
+export declare const START_TLS_MODES: readonly StartTls[];
+
+### build/xmpp.d.ts#STREAM_ERRORS
+export declare const STREAM_ERRORS: readonly string[];
+
+### build/xmpp.d.ts#SaslAnswer
+export type SaslAnswer = "check" | {
+  readonly failure: string;
+  readonly text?: string;
+};
+
+### build/xmpp.d.ts#StartTls
+export type StartTls = "required" | "optional" | "none";
+
+### build/xmpp.d.ts#XMPP_TOKENS
+export declare const XMPP_TOKENS: readonly string[];
+
+### build/xmpp.d.ts#XmppAccount
+export interface XmppAccount {
+  readonly username: string;
+  readonly password: string;
+}
+
+### build/xmpp.d.ts#XmppCloseStep
+export interface XmppCloseStep {
+  readonly close: {
+    readonly condition?: string;
+    readonly text?: string;
+  };
+  readonly delayMs?: number;
+}
+
+### build/xmpp.d.ts#XmppConnection
+export interface XmppConnection {
+  readonly connection: number;
+  readonly session: number;
+  readonly negotiation: readonly string[];
+  readonly secure: boolean;
+  readonly username: string | undefined;
+  readonly sasl: string | undefined;
+  readonly jid: string | undefined;
+  readonly stanzas: readonly XmppStanza[];
+  readonly wire: readonly XmppWire[];
+  readonly steps: number;
+  readonly error: string | undefined;
+  readonly clientClosed: boolean;
+  readonly closedAt: number | undefined;
+}
+
+### build/xmpp.d.ts#XmppDestroyStep
+export interface XmppDestroyStep {
+  readonly destroy: true;
+  readonly delayMs?: number;
+}
+
+### build/xmpp.d.ts#XmppEndStep
+export interface XmppEndStep {
+  readonly end: true;
+  readonly delayMs?: number;
+}
+
+### build/xmpp.d.ts#XmppRawStep
+export interface XmppRawStep {
+  readonly raw: string | Uint8Array;
+  readonly delayMs?: number;
+}
+
+### build/xmpp.d.ts#XmppReceiveStep
+export interface XmppReceiveStep {
+  readonly receive: string;
+  readonly attrs?: Readonly<Record<string, string>>;
+  readonly limitMs?: number;
+  readonly delayMs?: number;
+}
+
+### build/xmpp.d.ts#XmppSendStep
+export interface XmppSendStep {
+  readonly send: string;
+  readonly delayMs?: number;
+}
+
+### build/xmpp.d.ts#XmppServer
+export interface XmppServer {
+  readonly url: string;
+  readonly host: string;
+  readonly port: number;
+  readonly domain: string;
+  readonly connections: readonly XmppConnection[];
+  close(): Promise<void>;
+}
+
+### build/xmpp.d.ts#XmppServerOptions
+export interface XmppServerOptions {
+  readonly domain: string;
+  readonly tls?: {
+    readonly key: string;
+    readonly cert: string;
+  };
+  readonly accounts?: readonly XmppAccount[];
+  readonly sessions: readonly XmppSession[];
+  readonly listen?: {
+    readonly host?: string;
+    readonly port?: number;
+  };
+}
+
+### build/xmpp.d.ts#XmppSession
+export interface XmppSession {
+  readonly startTls?: StartTls;
+  readonly sasl?: SaslAnswer;
+  readonly steps?: readonly XmppStep[];
+  readonly answerClose?: boolean;
+}
+
+### build/xmpp.d.ts#XmppStanza
+export interface XmppStanza {
+  readonly at: number;
+  readonly name: string;
+  readonly attrs: Readonly<Record<string, string>>;
+  readonly xml: string;
+}
+
+### build/xmpp.d.ts#XmppStep
+export type XmppStep = XmppSendStep | XmppRawStep | XmppReceiveStep | XmppCloseStep | XmppEndStep | XmppDestroyStep;
+
+### build/xmpp.d.ts#XmppWire
+export interface XmppWire {
+  readonly step: number;
+  readonly offset: number;
+  readonly length: number;
+  readonly xml: string;
+}
+
+### build/xmpp.d.ts#checkXmppServer
+export declare function checkXmppServer(options: XmppServerOptions): readonly string[];
+
+### build/xmpp.d.ts#checkXmppStep
+export declare function checkXmppStep(step: XmppStep): readonly string[];
+
+### build/xmpp.d.ts#startXmppServer
+export declare function startXmppServer(options: XmppServerOptions): Promise<XmppServer>;
