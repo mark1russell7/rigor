@@ -7,6 +7,7 @@ This file lists the items of the roadmap of this repository. The status page of 
 | ID | Status | Priority | Title |
 | --- | --- | --- | --- |
 | R13 | in progress | P1 | bench: the five local harnesses (Vex, packing, highways, layout-contract, typeset) use rigor-bench. The survey found 8 gaps. Done: `timeArm`, the child-side timer of one arm (#218), the fields of each child (#219, #220, #222), gate limits from runs and A/A records (#225), two commits as paired arms in one job (#226), a decision for each case over k processes with a count of slow ones (#230), more than 2 arms in one process (`timeArmRounds`) and the limit of a gate of 1 case from its own A/A rounds (`aaFrom: "rounds"`, 0.2.47). A fresh child for each arm in each round with balanced rounds, a list of case modules, fixture files with a pinned SHA-256 and the A/A of each order (`freshArms`, 0.2.49) are in progress for typeset (#115). The text bench of `layout-contract` uses `timeArmRounds`, with a second load of the base build as its A/A arm (layout-contract#333). Next: Vex, packing, highways and typeset remove their copies |
+| R29 | in progress | P2 | statistics: `totalCalibration`, the count of hits of independent predictions against the sum of their chances (`expected`, `sd`, `z`, `within2`). Its p values come from the exact Poisson binomial law: `poissonBinomial` and `poissonBinomialTest` (statistics 0.2.11) |
 
 ## Next
 

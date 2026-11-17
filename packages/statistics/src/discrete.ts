@@ -212,6 +212,70 @@ export function binomialTest(k: number, n: number, p: number, side: BinomialSide
   return Math.min(1, Math.exp(top) * sum);
 }
 
+/** The smallest normal double, 2^-1022. The Poisson binomial law counts a smaller chance as 0. */
+const SMALLEST_NORMAL = 2 ** -1022;
+
+/** This function gives the Poisson binomial law of `ps`, after it examines each chance. */
+export function poissonBinomialOf(name: string, ps: readonly number[]): Float64Array {
+  for (const p of ps) if (!(p >= 0 && p <= 1)) throw new RangeError(`${name}: each p is from 0 to 1, not ${p}.`);
+  const chances = new Float64Array(ps.length + 1);
+  chances[0] = 1;
+  // Each count from lo to hi has a chance of 2^-1022 or more. Each other count has the chance 0.
+  let [lo, hi] = [0, 0];
+  for (const p of ps) {
+    const q = 1 - p;
+    // The loop goes down, so chances[k - 1] is the value from before this trial.
+    for (let k = hi + 1; k > lo; k--) chances[k] = q * (chances[k] ?? 0) + p * (chances[k - 1] ?? 0);
+    chances[lo] = q * (chances[lo] ?? 0);
+    hi++;
+    // A chance under 2^-1022 has fewer digits, and its arithmetic is slow. The sum of the law keeps at least one count.
+    while (lo < hi && (chances[lo] ?? 0) < SMALLEST_NORMAL) chances[lo++] = 0;
+    while (hi > lo && (chances[hi] ?? 0) < SMALLEST_NORMAL) chances[hi--] = 0;
+  }
+  return chances;
+}
+
+/** This function gives `P(X <= k)` and `P(X >= k)` of a law. Each sum starts at the far end of its tail. */
+export function tailsOf(chances: ArrayLike<number>, k: number): readonly [number, number] {
+  let [less, greater] = [0, 0];
+  for (let i = 0; i <= k; i++) less += chances[i] ?? 0;
+  for (let i = chances.length - 1; i >= k; i--) greater += chances[i] ?? 0;
+  return [k === chances.length - 1 ? 1 : Math.min(1, less), k === 0 ? 1 : Math.min(1, greater)];
+}
+
+/**
+ * This function gives the chance of each count of successes of independent trials. The trial `i` has the chance
+ * `ps[i]` of a success. This law is the Poisson binomial law. When each chance is `p`, it is the law Binomial(n, p).
+ *
+ * The recursion adds one trial at each step. The new chance of k is `(1 - p)` times the old chance of k, plus `p` times
+ * the old chance of k - 1. Each step adds two positive numbers, so the chances keep their digits. A chance under
+ * 2^-1022, the smallest normal double, is 0 in the result. The time grows as n times the count of the other counts.
+ *
+ * @param ps - The chance of a success of each trial, from 0 to 1.
+ * @returns The chance of each count k from 0 to n, with n the length of `ps`. The list has n + 1 numbers.
+ */
+export function poissonBinomial(ps: readonly number[]): number[] {
+  return Array.from(poissonBinomialOf("poissonBinomial", ps));
+}
+
+/**
+ * This function gives the p of the exact one-sided test of `k` successes of independent trials. The trial `i` has the
+ * chance `ps[i]` of a success. The side `"less"` gives `P(X <= k)`, and the side `"greater"` gives `P(X >= k)`. When
+ * each chance is `p`, the result is equal to `binomialTest(k, ps.length, p, side)`. The law comes from `poissonBinomial`.
+ *
+ * @param k - The count of successes, a whole number from 0 to the length of `ps`.
+ * @param ps - The chance of a success of each trial, from 0 to 1.
+ * @param side - The side of the tail.
+ * @returns The p of the test, from 0 to 1.
+ */
+export function poissonBinomialTest(k: number, ps: readonly number[], side: BinomialSide): number {
+  whole("poissonBinomialTest", k);
+  if (k > ps.length) throw new RangeError(`poissonBinomialTest: k ${k} is more than the count of trials ${ps.length}.`);
+  if (side !== "less" && side !== "greater") throw new RangeError(`poissonBinomialTest: side is "less" or "greater", not ${String(side)}.`);
+  const [less, greater] = tailsOf(poissonBinomialOf("poissonBinomialTest", ps), k);
+  return side === "less" ? less : greater;
+}
+
 /**
  * This function halves the range from 0 to `top` until its ends are two adjacent doubles, and it gives the two ends. The
  * test `rootAbove(x)` is true when the root is above x. The test must be monotone in x.
