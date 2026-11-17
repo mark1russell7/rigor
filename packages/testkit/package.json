@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/rigor-testkit",
-  "version": "0.1.19",
-  "description": "Test helpers: the code blocks of Markdown files as test cases, model-based tests on fast-check, metamorphic relations on fast-check, arbitraries that are uniform by value, the propagation gate of one context id over each transport, the capture of the OpenTelemetry SDK, a scripted HTTP server for fixtures, a stand-in OTLP collector, a fake event target, a server of a test in a child process that reports its port, the harness of a stop plan that stops a process of a test at a step or a time, a behavior check of two functions on the same seeded inputs, and a check of an operation that must give a rejected promise.",
+  "version": "0.1.20",
+  "description": "Test helpers: the code blocks of Markdown files as test cases, model-based tests on fast-check, metamorphic relations on fast-check, arbitraries that are uniform by value, the propagation gate of one context id over each transport, the capture of the OpenTelemetry SDK, a scripted HTTP server for fixtures, a scripted XMPP server with test certificates, a stand-in OTLP collector, a fake event target, a server of a test in a child process that reports its port, the harness of a stop plan that stops a process of a test at a step or a time, a behavior check of two functions on the same seeded inputs, and a check of an operation that must give a rejected promise.",
   "keywords": [
     "testing",
     "markdown",
@@ -21,7 +21,9 @@
     "fakes",
     "crash",
     "stop-plan",
-    "differential-testing"
+    "differential-testing",
+    "xmpp",
+    "tls"
   ],
   "homepage": "https://github.com/mark1russell7/rigor/tree/main/packages/testkit#readme",
   "bugs": {
@@ -110,6 +112,16 @@
         "import": "./build/behavior.js",
         "default": "./build/behavior.js"
       },
+      "./xmpp": {
+        "types": "./build/xmpp.d.ts",
+        "import": "./build/xmpp.js",
+        "default": "./build/xmpp.js"
+      },
+      "./tls": {
+        "types": "./build/tls.d.ts",
+        "import": "./build/tls.js",
+        "default": "./build/tls.js"
+      },
       "./package.json": "./package.json"
     }
   },
@@ -134,8 +146,10 @@
     "@opentelemetry/sdk-logs": "^3.0.0",
     "@opentelemetry/sdk-metrics": "^3.0.0",
     "@opentelemetry/sdk-trace-base": "^2.12.0",
+    "@types/ltx": "^3.1.1",
     "@types/node": "^26.6.5",
     "fast-check": "^4.10.2",
+    "ltx": "^3.1.2",
     "tsdown": "^0.23.1",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3"
@@ -154,6 +168,8 @@
     "./stop": "./src/stop.ts",
     "./stop-point": "./src/stop-point.ts",
     "./behavior": "./src/behavior.ts",
+    "./xmpp": "./src/xmpp.ts",
+    "./tls": "./src/tls.ts",
     "./package.json": "./package.json"
   },
   "peerDependencies": {
@@ -165,7 +181,8 @@
     "@opentelemetry/sdk-logs": "^0.223.0 || ^3.0.0",
     "@opentelemetry/sdk-metrics": "^2.12.0 || ^3.0.0",
     "@opentelemetry/sdk-trace-base": "^2.12.0",
-    "fast-check": "^4.0.0"
+    "fast-check": "^4.0.0",
+    "ltx": "^3.1.2"
   },
   "peerDependenciesMeta": {
     "@mark1russell7/rigor-chaos": {
@@ -193,6 +210,9 @@
       "optional": true
     },
     "fast-check": {
+      "optional": true
+    },
+    "ltx": {
       "optional": true
     }
   }

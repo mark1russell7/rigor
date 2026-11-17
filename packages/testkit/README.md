@@ -13,6 +13,8 @@ Test helpers:
 - `createFakeEventTarget` records the listeners of browser code in a Node test, from the entry `@mark1russell7/rigor-testkit/fakes`.
 - `startChildServer` starts a server of a test in a child process on the port 0, and reads the port that the child got. It is in the entry `@mark1russell7/rigor-testkit/child`.
 - `runToStop` stops a program of a test at a step or a time of a stop plan, from the entry `@mark1russell7/rigor-testkit/stop`. The entry `/stop-point` has the child side, with no packages.
+- `startXmppServer` gives an XMPP server for a client test, with STARTTLS, a login and steps as data. It is in the entry `@mark1russell7/rigor-testkit/xmpp`.
+- `testCertificates` makes the certificates of a TLS server of a test at the time of the test, from the entry `@mark1russell7/rigor-testkit/tls`.
 
 ```sh
 npm install --save-dev @mark1russell7/rigor-testkit
@@ -396,6 +398,102 @@ These routes load the frame codec of `@mark1russell7/rigor-proxy`. Install it ne
 - `webSockets` holds a record of each connection: its target, the fields of its request and the frames of the client. It also holds the writes of the server and the time of the close.
 - `messagesOf` joins the frames of each message into its text or its bytes.
 - A client that sends bytes that are not a frame gets a reset. Its record has `invalid: true`.
+
+## A scripted XMPP server
+
+The entry `@mark1russell7/rigor-testkit/xmpp` gives an XMPP server for the fixtures of a client test (RFC 6120). The negotiation and the steps of each connection are data. The server uses `node:net` and `node:tls`.
+
+The entry `/xmpp` reads the XML of the client with the package `ltx`. Install it next to this package. The other entries do not load it:
+
+```sh
+npm install --save-dev ltx
+```
+
+Without `ltx`, the import of `/xmpp` throws an `Error` that gives this command. The entry loads the package with a top-level `await`, so `require()` cannot load the entry. Use `import`.
+
+```ts no-run
+import { testCertificates, trustCertificate } from "@mark1russell7/rigor-testkit/tls";
+import { startXmppServer } from "@mark1russell7/rigor-testkit/xmpp";
+
+const certs = testCertificates({ names: ["example.org"] });
+const untrust = trustCertificate(certs.ca);
+const server = await startXmppServer({
+  domain: "example.org",
+  tls: certs,
+  accounts: [{ username: "operator", password: "a-password" }],
+  sessions: [
+    {
+      steps: [
+        { receive: "presence" },
+        { send: "<presence from='{{to}}' to='{{jid}}'><x xmlns='http://jabber.org/protocol/muc#user'><status code='110'/></x></presence>" },
+        { send: "<message from='room@conference.example.org/feed' to='{{jid}}' type='groupchat'><body>one</body></message>" },
+        { close: { condition: "system-shutdown" }, delayMs: 50 },
+      ],
+    },
+  ],
+});
+// The client under test connects to server.url, or to a fault proxy in front of server.port.
+expect(server.connections[0].stanzas.map((stanza) => stanza.name)).toEqual(["presence"]);
+await server.close();
+untrust();
+```
+
+### The negotiation
+
+The server does the negotiation of RFC 6120 from the script of the connection. Then it does the steps.
+
+| The client sends | The server |
+|---|---|
+| The stream header | Sends its own header and the features. A header to another domain gets the stream error `host-unknown`. |
+| `<starttls/>` | Sends `<proceed/>`, then does the TLS handshake with the `tls` of the options. |
+| `<auth mechanism='PLAIN'>` | Sends `<success/>` for an account of the options, or a SASL failure. |
+| `<iq type='set'><bind/></iq>` | Sends the full JID: the user name, the domain and the resource of the client. The default resource is `rigor-<n>`. |
+| Another element before the bind | Sends the stream error `not-authorized`. |
+| XML that is not well formed | Sends the stream error `not-well-formed`. |
+
+- `startTls` of a session tells how the server offers STARTTLS. With `required` (the default), the login comes only after TLS. `optional` offers the two together. `none` offers no TLS.
+- A login with no TLS gets `encryption-required` when the mode is `required`.
+- With no option `accounts`, each login with SASL PLAIN gets success. An empty list refuses each login.
+- `sasl` of a session gives one SASL failure to each login.
+- The sessions go in their order, one for each connection. After the end of the list, the server gives the last session again.
+- The record of a connection keeps the user name of the login. It does not keep the password.
+
+### The steps
+
+| Step | The server |
+|---|---|
+| `send` | Sends one or more whole XML elements in one write. |
+| `raw` | Sends text or bytes as they are, for example XML that is not well formed. |
+| `receive` | Waits for the next stanza with this name and these `attrs`, and skips each other stanza. After `limitMs`, it goes to the next step. |
+| `close` | Sends a stream error with the `condition`, when the step has one. Then it sends `</stream:stream>` and ends TCP. |
+| `end` | Closes its side of the TCP connection, with no close of the stream. |
+| `destroy` | Resets the TCP connection. |
+
+- Each step can have `delayMs`, a time before the step. After the last step, the server keeps the connection open.
+- A reset deletes the bytes that the client did not read yet. Thus a reset after a write needs a `delayMs`.
+- A `send` can hold the tokens `{{jid}}`, `{{bare}}`, `{{resource}}` and `{{domain}}` of the bind. `{{id}}` and `{{to}}` come from the stanza of the last `receive`.
+- The server writes each value of a token as XML text.
+- The server answers the close of the stream of the client with its own close. With `answerClose: false`, it records the close and sends nothing.
+- `checkXmppServer` and `checkXmppStep` give each problem of a script. `startXmppServer` throws a `RangeError` for them.
+
+### The place of a write on the wire
+
+The record of each connection has `wire`, the place of each write of the server in the bytes of the TCP connection. A fault plan of `@mark1russell7/rigor-proxy` with a `byte` point uses it.
+
+- `offset` is the count of bytes that the server sent before the write. `length` is the count of bytes of the write.
+- After STARTTLS, the counts include the TLS records and the handshake. `xml` holds the text of the write, before TLS.
+- `step` is the number of the step of the write. It is -1 for a write of the negotiation.
+- The keys of `/tls` are Ed25519 keys, so each set of certificates of the same names has the same size. Thus the same script gives the same counts on each run.
+
+## The certificates of a TLS test
+
+The entry `@mark1russell7/rigor-testkit/tls` makes a certificate authority and a server certificate at the time of the test. Thus no key goes into git. It uses only `node:crypto` and `node:tls`, with no peer.
+
+- `testCertificates({ names })` gives `ca`, `cert` and `key` in PEM. The names are DNS names and IP addresses. A DNS name can start with the label `*`.
+- The certificates are valid from one hour before the call, for one day. The options `from` and `days` change this.
+- A client with the option `ca` trusts the server.
+- `trustCertificate(ca)` adds the authority to the default authorities of the process. Then a client with no `ca` option trusts the server.
+- `trustCertificate` gives a function that puts back the authorities from before. It needs Node.js 22.19 or 24.5.
 
 ## A stand-in OTLP collector
 
