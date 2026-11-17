@@ -7,13 +7,11 @@ This file lists the items of the roadmap of this repository. The status page of 
 | ID | Status | Priority | Title |
 | --- | --- | --- | --- |
 | R13 | in progress | P1 | bench: the five local harnesses (Vex, packing, highways, layout-contract, typeset) use rigor-bench. The survey found 8 gaps. Done: `timeArm`, the child-side timer of one arm (#218), the fields of each child (#219, #220, #222), gate limits from runs and A/A records (#225), two commits as paired arms in one job (#226), a decision for each case over k processes with a count of slow ones (#230), more than 2 arms in one process (`timeArmRounds`) and the limit of a gate of 1 case from its own A/A rounds (`aaFrom: "rounds"`, 0.2.47). A fresh child for each arm in each round with balanced rounds, a list of case modules, fixture files with a pinned SHA-256 and the A/A of each order (`freshArms`, 0.2.49) are in progress for typeset (#115). The text bench of `layout-contract` uses `timeArmRounds`, with a second load of the base build as its A/A arm (layout-contract#333). Next: Vex, packing, highways and typeset remove their copies |
-| R29 | in progress | P2 | statistics: `totalCalibration`, the count of hits of independent predictions against the sum of their chances (`expected`, `sd`, `z`, `within2`). Its p values come from the exact Poisson binomial law: `poissonBinomial` and `poissonBinomialTest` (statistics 0.2.11) |
 
 ## Next
 
 | ID | Status | Priority | Title |
 | --- | --- | --- | --- |
-| R12 | blocked | P2 | bench: the k-of-n read of joint non-domination. An entry wins only when no control dominates it on k of n stated measures. k of n has two meanings, and no caller states one. It waits on the answer of highways#441 |
 | R14 | in progress | P2 | bench: the verdicts that coeval asked for. These are a verdict for each case from its rounds, a slope verdict and the bias of a case between jobs. Done: the timed samples in a fresh child (#218), limits from A/A records (#225) and the slope verdict of a log-log ladder with the A/A check of each run (`slopeVerdict`, 0.2.48) |
 | R16 | next | P2 | bench: several case modules in one run, and fixture files with a pinned hash (#115) |
 
@@ -50,3 +48,5 @@ This file lists the items of the roadmap of this repository. The status page of 
 | R26 | done | P2 | statistics: `pearson(a, b)`, and `correlationPermutation(a, b, options)`, the permutation test of a correlation with a seed. The statistic is Pearson, Spearman or a function. When `n!` is `runs` or less, the p is exact (statistics 0.2.10). Done on 2026-11-16 |
 | R27 | done | P1 | testkit: WebSocket routes on the scripted server of the entry `/http`, with the frame codec of RFC 6455 in rigor-proxy (`readWebSocketFrame`, `encodeWebSocketFrame`). A session is the reply to the handshake and the steps of the server, as data. The tests of WebSocket clients use them (proxy 0.4.1, testkit 0.1.19). Done on 2026-11-16 |
 | R28 | done | P1 | testkit: a scripted XMPP server in the entry `/xmpp` (RFC 6120). The negotiation (STARTTLS, SASL PLAIN, the bind) and the steps of each connection are data. The server records each stanza and the place of each write on the wire. The entry `/tls` makes the certificates of a test at the time of the test, so no key goes into git. The tests of XMPP clients use them (testkit 0.1.20). Done on 2026-11-16 |
+| R29 | done | P2 | statistics: `totalCalibration`, the count of hits of independent predictions against the sum of their chances (`expected`, `sd`, `z`, `within2`). Its p values come from the exact Poisson binomial law: `poissonBinomial` and `poissonBinomialTest` (statistics 0.2.11). Done on 2026-11-17 |
+| R12 | done | P2 | bench: the k-of-n read of joint non-domination. highways#441 answered that `jointClaim` with its verdict `survives` covers JOINT-WIN, so R12 closes with no change. A repository that needs a k-of-n read states its meaning and its k in a new issue. Done on 2026-11-17 |
