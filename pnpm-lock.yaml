@@ -218,8 +218,8 @@ importers:
         specifier: workspace:^
         version: link:../statistics
       '@mark1russell7/text':
-        specifier: ^0.0.11
-        version: 0.0.11
+        specifier: ^0.0.13
+        version: 0.0.13
     devDependencies:
       '@mark1russell7/cue':
         specifier: ^2.0.0
@@ -301,8 +301,8 @@ importers:
         specifier: workspace:^
         version: link:../statistics
       '@mark1russell7/text':
-        specifier: ^0.0.11
-        version: 0.0.11
+        specifier: ^0.0.13
+        version: 0.0.13
     devDependencies:
       '@mark1russell7/cue':
         specifier: ^2.0.0
@@ -375,8 +375,8 @@ importers:
         specifier: workspace:*
         version: link:../statistics
       '@mark1russell7/text':
-        specifier: ^0.0.11
-        version: 0.0.11
+        specifier: ^0.0.13
+        version: 0.0.13
     devDependencies:
       '@mark1russell7/cue':
         specifier: ^2.0.0
@@ -1121,8 +1121,8 @@ packages:
     engines: {node: '>=22.12'}
     hasBin: true
 
-  '@mark1russell7/text@0.0.11':
-    resolution: {integrity: sha512-4CxTYXlCzloFRGiEMs6veve/x5HzeEzASMVbYrbIxAEdwVsVoCzKwW7/YBqtFxBcp4Em57pn5kNIYm2SLGCvMA==}
+  '@mark1russell7/text@0.0.13':
+    resolution: {integrity: sha512-8Tu7DTTpfmpXIy0F2JCyOW1RD91X7tm38c5xiqz3cLdmEkUQViH/06kTBLj+hrzuQPMBGVyxd7snqVG6EpNLdQ==}
     engines: {node: '>=22.12'}
 
   '@napi-rs/wasm-runtime@1.2.6':
@@ -3258,7 +3258,7 @@ snapshots:
     dependencies:
       '@clack/prompts': 1.8.1
 
-  '@mark1russell7/text@0.0.11': {}
+  '@mark1russell7/text@0.0.13': {}
 
   '@napi-rs/wasm-runtime@1.2.6(@emnapi/core@2.0.0-beta.2)(@emnapi/runtime@2.0.0-beta.2)':
     dependencies:
