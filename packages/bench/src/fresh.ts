@@ -62,7 +62,15 @@ export interface ChildFields {
   readonly warm?: number;
   /** The events of the counted samples. */
   readonly events?: ChildEvents;
+  /**
+   * The other fields of the child line, with their JSON values, for example the samples of a child.
+   * The runner keeps them in the record, and it does not examine them. Only a line with another field has `extra`.
+   */
+  readonly extra?: Readonly<Record<string, unknown>>;
 }
+
+/** The fields of a child line that `childLine` reads. Each other field of a time line goes into `extra`. */
+const KNOWN_FIELDS: ReadonlySet<string> = new Set(["ms", "hash", "skipped", "peakRss", "warm", "events"]);
 
 /** The result line of a child that timed the arm. */
 export interface ChildTime extends ChildFields {
@@ -84,6 +92,8 @@ export interface ChildSkip {
  * This function reads the last line of `stdout` that starts with `{`. The time `ms` is a finite number above 0.
  * A skip line has the reason `skipped` and does not need a time. No such line, bad JSON or a bad field is an error.
  * The fields `peakRss`, `warm` and `events` are optional. When a line has one of them, the field must be valid.
+ *
+ * A time line keeps each other field in `extra`. A skip line keeps only its reason, its time and its hash.
  */
 export function childLine(stdout: string): ChildLine {
   const line = stdout
@@ -130,7 +140,14 @@ function childFields(value: Record<string, unknown>): ChildFields {
       ...(deopt === undefined ? {} : { deopt: [deopt[0], deopt[1]] as const }),
     };
   }
-  return { ...(peakRss === undefined ? {} : { peakRss }), ...(warm === undefined ? {} : { warm }), ...(read === undefined ? {} : { events: read }) };
+  // Object.fromEntries makes own fields, so a key such as "__proto__" stays a plain field.
+  const others = Object.entries(value).filter(([key]) => !KNOWN_FIELDS.has(key));
+  return {
+    ...(peakRss === undefined ? {} : { peakRss }),
+    ...(warm === undefined ? {} : { warm }),
+    ...(read === undefined ? {} : { events: read }),
+    ...(others.length === 0 ? {} : { extra: Object.fromEntries(others) }),
+  };
 }
 
 /** This function gives the memory peak of this process in bytes. Print it in the child line as `peakRss`. */
@@ -294,6 +311,16 @@ export interface FreshOptions {
    * The value `"each"` also adds the A/A pair of each candidate, with the id `${id}~aa`. Two builds of a run need it.
    */
   readonly aa?: boolean | "each";
+  /**
+   * The order of the children of a case in a round. The default `"pairs"` starts the pairs in the order of `pairOrder`.
+   * Then each pair has a child of the base of its own.
+   *
+   * With `"arms"`, each arm starts one child in the order of `armOrder`, after a turn by the index of the case.
+   * The arms are the base, each candidate and each A/A copy. Each pair gets the time of the one base child of the round.
+   * Thus a round of k pairs has k + 1 children, not 2 k, as in `timeArmRounds`.
+   * A multiple of `balancedRounds(k + 1)` rounds balances the order.
+   */
+  readonly order?: "pairs" | "arms";
   /** The arguments of a case after the command of an arm. The default is `["--case", id]`. */
   readonly args?: (caseId: string) => readonly string[];
   /** The longest time of one child in milliseconds. The default is 600000 (10 minutes). */
@@ -334,6 +361,15 @@ export interface FreshSkip {
   readonly reason: string;
 }
 
+/** The order of the children of one case in one round of a fresh run with the order `"arms"`. */
+export interface CaseOrder {
+  readonly case: string;
+  /** The global round. */
+  readonly round: number;
+  /** The ids of the arms in the order of their children. The id of an A/A copy is the id of its pair. */
+  readonly arms: readonly string[];
+}
+
 /** The result of a fresh run. */
 export interface FreshRun {
   readonly env: BenchEnv;
@@ -341,6 +377,8 @@ export interface FreshRun {
   /** The records of each pair, by the id of the pair. */
   readonly pairs: Record<string, FreshRecord[]>;
   readonly skipped: FreshSkip[];
+  /** The order of the children of each case in each round. Only a run with the order `"arms"` has it. A skipped case has no order. */
+  readonly orders?: readonly CaseOrder[];
 }
 
 /** The suffix of the id of the A/A pair. */
@@ -348,8 +386,11 @@ const AA_SUFFIX = "~aa";
 
 /**
  * This function starts each arm of each pair, case and round in a fresh child, and gives the records of each pair.
- * - Each candidate is a pair (base, candidate) with its own base child. The A/A pair is (base, base).
- * - In each round and case, the pairs come in the order of `pairOrder`. The first arm of a pair starts first.
+ * - Each candidate is a pair (base, candidate). The A/A pair is (base, base).
+ * - With the default order `"pairs"`, the pairs of a round and case come in the order of `pairOrder`.
+ *   Each pair has its own base child, and the first arm of a pair starts first.
+ * - With the order `"arms"`, each arm starts one child in the order of `armOrder`. The pairs share the base child.
+ *   The result keeps the order of each round and case in `orders`.
  * - A child that exits with an error, takes too long or prints no JSON line is an error. A skip line skips a case.
  *   With `overLimit: "skip"`, a child that takes too long in the first round skips its case too.
  * - A case that an arm skips in the first round of the job leaves each pair, and the runner starts no more children for it.
@@ -377,6 +418,8 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
   if (aa !== true && aa !== false && aa !== "each") throw new RangeError(`freshRun: aa is true, false or "each", not ${JSON.stringify(aa)}.`);
   if (aa !== false) pairs.push({ id: `${base.id}${AA_SUFFIX}`, a: base, b: base });
   if (aa === "each") for (const c of candidates) pairs.push({ id: `${c.id}${AA_SUFFIX}`, a: c, b: c });
+  const order = options.order ?? "pairs";
+  if (order !== "pairs" && order !== "arms") throw new RangeError(`freshRun: order is "pairs" or "arms", not ${JSON.stringify(order)}.`);
   if (pairs.length === 0) throw new RangeError("freshRun: the run has no pairs. Give a candidate, or keep the A/A pair.");
   for (const arm of [base, ...candidates]) {
     if (typeof arm.id !== "string" || arm.id === "") throw new RangeError("freshRun: the id of an arm is a string that is not empty.");
@@ -397,12 +440,59 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
   const skipped: FreshSkip[] = [];
   const gone = new Set<string>();
   const hashes = new Map<string, string>();
+  const orders: CaseOrder[] = [];
+  // The arms of the order "arms": the base, then arm `b` of each pair with the id of the pair.
+  const slots: { id: string; arm: FreshArm }[] = [{ id: base.id, arm: base }, ...pairs.map((p) => ({ id: p.id, arm: p.b }))];
+
+  /** This function starts one child of an arm on a case, and examines its skip and its hash. A skip after the first round is an error. */
+  const timed = async (who: FreshArm, id: string, r: number, where: string): Promise<ChildLine> => {
+    const line = await child(start, [...who.command, ...args(id)], { timeoutMs, maxBuffer, ...(who.cwd === undefined ? {} : { cwd: who.cwd }) }, where, overLimit, "freshRun");
+    if (line.skipped !== undefined) {
+      if (r > 0) throw new Error(`freshRun: ${where} skipped the case after the first round of the job (${JSON.stringify(line.skipped)}). A child that skips only in a later round is not deterministic.`);
+      return line;
+    }
+    if (line.hash !== undefined) {
+      const key = `${who.id}\u0000${id}`;
+      const known = hashes.get(key);
+      if (known !== undefined && known !== line.hash) throw new Error(`freshRun: ${where} gave the hash ${line.hash}, and an earlier child of the arm gave ${known}.`);
+      hashes.set(key, line.hash);
+    }
+    return line;
+  };
 
   for (let r = 0; r < rounds; r++) {
     const round = roundOffset + r;
     for (let i = 0; i < cases.length; i++) {
       const id = cases[i]!;
       if (gone.has(id)) continue;
+      if (order === "arms") {
+        const turn = i % slots.length;
+        const sequence = armOrder([...slots.slice(turn), ...slots.slice(0, turn)], round);
+        const times = new Map<string, { ms: number; fields: ChildFields; position: number }>();
+        let skip: FreshSkip | undefined;
+        for (const [position, slot] of sequence.entries()) {
+          const line = await timed(slot.arm, id, r, `the arm ${JSON.stringify(slot.id)} on the case ${JSON.stringify(id)}, round ${round}`);
+          if (line.skipped !== undefined) {
+            skip = { arm: slot.arm.id, case: id, round, reason: line.skipped };
+            break;
+          }
+          const { ms, hash: _hash, skipped: _skipped, ...more } = line;
+          times.set(slot.id, { ms, fields: more, position });
+        }
+        if (skip !== undefined) {
+          skipped.push(skip);
+          gone.add(id);
+          continue;
+        }
+        orders.push({ case: id, round, arms: sequence.map((slot) => slot.id) });
+        for (const pair of pairs) {
+          const a = times.get(pair.a.id)!;
+          const b = times.get(pair.id)!;
+          const extra = Object.keys(a.fields).length + Object.keys(b.fields).length > 0 ? { fields: { a: a.fields, b: b.fields } } : {};
+          out[pair.id]!.push({ case: id, round, first: a.position < b.position ? "a" : "b", a: a.ms, b: b.ms, job, env, ...extra, ...commitsOf(pair) });
+        }
+        continue;
+      }
       const records: { pair: string; record: FreshRecord }[] = [];
       let skip: FreshSkip | undefined;
       for (const slot of pairOrder(pairs.length, round, i)) {
@@ -412,17 +502,10 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
         for (const arm of [slot.first, slot.first === "a" ? "b" : "a"] as const) {
           const who = pair[arm];
           const where = `the arm ${JSON.stringify(who.id)} (pair ${JSON.stringify(pair.id)}, arm ${arm}) on the case ${JSON.stringify(id)}, round ${round}`;
-          const line = await child(start, [...who.command, ...args(id)], { timeoutMs, maxBuffer, ...(who.cwd === undefined ? {} : { cwd: who.cwd }) }, where, overLimit, "freshRun");
+          const line = await timed(who, id, r, where);
           if (line.skipped !== undefined) {
-            if (r > 0) throw new Error(`freshRun: ${where} skipped the case after the first round of the job (${JSON.stringify(line.skipped)}). A child that skips only in a later round is not deterministic.`);
             skip = { arm: who.id, case: id, round, reason: line.skipped };
             break;
-          }
-          if (line.hash !== undefined) {
-            const key = `${who.id}\u0000${id}`;
-            const known = hashes.get(key);
-            if (known !== undefined && known !== line.hash) throw new Error(`freshRun: ${where} gave the hash ${line.hash}, and an earlier child of the arm gave ${known}.`);
-            hashes.set(key, line.hash);
           }
           times[arm] = line.ms;
           const { ms: _ms, hash: _hash, skipped: _skipped, ...more } = line;
@@ -440,7 +523,7 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
       for (const { pair, record } of records) out[pair]!.push(record);
     }
   }
-  return { env, job, pairs: out, skipped };
+  return { env, job, pairs: out, skipped, ...(order === "arms" ? { orders } : {}) };
 }
 
 /** One arm of a run of arms: its id, the case that it times, and the argv of its child. */

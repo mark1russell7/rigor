@@ -33,6 +33,10 @@ export interface ArmTimes {
   readonly p90: number;
   /** The value `p90 / p10`. A claim on the spread of an arm uses it, because one bad child does not decide it. */
   readonly spread: number;
+  /** The least time of the children, in milliseconds. One fast child sets it. */
+  readonly min: number;
+  /** The greatest time of the children, in milliseconds. One slow child sets it, so a report uses it, and a gate uses `spread`. */
+  readonly max: number;
 }
 
 /**
@@ -52,6 +56,8 @@ export function armTimes(processes: readonly ArmProcess[]): ArmTimes[] {
   return [...byArm].map(([arm, group]) => {
     const p10 = quantile(group.ms, 0.1);
     const p90 = quantile(group.ms, 0.9);
-    return { arm, case: group.case, processes: group.ms.length, median: median(group.ms), p10, p90, spread: p90 / p10 };
+    const min = group.ms.reduce((x, y) => Math.min(x, y));
+    const max = group.ms.reduce((x, y) => Math.max(x, y));
+    return { arm, case: group.case, processes: group.ms.length, median: median(group.ms), p10, p90, spread: p90 / p10, min, max };
   });
 }
