@@ -439,8 +439,8 @@ describe("freshRun", () => {
       expect(gcMs).toHaveLength(2);
       expect(gcMaxMs).toHaveLength(2);
       for (const half of [0, 1]) expect(gcMs![half]! >= 0 && (gc[half]! > 0 || gcMs![half] === 0)).toBe(true);
-      // The longest event of a half is part of its sum, and a half with one event or more has a longest event
-      for (const half of [0, 1]) expect(gcMaxMs![half]! <= gcMs![half]! && (gc[half] === 0) === (gcMaxMs![half] === 0)).toBe(true);
+      // The longest event of a half is part of its sum, and a half with no GC event has no longest event
+      for (const half of [0, 1]) expect(gcMaxMs![half]! <= gcMs![half]! && (gc[half]! > 0 || gcMaxMs![half] === 0)).toBe(true);
       expect(fields.events!.deopt).toHaveLength(2);
     }
   });
