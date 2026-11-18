@@ -571,6 +571,8 @@ console.log(JSON.stringify({ ms: time.ms, warm: time.warm, peakRss: peakRss(), e
 
 - `events.gc` and `events.deopt` each have two counts: the first half and the last half of the counted samples.
 - `events.gcMs` has the GC time of each half in milliseconds: the sum of the durations of the GC events that start in the half.
+- `events.gcMaxMs` has the longest GC event of each half in milliseconds. A half with no GC event has 0.
+- A long block of the event loop can be one GC event. Compare the block with `gcMaxMs`, not with the mean of `gcMs`.
 - The probe counts the deopts only with `deopt: true`. Then the V8 flag `--trace-deopt` writes them to a temporary file.
 - `childLine` refuses a field that is not valid. A record has `fields` only when a child of the record gives a field.
 - A time line keeps each other field in `fields.extra`, with its JSON value. An example is the samples of a child, or its batch. The runner does not examine them.
