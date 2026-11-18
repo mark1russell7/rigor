@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   context,
   createContextKey,
-  logs as apiLogs,
+  logs,
   metrics,
   propagation,
   trace,
@@ -11,12 +11,12 @@ import {
   type TextMapPropagator,
   type TextMapSetter,
 } from "@opentelemetry/api";
-import { logs } from "@opentelemetry/api-logs";
+import { logs as sdk2Logs } from "@opentelemetry/api-logs";
 import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import { W3CBaggagePropagator, W3CTraceContextPropagator } from "@opentelemetry/core";
 import { InMemoryLogRecordExporter, LoggerProvider, SimpleLogRecordProcessor, type LogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { AggregationTemporality, InMemoryMetricExporter, MeterProvider, PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
-import { BasicTracerProvider, InMemorySpanExporter, SimpleSpanProcessor, type SpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { InMemorySpanExporter, SimpleSpanProcessor, TracerProvider, type SpanProcessor } from "@opentelemetry/sdk-trace";
 import {
   formatPropagationReport,
   localTransport,
@@ -64,7 +64,7 @@ const spans = new InMemorySpanExporter();
 const logRecords = new InMemoryLogRecordExporter();
 const metricExporter = new InMemoryMetricExporter(AggregationTemporality.DELTA);
 const reader = new PeriodicExportingMetricReader({ exporter: metricExporter, exportIntervalMillis: 3_600_000 });
-const tracerProvider = new BasicTracerProvider({ spanProcessors: [spanProcessor, new SimpleSpanProcessor(spans)] });
+const tracerProvider = new TracerProvider({ spanProcessors: [spanProcessor, new SimpleSpanProcessor({ exporter: spans })] });
 const loggerProvider = new LoggerProvider({ processors: [logProcessor, new SimpleLogRecordProcessor({ exporter: logRecords })] });
 const meterProvider = new MeterProvider({
   readers: [reader],
@@ -121,14 +121,14 @@ describe("propagationGate", () => {
     expect(report.ok).toBe(true);
   });
 
-  it("reads the log record of a program that sets its logger provider in the logs API of @opentelemetry/api (the SDK 3)", async () => {
+  it("reads the log record of a program on the SDK 2 that sets its logger provider in the logs API of @opentelemetry/api-logs", async () => {
     logs.disable();
-    apiLogs.setGlobalLoggerProvider(loggerProvider);
+    sdk2Logs.setGlobalLoggerProvider(loggerProvider);
     try {
       const report = await propagationGate({ key: KEY, capture, transports: [localTransport(internalCall)] });
       expect(report.lines).toEqual([{ transport: "local", verdict: "pass", faults: [] }]);
     } finally {
-      apiLogs.disable();
+      sdk2Logs.disable();
       logs.setGlobalLoggerProvider(loggerProvider);
     }
   });
