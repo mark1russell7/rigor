@@ -983,6 +983,7 @@ interface CaseLimit extends CaseInterval {
   readonly floor: number;
   readonly noise: number;
   readonly outcome: LimitOutcome;
+  readonly noiseCheck?: NoiseCheck;
 }
 
 ### build/index.d.ts#CaseProcesses
@@ -1560,6 +1561,8 @@ interface LimitOptions extends BandOptions {
   readonly caseLevel?: number;
   readonly share?: number;
   readonly aaFrom?: "cases" | "rounds";
+  readonly noiseCap?: number;
+  readonly spreadLevel?: number;
 }
 
 ### build/index.d.ts#LimitOutcome

@@ -2,9 +2,10 @@
  * The limit verdict of a bench: is the ratio of each case at most a limit? For example, the claim "the new code takes at most
  * 2 times the time of the old code" needs it. The time verdict compares only with 1.
  */
-import { medianInterval } from "@mark1russell7/rigor-statistics";
+import { median, medianInterval } from "@mark1russell7/rigor-statistics";
 import { type CaseRatio, type PairedTime, caseRatios } from "./paired.ts";
-import { type Band, type BandOptions, aaBand } from "./verdict.ts";
+import { aaStats } from "./run-limit.ts";
+import { type Band, type BandOptions, type NoiseCheck, aaBand, aaSpread } from "./verdict.ts";
 
 /** The ratio of one case with the interval of its median over the rounds. */
 export interface CaseInterval extends CaseRatio {
@@ -54,6 +55,15 @@ export interface LimitOptions extends BandOptions {
    * A case with no A/A records cannot decide.
    */
   readonly aaFrom?: "cases" | "rounds";
+  /**
+   * The noise cap on the A/A spread, on a log scale. A case with an A/A spread above the cap is `cannot decide`. So is a
+   * case with an A/A median ratio out of `[exp(-noiseCap), exp(noiseCap)]`. The default is no cap.
+   * With `aaFrom: "rounds"`, the spread of a case is the spread of its own A/A rounds, as `aaStats` gives it.
+   * With `"cases"`, each case has the spread of the A/A arm, as `aaSpread` gives it. Thus a noisy run cannot pass.
+   */
+  readonly noiseCap?: number;
+  /** The quantile of the A/A spread of the noise cap. The default is 0.9. */
+  readonly spreadLevel?: number;
 }
 
 /** The verdict of one case against the limit. */
@@ -65,6 +75,8 @@ export interface CaseLimit extends CaseInterval {
   /** The half width of the A/A band of the case on a log scale. It is the noise of `band` or of the A/A rounds of the case. */
   readonly noise: number;
   readonly outcome: LimitOutcome;
+  /** The check of the noise cap of the case. The case has this field only with the option `noiseCap` and A/A records. */
+  readonly noiseCheck?: NoiseCheck;
 }
 
 /** A limit verdict, with the facts that it uses. */
@@ -90,12 +102,17 @@ export interface LimitVerdict {
  * - The verdict is `beyond` when more than `allowed` cases are `beyond`.
  * - Each other verdict is `cannot decide`, and so is an A/A arm with too few cases or a candidate with no cases.
  * - With `aaFrom: "rounds"`, the A/A rounds of each case give its band, and the count of the A/A cases does not matter.
+ * - With `noiseCap`, a case with a noisy or biased A/A arm is `cannot decide`, also when its bound is at most the limit.
  */
 export function limitVerdict(candidate: readonly PairedTime[], aa: readonly PairedTime[], options: LimitOptions): LimitVerdict {
   const { limit } = options;
   if (!(limit > 0 && Number.isFinite(limit))) throw new RangeError(`limitVerdict: the limit is a finite number above 0, not ${limit}.`);
   const share = options.share ?? 1;
   if (!(share > 0 && share <= 1)) throw new RangeError(`limitVerdict: the share is above 0 and at most 1, not ${share}.`);
+  const cap = options.noiseCap;
+  if (cap !== undefined && !(cap >= 0 && Number.isFinite(cap))) throw new RangeError(`limitVerdict: the noise cap is a finite number of 0 or more, not ${cap}.`);
+  const level = options.spreadLevel ?? 0.9;
+  if (!(level > 0 && level < 1)) throw new RangeError(`limitVerdict: the spread level is a number between 0 and 1, not ${level}.`);
   const intervals = caseIntervals(candidate, options.caseLevel);
   const minimum = options.minimum ?? 5;
   // The small term keeps a product such as 10 * (1 - 0.9) = 0.9999999999999998 from a floor of 0.
@@ -118,14 +135,18 @@ export function limitVerdict(candidate: readonly PairedTime[], aa: readonly Pair
     band = all;
     noiseOf = () => all.noise;
   }
+  const checkOf = cap === undefined ? () => undefined : noiseChecks(aa, aaFrom, cap, level);
   const cases = intervals.map((c): CaseLimit => {
     const noise = noiseOf(c.case);
     // A case with no A/A rounds has no noise, and thus no read.
     if (noise === undefined) return { ...c, bound: c.high, floor: c.low, noise: 0, outcome: "cannot decide" };
     const bound = c.high * Math.exp(noise);
     const floor = c.low * Math.exp(-noise);
-    const outcome: LimitOutcome = bound <= limit ? "within" : floor > limit ? "beyond" : "cannot decide";
-    return { ...c, bound, floor, noise, outcome };
+    const check = checkOf(c.case);
+    // A noisy or biased A/A arm cannot decide the case, also with a bound below the limit.
+    const loud = check !== undefined && (check.noisy || check.biased);
+    const outcome: LimitOutcome = loud ? "cannot decide" : bound <= limit ? "within" : floor > limit ? "beyond" : "cannot decide";
+    return { ...c, bound, floor, noise, outcome, ...(check === undefined ? {} : { noiseCheck: check }) };
   });
   const facts = { limit, cases, band, share, allowed };
   const beyond = cases.filter((c) => c.outcome === "beyond");
@@ -140,8 +161,29 @@ export function limitVerdict(candidate: readonly PairedTime[], aa: readonly Pair
     const rest = others.length === 0 ? "" : ` ${others.length} of ${cases.length} cases are not within${permit}.`;
     return { outcome: "within", reason: `The largest bound of a case within is ${round(top.bound)} in the case ${JSON.stringify(top.case)}, and it is at most the limit ${limit}.${rest}`, ...facts };
   }
+  const loud = cases.filter((c) => c.noiseCheck !== undefined && (c.noiseCheck.noisy || c.noiseCheck.biased));
+  if (loud.length > 0) {
+    const first = loud[0]!;
+    const check = first.noiseCheck!;
+    const why = check.noisy ? `the A/A spread ${round(check.spread!)}` : `the A/A median ratio ${round(check.aaMedian!)}`;
+    return { outcome: "cannot decide", reason: `${loud.length} of ${cases.length} cases are noisy for the noise cap ${cap}${permit}. The first is ${JSON.stringify(first.case)}, with ${why}.`, ...facts };
+  }
   const top = cases.reduce((a, b) => (b.bound > a.bound ? b : a));
   return { outcome: "cannot decide", reason: `${others.length} of ${cases.length} cases are not within${permit}. The bound of the case ${JSON.stringify(top.case)} is ${round(top.bound)}, above the limit ${limit}, and too few floors are above it.`, ...facts };
+}
+
+/**
+ * This function gives the check of the noise cap for each case. With `"rounds"`, each case has the spread and the median
+ * of its own A/A rounds. With `"cases"`, each case has the spread and the median of the A/A arm.
+ */
+function noiseChecks(aa: readonly PairedTime[], aaFrom: "cases" | "rounds", cap: number, level: number): (name: string) => NoiseCheck | undefined {
+  const check = (spread: number, logMedian: number): NoiseCheck => ({ spread, cap, noisy: spread > cap, aaMedian: Math.exp(logMedian), biased: Math.abs(logMedian) > cap });
+  if (aaFrom === "rounds") {
+    const own = new Map(aaStats(aa, level).map((s) => [s.case, check(s.spread, s.median)]));
+    return (name) => own.get(name);
+  }
+  const all = check(aaSpread(aa, level), median(caseRatios(aa).map((r) => Math.log(r.ratio))));
+  return () => all;
 }
 
 function round(x: number): number {
