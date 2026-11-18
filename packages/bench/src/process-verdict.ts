@@ -10,6 +10,9 @@
  * and a process counts only when its band contains 1. With `slow` equal to `limit` and `maxSlow` 0, check (b) is "the
  * worst ratio is at most the limit". Thus a read can also be the median ratio of one job, and the verdict reads k jobs.
  * The limits come from earlier runs, for example with `runLimit`.
+ *
+ * A noisy process cannot decide a case. With the limit `noiseCap`, a process counts only when the A/A noise of its band
+ * is at most the cap. Thus a case with too many noisy processes is `cannot decide`, and a gate fails on it.
  */
 import { median } from "@mark1russell7/rigor-statistics";
 import { type Gate, gateOf } from "./gate.ts";
@@ -22,7 +25,10 @@ export interface ProcessRead {
   readonly case: string;
   /** The ratio of the case in the process, where lower is better. It is a finite number above 0. */
   readonly ratio: number;
-  /** The A/A band of the process, low and high. The read is valid only when the band contains 1. A read with no band is valid. */
+  /**
+   * The A/A band of the process, low and high. The read is valid only when the band contains 1 and its noise is at most
+   * the noise cap of the case. A read with no band is valid only when the case has no noise cap.
+   */
   readonly aa?: readonly [number, number];
   /** A fault of the case in the process, for example a wrong result. A fault blocks the case. */
   readonly fault?: string;
@@ -36,6 +42,11 @@ export interface ProcessLimits {
   readonly slow?: number;
   /** The largest count of valid processes above the slow line. Without it, the count is a record only. */
   readonly maxSlow?: number;
+  /**
+   * The largest A/A noise of a valid read, on a log scale, as `readNoise` gives it. A read above it is noisy, and the case
+   * does not use it. Without it, each band that contains 1 is valid. Take it from the A/A noise of earlier quiet runs.
+   */
+  readonly noiseCap?: number;
 }
 
 /** The options of `processVerdict`. */
@@ -58,6 +69,8 @@ export interface CaseProcesses {
   readonly limit: number;
   readonly slow: number;
   readonly maxSlow: number | undefined;
+  /** The noise cap of the case, or undefined when the case has no noise cap. */
+  readonly noiseCap: number | undefined;
   /** The ratios of the first k valid processes, in the order of the processes. */
   readonly ratios: readonly number[];
   /** The ids of the processes of `ratios`. */
@@ -68,6 +81,8 @@ export interface CaseProcesses {
   readonly slowCount: number;
   /** The processes with a read whose A/A band does not contain 1. */
   readonly invalid: readonly string[];
+  /** The processes with a noisy read: its band contains 1, but its noise is above the noise cap or not known. */
+  readonly noisy: readonly string[];
   /** The processes with no read of the case. */
   readonly missing: readonly string[];
   /** The faults of the case, each as `<process>: <fault>`. */
@@ -86,15 +101,33 @@ export interface ProcessVerdict extends Gate {
   readonly more: number;
 }
 
-/** This function tells if the A/A band of a read contains 1. A read with no band is valid. */
-export function isValidRead(read: ProcessRead): boolean {
-  return read.aa === undefined || (read.aa[0] <= 1 && read.aa[1] >= 1);
+/**
+ * This function gives the A/A noise of a read on a log scale. The noise is the larger distance from 0 of the logs of the
+ * two ends of its band. A read with no band has no known noise, so the value is undefined.
+ */
+export function readNoise(read: ProcessRead): number | undefined {
+  return read.aa === undefined ? undefined : Math.max(Math.abs(Math.log(read.aa[0])), Math.abs(Math.log(read.aa[1])));
+}
+
+/**
+ * This function tells if a read is valid. Its A/A band contains 1, and its noise is at most `noiseCap`. Without
+ * `noiseCap`, a read with no band is valid. With `noiseCap`, a read with no band is not valid, because its noise is not known.
+ */
+export function isValidRead(read: ProcessRead, noiseCap?: number): boolean {
+  if (read.aa === undefined) return noiseCap === undefined;
+  return containsOne(read.aa) && (noiseCap === undefined || readNoise(read)! <= noiseCap);
+}
+
+/** This function tells if a band contains 1. */
+function containsOne(band: readonly [number, number]): boolean {
+  return band[0] <= 1 && band[1] >= 1;
 }
 
 /**
  * This function gives the verdict of each case over k processes, and the gate of the cases.
  * - A case with a fault in a process is `beyond`. A case with a missing process is `cannot decide`.
  * - The case reads its first k valid processes, in the order of the processes. Each other valid process is not used.
+ * - A process is valid when its A/A band contains 1, and its noise is at most the noise cap of the case.
  * - The case is `beyond` when check (a) or check (b) fails, and else `within`.
  * - With fewer than k valid processes, the case is `cannot decide`, and `more` tells the count that it still needs.
  * - A case is `beyond` before k valid processes when the reads already fail a check for each value of the other processes.
@@ -125,7 +158,8 @@ export function processCaseLine(c: CaseProcesses): string {
   const median = c.median === undefined ? "no median" : `median ${round(c.median)}`;
   const most = c.maxSlow === undefined ? "a record only" : `at most ${c.maxSlow}`;
   const ratios = c.ratios.length === 0 ? "" : `, ratios ${c.ratios.map((r) => round(r)).join(", ")}`;
-  return `${c.outcome} ${c.case}: ${median} of ${c.ratios.length} valid processes (limit ${c.limit}), ${c.slowCount} above the slow line ${c.slow} (${most})${ratios}. ${c.reason}`;
+  const cap = c.noiseCap === undefined ? "" : `, noise cap ${c.noiseCap}, ${c.noisy.length} noisy`;
+  return `${c.outcome} ${c.case}: ${median} of ${c.ratios.length} valid processes (limit ${c.limit}${cap}), ${c.slowCount} above the slow line ${c.slow} (${most})${ratios}. ${c.reason}`;
 }
 
 /** This function examines one read. */
@@ -139,14 +173,23 @@ function checkRead(read: ProcessRead, known: ReadonlySet<string>): void {
   }
 }
 
+/** The limits of one case, with the default slow line. */
+interface CaseLimits {
+  readonly limit: number;
+  readonly slow: number;
+  readonly maxSlow: number | undefined;
+  readonly noiseCap: number | undefined;
+}
+
 /** This function gives the limits of one case, with the default slow line, and examines them. */
-function limitsOf(limits: ProcessOptions["limits"], name: string): { readonly limit: number; readonly slow: number; readonly maxSlow: number | undefined } {
+function limitsOf(limits: ProcessOptions["limits"], name: string): CaseLimits {
   const l = typeof limits === "function" ? limits(name) : limits;
   const slow = l.slow ?? l.limit;
   if (!(Number.isFinite(l.limit) && l.limit > 0)) throw new RangeError(`processVerdict: the limit of the case ${JSON.stringify(name)} is a finite number above 0, not ${l.limit}.`);
   if (!(Number.isFinite(slow) && slow > 0)) throw new RangeError(`processVerdict: the slow line of the case ${JSON.stringify(name)} is a finite number above 0, not ${slow}.`);
   if (l.maxSlow !== undefined && !(Number.isInteger(l.maxSlow) && l.maxSlow >= 0)) throw new RangeError(`processVerdict: maxSlow of the case ${JSON.stringify(name)} is a whole number of 0 or more, not ${l.maxSlow}.`);
-  return { limit: l.limit, slow, maxSlow: l.maxSlow };
+  if (l.noiseCap !== undefined && !(Number.isFinite(l.noiseCap) && l.noiseCap >= 0)) throw new RangeError(`processVerdict: the noise cap of the case ${JSON.stringify(name)} is a finite number of 0 or more, not ${l.noiseCap}.`);
+  return { limit: l.limit, slow, maxSlow: l.maxSlow, noiseCap: l.noiseCap };
 }
 
 /** This function gives the verdict of one case. */
@@ -155,19 +198,22 @@ function caseVerdict(
   list: ReadonlyMap<string, ProcessRead>,
   order: readonly string[],
   k: number,
-  limits: { readonly limit: number; readonly slow: number; readonly maxSlow: number | undefined },
+  limits: CaseLimits,
 ): CaseProcesses {
-  const { limit, slow, maxSlow } = limits;
+  const { limit, slow, maxSlow, noiseCap } = limits;
   const present = order.flatMap((p) => list.get(p) ?? []);
   const faults = present.filter((r) => r.fault !== undefined).map((r) => `${r.process}: ${r.fault}`);
   const missing = order.filter((p) => !list.has(p));
-  const invalid = present.filter((r) => !isValidRead(r)).map((r) => r.process);
-  const usedReads = present.filter(isValidRead).slice(0, k);
+  // A read is invalid when its band does not contain 1, and noisy when its band contains 1 but it is not valid.
+  const biased = (r: ProcessRead): boolean => r.aa !== undefined && !containsOne(r.aa);
+  const invalid = present.filter(biased).map((r) => r.process);
+  const noisy = present.filter((r) => !biased(r) && !isValidRead(r, noiseCap)).map((r) => r.process);
+  const usedReads = present.filter((r) => isValidRead(r, noiseCap)).slice(0, k);
   const ratios = usedReads.map((r) => r.ratio);
   const m = ratios.length === 0 ? undefined : median(ratios);
   const slowCount = ratios.filter((r) => r > slow).length;
   const aboveLimit = ratios.filter((r) => r > limit).length;
-  const facts = { case: name, limit, slow, maxSlow, ratios, used: usedReads.map((r) => r.process), median: m, slowCount, invalid, missing, faults };
+  const facts = { case: name, limit, slow, maxSlow, noiseCap, ratios, used: usedReads.map((r) => r.process), median: m, slowCount, invalid, noisy, missing, faults };
   const slowFails = maxSlow !== undefined && slowCount > maxSlow;
   const slowText = `${slowCount} valid processes are above the slow line ${slow}, and the limit is ${maxSlow}`;
   if (faults.length > 0) return { ...facts, outcome: "beyond", more: 0, reason: `${faults.length} processes have a fault. The first is ${JSON.stringify(faults[0])}.` };
@@ -179,7 +225,9 @@ function caseVerdict(
     if (aboveLimit > Math.floor(k / 2)) return { ...facts, outcome: "beyond", more: 0, reason: `${aboveLimit} of the ${k} processes are above the limit ${limit}, so the median is above it. The run has ${ratios.length} valid processes.` };
     if (slowFails) return { ...facts, outcome: "beyond", more: 0, reason: `${slowText}. The run has ${ratios.length} valid processes of ${k}.` };
     const more = k - ratios.length;
-    return { ...facts, outcome: "cannot decide", more, reason: `The case has ${ratios.length} valid processes of ${k}, and ${invalid.length} processes have an A/A band without 1. It needs ${more} more.` };
+    const without = `${invalid.length} processes have an A/A band without 1`;
+    const why = noiseCap === undefined ? `and ${without}` : `${without}, and ${noisy.length} processes are noisy for the noise cap ${noiseCap}`;
+    return { ...facts, outcome: "cannot decide", more, reason: `The case has ${ratios.length} valid processes of ${k}, ${why}. It needs ${more} more.` };
   }
   const medianFails = m! > limit;
   if (medianFails || slowFails) {

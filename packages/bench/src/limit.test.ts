@@ -1,6 +1,6 @@
 import { random } from "@mark1russell7/rigor-generators";
 import { describe, expect, it } from "vitest";
-import { type PairedTime, caseIntervals, caseRatios, firstArm, limitVerdict } from "./index.ts";
+import { type PairedTime, aaSpread, aaStats, caseIntervals, caseRatios, firstArm, limitVerdict } from "./index.ts";
 
 /** The records of `cases` cases of 11 rounds. Arm b takes `factor` times arm a, with a seeded noise of about 2 %. */
 function records(cases: number, factor: number, seed: number): PairedTime[] {
@@ -115,5 +115,58 @@ describe("limitVerdict with the A/A noise of the rounds", () => {
 
   it("refuses an unknown source of the A/A noise", () => {
     expect(() => limitVerdict(records(1, 1.5, 22), records(1, 1, 21), { limit: 2, aaFrom: "jobs" as "rounds" })).toThrow(/"cases" or "rounds"/);
+  });
+});
+
+describe("limitVerdict with a noise cap", () => {
+  /** The A/A records of `cases` cases of 11 rounds, with a seeded noise of approximately `width` (0.4 is 40 %). */
+  function loud(cases: number, width: number, seed: number): PairedTime[] {
+    const r = random(seed);
+    return records(cases, 1, seed).map((x) => ({ ...x, b: x.a * (1 + width * (r.next() - 0.5)) }));
+  }
+
+  it("cannot decide a case with a noisy A/A arm, also with a bound below the limit", () => {
+    const aa = loud(1, 0.4, 31);
+    const free = limitVerdict(records(1, 1.2, 32), aa, { limit: 2, aaFrom: "rounds" });
+    expect(free.outcome).toBe("within");
+    expect(free.cases[0]?.noiseCheck).toBeUndefined();
+    const capped = limitVerdict(records(1, 1.2, 32), aa, { limit: 2, aaFrom: "rounds", noiseCap: 0.05 });
+    expect(capped.outcome).toBe("cannot decide");
+    expect(capped.cases[0]?.noiseCheck).toMatchObject({ cap: 0.05, noisy: true });
+    expect(capped.cases[0]?.noiseCheck?.spread).toBeCloseTo(aaStats(aa)[0]!.spread, 12);
+    expect(capped.reason).toMatch(/^1 of 1 cases are noisy for the noise cap 0.05. The first is "c0", with the A\/A spread 0\.\d+\.$/);
+  });
+
+  it("keeps the outcome of a quiet case, with the facts of its check", () => {
+    const v = limitVerdict(records(1, 1.5, 22), records(1, 1, 21), { limit: 2, aaFrom: "rounds", noiseCap: 0.05 });
+    expect(v.outcome).toBe("within");
+    expect(v.cases[0]?.noiseCheck).toMatchObject({ cap: 0.05, noisy: false, biased: false });
+    expect(limitVerdict(records(1, 3, 23), records(1, 1, 21), { limit: 2, aaFrom: "rounds", noiseCap: 0.05 }).outcome).toBe("beyond");
+  });
+
+  it("cannot decide a case with a biased A/A arm", () => {
+    const v = limitVerdict(records(1, 1.5, 22), records(1, 1.1, 33), { limit: 2, aaFrom: "rounds", noiseCap: 0.05 });
+    expect(v.outcome).toBe("cannot decide");
+    expect(v.cases[0]?.noiseCheck).toMatchObject({ biased: true });
+    expect(v.cases[0]?.noiseCheck?.aaMedian).toBeCloseTo(1.1, 1);
+  });
+
+  it("uses the spread of the A/A arm for each case with the A/A noise of the cases", () => {
+    const quiet = records(6, 1, 2);
+    expect(limitVerdict(records(6, 1.5, 3), quiet, { limit: 2, noiseCap: 0.05 }).outcome).toBe("within");
+    const aa = loud(6, 1, 34);
+    const v = limitVerdict(records(6, 1.5, 3), aa, { limit: 2, noiseCap: 0.05 });
+    expect(v.outcome).toBe("cannot decide");
+    for (const c of v.cases) expect(c.noiseCheck).toMatchObject({ spread: aaSpread(aa), noisy: true });
+  });
+
+  it("refuses a bad noise cap and a bad spread level", () => {
+    const one = records(1, 1.5, 22);
+    for (const noiseCap of [-0.1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() => limitVerdict(one, one, { limit: 2, aaFrom: "rounds", noiseCap }), String(noiseCap)).toThrow(/the noise cap is a finite number/);
+    }
+    for (const spreadLevel of [0, 1, Number.NaN]) {
+      expect(() => limitVerdict(one, one, { limit: 2, aaFrom: "rounds", noiseCap: 0.1, spreadLevel }), String(spreadLevel)).toThrow(/the spread level/);
+    }
   });
 });
