@@ -1,13 +1,13 @@
 /**
- * The pure part of the fault-plan demo. `faultPlan` of `@mark1russell7/rigor-chaos` draws the plan, and `applierOf` of
- * `@mark1russell7/rigor-proxy` applies it. This module only gives frames to the applier of each direction, at their times.
+ * The pure part of the fault-plan demo. `faultPlan` of `@mark1russell7/rigor-chaos` draws the plan, and `connectionOf` of
+ * `@mark1russell7/rigor-proxy` applies it. This module only gives the frames of each direction to the connection, at
+ * their times.
  *
- * The rules of a connection come from the proxy (`proxy.ts`). The proxy uses sockets and a browser has none, so this
- * module applies the same rules. A pause stops the reads of one direction. A cut ends both appliers. A reset loses each
- * write that waits. If a second user needs these rules without sockets, they move to the entry `rigor-proxy/applier`.
+ * The rules of a connection come from `connectionOf`, the same rules that the proxy uses. This module adds only a
+ * simulated timeline: the frames arrive at fixed times, and a pause moves the read of a frame to its end.
  */
 import { type Direction, type Fault, type FaultKind, type FaultPlan, type FaultRanges, type FaultSpec, FAULT_KINDS, faultPlan } from "@mark1russell7/rigor-chaos";
-import { type Applier, type FaultRecord, type Step, applierOf } from "@mark1russell7/rigor-proxy/applier";
+import { type ConnectionStep, type FaultRecord, type Send, connectionOf } from "@mark1russell7/rigor-proxy/applier";
 import { seedFrom } from "./seed.ts";
 
 /** The frames of each direction of each connection. */
@@ -141,73 +141,63 @@ interface Event {
 const ORDER: Readonly<Record<Event["kind"], number>> = { wake: 0, read: 1, end: 2 };
 const before = (a: Event, b: Event): boolean => a.time < b.time || (a.time === b.time && (ORDER[a.kind] < ORDER[b.kind] || (ORDER[a.kind] === ORDER[b.kind] && a.direction === "up" && b.direction === "down")));
 
-/** This function gives the frames of one connection to its two appliers in the order of time, and keeps each result. */
+/** This function gives the frames of one connection to `connectionOf` in the order of time, and keeps each result. */
 function runConnection(plan: FaultPlan, connection: number): DemoConnection {
-  const appliers: Record<Direction, Applier> = { up: applierOf(plan, connection, "up"), down: applierOf(plan, connection, "down") };
+  const model = connectionOf(plan, connection);
   const frames: Record<Direction, { index: number; arrives: number; read: number | undefined; writes: DemoWrite[] }[]> = {
     up: Array.from({ length: FRAMES }, (_, index) => ({ index, arrives: arrivalOf("up", index), read: undefined, writes: [] })),
     down: Array.from({ length: FRAMES }, (_, index) => ({ index, arrives: arrivalOf("down", index), read: undefined, writes: [] })),
   };
   const writes: Record<Direction, { frame: number; bytes: number; at: number; lost: boolean }[]> = { up: [], down: [] };
   const pauses: Record<Direction, { from: number; until: number }[]> = { up: [], down: [] };
-  const state: Record<Direction, { next: number; paused: number; ended: boolean }> = { up: { next: 0, paused: 0, ended: false }, down: { next: 0, paused: 0, ended: false } };
+  const next: Record<Direction, number> = { up: 0, down: 0 };
   const records: FaultRecord[] = [];
-  let close: DemoConnection["close"];
+  /** The write of each send, thus a reset can mark the writes that it lost. */
+  const writeOf = new Map<Send, { lost: boolean }>();
 
-  const apply = (direction: Direction, step: Step, now: number): void => {
+  const take = (step: ConnectionStep): void => {
     records.push(...step.records);
-    for (const send of step.sends) {
-      const write = { frame: send.bytes[0] ?? 0, bytes: send.bytes.length, at: send.at, lost: false };
-      writes[direction].push(write);
-      frames[direction][write.frame]?.writes.push(write);
+    for (const direction of DIRECTIONS) {
+      for (const send of step.sends[direction]) {
+        const write = { frame: send.bytes[0] ?? 0, bytes: send.bytes.length, at: send.at, lost: false };
+        writes[direction].push(write);
+        writeOf.set(send, write);
+        frames[direction][write.frame]?.writes.push(write);
+      }
+      for (const send of step.lost[direction]) {
+        const write = writeOf.get(send);
+        if (write !== undefined) write.lost = true;
+      }
     }
-    if (step.pauseUntil !== undefined) {
-      state[direction].paused = Math.max(state[direction].paused, step.pauseUntil);
-      pauses[direction].push({ from: now, until: step.pauseUntil });
-    }
-    if (step.close === undefined || close !== undefined) return;
-    close = { kind: step.close.kind, at: step.close.at, direction };
-    if (step.close.kind === "reset") {
-      // The proxy destroys both sockets at once, thus each write that waits does not go out.
-      for (const d of DIRECTIONS) for (const write of writes[d]) if (write.at > step.close.at) write.lost = true;
-      return;
-    }
-    // A cut ends both appliers. Each frame that a reorder holds goes out, and then each side sends a FIN.
-    for (const d of DIRECTIONS) apply(d, appliers[d].end(now), now);
+    for (const pause of step.pauses) pauses[pause.direction].push({ from: pause.from, until: pause.until });
   };
 
   // Each pass takes the first event: a wake of an applier, the read of the next frame, or the end of a stream.
-  for (let guard = 0; close === undefined && guard < 10_000; guard += 1) {
-    let next: Event | undefined;
+  for (let guard = 0; model.close === undefined && guard < 10_000; guard += 1) {
+    let first: Event | undefined;
     const consider = (event: Event): void => {
-      if (next === undefined || before(event, next)) next = event;
+      if (first === undefined || before(event, first)) first = event;
     };
     for (const direction of DIRECTIONS) {
-      const s = state[direction];
-      if (s.ended) continue;
-      const wake = appliers[direction].wake;
+      if (model.ending(direction)) continue;
+      const wake = model.wake(direction);
       if (wake !== undefined) consider({ time: wake, direction, kind: "wake" });
-      const arrives = s.next < FRAMES ? arrivalOf(direction, s.next) : arrivalOf(direction, FRAMES - 1) + END_GAP_MS;
-      consider({ time: Math.max(arrives, s.paused), direction, kind: s.next < FRAMES ? "read" : "end" });
+      const arrives = next[direction] < FRAMES ? arrivalOf(direction, next[direction]) : arrivalOf(direction, FRAMES - 1) + END_GAP_MS;
+      consider({ time: Math.max(arrives, model.pausedUntil(direction)), direction, kind: next[direction] < FRAMES ? "read" : "end" });
     }
-    if (next === undefined) break;
-    const { time, direction, kind } = next;
-    const s = state[direction];
-    if (kind === "wake") apply(direction, appliers[direction].tick(time), time);
+    if (first === undefined) break;
+    const { time, direction, kind } = first;
+    if (kind === "wake") take(model.tick(direction, time));
     else if (kind === "read") {
-      const frame = frames[direction][s.next];
+      const frame = frames[direction][next[direction]];
       if (frame !== undefined) frame.read = time;
-      apply(direction, appliers[direction].push(frameBytes(s.next), time), time);
-      s.next += 1;
-    } else {
-      apply(direction, appliers[direction].end(time), time);
-      s.ended = true;
-    }
+      take(model.read(direction, frameBytes(next[direction]), time));
+      next[direction] += 1;
+    } else take(model.end(direction, time));
   }
 
   const lane = (direction: Direction): DemoLane => ({ direction, frames: frames[direction], writes: writes[direction], pauses: pauses[direction] });
-  const pending = [...appliers.up.pending(), ...appliers.down.pending()].sort((a, b) => a.index - b.index);
-  return { connection, lanes: [lane("up"), lane("down")], records, pending, close };
+  return { connection, lanes: [lane("up"), lane("down")], records, pending: model.pending(), close: model.close };
 }
 
 /** This function draws the plan of the settings and applies it. One seed gives the same result each time, in Node and in each browser. */
@@ -303,7 +293,7 @@ export function demoCode(demo: FaultDemo): string {
   const kinds = Object.keys(spec.kinds).map((kind) => `${kind}: 1`).join(", ");
   const directions = (spec.directions ?? []).map((d) => JSON.stringify(d)).join(", ");
   return `import { faultPlan } from "@mark1russell7/rigor-chaos";
-import { applierOf } from "@mark1russell7/rigor-proxy/applier";
+import { connectionOf } from "@mark1russell7/rigor-proxy/applier";
 
 const plan = faultPlan({
   connections: ${spec.connections},
@@ -314,6 +304,6 @@ const plan = faultPlan({
   ranges: { delayMs: [50, 300], stallMs: [100, 400] /* and the others of the page */ },
 }, ${JSON.stringify(seedFrom(demo.seed))});
 
-const up = applierOf(plan, 0, "up");
-const step = up.push(frame, now); // step.sends, step.records, step.pauseUntil, step.close`;
+const connection = connectionOf(plan, 0);
+const step = connection.read("up", frame, now); // step.sends, step.records, step.pauses, step.close, step.lost`;
 }

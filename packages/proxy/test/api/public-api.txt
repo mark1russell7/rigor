@@ -7,8 +7,12 @@
 ## . (build/index.d.ts): names
 
 type Applier: build/applier.d.ts#Applier
+type ConnectionClose: build/connection.d.ts#ConnectionClose
 type ConnectionEnd: build/proxy.d.ts#ConnectionEnd
+type ConnectionPause: build/connection.d.ts#ConnectionPause
+type ConnectionStep: build/connection.d.ts#ConnectionStep
 type ConnectionSummary: build/proxy.d.ts#ConnectionSummary
+type FaultConnection: build/connection.d.ts#FaultConnection
 type FaultProxy: build/proxy.d.ts#FaultProxy
 type FaultRecord: build/applier.d.ts#FaultRecord
 type Framer: build/framers.d.ts#Framer
@@ -26,6 +30,7 @@ type WebSocketFrameRead: build/framers.d.ts#WebSocketFrameRead
 answerBytes: build/answer.d.ts#answerBytes
 applierOf: build/applier.d.ts#applierOf
 chunkFramer: build/framers.d.ts#chunkFramer
+connectionOf: build/connection.d.ts#connectionOf
 encodeWebSocketFrame: build/framers.d.ts#encodeWebSocketFrame
 httpFramers: build/framers.d.ts#httpFramers
 readHttpHead: build/framers.d.ts#readHttpHead
@@ -39,6 +44,10 @@ webSocketFramer: build/framers.d.ts#webSocketFramer
 ## ./applier (build/applier-entry.d.ts): names
 
 type Applier: build/applier.d.ts#Applier
+type ConnectionClose: build/connection.d.ts#ConnectionClose
+type ConnectionPause: build/connection.d.ts#ConnectionPause
+type ConnectionStep: build/connection.d.ts#ConnectionStep
+type FaultConnection: build/connection.d.ts#FaultConnection
 type FaultRecord: build/applier.d.ts#FaultRecord
 type Framer: build/framers.d.ts#Framer
 type FramerPair: build/framers.d.ts#FramerPair
@@ -53,6 +62,7 @@ type WebSocketFrameRead: build/framers.d.ts#WebSocketFrameRead
 answerBytes: build/answer.d.ts#answerBytes
 applierOf: build/applier.d.ts#applierOf
 chunkFramer: build/framers.d.ts#chunkFramer
+connectionOf: build/connection.d.ts#connectionOf
 encodeWebSocketFrame: build/framers.d.ts#encodeWebSocketFrame
 httpFramers: build/framers.d.ts#httpFramers
 readHttpHead: build/framers.d.ts#readHttpHead
@@ -118,6 +128,49 @@ export declare function applierOf(plan: FaultPlan, connection: number, direction
 
 ### build/applier.d.ts#splitBytes
 export declare function splitBytes(bytes: Uint8Array, pieces: number): Uint8Array[];
+
+### build/connection.d.ts#ConnectionClose
+export interface ConnectionClose {
+  readonly kind: "cut" | "reset";
+  readonly at: number;
+  readonly direction: Direction;
+}
+
+### build/connection.d.ts#ConnectionPause
+export interface ConnectionPause {
+  readonly direction: Direction;
+  readonly from: number;
+  readonly until: number;
+}
+
+### build/connection.d.ts#ConnectionStep
+export interface ConnectionStep {
+  readonly records: readonly FaultRecord[];
+  readonly sends: Readonly<Record<Direction, readonly Send[]>>;
+  readonly pauses: readonly ConnectionPause[];
+  readonly close?: ConnectionClose;
+  readonly lost: Readonly<Record<Direction, readonly Send[]>>;
+}
+
+### build/connection.d.ts#FaultConnection
+export interface FaultConnection {
+  read(direction: Direction, frame: Uint8Array, now: number): ConnectionStep;
+  tick(direction: Direction, now: number): ConnectionStep;
+  end(direction: Direction, now: number): ConnectionStep;
+  wake(direction: Direction): number | undefined;
+  pausedUntil(direction: Direction): number;
+  due(direction: Direction, now: number): Send[];
+  next(direction: Direction): number | undefined;
+  ending(direction: Direction): boolean;
+  readonly close: ConnectionClose | undefined;
+  pending(): readonly {
+    readonly index: number;
+    readonly fault: Fault;
+  }[];
+}
+
+### build/connection.d.ts#connectionOf
+export declare function connectionOf(plan: FaultPlan, connection: number, opened?: number): FaultConnection;
 
 ### build/framers.d.ts#Framer
 export interface Framer {

@@ -1,7 +1,8 @@
 import { type AddressInfo, type Socket, connect, createServer } from "node:net";
 import { type Cancel, type Clock, platformClock } from "@mark1russell7/algebra/clock";
 import { type Direction, type Fault, type FaultPlan, checkFaultPlan } from "@mark1russell7/rigor-chaos";
-import { type Applier, type FaultRecord, type Send, type Step, applierOf } from "./applier.ts";
+import type { FaultRecord } from "./applier.ts";
+import { type ConnectionStep, connectionOf } from "./connection.ts";
 import { type Framer, type FramerPair, httpFramers, tcpFramers } from "./framers.ts";
 
 /** The protocol of the streams. `http` and `websocket` use the same framers: a WebSocket starts as an HTTP upgrade. */
@@ -66,20 +67,18 @@ interface Side {
   readonly from: Socket;
   readonly to: Socket;
   readonly framer: Framer;
-  readonly applier: Applier;
-  readonly queue: Send[];
   write: Cancel | undefined;
   wake: Cancel | undefined;
   stall: Cancel | undefined;
   stalled: boolean;
   draining: boolean;
-  ending: boolean;
   read: number;
 }
 
 /**
  * This function starts a proxy that puts the faults of a plan into the connections between clients and a target. The
  * proxy numbers the connections from 0, in the order that it accepts them. It throws a `RangeError` for a plan with problems.
+ * The rules of each connection come from `connectionOf`. The proxy adds the sockets, the timers and the back pressure.
  */
 export async function startFaultProxy(options: ProxyOptions): Promise<FaultProxy> {
   const problems = checkFaultPlan(options.plan);
@@ -105,26 +104,23 @@ export async function startFaultProxy(options: ProxyOptions): Promise<FaultProxy
     open.add(client);
     open.add(upstream);
     const pair = makeFramers();
+    const model = connectionOf(options.plan, connection, opened);
     const side = (direction: Direction, from: Socket, to: Socket): Side => ({
       direction,
       from,
       to,
       framer: pair[direction],
-      applier: applierOf(options.plan, connection, direction, opened),
-      queue: [],
       write: undefined,
       wake: undefined,
       stall: undefined,
       stalled: false,
       draining: false,
-      ending: false,
       read: 0,
     });
     const sides = [side("up", client, upstream), side("down", upstream, client)] as const;
+    const sideOf = (direction: Direction): Side => (direction === "up" ? sides[0] : sides[1]);
     let end: ConnectionEnd | undefined;
     let closed = 0;
-    /** After an answer, no byte of the server goes to the client. */
-    let answered = false;
 
     const cancelTimers = (): void => {
       for (const s of sides) {
@@ -145,8 +141,7 @@ export async function startFaultProxy(options: ProxyOptions): Promise<FaultProxy
       s.write = undefined;
       if (end === "reset" || end === "error") return;
       const t = now();
-      while (s.queue.length > 0 && (s.queue[0] as Send).at <= t) {
-        const send = s.queue.shift() as Send;
+      for (const send of model.due(s.direction, t)) {
         if (!s.to.write(send.bytes) && !s.draining) {
           s.draining = true;
           s.from.pause();
@@ -156,52 +151,46 @@ export async function startFaultProxy(options: ProxyOptions): Promise<FaultProxy
           });
         }
       }
-      if (s.queue.length > 0) s.write = clock.after((s.queue[0] as Send).at - t, () => pump(s));
-      else if (s.ending && !s.to.writableEnded) s.to.end(() => (end === "cut" ? s.to.destroy() : undefined));
+      const next = model.next(s.direction);
+      if (next !== undefined) s.write = clock.after(next - t, () => pump(s));
+      else if (model.ending(s.direction) && !s.to.writableEnded) s.to.end(() => (end === "cut" ? s.to.destroy() : undefined));
     };
 
-    const apply = (s: Side, step: Step): void => {
+    /** This function stops the reads of a side until `until`, the latest end of its stalls. */
+    const stall = (s: Side, until: number): void => {
+      s.stalled = true;
+      s.from.pause();
+      s.stall?.();
+      s.stall = clock.after(until - now(), () => {
+        s.stall = undefined;
+        s.stalled = false;
+        resume(s);
+      });
+    };
+
+    /** This function acts on a step of the connection that a read, a tick or an end of the side `s` gave. */
+    const apply = (s: Side, step: ConnectionStep): void => {
       for (const record of step.records) {
         records.push(record);
         options.onFault?.(record);
       }
-      if (step.sends.length > 0 && !(answered && s.direction === "down")) {
-        s.queue.push(...step.sends);
-        if (s.write === undefined) pump(s);
-      }
-      if (step.answer !== undefined && !answered) {
-        answered = true;
-        const down = sides[1];
-        down.queue.push(step.answer);
-        if (down.write === undefined) pump(down);
-      }
-      if (step.pauseUntil !== undefined) {
-        s.stalled = true;
-        s.from.pause();
-        s.stall?.();
-        s.stall = clock.after(step.pauseUntil - now(), () => {
-          s.stall = undefined;
-          s.stalled = false;
-          resume(s);
-        });
-      }
+      for (const pause of step.pauses) stall(sideOf(pause.direction), pause.until);
       if (step.close !== undefined) shut(step.close.kind);
+      for (const one of sides) if (one.write === undefined && (step.sends[one.direction].length > 0 || model.ending(one.direction))) pump(one);
       rearm(s);
     };
 
     const rearm = (s: Side): void => {
       s.wake?.();
       s.wake = undefined;
-      const wake = s.applier.wake;
-      if (wake !== undefined && end === undefined) s.wake = clock.after(Math.max(0, wake - now()), () => apply(s, s.applier.tick(now())));
+      const wake = model.wake(s.direction);
+      if (wake !== undefined && end === undefined) s.wake = clock.after(Math.max(0, wake - now()), () => apply(s, model.tick(s.direction, now())));
     };
 
     const finish = (s: Side): void => {
-      if (s.ending) return;
-      for (const frame of s.framer.end()) apply(s, s.applier.push(frame, now()));
-      apply(s, s.applier.end(now()));
-      s.ending = true;
-      if (s.write === undefined) pump(s);
+      if (model.ending(s.direction)) return;
+      for (const frame of s.framer.end()) apply(s, model.read(s.direction, frame, now()));
+      apply(s, model.end(s.direction, now()));
     };
 
     const shut = (kind: "cut" | "reset"): void => {
@@ -209,17 +198,20 @@ export async function startFaultProxy(options: ProxyOptions): Promise<FaultProxy
       end = kind;
       for (const s of sides) s.from.pause();
       if (kind === "reset") {
+        // The writes at or before the reset go out. The connection lost each write after it.
+        const t = now();
+        for (const s of sides) for (const send of model.due(s.direction, t)) s.to.write(send.bytes);
         cancelTimers();
         client.resetAndDestroy();
         upstream.resetAndDestroy();
         return;
       }
+      // The connection ended the two appliers. Each side writes what waits, and then ends its target.
       for (const s of sides) {
         s.wake?.();
+        s.wake = undefined;
         s.stall?.();
-        apply(s, s.applier.end(now()));
-        s.ending = true;
-        if (s.write === undefined) pump(s);
+        s.stall = undefined;
       }
     };
 
@@ -228,7 +220,7 @@ export async function startFaultProxy(options: ProxyOptions): Promise<FaultProxy
         if (end !== undefined) return;
         s.read += bytes.length;
         for (const frame of s.framer.push(bytes)) {
-          apply(s, s.applier.push(frame, now()));
+          apply(s, model.read(s.direction, frame, now()));
           if (end !== undefined) return;
         }
       });
@@ -256,14 +248,14 @@ export async function startFaultProxy(options: ProxyOptions): Promise<FaultProxy
           opened,
           end: end ?? "close",
           bytes: { up: sides[0].read, down: sides[1].read },
-          missed: [...sides[0].applier.pending(), ...sides[1].applier.pending()].sort((a, b) => a.index - b.index),
+          missed: model.pending(),
         };
         connections.push(summary);
         options.onClose?.(summary);
       });
     }
     // A fault at 0 ms occurs before the first byte.
-    for (const s of sides) apply(s, s.applier.tick(0));
+    for (const s of sides) apply(s, model.tick(s.direction, 0));
   });
 
   await new Promise<void>((resolve, reject) => {

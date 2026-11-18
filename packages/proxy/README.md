@@ -67,16 +67,29 @@ The framers (`tcpFramers`, `httpFramers`, `webSocketFramer`), the applier (`appl
 
 The entry `@mark1russell7/rigor-proxy/applier` has these parts and no module of Node.js. A browser can load it, for example to show the writes of a plan.
 
+`connectionOf` holds the two appliers of one connection and the rules between the two directions. The proxy uses these rules, and a browser can use them with no socket:
+
+- A stall stops the reads of its direction until the latest end of the stalls of that direction.
+- A cut ends the two appliers. Each write that waits goes out, and then each target gets a FIN.
+- A reset closes the connection at once. Each write with a time after the reset is lost.
+- After an answer, no write of the server goes to the client.
+
+`read`, `tick` and `end` give a step: the records, the writes of each direction, the pauses, the close and the lost writes.
+
 The frame codec of RFC 6455 is also a pure part. `readWebSocketFrame` reads the first frame of some bytes, with its bits, its mask and its payload with no mask. `encodeWebSocketFrame` writes a frame, with the shortest form of the length. `WEBSOCKET_OPCODES` names the opcodes. The scripted server of `@mark1russell7/rigor-testkit/http` uses this codec for its WebSocket routes.
 
 ```ts
 import { faultPlan } from "@mark1russell7/rigor-chaos";
-import { applierOf } from "@mark1russell7/rigor-proxy/applier";
+import { applierOf, connectionOf } from "@mark1russell7/rigor-proxy/applier";
 
 const plan = faultPlan({ connections: 1, perConnection: 2, kinds: { delay: 1, cut: 1 }, within: { frame: 8 } }, 7);
 const applier = applierOf(plan, 0, "up");
 const step = applier.push(new TextEncoder().encode("frame 0"), 0);
 // step.sends has the bytes and the time of each write. step.records has each fault that the frame started.
+
+const connection = connectionOf(plan, 0);
+const both = connection.read("up", new TextEncoder().encode("frame 0"), 0);
+// both.sends.up and both.sends.down have the writes of each direction. both.close is the close, if any.
 ```
 
 `REASONS` has the reason of each HTTP status, equal to `STATUS_CODES` of `node:http` in Node.js 24. Thus `answerBytes` gives the same bytes in each runtime.

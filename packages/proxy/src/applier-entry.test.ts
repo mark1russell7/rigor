@@ -27,7 +27,7 @@ describe("the entry applier", () => {
       }
     };
     visit(join(here, "applier-entry.ts"));
-    expect([...seen].map((f) => f.slice(here.length + 1)).sort()).toEqual(["answer.ts", "applier-entry.ts", "applier.ts", "framers.ts"]);
+    expect([...seen].map((f) => f.slice(here.length + 1)).sort()).toEqual(["answer.ts", "applier-entry.ts", "applier.ts", "connection.ts", "framers.ts"]);
     expect(nodeModules).toEqual([]);
   });
 
