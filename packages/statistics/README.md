@@ -255,6 +255,7 @@ In the tests, the series are AR(1) with 200 readings and the slope 0.6. There, t
 | `classScores(table, z)` | The support, the hits, the recall with its Wilson interval, the precision and the F1 score of each class of a confusion table. |
 | `entropy(probabilities)` | The entropy of a discrete distribution, in bits. One sure outcome gives 0, and `n` equal outcomes give `log2(n)`. |
 | `informationGain(prior, likelihood)` | The expected information gain of an observation about a discrete variable, in bits: the mutual information of the two. `likelihood[h][x]` is the probability of the outcome `x` for the value `h`. A diagnosis uses it to choose the next test. |
+| `polyaPredictive(base, a, same, earlier)`, `polyaLogLikelihood(observations, base, a)`, `fitConcentration(units, { low, high })` | The Dirichlet-multinomial law of repeated observations of one unit. A small concentration `a` makes repeats agree, and `Infinity` makes them independent. The fit gives the `a` with the largest likelihood, or `Infinity`. |
 | `medianInterval(values, level)` | The distribution-free interval of a median, from two order statistics. It gives `low`, `high`, the `rank` of `low` and the `coverage`. |
 | `quantileInterval(values, p, level)` | The distribution-free interval of a quantile, from two order statistics. A side with no rank is infinite. The values must be independent draws. |
 | `quantileSamples(p, level)` | The fewest independent values that give a quantile an upper bound. At the level 0.95: 72 values for p95, 368 for p99 and 3,688 for p99.9. |
