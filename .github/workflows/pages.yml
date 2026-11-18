@@ -41,9 +41,11 @@ jobs:
 
   # This job examines the deployed site: the page, its script and the pages of site-pages.
   # It starts no code of the repository and reads only the public site.
+  # When the shared workflow deploys nothing, it gives no page URL, and this job does not start.
+  # For example, a red CI of the commit on main stops the deploy.
   served:
     needs: pages
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && needs.pages.outputs.page-url != ''
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
