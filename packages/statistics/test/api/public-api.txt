@@ -21,6 +21,7 @@ type CategoricalDimension: build/index.d.ts#CategoricalDimension
 type ClassScore: build/index.d.ts#ClassScore
 type CompareOptions: build/index.d.ts#CompareOptions
 type Comparison: build/index.d.ts#Comparison
+type ConcentrationOptions: build/index.d.ts#ConcentrationOptions
 type Confusion: build/index.d.ts#Confusion
 type ContinuousDimension: build/index.d.ts#ContinuousDimension
 type Corrected: build/index.d.ts#Corrected
@@ -78,6 +79,7 @@ type PairProbabilities: build/index.d.ts#PairProbabilities
 type ParsedResponseRecord: build/index.d.ts#ParsedResponseRecord
 type PermutationOptions: build/index.d.ts#PermutationOptions
 type PermutationResult: build/index.d.ts#PermutationResult
+type PolyaUnit: build/index.d.ts#PolyaUnit
 type Proportion: build/index.d.ts#Proportion
 type QuantileInterval: build/index.d.ts#QuantileInterval
 type QuantileMethod: build/index.d.ts#QuantileMethod
@@ -193,6 +195,7 @@ eloReplay: build/index.d.ts#eloReplay
 eloUpdate: build/index.d.ts#eloUpdate
 emptyHistogram: build/index.d.ts#emptyHistogram
 entropy: build/index.d.ts#entropy
+fitConcentration: build/index.d.ts#fitConcentration
 fitRatings: build/index.d.ts#fitRatings
 fitResponse: build/index.d.ts#fitResponse
 foldRule: build/index.d.ts#foldRule
@@ -232,6 +235,8 @@ pearson: build/index.d.ts#pearson
 poissonBinomial: build/index.d.ts#poissonBinomial
 poissonBinomialTest: build/index.d.ts#poissonBinomialTest
 poissonInterval: build/index.d.ts#poissonInterval
+polyaLogLikelihood: build/index.d.ts#polyaLogLikelihood
+polyaPredictive: build/index.d.ts#polyaPredictive
 predictResponse: build/index.d.ts#predictResponse
 quantile: build/index.d.ts#quantile
 quantileInterval: build/index.d.ts#quantileInterval
@@ -388,6 +393,12 @@ interface Comparison {
   readonly gainInterval: Proportion;
   readonly dropShare: number;
   readonly dropInterval: Proportion;
+}
+
+### build/index.d.ts#ConcentrationOptions
+interface ConcentrationOptions {
+  readonly low?: number | undefined;
+  readonly high?: number | undefined;
 }
 
 ### build/index.d.ts#Confusion
@@ -757,6 +768,12 @@ interface PermutationResult {
   readonly observed: number;
   readonly p: number;
   readonly runs: number;
+}
+
+### build/index.d.ts#PolyaUnit
+interface PolyaUnit {
+  readonly observations: readonly string[];
+  readonly base: Readonly<Record<string, number>>;
 }
 
 ### build/index.d.ts#Proportion
@@ -1415,6 +1432,9 @@ export declare function emptyHistogram(relativeError?: number): Histogram;
 ### build/index.d.ts#entropy
 export declare function entropy(probabilities: readonly number[]): number;
 
+### build/index.d.ts#fitConcentration
+export declare function fitConcentration(units: readonly PolyaUnit[], options?: ConcentrationOptions): number;
+
 ### build/index.d.ts#fitRatings
 export declare function fitRatings(model: RatingModel, items: number, comparisons: readonly PairComparison[], options?: RatingFitOptions): RatingFit;
 
@@ -1527,6 +1547,12 @@ export declare function poissonBinomialTest(k: number, ps: readonly number[], si
 
 ### build/index.d.ts#poissonInterval
 export declare function poissonInterval(k: number, exposure?: number, level?: number): RateInterval;
+
+### build/index.d.ts#polyaLogLikelihood
+export declare function polyaLogLikelihood(observations: readonly string[], base: Readonly<Record<string, number>>, concentration: number): number;
+
+### build/index.d.ts#polyaPredictive
+export declare function polyaPredictive(base: number, concentration: number, same: number, earlier: number): number;
 
 ### build/index.d.ts#predictResponse
 export declare function predictResponse(model: ResponseModel, inputs: Readonly<Record<string, ResponseInputValue>>): number;
