@@ -15,6 +15,8 @@ Test helpers:
 - `runToStop` stops a program of a test at a step or a time of a stop plan, from the entry `@mark1russell7/rigor-testkit/stop`. The entry `/stop-point` has the child side, with no packages.
 - `startXmppServer` gives an XMPP server for a client test, with STARTTLS, a login and steps as data. It is in the entry `@mark1russell7/rigor-testkit/xmpp`.
 - `testCertificates` makes the certificates of a TLS server of a test at the time of the test, from the entry `@mark1russell7/rigor-testkit/tls`.
+- `countProcessStarts` counts the process starts of each test file and holds each file under a budget. It is in the entry `@mark1russell7/rigor-testkit/process-starts`.
+- `gitFixtures` makes the git repositories of a test file with few git starts, from the entry `@mark1russell7/rigor-testkit/git-fixture`.
 
 ```sh
 npm install --save-dev @mark1russell7/rigor-testkit
@@ -779,6 +781,65 @@ const comparison = compareDigests(JSON.parse(local), JSON.parse(home));
 - `compareDigests` refuses two digests of different draws with a `RangeError`: a different family, seed, design, count or hash of the draws.
 - The comparison has the counts of `behaviorCheck`. Its `firstDifference` has the index and the two entries of the draw, not the input. `behaviorDraws(options)` gives the input of an index.
 - The digest of a list of inputs keeps the hash of the list. Thus the inputs need a stable form.
+
+## A budget of process starts
+
+The entry `@mark1russell7/rigor-testkit/process-starts` counts the process starts of each test file. Each start costs time. On Windows, each start also uses kernel memory that the system does not free. Thus a suite with thousands of starts can stop the computer.
+
+A setup file of the test runner wraps `node:child_process` one time, clears the count before each file and examines the budget after the file:
+
+```ts no-run
+// process-starts.setup.ts, in setupFiles of vitest:
+import { readFileSync } from "node:fs";
+import { afterAll, beforeAll } from "vitest";
+import { countProcessStarts, parseStartBudgets, startBudgetBreak } from "@mark1russell7/rigor-testkit/process-starts";
+
+const counts = countProcessStarts();
+const source = "test/git-starts.json";
+const budgets = parseStartBudgets(readFileSync(source, "utf8"), source);
+beforeAll(() => counts.clear());
+afterAll((_context, suite) => {
+  const message = startBudgetBreak(suite.file.name, counts, budgets, { source, advice: "Share the fixture repositories." });
+  if (message !== undefined) throw new Error(message);
+});
+```
+
+- The budget file is JSON: `{ "default": 20, "files": { "test/big.test.ts": 60 } }`. A file with no entry gets `default`.
+- `startBudgetBreak` counts `git` by default. Give `command` to count another command.
+- A git start counts under `git-<command>`, for example `git-ls-files`. `startsIn(counts, "git")` gives the sum of each key of git.
+- The wrappers also apply to the named imports of `node:child_process`, through `syncBuiltinESMExports`.
+- `startsOf(name)` gives the count since the last clear. A test of a helper compares two reads of it.
+- `startsReport(rows)` gives one line for each file, the most starts first, and a line of the sums. A global setup prints it at the end of a CI run.
+
+## Git repositories with few git starts
+
+The entry `@mark1russell7/rigor-testkit/git-fixture` makes the git repositories of a test file. One file makes one empty repository with one `git init`. Each other repository copies its `.git` folder.
+
+```ts no-run
+import { afterAll, it } from "vitest";
+import { gitFixtures } from "@mark1russell7/rigor-testkit/git-fixture";
+
+const repos = gitFixtures("my-rule-");
+afterAll(() => repos.remove());
+
+it("reads the files in the index", () => {
+  const root = repos.fixture({ "package.json": { name: "a" }, "src/a.ts": "export const a = 1;\n" });
+  repos.stageAll(root); // one git start
+  // ...
+});
+```
+
+| Function | It does | Git starts |
+|---|---|---|
+| `init(root)` | It makes `root` a repository with the branch `main` and no commit. | 1 for the first in a file, then 0 |
+| `stageAll(root)` | It puts each file in the index. This is enough for code that reads only `git ls-files`. | 1 |
+| `commitAll(root, message)` | It commits each file, for code that reads the history. | 2 |
+| `commitOf(root, branch)` | It reads the commit of `HEAD` or of a branch from the files of `.git`. | 0, or 1 for a packed ref |
+| `copy(root)` | It copies a repository with its work tree, for a case that changes a shared repository. | 0 |
+| `shared(key, build)` | It starts `build` one time for each key, and gives each call its own copy. | The starts of one `build` |
+
+- The git of the fixtures has a test identity, no signature and no hooks.
+- It removes `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE` and the other variables of a git hook. Thus a test in a hook writes to the fixture.
 
 ## License
 

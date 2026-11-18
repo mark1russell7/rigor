@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/rigor-testkit",
-  "version": "0.1.20",
+  "version": "0.1.21",
   "description": "Test helpers: the code blocks of Markdown files as test cases, model-based tests on fast-check, metamorphic relations on fast-check, arbitraries that are uniform by value, the propagation gate of one context id over each transport, the capture of the OpenTelemetry SDK, a scripted HTTP server for fixtures, a scripted XMPP server with test certificates, a stand-in OTLP collector, a fake event target, a server of a test in a child process that reports its port, the harness of a stop plan that stops a process of a test at a step or a time, a behavior check of two functions on the same seeded inputs, and a check of an operation that must give a rejected promise.",
   "keywords": [
     "testing",
@@ -122,6 +122,16 @@
         "import": "./build/tls.js",
         "default": "./build/tls.js"
       },
+      "./process-starts": {
+        "types": "./build/process-starts.d.ts",
+        "import": "./build/process-starts.js",
+        "default": "./build/process-starts.js"
+      },
+      "./git-fixture": {
+        "types": "./build/git-fixture.d.ts",
+        "import": "./build/git-fixture.js",
+        "default": "./build/git-fixture.js"
+      },
       "./package.json": "./package.json"
     }
   },
@@ -170,6 +180,8 @@
     "./behavior": "./src/behavior.ts",
     "./xmpp": "./src/xmpp.ts",
     "./tls": "./src/tls.ts",
+    "./process-starts": "./src/process-starts.ts",
+    "./git-fixture": "./src/git-fixture.ts",
     "./package.json": "./package.json"
   },
   "peerDependencies": {

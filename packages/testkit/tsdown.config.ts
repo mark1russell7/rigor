@@ -16,9 +16,10 @@ import { defineConfig } from "tsdown";
 // other entries do not load it.
 // The entry xmpp is a scripted XMPP server on node:net and node:tls. It reads the XML of the client with ltx (an
 // optional peer dependency), so the other entries do not load it. The entry tls makes the certificates of a TLS server
-// of a test with node:crypto, and it has no peer.
+// of a test with node:crypto, and it has no peer. The entry process-starts counts the starts of node:child_process, and
+// the entry git-fixture makes the git repositories of a test with few git starts. They have no dependency.
 export default defineConfig({
-  entry: ["src/index.ts", "src/model.ts", "src/metamorphic.ts", "src/arbitrary.ts", "src/propagation.ts", "src/otel.ts", "src/http.ts", "src/otlp.ts", "src/fakes.ts", "src/child.ts", "src/stop.ts", "src/stop-point.ts", "src/behavior.ts", "src/xmpp.ts", "src/tls.ts"],
+  entry: ["src/index.ts", "src/model.ts", "src/metamorphic.ts", "src/arbitrary.ts", "src/propagation.ts", "src/otel.ts", "src/http.ts", "src/otlp.ts", "src/fakes.ts", "src/child.ts", "src/stop.ts", "src/stop-point.ts", "src/behavior.ts", "src/xmpp.ts", "src/tls.ts", "src/process-starts.ts", "src/git-fixture.ts"],
   outDir: "build",
   format: "esm",
   platform: "node",
