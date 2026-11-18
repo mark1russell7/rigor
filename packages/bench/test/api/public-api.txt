@@ -21,6 +21,7 @@ type Balanced: build/index.d.ts#Balanced
 type Band: build/index.d.ts#Band
 type BandKind: build/index.d.ts#BandKind
 type BandOptions: build/index.d.ts#BandOptions
+type BatchSpan: build/index.d.ts#BatchSpan
 type Better: build/index.d.ts#Better
 type BudgetLook: build/index.d.ts#BudgetLook
 type BudgetLooksOptions: build/index.d.ts#BudgetLooksOptions
@@ -365,6 +366,7 @@ freshRun: build/fresh.d.ts#freshRun
 pairOrder: build/fresh.d.ts#pairOrder
 peakRss: build/fresh.d.ts#peakRss
 repoCommit: build/fresh.d.ts#repoCommit
+startProcess: build/fresh.d.ts#startProcess
 
 ## ./supervise (build/supervise.d.ts): names
 
@@ -620,6 +622,7 @@ export interface FreshOptions {
   readonly roundOffset?: number;
   readonly aa?: boolean | "each";
   readonly order?: "pairs" | "arms";
+  readonly firstCase?: number;
   readonly args?: (caseId: string) => readonly string[];
   readonly timeoutMs?: number;
   readonly overLimit?: "error" | "skip";
@@ -731,6 +734,9 @@ export declare function peakRss(): number;
 ### build/fresh.d.ts#repoCommit
 export declare function repoCommit(ref: string, options?: RepoCommitOptions): Promise<string>;
 
+### build/fresh.d.ts#startProcess
+export declare function startProcess(argv: readonly string[], options: StartOptions): Promise<ChildExit>;
+
 ### build/index.d.ts#AaLimitOptions
 interface AaLimitOptions {
   readonly family?: (name: string) => string | undefined;
@@ -783,6 +789,7 @@ interface ArmPair {
 interface ArmRounds {
   readonly pairs: Record<string, PairedTime[]>;
   readonly orders: readonly (readonly string[])[];
+  readonly spans: readonly (readonly BatchSpan[])[];
   readonly count: number;
   readonly sink: number;
 }
@@ -797,6 +804,7 @@ interface ArmRoundsOptions {
   readonly aa?: boolean | (() => number);
   readonly targetMs?: number;
   readonly warmMs?: number;
+  readonly warmBatches?: number;
   readonly now?: () => number;
 }
 
@@ -836,6 +844,12 @@ interface BandOptions {
   readonly level?: number;
   readonly minimum?: number;
   readonly bootstrap?: BootstrapOptions;
+}
+
+### build/index.d.ts#BatchSpan
+interface BatchSpan {
+  readonly start: number;
+  readonly end: number;
 }
 
 ### build/index.d.ts#Better
