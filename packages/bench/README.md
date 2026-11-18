@@ -57,6 +57,7 @@ v.comparison;                                     // the cases that gain and dro
 | `isValidRead(read, noiseCap?)` | True when the A/A band of a process read contains 1 and its noise is at most `noiseCap`. Without a cap, a read with no band is valid. |
 | `readNoise(read)` | The A/A noise of a process read on a log scale: the larger distance from 0 of the logs of the ends of its band. |
 | `processNoiseCap(jobs, options)` | The noise cap of one case from the reads of earlier quiet jobs: a quantile of the read noise, its interval and the decide rate at the cap. |
+| `processLimits(jobs, options)` | The limits of `processVerdict` for one case from the reads of earlier jobs: the limit, the slow line and `maxSlow`, with their derivation. |
 | `modelTest(reads, options)` | The read of each CPU model against the rest, for each case: `differs`, `no read`, `too-few` or `not asked`. |
 | `visibleShift(values, rest, level, direction, options)` | The smallest shift in one direction that a test can see at this count and level, and the smallest p of this count. |
 | `modelRowText(row, family)` | The words of one row. No word says that a model is the same as the rest. |
@@ -253,6 +254,25 @@ if (c.source === "jobs") {
 - The decide rate is the chance of at least k valid reads in 2k processes, for each quiet job. A gate test can refuse a cap with a decide rate under 0.95.
 - The reads of one job share one runner. So the bootstrap interval draws whole jobs.
 - With fewer than 5 quiet jobs, the result has no cap: its `source` is `too few`.
+
+### The limits from earlier jobs
+
+`processLimits` gives the limits of one case from the reads of 5 or more earlier jobs. Keep the limits of a gate as data, and let a test give them again from the jobs:
+
+```ts
+const fit = processLimits(jobs, { k: 11, digits: 2 }); // jobs: the reads of one case on one CPU model
+if (fit.source === "jobs") {
+  fit.limits;                                          // { limit, slow, maxSlow }: the limits of processVerdict
+  fit.median;                                          // runLimit of the job medians: the worst, the spread, the values
+  fit.slow;                                            // the slow reads, their Wilson interval and the chance at maxSlow
+}
+```
+
+- The median of a job is the median of its first k valid reads, as `processVerdict` takes them. With `noiseCap`, a noisy read is not valid.
+- The limit is `runLimit` of the job medians: the worst median plus their spread, rounded up. The slow line is the limit.
+- The slow rate is the upper end of the Wilson interval of the share of the used reads above the limit.
+- `maxSlow` is the smallest count with P(Binomial(k, slow rate) > count) under `risk`. The default `risk` is 0.01.
+- With fewer than 5 jobs, the result has no limits: its `source` is `too few`.
 
 ## A read of each CPU model
 

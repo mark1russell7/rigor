@@ -175,6 +175,8 @@ type Power: build/index.d.ts#Power
 type PowerOptions: build/index.d.ts#PowerOptions
 type ProcessArm: build/index.d.ts#ProcessArm
 type ProcessLimits: build/index.d.ts#ProcessLimits
+type ProcessLimitsFit: build/index.d.ts#ProcessLimitsFit
+type ProcessLimitsOptions: build/index.d.ts#ProcessLimitsOptions
 type ProcessOptions: build/index.d.ts#ProcessOptions
 type ProcessRead: build/index.d.ts#ProcessRead
 type ProcessVerdict: build/index.d.ts#ProcessVerdict
@@ -206,6 +208,7 @@ type SlopeRound: build/index.d.ts#SlopeRound
 type SlopeRun: build/index.d.ts#SlopeRun
 type SlopeRung: build/index.d.ts#SlopeRung
 type SlopeVerdict: build/index.d.ts#SlopeVerdict
+type SlowCount: build/index.d.ts#SlowCount
 type SpreadRead: build/index.d.ts#SpreadRead
 type TailFalseFails: build/index.d.ts#TailFalseFails
 type TailGainCase: build/index.d.ts#TailGainCase
@@ -290,6 +293,7 @@ pooledBand: build/index.d.ts#pooledBand
 pooledLimitVerdict: build/index.d.ts#pooledLimitVerdict
 pooledVerdict: build/index.d.ts#pooledVerdict
 processCaseLine: build/index.d.ts#processCaseLine
+processLimits: build/index.d.ts#processLimits
 processNoiseCap: build/index.d.ts#processNoiseCap
 processVerdict: build/index.d.ts#processVerdict
 readNoise: build/index.d.ts#readNoise
@@ -1999,6 +2003,28 @@ interface ProcessLimits {
   readonly noiseCap?: number;
 }
 
+### build/index.d.ts#ProcessLimitsFit
+type ProcessLimitsFit = {
+  readonly source: "jobs";
+  readonly jobs: readonly string[];
+  readonly limits: ProcessLimits;
+  readonly median: RunLimit;
+  readonly slow: SlowCount;
+} | {
+  readonly source: "too few";
+  readonly jobs: readonly string[];
+};
+
+### build/index.d.ts#ProcessLimitsOptions
+interface ProcessLimitsOptions {
+  readonly k: number;
+  readonly minimum?: number;
+  readonly digits?: number;
+  readonly z?: number;
+  readonly risk?: number;
+  readonly noiseCap?: number;
+}
+
 ### build/index.d.ts#ProcessOptions
 interface ProcessOptions {
   readonly k: number;
@@ -2258,6 +2284,15 @@ interface SlopeVerdict {
   readonly limit: number;
   readonly holds: number | undefined;
   readonly band: number;
+}
+
+### build/index.d.ts#SlowCount
+interface SlowCount {
+  readonly above: number;
+  readonly reads: number;
+  readonly rate: Proportion;
+  readonly maxSlow: number;
+  readonly chance: number;
 }
 
 ### build/index.d.ts#SpreadRead
@@ -2612,6 +2647,9 @@ export declare function pooledVerdict(jobs: readonly JobRecords[], options?: Ver
 
 ### build/index.d.ts#processCaseLine
 export declare function processCaseLine(c: CaseProcesses): string;
+
+### build/index.d.ts#processLimits
+export declare function processLimits(jobs: readonly JobReads[], options: ProcessLimitsOptions): ProcessLimitsFit;
 
 ### build/index.d.ts#processNoiseCap
 export declare function processNoiseCap(jobs: readonly JobReads[], options: NoiseCapOptions): NoiseCap;

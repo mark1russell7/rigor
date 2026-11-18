@@ -172,6 +172,7 @@ export {
   runLimit,
 } from "./run-limit.ts";
 export { type JobDecide, type JobReads, type NoiseCap, type NoiseCapJobs, type NoiseCapOptions, processNoiseCap } from "./noise-cap.ts";
+export { type ProcessLimitsFit, type ProcessLimitsOptions, type SlowCount, processLimits } from "./process-limits.ts";
 export { type CaseWarm, type WarmArm, type WarmBand, type WarmCheck, type WarmOptions, type WarmRecord, type WarmVerdict, caseWarms, warmVerdict } from "./warm.ts";
 export { type Rounds, type RoundsOptions, timeRounds } from "./rounds.ts";
 export { type ArmRounds, type ArmRoundsOptions, type BatchSpan, type ProcessArm, timeArmRounds } from "./arm-rounds.ts";
