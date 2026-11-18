@@ -217,6 +217,26 @@ checkTestCertificateOptions: build/tls.d.ts#checkTestCertificateOptions
 testCertificates: build/tls.d.ts#testCertificates
 trustCertificate: build/tls.d.ts#trustCertificate
 
+## ./process-starts (build/process-starts.d.ts): names
+
+FileStarts: build/process-starts.d.ts#FileStarts
+StartBudgetOptions: build/process-starts.d.ts#StartBudgetOptions
+StartBudgets: build/process-starts.d.ts#StartBudgets
+commandName: build/process-starts.d.ts#commandName
+countProcessStarts: build/process-starts.d.ts#countProcessStarts
+lineCommandName: build/process-starts.d.ts#lineCommandName
+parseStartBudgets: build/process-starts.d.ts#parseStartBudgets
+startBudgetBreak: build/process-starts.d.ts#startBudgetBreak
+startKey: build/process-starts.d.ts#startKey
+startsIn: build/process-starts.d.ts#startsIn
+startsOf: build/process-starts.d.ts#startsOf
+startsReport: build/process-starts.d.ts#startsReport
+
+## ./git-fixture (build/git-fixture.d.ts): names
+
+GitFixtures: build/git-fixture.d.ts#GitFixtures
+gitFixtures: build/git-fixture.d.ts#gitFixtures
+
 ## Declarations
 
 ### build/arbitrary.d.ts#UniformDoubleOptions
@@ -438,6 +458,25 @@ export interface FakeRegistration {
 
 ### build/fakes.d.ts#createFakeEventTarget
 export declare function createFakeEventTarget(): FakeEventTarget;
+
+### build/git-fixture.d.ts#GitFixtures
+export interface GitFixtures {
+  readonly temp: string;
+  folder(): string;
+  write(root: string, files: Readonly<Record<string, unknown>>): void;
+  fixture(files: Readonly<Record<string, unknown>>): string;
+  git(root: string, ...args: string[]): string;
+  init(root: string): void;
+  stageAll(root: string): void;
+  commitAll(root: string, message?: string): void;
+  commitOf(root: string, branch?: string): string;
+  copy(root: string): string;
+  shared(key: string, build: () => string): string;
+  remove(): void;
+}
+
+### build/git-fixture.d.ts#gitFixtures
+export declare function gitFixtures(prefix: string): GitFixtures;
 
 ### build/http.d.ts#BodyPart
 export type BodyPart = string | Uint8Array;
@@ -741,6 +780,52 @@ export interface OtlpWaitOptions {
 
 ### build/otlp.d.ts#startOtlpCollector
 export declare function startOtlpCollector(): Promise<OtlpCollector>;
+
+### build/process-starts.d.ts#FileStarts
+export interface FileStarts {
+  readonly file: string;
+  readonly counts: Readonly<Record<string, number>>;
+}
+
+### build/process-starts.d.ts#StartBudgetOptions
+export interface StartBudgetOptions {
+  readonly command?: string;
+  readonly source?: string;
+  readonly advice?: string;
+}
+
+### build/process-starts.d.ts#StartBudgets
+export interface StartBudgets {
+  readonly default: number;
+  readonly files: Readonly<Record<string, number>>;
+}
+
+### build/process-starts.d.ts#commandName
+export declare function commandName(file: unknown): string;
+
+### build/process-starts.d.ts#countProcessStarts
+export declare function countProcessStarts(): Map<string, number>;
+
+### build/process-starts.d.ts#lineCommandName
+export declare function lineCommandName(line: unknown): string;
+
+### build/process-starts.d.ts#parseStartBudgets
+export declare function parseStartBudgets(text: string, source?: string): StartBudgets;
+
+### build/process-starts.d.ts#startBudgetBreak
+export declare function startBudgetBreak(file: string, counts: ReadonlyMap<string, number>, budgets: StartBudgets, options?: StartBudgetOptions): string | undefined;
+
+### build/process-starts.d.ts#startKey
+export declare function startKey(name: string, args: unknown): string;
+
+### build/process-starts.d.ts#startsIn
+export declare function startsIn(counts: ReadonlyMap<string, number>, name: string): number;
+
+### build/process-starts.d.ts#startsOf
+export declare function startsOf(name: string): number;
+
+### build/process-starts.d.ts#startsReport
+export declare function startsReport(rows: readonly FileStarts[]): string[];
 
 ### build/propagation.d.ts#GATE_NAMES
 export declare const GATE_NAMES: {
