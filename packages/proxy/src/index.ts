@@ -1,5 +1,6 @@
 export { REASONS, answerBytes } from "./answer.ts";
 export { type Applier, type FaultRecord, type Send, type Step, applierOf, splitBytes } from "./applier.ts";
+export { type ConnectionClose, type ConnectionPause, type ConnectionStep, type FaultConnection, connectionOf } from "./connection.ts";
 export {
   type Framer,
   type FramerPair,

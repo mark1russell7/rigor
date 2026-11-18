@@ -82,7 +82,7 @@ export function faultSection(): string {
   const heads = RECORD_HEADS.map((h) => `<th>${h}</th>`).join("");
   return `<section id="faults">
 <h2>Try a fault plan</h2>
-<p>A fault plan is data. Each fault has a connection, a direction, a point and a kind. <code>faultPlan</code> of <code>rigor-chaos</code> makes the plan from a seed, and <code>applierOf</code> of <code>rigor-proxy</code> applies it to the frames of each direction.</p>
+<p>A fault plan is data. Each fault has a connection, a direction, a point and a kind. <code>faultPlan</code> of <code>rigor-chaos</code> makes the plan from a seed, and <code>connectionOf</code> of <code>rigor-proxy</code> applies it to the frames of the two directions of each connection.</p>
 <p>Here, each direction has ${FRAMES} frames, ${FRAME_GAP_MS} ms apart. Each line goes from a frame that the proxy reads to a write of the proxy. The proxy applies the same code to real sockets.</p>
 <div class="card">
 <div class="controls">
