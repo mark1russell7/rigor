@@ -100,10 +100,12 @@ type GrowthVerdict: build/index.d.ts#GrowthVerdict
 type GuardRead: build/index.d.ts#GuardRead
 type JobAaStats: build/index.d.ts#JobAaStats
 type JobCost: build/index.d.ts#JobCost
+type JobDecide: build/index.d.ts#JobDecide
 type JobEnv: build/index.d.ts#JobEnv
 type JobLimitVerdict: build/index.d.ts#JobLimitVerdict
 type JobModel: build/index.d.ts#JobModel
 type JobModelsOptions: build/index.d.ts#JobModelsOptions
+type JobReads: build/index.d.ts#JobReads
 type JobRecords: build/index.d.ts#JobRecords
 type JobVerdict: build/index.d.ts#JobVerdict
 type JointClaim: build/index.d.ts#JointClaim
@@ -150,6 +152,9 @@ type ModuleListGaps: build/index.d.ts#ModuleListGaps
 NARROW_SPREAD_SHARE: build/index.d.ts#NARROW_SPREAD_SHARE
 type NoControl: build/index.d.ts#NoControl
 type NoFactor: build/index.d.ts#NoFactor
+type NoiseCap: build/index.d.ts#NoiseCap
+type NoiseCapJobs: build/index.d.ts#NoiseCapJobs
+type NoiseCapOptions: build/index.d.ts#NoiseCapOptions
 type NoiseCheck: build/index.d.ts#NoiseCheck
 type NotSlowerOptions: build/index.d.ts#NotSlowerOptions
 type NotSlowerRead: build/index.d.ts#NotSlowerRead
@@ -285,6 +290,7 @@ pooledBand: build/index.d.ts#pooledBand
 pooledLimitVerdict: build/index.d.ts#pooledLimitVerdict
 pooledVerdict: build/index.d.ts#pooledVerdict
 processCaseLine: build/index.d.ts#processCaseLine
+processNoiseCap: build/index.d.ts#processNoiseCap
 processVerdict: build/index.d.ts#processVerdict
 readNoise: build/index.d.ts#readNoise
 resultRows: build/index.d.ts#resultRows
@@ -1423,6 +1429,15 @@ interface JobCost {
   readonly extrapolated: readonly number[];
 }
 
+### build/index.d.ts#JobDecide
+interface JobDecide {
+  readonly job: string;
+  readonly median: number;
+  readonly reads: number;
+  readonly valid: number;
+  readonly decide: number;
+}
+
 ### build/index.d.ts#JobEnv
 interface JobEnv {
   readonly cpu: string;
@@ -1445,6 +1460,12 @@ interface JobModel {
 ### build/index.d.ts#JobModelsOptions
 interface JobModelsOptions {
   readonly cores?: boolean;
+}
+
+### build/index.d.ts#JobReads
+interface JobReads {
+  readonly job: string;
+  readonly reads: readonly ProcessRead[];
 }
 
 ### build/index.d.ts#JobRecords
@@ -1797,6 +1818,34 @@ interface NoControl {
 interface NoFactor extends GroupCounts {
   readonly factor: undefined;
   readonly reason: string;
+}
+
+### build/index.d.ts#NoiseCap
+type NoiseCap = (NoiseCapJobs & {
+  readonly source: "jobs";
+  readonly cap: number;
+  readonly quantile: Interval;
+  readonly decideRate: number;
+  readonly decides: readonly JobDecide[];
+}) | (NoiseCapJobs & {
+  readonly source: "too few";
+});
+
+### build/index.d.ts#NoiseCapJobs
+interface NoiseCapJobs {
+  readonly jobs: readonly string[];
+  readonly dropped: readonly DroppedJob[];
+}
+
+### build/index.d.ts#NoiseCapOptions
+interface NoiseCapOptions {
+  readonly k: number;
+  readonly processes?: number;
+  readonly level?: number;
+  readonly minimum?: number;
+  readonly cut?: number;
+  readonly digits?: number;
+  readonly bootstrap?: BootstrapOptions;
 }
 
 ### build/index.d.ts#NoiseCheck
@@ -2563,6 +2612,9 @@ export declare function pooledVerdict(jobs: readonly JobRecords[], options?: Ver
 
 ### build/index.d.ts#processCaseLine
 export declare function processCaseLine(c: CaseProcesses): string;
+
+### build/index.d.ts#processNoiseCap
+export declare function processNoiseCap(jobs: readonly JobReads[], options: NoiseCapOptions): NoiseCap;
 
 ### build/index.d.ts#processVerdict
 export declare function processVerdict(reads: readonly ProcessRead[], options: ProcessOptions): ProcessVerdict;
