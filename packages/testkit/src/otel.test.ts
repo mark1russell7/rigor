@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { logs as apiLogs, metrics, trace } from "@opentelemetry/api";
-import { logs } from "@opentelemetry/api-logs";
+import { logs, metrics, trace } from "@opentelemetry/api";
+import { logs as sdk2Logs } from "@opentelemetry/api-logs";
 import { BatchLogRecordProcessor, LoggerProvider, SimpleLogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { MeterProvider } from "@opentelemetry/sdk-metrics";
-import { BasicTracerProvider, SimpleSpanProcessor, type SpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { SimpleSpanProcessor, TracerProvider, type SpanProcessor } from "@opentelemetry/sdk-trace";
+import { logsApis } from "./logs-api.ts";
 import { captureTelemetry, type TelemetryCapture } from "./otel.ts";
 import type { PropagationCapture } from "./propagation.ts";
 
@@ -84,15 +85,15 @@ describe("captureTelemetry with the providers of the capture", () => {
       await capture.shutdown();
     };
 
-    apiLogs.getLogger("test").emit({ body: "through @opentelemetry/api" });
-    logs.getLogger("test").emit({ body: "through @opentelemetry/api-logs" });
+    logs.getLogger("test").emit({ body: "through @opentelemetry/api" });
+    sdk2Logs.getLogger("test").emit({ body: "through @opentelemetry/api-logs" });
     const both = ["through @opentelemetry/api", "through @opentelemetry/api-logs"];
     expect((await capture.logRecords()).map((record) => record.body)).toEqual(both);
 
     // After unregister(), neither API has the provider of the capture
     unregister();
-    apiLogs.getLogger("test").emit({ body: "late" });
     logs.getLogger("test").emit({ body: "late" });
+    sdk2Logs.getLogger("test").emit({ body: "late" });
     expect((await capture.logRecords()).map((record) => record.body)).toEqual(both);
   });
 
@@ -106,7 +107,7 @@ describe("captureTelemetry with the SDK of the program under test", () => {
   it("gets the records of the SDK that uses its exporters and its reader, and reset() removes all three", async () => {
     const capture = captureTelemetry({ sdk: "external" });
     // The SDK of the program under test, for example startNodeTelemetry() of otel-ts
-    const tracerProvider = new BasicTracerProvider({ spanProcessors: [new SimpleSpanProcessor(capture.spanExporter)] });
+    const tracerProvider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter: capture.spanExporter })] });
     const loggerProvider = new LoggerProvider({ processors: [new SimpleLogRecordProcessor({ exporter: capture.logExporter })] });
     const meterProvider = new MeterProvider({ readers: [capture.metricReader] });
     trace.setGlobalTracerProvider(tracerProvider);
@@ -131,21 +132,21 @@ describe("captureTelemetry with the SDK of the program under test", () => {
     expect(await recordsOf(capture)).toEqual({ spans: [], logs: [], metrics: [] });
   });
 
-  it("flushes an SDK that sets its logger provider in the logs API of @opentelemetry/api (the SDK 3)", async () => {
+  it("flushes an SDK 2 that sets its logger provider in the logs API of @opentelemetry/api-logs", async () => {
     const capture = captureTelemetry({ sdk: "external" });
     // A batch that does not export by itself: the records come only with the flush of the capture
     const loggerProvider = new LoggerProvider({ processors: [new BatchLogRecordProcessor({ exporter: capture.logExporter, scheduledDelayMillis: 3_600_000 })] });
-    apiLogs.setGlobalLoggerProvider(loggerProvider);
+    sdk2Logs.setGlobalLoggerProvider(loggerProvider);
     cleanup = async () => {
-      apiLogs.disable();
+      sdk2Logs.disable();
       await loggerProvider.shutdown();
     };
 
-    apiLogs.getLogger("test").emit({ body: "a log" });
+    sdk2Logs.getLogger("test").emit({ body: "a log" });
     expect(capture.logExporter.getFinishedLogRecords()).toEqual([]);
     expect((await capture.logRecords()).map((record) => record.body)).toEqual(["a log"]);
 
-    apiLogs.getLogger("test").emit({ body: "a second log" });
+    sdk2Logs.getLogger("test").emit({ body: "a second log" });
     await capture.reset();
     expect(await capture.logRecords()).toEqual([]);
   });
@@ -154,5 +155,27 @@ describe("captureTelemetry with the SDK of the program under test", () => {
     const capture = captureTelemetry({ sdk: "external" });
     await expect(capture.reset()).resolves.toBeUndefined();
     expect(await capture.spans()).toEqual([]);
+  });
+});
+
+describe("the logs APIs", () => {
+  const notFound = (): never => {
+    throw Object.assign(new Error("Cannot find module"), { code: "MODULE_NOT_FOUND" });
+  };
+
+  it("gives the API of @opentelemetry/api, then the API of @opentelemetry/api-logs of the program", () => {
+    expect(logsApis()).toEqual([logs, sdk2Logs]);
+    expect(logsApis()[1]).toBe(sdk2Logs);
+  });
+
+  it("gives only the API of @opentelemetry/api when the program does not install @opentelemetry/api-logs", () => {
+    expect(logsApis(notFound)).toEqual([logs]);
+  });
+
+  it("gives each other error of the load to the caller", () => {
+    const broken = (): never => {
+      throw new SyntaxError("Unexpected token");
+    };
+    expect(() => logsApis(broken)).toThrow(SyntaxError);
   });
 });

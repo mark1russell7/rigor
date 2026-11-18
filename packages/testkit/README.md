@@ -234,7 +234,7 @@ fc.assert(fc.property(uniformDouble({ min: -1, max: 1 }), (x) => simplify(x).ok)
 
 ## The propagation gate
 
-The entry `@mark1russell7/rigor-testkit/propagation` examines one claim: one context id goes from a client to a server. From there, it goes to the spans, the log records and the metrics. It uses the OpenTelemetry API only. Install `@opentelemetry/api` and `@opentelemetry/api-logs` to use it.
+The entry `@mark1russell7/rigor-testkit/propagation` examines one claim: one context id goes from a client to a server. From there, it goes to the spans, the log records and the metrics. It uses the OpenTelemetry API only. Install `@opentelemetry/api` 1.10 or later to use it. A program on the SDK 2 also installs `@opentelemetry/api-logs`.
 
 ```ts no-run
 import { localTransport, propagationGate, formatPropagationReport } from "@mark1russell7/rigor-testkit/propagation";
@@ -266,7 +266,7 @@ For each transport, the gate sets the value of `key` on the client side and make
 
 ## The capture of the OpenTelemetry SDK
 
-The entry `@mark1russell7/rigor-testkit/otel` gives the spans, the log records and the metric points of a test. Install `@opentelemetry/api`, `@opentelemetry/api-logs`, `@opentelemetry/sdk-trace-base`, `@opentelemetry/sdk-logs` and `@opentelemetry/sdk-metrics` to use it. The other entries do not load the SDK.
+The entry `@mark1russell7/rigor-testkit/otel` gives the spans, the log records and the metric points of a test. Install `@opentelemetry/api` 1.10 or later, and the SDK 3: `@opentelemetry/sdk-trace`, `@opentelemetry/sdk-logs` and `@opentelemetry/sdk-metrics`. The other entries do not load the SDK.
 
 ```ts no-run
 import { captureTelemetry } from "@mark1russell7/rigor-testkit/otel";
@@ -298,7 +298,10 @@ const report = await propagationGate({ key: "request.id", capture, transports })
 - The metric reader collects only when the test asks, with the delta temporality. Thus `metricPoints()` gives the points after the last collection.
 - `reset()` removes all spans, log records and metric points.
 - The capture is also a `PropagationCapture` of the propagation gate.
-- The capture serves the SDK 2 and the SDK 3 of OpenTelemetry. They use different logs APIs. The SDK 3 uses the logs API of `@opentelemetry/api` 1.10, and the SDK 2 uses `@opentelemetry/api-logs`. `register()` sets the logger provider in each of the two APIs. With `sdk: "external"`, `logRecords()` flushes the provider of each API. The propagation gate writes its log record through the API that has a provider.
+- The providers of the capture are the providers of the SDK 3. A program on the SDK 2 can use them too, because it writes through the API.
+- The SDK 3 uses the logs API of `@opentelemetry/api` 1.10, and the SDK 2 uses `@opentelemetry/api-logs`. The kit loads `@opentelemetry/api-logs` only when the program installs it.
+- `register()` sets the logger provider in each logs API of the program. With `sdk: "external"`, `logRecords()` flushes the provider of each API. The propagation gate writes its log record through each API that has a provider.
+- The support of `@opentelemetry/api-logs` is a bridge for the programs on the SDK 2. It ends when no user of the kit is on the SDK 2.
 
 ## A scripted HTTP server
 

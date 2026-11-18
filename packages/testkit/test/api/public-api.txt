@@ -733,7 +733,7 @@ export interface OwnSdkCaptureOptions {
 
 ### build/otel.d.ts#OwnSdkTelemetryCapture
 export interface OwnSdkTelemetryCapture extends TelemetryCapture {
-  readonly tracerProvider: BasicTracerProvider;
+  readonly tracerProvider: TracerProvider;
   readonly loggerProvider: LoggerProvider;
   readonly meterProvider: MeterProvider;
   register(): () => void;

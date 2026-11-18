@@ -8,8 +8,9 @@
  *
  * The object that `captureTelemetry()` returns is also a `PropagationCapture` of the entry `/propagation`.
  *
- * The capture serves the two logs APIs: the API of `@opentelemetry/api` (1.10 and later, used by the SDK 3) and
- * `@opentelemetry/api-logs` (used by the SDK 2).
+ * The providers of the capture are the providers of the SDK 3. The capture serves the two logs APIs: the API of
+ * `@opentelemetry/api` (1.10 and later, used by the SDK 3) and `@opentelemetry/api-logs` (used by the SDK 2), when the
+ * program installs it.
  *
  * @packageDocumentation
  */
@@ -22,7 +23,7 @@ import {
   type ReadableLogRecord,
 } from "@opentelemetry/sdk-logs";
 import { AggregationTemporality, MeterProvider, MetricReader, type MetricProducer, type ViewOptions } from "@opentelemetry/sdk-metrics";
-import { BasicTracerProvider, InMemorySpanExporter, SimpleSpanProcessor, type ReadableSpan, type SpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { InMemorySpanExporter, SimpleSpanProcessor, TracerProvider, type ReadableSpan, type SpanProcessor } from "@opentelemetry/sdk-trace";
 import { LOGS_APIS, registeredLoggerProviders } from "./logs-api.ts";
 
 /** A metric data point: the name of its metric and its attributes */
@@ -72,7 +73,7 @@ export interface TelemetryCapture {
 
 /** The records of the SDK for a test, with the providers that the capture made */
 export interface OwnSdkTelemetryCapture extends TelemetryCapture {
-  readonly tracerProvider: BasicTracerProvider;
+  readonly tracerProvider: TracerProvider;
   readonly loggerProvider: LoggerProvider;
   readonly meterProvider: MeterProvider;
   /**
@@ -168,7 +169,7 @@ export function captureTelemetry(options: OwnSdkCaptureOptions | ExternalSdkCapt
     };
   }
 
-  const tracerProvider = new BasicTracerProvider({ spanProcessors: [...(options.spanProcessors ?? []), new SimpleSpanProcessor(spanExporter)] });
+  const tracerProvider = new TracerProvider({ spanProcessors: [...(options.spanProcessors ?? []), new SimpleSpanProcessor({ exporter: spanExporter })] });
   const loggerProvider = new LoggerProvider({ processors: [...(options.logProcessors ?? []), new SimpleLogRecordProcessor({ exporter: logExporter })] });
   const meterProvider = new MeterProvider({ readers: [metricReader], views: [...(options.views ?? [])] });
   const flushOwn = async (): Promise<void> => {
