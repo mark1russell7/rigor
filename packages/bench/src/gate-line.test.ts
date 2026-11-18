@@ -2,7 +2,20 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { GATE_LINE_LIMIT, GATE_LINE_NAMES, armModels, gateLine, gateOf, isBlock, isNoRead, jobModels, writeGateLine } from "./index.ts";
+import {
+  GATE_LINE_LIMIT,
+  GATE_LINE_NAMES,
+  GATE_VERDICT_WORDS,
+  armModels,
+  gateLine,
+  gateOf,
+  gateVerdictWord,
+  isBlock,
+  isNoRead,
+  jobModels,
+  writeGateLine,
+  writeGateVerdict,
+} from "./index.ts";
 
 const ONE = armModels([{ a: "AMD EPYC 7763", b: "AMD EPYC 7763" }]);
 const MIXED = armModels([
@@ -286,5 +299,45 @@ describe("writeGateLine", () => {
     const out = writeGateLine(gateLine([], { title: "t" }), { log: (s) => lines.push(s), summary: "" });
     expect(lines).toHaveLength(1);
     expect(out?.summary).toContain("**No read.**");
+  });
+});
+
+describe("writeGateVerdict", () => {
+  it("gives the word of each gate outcome, and each word is one of GATE_VERDICT_WORDS", () => {
+    expect(gateVerdictWord("pass")).toBe("pass");
+    expect(gateVerdictWord("block")).toBe("block");
+    expect(gateVerdictWord("no read")).toBe("no-read");
+    expect(GATE_VERDICT_WORDS).toEqual(["pass", "block", "no-read"]);
+  });
+
+  it("adds one line for each gate to the file, and the outcome of gateOf decides the word", () => {
+    const dir = mkdtempSync(join(tmpdir(), "gate-verdict-"));
+    try {
+      const file = join(dir, "verdicts.txt");
+      expect(writeGateVerdict(gateOf([{ case: "a", outcome: "within" }]).outcome, file)).toBe("pass");
+      expect(writeGateVerdict(gateOf([{ case: "a", outcome: "cannot decide" }]).outcome, file)).toBe("no-read");
+      expect(writeGateVerdict(gateOf([]).outcome, file)).toBe("no-read");
+      expect(writeGateVerdict(gateOf([{ case: "a", outcome: "beyond" }, { case: "b", outcome: "cannot decide" }]).outcome, file)).toBe("block");
+      expect(readFileSync(file, "utf8")).toBe("pass\nno-read\nno-read\nblock\n");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("takes the file of the variable GATE_VERDICT_FILE, and writes nothing with no file", () => {
+    const dir = mkdtempSync(join(tmpdir(), "gate-verdict-"));
+    try {
+      const file = join(dir, "verdicts.txt");
+      vi.stubEnv("GATE_VERDICT_FILE", file);
+      expect(writeGateVerdict("block")).toBe("block");
+      expect(readFileSync(file, "utf8")).toBe("block\n");
+      vi.stubEnv("GATE_VERDICT_FILE", "");
+      expect(writeGateVerdict("pass")).toBeUndefined();
+      expect(writeGateVerdict("pass", undefined)).toBeUndefined();
+      expect(readFileSync(file, "utf8")).toBe("block\n");
+    } finally {
+      vi.unstubAllEnvs();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

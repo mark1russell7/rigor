@@ -88,6 +88,29 @@ describe("gateLineCli", () => {
     expect(io.out[0]?.startsWith("::error ")).toBe(true);
   });
 
+  it("adds the verdict of an enforced read to the verdict file, and no verdict for a read that only reports", () => {
+    const verdicts = join(dir, "verdicts.txt");
+    const own = join(dir, "own.txt");
+    const run = (outcomes: readonly string[], enforced: boolean, argv: string[] = []): number =>
+      gateLineCli(argv, fakeIo({}, JSON.stringify({ reads: outcomes.map((outcome, i) => ({ case: `c${i}`, outcome })), options: { title: "t", enforced } }), { GATE_VERDICT_FILE: verdicts }));
+    expect(run(["within", "within"], true)).toBe(0);
+    expect(run(["within", "beyond", "cannot decide"], true)).toBe(0);
+    expect(run(["within", "no read"], true)).toBe(0);
+    expect(run([], true)).toBe(0);
+    expect(run(["beyond"], false)).toBe(0);
+    expect(readFileSync(verdicts, "utf8")).toBe("pass\nblock\nno-read\nno-read\n");
+    // The flag --verdict comes before the variable.
+    expect(run(["slower"], true, ["--verdict", own])).toBe(0);
+    expect(readFileSync(own, "utf8")).toBe("block\n");
+    expect(readFileSync(verdicts, "utf8")).toBe("pass\nblock\nno-read\nno-read\n");
+  });
+
+  it("writes no verdict with no verdict file", () => {
+    const io = fakeIo({}, JSON.stringify({ reads: [{ case: "a", outcome: "within" }], options: { title: "t", enforced: true } }), { GATE_VERDICT_FILE: "" });
+    expect(gateLineCli([], io)).toBe(0);
+    expect(io.err).toEqual([]);
+  });
+
   it("gives the help with exit code 0", () => {
     const io = fakeIo({});
     expect(gateLineCli(["--help"], io)).toBe(0);

@@ -77,6 +77,7 @@ GATE_LINE_HELP: build/index.d.ts#GATE_LINE_HELP
 GATE_LINE_LIMIT: build/index.d.ts#GATE_LINE_LIMIT
 GATE_LINE_NAMES: build/index.d.ts#GATE_LINE_NAMES
 GATE_LOOKS: build/index.d.ts#GATE_LOOKS
+GATE_VERDICT_WORDS: build/index.d.ts#GATE_VERDICT_WORDS
 type Gate: build/index.d.ts#Gate
 type GateCaseOutcome: build/index.d.ts#GateCaseOutcome
 type GateJobRead: build/index.d.ts#GateJobRead
@@ -88,6 +89,7 @@ type GateLineOptions: build/index.d.ts#GateLineOptions
 type GateLineOutputs: build/index.d.ts#GateLineOutputs
 type GateLineWritten: build/index.d.ts#GateLineWritten
 type GateOutcome: build/index.d.ts#GateOutcome
+type GateVerdictWord: build/index.d.ts#GateVerdictWord
 type GroupCounts: build/index.d.ts#GroupCounts
 type GroupFactor: build/index.d.ts#GroupFactor
 type GroupJobs: build/index.d.ts#GroupJobs
@@ -268,6 +270,7 @@ freezeLimits: build/index.d.ts#freezeLimits
 gateLine: build/index.d.ts#gateLine
 gateLineCli: build/index.d.ts#gateLineCli
 gateOf: build/index.d.ts#gateOf
+gateVerdictWord: build/index.d.ts#gateVerdictWord
 growthVerdict: build/index.d.ts#growthVerdict
 isBlock: build/index.d.ts#isBlock
 isNoRead: build/index.d.ts#isNoRead
@@ -319,6 +322,7 @@ visibleShift: build/index.d.ts#visibleShift
 warmVerdict: build/index.d.ts#warmVerdict
 winClaim: build/index.d.ts#winClaim
 writeGateLine: build/index.d.ts#writeGateLine
+writeGateVerdict: build/index.d.ts#writeGateVerdict
 
 ## ./code-stamp (build/code-stamp.d.ts): names
 
@@ -1265,6 +1269,9 @@ export declare const GATE_LINE_NAMES: number;
 ### build/index.d.ts#GATE_LOOKS
 export declare const GATE_LOOKS: readonly number[];
 
+### build/index.d.ts#GATE_VERDICT_WORDS
+export declare const GATE_VERDICT_WORDS: readonly ["pass", "block", "no-read"];
+
 ### build/index.d.ts#Gate
 interface Gate {
   readonly outcome: GateOutcome;
@@ -1345,6 +1352,9 @@ interface GateLineWritten {
 
 ### build/index.d.ts#GateOutcome
 type GateOutcome = "pass" | "block" | "no read";
+
+### build/index.d.ts#GateVerdictWord
+type GateVerdictWord = (typeof GATE_VERDICT_WORDS)[number];
 
 ### build/index.d.ts#GroupCounts
 interface GroupCounts {
@@ -2576,6 +2586,9 @@ export declare function gateLineCli(argv: readonly string[], io: GateLineCliIo):
 ### build/index.d.ts#gateOf
 export declare function gateOf(cases: readonly GateCaseOutcome[]): Gate;
 
+### build/index.d.ts#gateVerdictWord
+export declare function gateVerdictWord(outcome: GateOutcome): GateVerdictWord;
+
 ### build/index.d.ts#growthVerdict
 export declare function growthVerdict(rounds: readonly GrowthRound[], options: GrowthOptions): GrowthVerdict;
 
@@ -2725,6 +2738,9 @@ export declare function winClaim(check: MeasureChecks, measure: string, entry: s
 
 ### build/index.d.ts#writeGateLine
 export declare function writeGateLine(line: GateLine | undefined, outputs?: GateLineOutputs): GateLineWritten | undefined;
+
+### build/index.d.ts#writeGateVerdict
+export declare function writeGateVerdict(outcome: GateOutcome, file?: string | undefined): GateVerdictWord | undefined;
 
 ### build/paired.d.ts#Arm
 type Arm = "a" | "b";
