@@ -60,8 +60,9 @@ describe("childLine", () => {
   });
 
   it("reads the memory peak, the warm check and the events of a child", () => {
-    const line = { ms: 2, hash: "h", peakRss: 4096, warm: 0.98, events: { gc: [3, 1], gcMs: [1.5, 0.25], deopt: [0, 2] }, other: "kept" };
-    expect(childLine(JSON.stringify(line))).toEqual({ ms: 2, hash: "h", peakRss: 4096, warm: 0.98, events: { gc: [3, 1], gcMs: [1.5, 0.25], deopt: [0, 2] }, extra: { other: "kept" } });
+    const events = { gc: [3, 1], gcMs: [1.5, 0.25], gcMaxMs: [0.75, 0.25], deopt: [0, 2] };
+    const line = { ms: 2, hash: "h", peakRss: 4096, warm: 0.98, events, other: "kept" };
+    expect(childLine(JSON.stringify(line))).toEqual({ ms: 2, hash: "h", peakRss: 4096, warm: 0.98, events, extra: { other: "kept" } });
     expect(childLine('{"ms":2,"events":{"gc":[0,0]}}')).toEqual({ ms: 2, events: { gc: [0, 0] } });
     // A skip line keeps only its reason, its time and its hash.
     expect(childLine('{"skipped":"too large","peakRss":1}')).toEqual({ skipped: "too large" });
@@ -84,6 +85,7 @@ describe("childLine", () => {
     }
     for (const gcMs of ["[1]", "[1,-0.5]", '[1,"2"]', "[1,null]", "{}"]) {
       expect(() => childLine(`{"ms":1,"events":{"gc":[1,1],"gcMs":${gcMs}}}`)).toThrow(/GC time gcMs/);
+      expect(() => childLine(`{"ms":1,"events":{"gc":[1,1],"gcMaxMs":${gcMs}}}`)).toThrow(/longest GC event gcMaxMs/);
     }
   });
 });
@@ -433,9 +435,12 @@ describe("freshRun", () => {
       expect(fields.warm).toBeGreaterThan(0);
       expect(fields.events!.gc.every((n) => Number.isSafeInteger(n) && n >= 0)).toBe(true);
       // A half without GC events has no GC time
-      const { gc, gcMs } = fields.events!;
+      const { gc, gcMs, gcMaxMs } = fields.events!;
       expect(gcMs).toHaveLength(2);
+      expect(gcMaxMs).toHaveLength(2);
       for (const half of [0, 1]) expect(gcMs![half]! >= 0 && (gc[half]! > 0 || gcMs![half] === 0)).toBe(true);
+      // The longest event of a half is part of its sum, and a half with no GC event has no longest event
+      for (const half of [0, 1]) expect(gcMaxMs![half]! <= gcMs![half]! && (gc[half]! > 0 || gcMaxMs![half] === 0)).toBe(true);
       expect(fields.events!.deopt).toHaveLength(2);
     }
   });
@@ -453,9 +458,13 @@ describe("freshRun", () => {
     const stdout = execFileSync(process.execPath, ["--expose-gc", "--input-type=module", "-e", script], { encoding: "utf8" });
     const line = childLine(stdout);
     if (line.skipped !== undefined) throw new Error("the child skipped");
-    const { gc, gcMs } = line.events!;
+    const { gc, gcMs, gcMaxMs } = line.events!;
     expect(gc[0]).toBeGreaterThanOrEqual(1);
     expect(gcMs![0]).toBeGreaterThan(0);
+    expect(gcMaxMs![0]).toBeGreaterThan(0);
+    expect(gcMaxMs![0]).toBeLessThanOrEqual(gcMs![0]!);
+    // A half with no GC event has no longest event
+    if (gc[1] === 0) expect(gcMaxMs![1]).toBe(0);
   });
 
   // The grandchild inherits stdout and keeps the pipe open.
