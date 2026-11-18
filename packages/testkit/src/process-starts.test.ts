@@ -1,10 +1,13 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import {
+  budgetOf,
   commandName,
   countProcessStarts,
   lineCommandName,
   parseStartBudgets,
+  ranInFull,
+  type SuiteTask,
   startBudgetBreak,
   startKey,
   startsIn,
@@ -80,6 +83,34 @@ describe("the start budgets", () => {
   it("counts the command of the options", () => {
     expect(startBudgetBreak("src/b.test.ts", new Map([["git", 9], ["pnpm", 2]]), budgets, { command: "pnpm" })).toBeUndefined();
     expect(startBudgetBreak("src/b.test.ts", new Map([["pnpm", 3]]), budgets, { command: "pnpm" })).toMatch(/started pnpm 3 times/);
+  });
+
+  it("gives the budget of a count: the next multiple of the step above it", () => {
+    expect([0, 9, 10, 26, 640].map((count) => budgetOf(count))).toEqual([10, 10, 20, 30, 650]);
+    expect(budgetOf(26, 5)).toBe(30);
+    expect(budgetOf(25, 5)).toBe(30);
+  });
+
+  it("breaks a file budget well above the count of a file that passed in full, so each gain stays held", () => {
+    const held = parseStartBudgets(JSON.stringify({ default: 20, files: { "src/a.test.ts": 40 } }));
+    const options = { inFull: true, source: "starts.json" };
+    expect(startBudgetBreak("src/a.test.ts", new Map([["git-add", 35]]), held, options)).toBeUndefined();
+    expect(startBudgetBreak("src/a.test.ts", new Map([["git-add", 30]]), held, options)).toBeUndefined();
+    expect(startBudgetBreak("src/a.test.ts", new Map([["git-add", 29]]), held, options)).toBe(
+      "src/a.test.ts started git 29 times, well under its budget of 40 in starts.json. Lower its budget to 30. Thus the gain stays held.",
+    );
+    expect(startBudgetBreak("src/a.test.ts", new Map([["git-add", 5]]), held, options)).toContain("Remove its entry: the default budget of 20 covers it.");
+    expect(startBudgetBreak("src/a.test.ts", new Map([["git-add", 5]]), held)).toBeUndefined();
+    expect(startBudgetBreak("src/a.test.ts", new Map([["git-add", 34]]), held, { ...options, step: 5 })).toContain("Lower its budget to 35.");
+    expect(startBudgetBreak("src/b.test.ts", new Map(), held, options)).toBeUndefined();
+  });
+
+  it("tells a file that passed in full from a file with a filter, a skip or a failed test", () => {
+    const pass = (mode = "run"): SuiteTask => ({ type: "test", mode, result: { state: "pass" } });
+    expect(ranInFull([pass(), { type: "suite", mode: "run", tasks: [pass(), pass("only")] }])).toBe(true);
+    expect(ranInFull([pass(), { type: "suite", mode: "run", tasks: [pass("skip")] }])).toBe(false);
+    expect(ranInFull([pass(), { type: "test", mode: "run", result: { state: "fail" } }])).toBe(false);
+    expect(ranInFull([{ type: "test", mode: "run" }])).toBe(false);
   });
 
   it("refuses a budget that is not a count, and names the file", () => {

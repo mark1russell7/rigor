@@ -222,10 +222,13 @@ trustCertificate: build/tls.d.ts#trustCertificate
 FileStarts: build/process-starts.d.ts#FileStarts
 StartBudgetOptions: build/process-starts.d.ts#StartBudgetOptions
 StartBudgets: build/process-starts.d.ts#StartBudgets
+SuiteTask: build/process-starts.d.ts#SuiteTask
+budgetOf: build/process-starts.d.ts#budgetOf
 commandName: build/process-starts.d.ts#commandName
 countProcessStarts: build/process-starts.d.ts#countProcessStarts
 lineCommandName: build/process-starts.d.ts#lineCommandName
 parseStartBudgets: build/process-starts.d.ts#parseStartBudgets
+ranInFull: build/process-starts.d.ts#ranInFull
 startBudgetBreak: build/process-starts.d.ts#startBudgetBreak
 startKey: build/process-starts.d.ts#startKey
 startsIn: build/process-starts.d.ts#startsIn
@@ -792,6 +795,8 @@ export interface StartBudgetOptions {
   readonly command?: string;
   readonly source?: string;
   readonly advice?: string;
+  readonly inFull?: boolean;
+  readonly step?: number;
 }
 
 ### build/process-starts.d.ts#StartBudgets
@@ -799,6 +804,19 @@ export interface StartBudgets {
   readonly default: number;
   readonly files: Readonly<Record<string, number>>;
 }
+
+### build/process-starts.d.ts#SuiteTask
+export interface SuiteTask {
+  readonly type: string;
+  readonly mode: string;
+  readonly result?: {
+    readonly state?: string;
+  } | undefined;
+  readonly tasks?: readonly SuiteTask[];
+}
+
+### build/process-starts.d.ts#budgetOf
+export declare function budgetOf(count: number, step?: number): number;
 
 ### build/process-starts.d.ts#commandName
 export declare function commandName(file: unknown): string;
@@ -811,6 +829,9 @@ export declare function lineCommandName(line: unknown): string;
 
 ### build/process-starts.d.ts#parseStartBudgets
 export declare function parseStartBudgets(text: string, source?: string): StartBudgets;
+
+### build/process-starts.d.ts#ranInFull
+export declare function ranInFull(tasks: readonly SuiteTask[]): boolean;
 
 ### build/process-starts.d.ts#startBudgetBreak
 export declare function startBudgetBreak(file: string, counts: ReadonlyMap<string, number>, budgets: StartBudgets, options?: StartBudgetOptions): string | undefined;
