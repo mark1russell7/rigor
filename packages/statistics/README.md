@@ -275,6 +275,7 @@ In the tests, the series are AR(1) with 200 readings and the slope 0.6. There, t
 | `modeCount(values, { minShare, valleyRatio })` | The count of the modes of a sample, from a kernel density estimate. |
 | `smoothLawScores(values)`, `bestSmoothLaw(values)` | The mean log density of the uniform, normal, exponential, log-normal and Pareto laws at their fits, and the best of them. |
 | `brier`, `calibration` | The Brier score of predictions, and the hit rate of each stated level. |
+| `reliability(forecasts, { bins })`, `calibrationError(forecasts, { bins })` | The hit rate of each bin of equal width from 0 to 1, with its Wilson interval, and the expected calibration error. The default is 10 bins. A p of 1 is in the last bin. Use them for continuous probabilities. |
 | `totalCalibration(forecasts)` | The count of hits of independent predictions against the sum of their chances: `expected`, `hits`, `sd`, `z`, `within2`, and exact p values. |
 | `logLoss(forecasts)` | The mean log-loss of predictions, with the natural log. A p of 0 for a hit gives Infinity. |
 | `eloExpected(ra, rb, { scale, base })`, `eloUpdate(ra, rb, score, { k, scale, base })` | The expected score of the first item, and the ratings of a pair after one result. The defaults are 400, 10 and a `k` of 32. |

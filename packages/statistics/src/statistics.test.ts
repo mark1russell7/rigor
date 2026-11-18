@@ -7,6 +7,7 @@ import {
   bootstrapMedian,
   brier,
   calibration,
+  calibrationError,
   compareRatios,
   holm,
   partialConjunction,
@@ -20,6 +21,7 @@ import {
   quantile,
   quantileSorted,
   ranks,
+  reliability,
   sd,
   signTest,
   signTestPower,
@@ -490,6 +492,84 @@ describe("the calibration", () => {
       [0.8, 3, 2],
     ]);
     expect(() => brier([{ p: 1.2, hit: true }])).toThrow(RangeError);
+  });
+
+  const many = (p: number, n: number, hits: number) => Array.from({ length: n }, (_, i) => ({ p, hit: i < hits }));
+
+  it("gives a calibration error of 0 for calibrated bins", () => {
+    const f = [...many(0.25, 4, 1), ...many(0.5, 2, 1), ...many(0.75, 8, 6)];
+    expect(calibrationError(f)).toBe(0);
+    expect(reliability(f).map((b) => [b.low, b.n, b.stated, b.hits, b.rate])).toEqual([
+      [0.2, 4, 0.25, 1, 0.25],
+      [0.5, 2, 0.5, 1, 0.5],
+      [0.7, 8, 0.75, 6, 0.75],
+    ]);
+  });
+
+  it("gives a calibration error of 0.4 for a p of 0.9 with a hit rate of 0.5", () => {
+    const f = many(0.9, 10, 5);
+    expect(calibrationError(f)).toBeCloseTo(0.4, 12);
+    const [bin] = reliability(f);
+    expect(bin!.interval).toEqual(wilson(5, 10));
+    expect(bin!.stated).toBeCloseTo(0.9, 12);
+  });
+
+  it("puts a p of 1 in the last bin and a p of 0 in the first bin", () => {
+    const bins = reliability([
+      { p: 1, hit: true },
+      { p: 0, hit: false },
+    ]);
+    expect(bins.map((b) => [b.low, b.high, b.n])).toEqual([
+      [0, 0.1, 1],
+      [0.9, 1, 1],
+    ]);
+    expect(calibrationError([{ p: 1, hit: true }])).toBe(0);
+  });
+
+  it("uses the bins of the option", () => {
+    const f = [
+      { p: 0.1, hit: false },
+      { p: 0.3, hit: true },
+      { p: 0.6, hit: true },
+      { p: 0.8, hit: false },
+    ];
+    expect(reliability(f).length).toBe(4);
+    expect(reliability(f, { bins: 2 }).map((b) => [b.low, b.high, b.n, b.hits])).toEqual([
+      [0, 0.5, 2, 1],
+      [0.5, 1, 2, 1],
+    ]);
+    expect(calibrationError(f, { bins: 2 })).toBeCloseTo(0.5 * 0.3 + 0.5 * 0.2, 12);
+    expect(calibrationError(f, { bins: 1 })).toBeCloseTo(0.05, 12);
+  });
+
+  it("throws a RangeError for bad input", () => {
+    const f = [{ p: 0.5, hit: true }];
+    for (const run of [reliability, calibrationError]) {
+      expect(() => run([])).toThrow(RangeError);
+      expect(() => run([{ p: 1.2, hit: true }])).toThrow(RangeError);
+      expect(() => run([{ p: -0.1, hit: true }])).toThrow(RangeError);
+      expect(() => run([{ p: Number.NaN, hit: true }])).toThrow(RangeError);
+      for (const bins of [0, -1, 2.5, Number.NaN, Number.POSITIVE_INFINITY]) expect(() => run(f, { bins })).toThrow(RangeError);
+    }
+  });
+
+  it("splits the predictions into ordered bins, with an error from 0 to 1", () => {
+    const forecast = fc.record({ p: fc.double({ min: 0, max: 1, noNaN: true }), hit: fc.boolean() });
+    fc.assert(
+      fc.property(fc.array(forecast, { minLength: 1, maxLength: 60 }), fc.integer({ min: 1, max: 40 }), (f, bins) => {
+        const table = reliability(f, { bins });
+        expect(table.reduce((s, b) => s + b.n, 0)).toBe(f.length);
+        expect(table.reduce((s, b) => s + b.hits, 0)).toBe(f.filter((x) => x.hit).length);
+        for (let i = 1; i < table.length; i++) expect(table[i]!.low).toBeGreaterThan(table[i - 1]!.low);
+        const error = calibrationError(f, { bins });
+        expect(error).toBeGreaterThanOrEqual(0);
+        expect(error).toBeLessThanOrEqual(1);
+        const meanP = f.reduce((s, x) => s + x.p, 0) / f.length;
+        const rate = f.filter((x) => x.hit).length / f.length;
+        expect(calibrationError(f, { bins: 1 })).toBeCloseTo(Math.abs(meanP - rate), 12);
+      }),
+      { seed: 61, numRuns: 500 },
+    );
   });
 });
 
