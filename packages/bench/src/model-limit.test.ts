@@ -169,7 +169,7 @@ describe("limitChanges", () => {
   it("refuses a change of the rule or the measure with no new ruleReason", () => {
     expect(limitChanges(frozen, { ...frozen, rule: { ...frozen.rule, k: 4 } }).refused).toEqual(["the rule or the measure changed with no new ruleReason"]);
     expect(limitChanges(frozen, { ...frozen, measure: "the p50 ms" }).refused).toHaveLength(1);
-    expect(limitChanges(frozen, { ...frozen, rule: { ...frozen.rule, k: 4 }, ruleReason: "the strategist set k to 4" }).refused).toEqual([]);
+    expect(limitChanges(frozen, { ...frozen, rule: { ...frozen.rule, k: 4 }, ruleReason: "a review set k to 4" }).refused).toEqual([]);
     expect(() => limitChanges(frozen, { ...frozen, format: "x" as typeof MODEL_LIMITS_FORMAT })).toThrow(/format/);
   });
 });
