@@ -79,6 +79,13 @@ describe("the histogram", () => {
     expect(addAllToHistogram(h, [])).toBe(h);
   });
 
+  it("keeps the extremes of an empty histogram that went through JSON", () => {
+    const saved = JSON.parse(JSON.stringify(emptyHistogram())) as ReturnType<typeof emptyHistogram>;
+    expect(addToHistogram(saved, 5)).toMatchObject({ n: 1, min: 5, max: 5 });
+    expect(addToHistogram(saved, -5)).toMatchObject({ n: 1, min: -5, max: -5 });
+    expect(histogramQuantile(addAllToHistogram(saved, [-5, -3]), 0)).toBe(-5);
+  });
+
   it("uses a count of buckets that grows with the logarithm of the range", () => {
     const h = histogramOf(Array.from({ length: 100_000 }, (_, i) => 10_000 ** (i / 99_999)));
     expect(h.positive.length).toBe(462);

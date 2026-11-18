@@ -88,6 +88,8 @@ export function addAllToHistogram(h: Histogram, values: Iterable<number>): Histo
   const positive = countsOf(h.positive);
   const negative = countsOf(h.negative);
   let { n, sum, min, max, zeros } = h;
+  // JSON writes Infinity as null. Thus an empty histogram from JSON starts from the extremes of no value, as here.
+  if (n === 0) [min, max] = [Infinity, -Infinity];
   for (const raw of values) {
     const value = checkedValue("addAllToHistogram", raw);
     n++;
