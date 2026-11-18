@@ -345,6 +345,8 @@ describe("a scripted XMPP server", () => {
     await closing.closed;
     expect(server.connections.map((record) => record.error)).toEqual(["host-unknown", "not-authorized", "not-well-formed", "not-well-formed", "system-shutdown"]);
     expect(server.connections[4]?.steps).toBe(1);
+    // The close event of the server socket can come after the close of the client. close() waits for it.
+    await server.close();
     expect(server.connections[4]?.closedAt).toBeGreaterThan(0);
   });
 
