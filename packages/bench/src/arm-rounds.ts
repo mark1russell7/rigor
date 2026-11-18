@@ -34,8 +34,20 @@ export interface ArmRoundsOptions {
   readonly targetMs?: number;
   /** The time in milliseconds of the warm-up of the arms. The default is 1000. */
   readonly warmMs?: number;
+  /**
+   * The count of untimed batches of each arm before its timed batch, in each round. The default is 0.
+   * No batch of another arm comes between them.
+   * These batches put the code and the data of the arm back in the caches after the other arms.
+   */
+  readonly warmBatches?: number;
   /** The clock in milliseconds. The default is `performance.now` of the global `performance` of Node and of each browser. */
   readonly now?: () => number;
+}
+
+/** The start and the end of one timed batch, in milliseconds of the clock `now`. */
+export interface BatchSpan {
+  readonly start: number;
+  readonly end: number;
 }
 
 /** The result of the timed rounds of one case with a base arm and one or more candidate arms. */
@@ -44,6 +56,11 @@ export interface ArmRounds {
   readonly pairs: Record<string, PairedTime[]>;
   /** The ids of the arms in the order of their batches, for each round. */
   readonly orders: readonly (readonly string[])[];
+  /**
+   * The start and the end of each timed batch, in the layout of `orders`. The time of a batch in `pairs` is its end less its start.
+   * The clock also times the warm-up and the calibration. Thus a reader of the marks of the clock uses these spans to find the timed batches.
+   */
+  readonly spans: readonly (readonly BatchSpan[])[];
   /** The count of calls of each arm in one batch. */
   readonly count: number;
   /** The sum of the numbers that the arms gave. The engine cannot remove the work of a call, because this sum uses it. */
@@ -59,6 +76,8 @@ function armsOf(options: ArmRoundsOptions): ProcessArm[] {
   const offset = options.offset ?? 0;
   const targetMs = options.targetMs ?? 10;
   const warmMs = options.warmMs ?? 1000;
+  const warmBatches = options.warmBatches ?? 0;
+  if (!Number.isSafeInteger(warmBatches) || warmBatches < 0) throw new RangeError(`timeArmRounds: the warm batches are a whole number of 0 or more, not ${warmBatches}.`);
   if (!Number.isSafeInteger(rounds) || rounds < 1) throw new RangeError(`timeArmRounds: the rounds are a whole number of 1 or more, not ${rounds}.`);
   if (!Number.isSafeInteger(offset)) throw new RangeError(`timeArmRounds: the offset is a whole number, not ${offset}.`);
   if (!(targetMs > 0) || !(warmMs >= 0)) throw new RangeError("timeArmRounds: the target time is above 0, and the warm-up time is 0 or more.");
@@ -80,7 +99,9 @@ function armsOf(options: ArmRoundsOptions): ProcessArm[] {
  * - The arms first operate in turn for the warm-up time. Then the count of calls of one batch grows until a batch of the base takes the target time.
  * - Each round times one batch of each arm. The order is `armOrder` of the arms, turned by `offset` first.
  *   Thus the two arms of each pair have each order one time in each two rounds.
+ * - With `warmBatches`, each arm first operates its untimed batches, and then its timed batch, in each round.
  * - Each candidate pair and the A/A pair use the one base batch of the round. The first arm of a record is the arm of its pair that came first.
+ * - The result keeps the start and the end of each timed batch in `spans`.
  * - Each call of an arm gives a number, and the sum of these numbers keeps the work.
  */
 export function timeArmRounds(options: ArmRoundsOptions): ArmRounds {
@@ -90,14 +111,19 @@ export function timeArmRounds(options: ArmRoundsOptions): ArmRounds {
   const turned = [...arms.slice(shift), ...arms.slice(0, shift)];
   const targetMs = options.targetMs ?? 10;
   const warmMs = options.warmMs ?? 1000;
+  const warmBatches = options.warmBatches ?? 0;
   const now = options.now ?? (() => performance.now());
   const [base, ...others] = arms as [ProcessArm, ...ProcessArm[]];
   let sink = 0;
-  const batch = (arm: ProcessArm, count: number): number => {
+  const span = (arm: ProcessArm, count: number): BatchSpan => {
     const run = arm.run;
     const start = now();
     for (let i = 0; i < count; i++) sink += run();
-    return now() - start;
+    return { start, end: now() };
+  };
+  const batch = (arm: ProcessArm, count: number): number => {
+    const { start, end } = span(arm, count);
+    return end - start;
   };
   let count = 1;
   const warmUntil = now() + warmMs;
@@ -108,19 +134,25 @@ export function timeArmRounds(options: ArmRoundsOptions): ArmRounds {
   while (batch(base, count) < targetMs) count *= 2;
   const pairs: Record<string, PairedTime[]> = Object.fromEntries(others.map((arm) => [arm.id, []]));
   const orders: string[][] = [];
+  const spans: BatchSpan[][] = [];
   for (let round = 0; round < rounds; round++) {
     const order = armOrder(turned, round);
     const times = new Map<string, number>();
     const place = new Map<string, number>();
+    const row: BatchSpan[] = [];
     for (const [index, arm] of order.entries()) {
-      times.set(arm.id, batch(arm, count));
+      for (let w = 0; w < warmBatches; w++) batch(arm, count);
+      const timed = span(arm, count);
+      times.set(arm.id, timed.end - timed.start);
       place.set(arm.id, index);
+      row.push(timed);
     }
     orders.push(order.map((arm) => arm.id));
+    spans.push(row);
     for (const arm of others) {
       const first = (place.get(base.id) as number) < (place.get(arm.id) as number) ? "a" : "b";
       pairs[arm.id]?.push({ case: options.case, round, first, a: times.get(base.id) as number, b: times.get(arm.id) as number });
     }
   }
-  return { pairs, orders, count, sink };
+  return { pairs, orders, spans, count, sink };
 }

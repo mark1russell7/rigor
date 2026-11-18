@@ -348,6 +348,35 @@ describe("freshRun", () => {
     expect(result.pairs["base~aa"]![0]).not.toHaveProperty("fields");
   });
 
+  it("turns the order of the cases in each round with firstCase, and keeps the arms of each case and round", async () => {
+    const cases = ["a", "b", "c", "d", "e"];
+    const key = (records: readonly { case: string; round: number; first: string }[]) => records.map((r) => `${r.case} ${r.round} ${r.first}`).sort();
+    for (const order of ["pairs", "arms"] as const) {
+      const plain = fake();
+      const fixed = await run({ start: plain.start, cases, rounds: 3, roundOffset: 2, order });
+      const turned = fake();
+      const result = await run({ start: turned.start, cases, rounds: 3, roundOffset: 2, order, firstCase: 7 });
+      const perRound = turned.calls.length / 3;
+      const perCase = perRound / cases.length;
+      // The step is max(1, floor(5 / 3)) = 1. Global round 2 + r starts with the case (7 + 2 + r) % 5.
+      for (let r = 0; r < 3; r++) {
+        const shift = (7 + 2 + r) % 5;
+        const inRound = turned.calls.slice(r * perRound, (r + 1) * perRound);
+        expect(inRound.filter((_c, k) => k % perCase === 0).map((c) => c.case)).toEqual([...cases.slice(shift), ...cases.slice(0, shift)]);
+        // Each case keeps the programs of its children, in their order, as without the turn.
+        const programs = (calls: readonly { program: string; case: string }[], id: string) => calls.filter((c) => c.case === id).map((c) => c.program);
+        const before = plain.calls.slice(r * perRound, (r + 1) * perRound);
+        for (const id of cases) expect(programs(inRound, id)).toEqual(programs(before, id));
+      }
+      for (const pair of Object.keys(fixed.pairs)) expect(key(result.pairs[pair]!)).toEqual(key(fixed.pairs[pair]!));
+      if (order === "arms") expect(result.orders!.slice(0, 5).map((o) => o.case)).toEqual(["e", "a", "b", "c", "d"]);
+    }
+    // The step spreads the first places when the cases are more than the rounds: 7 cases in 2 rounds give the step 3.
+    const { start, calls } = fake();
+    await run({ start, cases: ["a", "b", "c", "d", "e", "f", "g"], rounds: 2, order: "arms", firstCase: 0 });
+    expect([calls[0]!.case, calls[calls.length / 2]!.case]).toEqual(["a", "d"]);
+  });
+
   it("refuses two hashes of one arm on one case, and permits other hashes for other arms", async () => {
     const hashOf = (program: string, k: number) => (program === "base" ? (k < 20 ? "h1" : "h2") : "n1");
     const start = fake((program, _c, k) => ({ stdout: JSON.stringify({ ms: 1, hash: hashOf(program, k) }) })).start;
@@ -368,6 +397,8 @@ describe("freshRun", () => {
     await expect(run({ start, candidates: [], aa: false })).rejects.toThrow(/no pairs/);
     await expect(run({ start, candidates: [{ id: "z", command: [] }] })).rejects.toThrow(/command/);
     await expect(run({ start, order: "both" as unknown as "arms" })).rejects.toThrow(/order is "pairs" or "arms"/);
+    await expect(run({ start, firstCase: -1 })).rejects.toThrow(/first case is a whole number/);
+    await expect(run({ start, firstCase: 1.5 })).rejects.toThrow(/first case is a whole number/);
   });
 
   it("starts real child processes", async () => {

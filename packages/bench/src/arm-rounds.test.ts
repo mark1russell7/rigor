@@ -118,6 +118,48 @@ describe("timeArmRounds", () => {
     expect(timeArmRounds({ case: "x", base: f.arm("base", 1), candidates: [f.arm("two", 2)], rounds: 1, targetMs: 10, warmMs: 5, now: f.now }).count).toBe(1024);
   });
 
+  it("keeps the start and the end of each timed batch in the layout of orders", () => {
+    const f = fake(COSTS);
+    const marks: number[] = [];
+    const now = (): number => {
+      const t = f.now();
+      marks.push(t);
+      return t;
+    };
+    const result = timeArmRounds({ case: "x", base: f.arm("base", 1), candidates: [f.arm("two", 2)], rounds: 4, targetMs: 1, warmMs: 2, now });
+    expect(result.spans.map((row) => row.length)).toEqual([3, 3, 3, 3]);
+    // The timed batches are the last marks of the clock: 2 for each batch, in the order of the rounds.
+    expect(result.spans.flat().flatMap((s) => [s.start, s.end])).toEqual(marks.slice(-2 * 4 * 3));
+    result.orders.forEach((order, round) => {
+      order.forEach((id, k) => {
+        const s = result.spans[round]![k]!;
+        if (id === "base") expect(result.pairs["two"]![round]!.a).toBe(s.end - s.start);
+        else expect(result.pairs[id]![round]!.b).toBe(s.end - s.start);
+      });
+    });
+  });
+
+  it("times each arm just after its untimed batches with warmBatches, in each round", () => {
+    const f = fake(COSTS);
+    const log: string[] = [];
+    const logged = (arm: { id: string; run: () => number }) => ({
+      id: arm.id,
+      run: () => {
+        log.push(arm.id);
+        return arm.run();
+      },
+    });
+    // A target far under the cost of one call keeps one call in each batch.
+    const result = timeArmRounds({ case: "x", base: logged(f.arm("base", 1)), candidates: [logged(f.arm("two", 2))], rounds: 4, warmBatches: 2, targetMs: 1e-9, warmMs: 0, now: f.now });
+    expect(result.count).toBe(1);
+    // The calibration has one base batch. Then each arm of a round has its 2 untimed batches and its timed batch, one after the other.
+    expect(log.slice(1)).toEqual(result.orders.flatMap((order) => order.flatMap((id) => Array<string>(3).fill(id === "base~aa" ? "base" : id))));
+    for (const r of result.pairs["two"]!) expect([r.a, r.b]).toEqual([expect.closeTo(0.01, 9), expect.closeTo(0.02, 9)]);
+    const big = timeArmRounds({ case: "x", base: f.arm("base", 1), candidates: [f.arm("two", 2)], rounds: 3, warmBatches: 2, targetMs: 10, warmMs: 0, now: f.now });
+    // The calibration has 11 base batches. Each round has 3 batches of each arm (the base, two and base~aa): 2 untimed and 1 timed.
+    expect(big.sink).toBe(2047 + 3 * 3 * 1024 * (1 + 2 + 1));
+  });
+
   it("refuses bad options", () => {
     const f = fake(COSTS);
     const run = (options: object) => () => timeArmRounds({ case: "x", base: f.arm("base", 1), candidates: [f.arm("two", 2)], rounds: 1, targetMs: 1, warmMs: 0, now: f.now, ...options });
@@ -126,6 +168,8 @@ describe("timeArmRounds", () => {
     expect(run({ offset: 0.5 })).toThrow(RangeError);
     expect(run({ targetMs: 0 })).toThrow(RangeError);
     expect(run({ warmMs: -1 })).toThrow(RangeError);
+    expect(run({ warmBatches: -1 })).toThrow(/warm batches/);
+    expect(run({ warmBatches: 0.5 })).toThrow(/warm batches/);
     expect(run({ candidates: [], aa: false })).toThrow(/1 pair or more/);
     expect(run({ candidates: [f.arm("base", 1)] })).toThrow(/not unique/);
     expect(run({ candidates: [f.arm("base~aa", 1)] })).toThrow(/not unique/);

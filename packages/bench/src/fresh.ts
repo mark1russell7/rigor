@@ -15,6 +15,7 @@ import { startProcess, stderrTail } from "./start.ts";
 export { type ArmProcess, type ArmTimes, armTimes } from "./arm-times.ts";
 export { type CheckoutArm, type CheckoutArmOptions, type RepoCommitOptions, checkoutArm, repoCommit } from "./checkout.ts";
 export { type FixtureFile, type FixtureHash, type FixtureOptions, checkFixtures, fixtureDifferences } from "./fixtures.ts";
+export { startProcess } from "./start.ts";
 
 /** The computer of a run. The `cpu` is the model of the first CPU. */
 export interface BenchEnv {
@@ -321,6 +322,15 @@ export interface FreshOptions {
    * A multiple of `balancedRounds(k + 1)` rounds balances the order.
    */
   readonly order?: "pairs" | "arms";
+  /**
+   * The index of the case that starts the first round. Without it, each round starts with the first case.
+   * With it, the order of the cases turns in each round. Thus a cost of the first place of a round does not stay on one case.
+   *
+   * Global round `r` starts with the case `(firstCase + r * max(1, floor(cases / rounds))) % cases`, and the other cases follow in their order.
+   * The turn of the arms and the order of the pairs keep the index of each case in `cases`.
+   * A retry of a job can give another value, so that the retry has another order.
+   */
+  readonly firstCase?: number;
   /** The arguments of a case after the command of an arm. The default is `["--case", id]`. */
   readonly args?: (caseId: string) => readonly string[];
   /** The longest time of one child in milliseconds. The default is 600000 (10 minutes). */
@@ -338,7 +348,7 @@ export interface FreshOptions {
   readonly job?: string;
   /** The computer of the run. The default is `benchEnv()`. */
   readonly env?: BenchEnv;
-  /** The start of a child. The default starts a process. A test gives its own. */
+  /** The start of a child. The default is `startProcess`. A test gives its own, and a caller can wrap `startProcess` to write the `stderr` of each child. */
   readonly start?: StartChild;
 }
 
@@ -391,6 +401,7 @@ const AA_SUFFIX = "~aa";
  *   Each pair has its own base child, and the first arm of a pair starts first.
  * - With the order `"arms"`, each arm starts one child in the order of `armOrder`. The pairs share the base child.
  *   The result keeps the order of each round and case in `orders`.
+ * - With `firstCase`, the order of the cases turns in each round. The turn of the arms and the order of the pairs do not change.
  * - A child that exits with an error, takes too long or prints no JSON line is an error. A skip line skips a case.
  *   With `overLimit: "skip"`, a child that takes too long in the first round skips its case too.
  * - A case that an arm skips in the first round of the job leaves each pair, and the runner starts no more children for it.
@@ -406,7 +417,9 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
   const maxBuffer = options.maxBuffer ?? 1 << 24;
   const args = options.args ?? ((id: string) => ["--case", id]);
   const start = options.start ?? startProcess;
+  const firstCase = options.firstCase;
   if (!Number.isSafeInteger(rounds) || rounds < 1) throw new RangeError(`freshRun: the rounds are a whole number of 1 or more, not ${rounds}.`);
+  if (firstCase !== undefined && (!Number.isSafeInteger(firstCase) || firstCase < 0)) throw new RangeError(`freshRun: the first case is a whole number of 0 or more, not ${firstCase}.`);
   if (!Number.isSafeInteger(roundOffset) || roundOffset < 0) throw new RangeError(`freshRun: the round offset is a whole number of 0 or more, not ${roundOffset}.`);
   if (!(timeoutMs > 0) || !(maxBuffer > 0)) throw new RangeError("freshRun: the time limit and the output limit are above 0.");
   if (overLimit !== "error" && overLimit !== "skip") throw new RangeError(`freshRun: overLimit is "error" or "skip", not ${JSON.stringify(overLimit)}.`);
@@ -460,9 +473,14 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
     return line;
   };
 
+  // The step of the turn of the cases spreads the first places of the rounds of one job over the cases.
+  const step = Math.max(1, Math.floor(cases.length / rounds));
   for (let r = 0; r < rounds; r++) {
     const round = roundOffset + r;
-    for (let i = 0; i < cases.length; i++) {
+    const shift = firstCase === undefined ? 0 : (firstCase + round * step) % cases.length;
+    for (let k = 0; k < cases.length; k++) {
+      // The index of the case, not its place in the round, gives the turn of the arms and the order of the pairs.
+      const i = (shift + k) % cases.length;
       const id = cases[i]!;
       if (gone.has(id)) continue;
       if (order === "arms") {

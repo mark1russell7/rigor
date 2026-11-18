@@ -89,7 +89,7 @@ v.comparison;                                     // the cases that gain and dro
 | `timeRounds(arms, options)` | The timed rounds of one case in one process: a warm-up, a batch of at least the target time, and the order of `firstArm`. |
 | `slopeVerdict(rounds, options)` | The verdict of a slope claim from a ladder on a log-log scale, with the A/A check of each run: `within`, `beyond` or `cannot decide`. |
 | `roundSlope(rungs)` | The least-squares slope of `log value` against `log size` of one round of 3 rungs or more. |
-| `timeArmRounds(options)` | The timed rounds of one case in one process for a base and 1 or more candidates, with the order of `armOrder` and an A/A pair. |
+| `timeArmRounds(options)` | The timed rounds of one case in one process for a base and 1 or more candidates, with the order of `armOrder`, an A/A pair and the span of each timed batch. |
 | `verdictPower(options)` | The share of each outcome over seeded benches with a known ratio: the power test of a rule. |
 | `familyRead(items, level)` | The reads of a family of cases as a report: Holm over the cases, each job alone, and both. Each read changes only `slower` and `faster`. |
 | `familyPower(options)` | The false-slower share of a family and the share of a slow case read, for each read, over seeded families. |
@@ -101,6 +101,7 @@ v.comparison;                                     // the cases that gain and dro
 | `benchEnv()` | From `/fresh`: the computer of this process, with the CPU model and the runner. |
 | `childLine(stdout)` | From `/fresh`: the last JSON line of a child, with its time `ms`, its `hash` and the reason of a skip. |
 | `pairOrder(pairs, round, caseIndex)` | From `/fresh`: the order of the pairs of one case in one round, and the first arm of each pair. |
+| `startProcess(argv, options)` | From `/fresh`: the default start of a child, with no shell, and a stop at the time limit or the output limit. |
 | `freshRun(options)` | From `/fresh`: the records of each pair, with each arm in its own fresh child process. With `order: "arms"`, the pairs of a round share one base child. |
 | `freshArms(options)` | From `/fresh`: one fresh child for each arm in each round, in the order of `armOrder`, with A/A records and fixture hashes. |
 | `armTimes(processes)` | From `/fresh`: the median, the 10th and the 90th percentiles, their ratio, and the least and the greatest time of each arm over its children. |
@@ -536,6 +537,8 @@ const verdicts = armVerdicts(run, "loops~aa");
 - `offset` turns the arms before `armOrder`. Give the index of the case, so the cases start with different arms.
 - Each pair of a round uses the one base batch of that round. `orders` has the order of the batches of each round.
 - The count of calls of a batch grows until a batch of the base takes `targetMs`. Each arm uses that count.
+- `warmBatches` adds untimed batches of each arm before its timed batch, in each round. No batch of another arm comes between them. The default is 0.
+- `spans` keeps the start and the end of each timed batch, in the layout of `orders`. The clock `now` also times the warm-up and the calibration. Thus a record of the marks of the clock uses `spans` to find the timed batches.
 
 ## Time one arm in a child
 
@@ -781,6 +784,9 @@ run.orders;                                      // the order of the children of
 - A round of k pairs has k + 1 children. The default order `"pairs"` has 2 k children.
 - A multiple of `balancedRounds(k + 1)` rounds balances the order. A skip removes a case as in the default order.
 - `orders` keeps the order of each case and round. The field `first` of each record tells which arm of its pair started first.
+- `firstCase` turns the order of the cases in each round. Global round `r` starts with the case `(firstCase + r * max(1, floor(cases / rounds))) % cases`.
+- The first place of a round can cost more. With `firstCase`, this cost does not stay on one case. The turn of the arms keeps the index of each case.
+- The default start pipes the `stderr` of each child, and shows its tail in the error of a failed child. To write each `stderr` to the log, wrap `startProcess` in `start`.
 
 ### Why pairs, and not a plain rotation of all arms
 
