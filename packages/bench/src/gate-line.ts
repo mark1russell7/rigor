@@ -235,6 +235,37 @@ export function gateLine(reads: readonly CaseRead[], options: GateLineOptions): 
   };
 }
 
+/**
+ * The words of the verdict file of a gate job, one line for each gate. The reusable gate workflow of `mark1russell7/template`
+ * reads the file: a no read gives a second try on a fresh runner.
+ */
+export const GATE_VERDICT_WORDS: readonly ["pass", "block", "no-read"] = ["pass", "block", "no-read"];
+
+/** The word of a gate in the verdict file. */
+export type GateVerdictWord = (typeof GATE_VERDICT_WORDS)[number];
+
+/** This function gives the word of a gate outcome in the verdict file. The outcome `no read` has the word `no-read`. */
+export function gateVerdictWord(outcome: GateOutcome): GateVerdictWord {
+  return outcome === "no read" ? "no-read" : outcome;
+}
+
+/**
+ * This function adds the word of a gate outcome as one line to the verdict file of the job.
+ * - The default file is the variable `GATE_VERDICT_FILE`. With no file, the function writes nothing.
+ * - Each gate of the job adds its own line. The job reads all the lines: a block decides first, then a no read.
+ * - Write the verdict of each gate that decides the check. A read that only reports writes no verdict.
+ *
+ * @param outcome - The outcome of the gate, as `gateOf` gives it.
+ * @param file - The verdict file. The default is the variable `GATE_VERDICT_FILE`.
+ * @returns The written word, or undefined with no file.
+ */
+export function writeGateVerdict(outcome: GateOutcome, file: string | undefined = process.env["GATE_VERDICT_FILE"]): GateVerdictWord | undefined {
+  if (file === undefined || file === "") return undefined;
+  const word = gateVerdictWord(outcome);
+  appendFileSync(file, `${word}\n`);
+  return word;
+}
+
 /** The outputs of `writeGateLine`. The defaults are the standard output and the file of `GITHUB_STEP_SUMMARY`. */
 export interface GateLineOutputs {
   /** This function writes one line of the log. The default writes to the stream of `stream`. */

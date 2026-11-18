@@ -2,17 +2,18 @@
  * The command line of `rigor-gate-line`. A shell step of a workflow gives the reads and the options as JSON, and the
  * command writes the gate line with `writeGateLine`. The work is in this file, so a test can start the same command.
  */
-import { type CaseRead, type GateLineOptions, type JobEnv, type JobModel, gateLine, jobModels, writeGateLine } from "./gate-line.ts";
+import { type CaseRead, type GateLineOptions, type JobEnv, type JobModel, gateLine, jobModels, writeGateLine, writeGateVerdict } from "./gate-line.ts";
 import type { ArmModels } from "./model.ts";
 
 /** The help text of `rigor-gate-line`. */
 export const GATE_LINE_HELP: string = `rigor-gate-line: the check line of a gate read, as an annotation and a line of the step summary.
 
-  rigor-gate-line [--from <file>] [--stream stdout|stderr] [--summary <file>]
+  rigor-gate-line [--from <file>] [--stream stdout|stderr] [--summary <file>] [--verdict <file>]
 
   --from <file>      the JSON document. Without it, the command reads the standard input.
   --stream <name>    the stream of the annotation: stdout (the default) or stderr.
   --summary <file>   the file of the step summary. The default is the variable GITHUB_STEP_SUMMARY.
+  --verdict <file>   the verdict file of the gate job. The default is the variable GATE_VERDICT_FILE.
   --help             this text.
 
   The JSON document:
@@ -20,6 +21,8 @@ export const GATE_LINE_HELP: string = `rigor-gate-line: the check line of a gate
       "options": { "title": "store gate", "enforced": false, "reason": "too few rounds", "models": ... },
       "jobs": [{ "cpu": "AMD EPYC 7763", "cores": 4 }], "cores": true }
   "jobs" gives the models of jobModels when "options" has no "models". With "cores": true, the line names the cores.
+
+  An enforced read adds one line to the verdict file: pass, block or no-read. A read that only reports adds no line.
 
   The exit code is 0 for a line and for no line. The step decides its own exit. A bad input gives the exit code 2.
 `;
@@ -32,7 +35,7 @@ export interface GateLineCliIo {
   readonly readStdin: () => string;
   readonly stdout: (text: string) => void;
   readonly stderr: (text: string) => void;
-  /** The environment. The command reads `GITHUB_STEP_SUMMARY` from it. */
+  /** The environment. The command reads `GITHUB_STEP_SUMMARY` and `GATE_VERDICT_FILE` from it. */
   readonly env: Readonly<Record<string, string | undefined>>;
 }
 
@@ -40,6 +43,7 @@ interface CliFlags {
   from?: string;
   stream: "stdout" | "stderr";
   summary?: string;
+  verdict?: string;
   help: boolean;
 }
 
@@ -53,7 +57,7 @@ function flags(argv: readonly string[]): CliFlags {
     }
     const eq = arg.indexOf("=");
     const name = eq < 0 ? arg : arg.slice(0, eq);
-    if (name !== "--from" && name !== "--stream" && name !== "--summary") throw new Error(`unknown argument "${arg}"`);
+    if (name !== "--from" && name !== "--stream" && name !== "--summary" && name !== "--verdict") throw new Error(`unknown argument "${arg}"`);
     let value: string | undefined;
     if (eq >= 0) value = arg.slice(eq + 1);
     else {
@@ -63,6 +67,7 @@ function flags(argv: readonly string[]): CliFlags {
     if (value === undefined) throw new Error(`${name} needs a value`);
     if (name === "--from") out.from = value;
     else if (name === "--summary") out.summary = value;
+    else if (name === "--verdict") out.verdict = value;
     else if (value === "stdout" || value === "stderr") out.stream = value;
     else throw new Error(`--stream is stdout or stderr, not "${value}"`);
   }
@@ -143,6 +148,7 @@ function document(text: string): { reads: CaseRead[]; options: GateLineOptions }
 
 /**
  * This function is the command `rigor-gate-line`. It reads the JSON document, and writes the line with `writeGateLine`.
+ * - An enforced read also writes its verdict with `writeGateVerdict`. A read that only reports writes no verdict.
  * - The exit code is 0 for a line and for no line, because the line informs. The step decides its own exit.
  * - A bad argument or a bad document gives the exit code 2, with the reason on the standard error.
  *
@@ -159,7 +165,10 @@ export function gateLineCli(argv: readonly string[], io: GateLineCliIo): number 
     }
     const { reads, options } = document(f.from === undefined ? io.readStdin() : io.readFile(f.from));
     const write = f.stream === "stderr" ? io.stderr : io.stdout;
-    writeGateLine(gateLine(reads, options), { log: (line) => write(`${line}\n`), summary: f.summary ?? io.env["GITHUB_STEP_SUMMARY"] });
+    const line = gateLine(reads, options);
+    writeGateLine(line, { log: (text) => write(`${text}\n`), summary: f.summary ?? io.env["GITHUB_STEP_SUMMARY"] });
+    // A read with no line passed in each case.
+    if (options.enforced === true) writeGateVerdict(line?.outcome ?? "pass", f.verdict ?? io.env["GATE_VERDICT_FILE"]);
     return 0;
   } catch (error) {
     io.stderr(`rigor-gate-line: ${error instanceof Error ? error.message : String(error)}\n`);

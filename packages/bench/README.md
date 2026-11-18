@@ -80,6 +80,8 @@ v.comparison;                                     // the cases that gain and dro
 | `jobModels(envs, options)` | The count of the jobs on each CPU model, sorted by model, for the job form of the models of `gateLine`. The option `cores` keeps the cores. |
 | `writeGateLine(line, outputs)` | The line as an annotation of GitHub Actions, an error for an enforced gate or a warning, and as a line of the step summary. |
 | `gateLineCli(argv, io)` | The command of the bin `rigor-gate-line`: a gate line from a JSON document of a shell step. |
+| `gateVerdictWord(outcome)` | The word of a gate outcome in the verdict file of a gate job: `pass`, `block` or `no-read`. |
+| `writeGateVerdict(outcome, file)` | The word of a gate outcome as one line of the verdict file. The default file is the variable `GATE_VERDICT_FILE`. |
 | `notSlowerVerdict(jobs, options)` | The gate of the claim "not slower by more than the margin", with looks and a family level. |
 | `budgetVerdict(rounds, aa, options)` | The verdict of the claim "the median of each case is at most `limit`", for one build: `within`, `beyond` or `cannot decide`. |
 | `budgetLooksVerdict(rounds, aa, options)` | The budget verdict of a run that adds rounds to the cases with no outcome, up to a stated budget. |
@@ -404,8 +406,24 @@ rigor-gate-line --from gate.json --summary own.md  # a summary file that is not 
 - `reads` and `options` are the two arguments of `gateLine`. `options.models` takes the two forms of `models`.
 - `jobs` gives the models with `jobModels` when `options` has no `models`. With `"cores": true`, the line names the cores.
 - The exit code is 0 for a line and for no line. The line informs, and the step decides its own exit.
+- An enforced read adds its verdict to the verdict file of the job: `--verdict <file>`, or the variable `GATE_VERDICT_FILE`. A read that only reports adds no verdict.
 - A bad argument or a bad document gives the exit code 2, with the reason on stderr.
 - `gateLineCli(argv, io)` is the same command as a function, for a test or a script of its own.
+
+### The verdict file of a gate job
+
+The reusable gate workflow of `mark1russell7/template` gives a gate job a second try on a fresh runner after a no read. It reads one verdict line for each gate from the file `GATE_VERDICT_FILE`.
+
+```ts
+const gate = gateOf(cases);
+writeGateLine(gateLine(cases, { title: "compiler gate", enforced: true }));
+writeGateVerdict(gate.outcome); // "pass", "block" or "no-read" as one line of GATE_VERDICT_FILE
+```
+
+- The word of `no read` is `no-read`. The other words are the outcomes of `gateOf`.
+- Each gate of the job adds its own line. The workflow reads all the lines: a block decides first, then a no read.
+- Without the variable, `writeGateVerdict` writes nothing and gives undefined. A local run then has no file.
+- Write the verdict of each gate that decides the check. A read that only reports writes no verdict.
 
 ## A claim with a budget
 
