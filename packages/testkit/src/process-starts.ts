@@ -131,6 +131,27 @@ export function parseStartBudgets(text: string, source = "the budget file"): Sta
   return { default: other, files: files as Record<string, number> };
 }
 
+/** This function gives the budget of a count of starts: the next multiple of `step` above the count. */
+export function budgetOf(count: number, step = 10): number {
+  return (Math.floor(count / step) + 1) * step;
+}
+
+/** A task of the test runner, with only the fields that `ranInFull` reads. A file, a suite and a test of vitest fit it. */
+export interface SuiteTask {
+  readonly type: string;
+  readonly mode: string;
+  readonly result?: { readonly state?: string } | undefined;
+  readonly tasks?: readonly SuiteTask[];
+}
+
+/**
+ * This function tells if each test of the tasks passed, with no filter and no skip. A name filter, `.only`, `.skip` or a
+ * failed test gives fewer starts, so then a count below the budget shows no gain.
+ */
+export function ranInFull(tasks: readonly SuiteTask[]): boolean {
+  return tasks.every((task) => (task.tasks !== undefined ? ranInFull(task.tasks) : (task.mode === "run" || task.mode === "only") && task.result?.state === "pass"));
+}
+
 /** The options of `startBudgetBreak`. */
 export interface StartBudgetOptions {
   /** The command that the budget counts. The default is `git`. */
@@ -139,14 +160,31 @@ export interface StartBudgetOptions {
   readonly source?: string;
   /** A sentence at the end of the message that tells how to start fewer processes. */
   readonly advice?: string;
+  /**
+   * True when each test of the file passed, from `ranInFull`. Then a file budget above `budgetOf` the count also breaks.
+   * Thus each gain stays held. The default is false.
+   */
+  readonly inFull?: boolean;
+  /** The step of `budgetOf`. The default is 10. */
+  readonly step?: number;
 }
 
-/** This function gives the message for a test file with more starts of the command than its budget, or `undefined`. */
+/**
+ * This function gives the message for a test file with more starts of the command than its budget, or `undefined`. With
+ * `inFull`, it also gives a message for a file budget above `budgetOf` the count.
+ */
 export function startBudgetBreak(file: string, counts: ReadonlyMap<string, number>, budgets: StartBudgets, options: StartBudgetOptions = {}): string | undefined {
   const command = options.command ?? "git";
+  const source = options.source ?? "the budget file";
   const used = startsIn(counts, command);
-  const budget = budgets.files[file] ?? budgets.default;
-  if (used <= budget) return undefined;
-  const message = `${file} started ${command} ${String(used)} times, over its budget of ${String(budget)} in ${options.source ?? "the budget file"}.`;
-  return options.advice === undefined ? message : `${message} ${options.advice}`;
+  const own = budgets.files[file];
+  const budget = own ?? budgets.default;
+  if (used > budget) {
+    const message = `${file} started ${command} ${String(used)} times, over its budget of ${String(budget)} in ${source}.`;
+    return options.advice === undefined ? message : `${message} ${options.advice}`;
+  }
+  const lower = budgetOf(used, options.step);
+  if (options.inFull !== true || own === undefined || lower >= own) return undefined;
+  const fix = lower <= budgets.default ? `Remove its entry: the default budget of ${String(budgets.default)} covers it.` : `Lower its budget to ${String(lower)}.`;
+  return `${file} started ${command} ${String(used)} times, well under its budget of ${String(own)} in ${source}. ${fix} Thus the gain stays held.`;
 }

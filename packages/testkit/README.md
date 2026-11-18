@@ -792,20 +792,23 @@ A setup file of the test runner wraps `node:child_process` one time, clears the 
 // process-starts.setup.ts, in setupFiles of vitest:
 import { readFileSync } from "node:fs";
 import { afterAll, beforeAll } from "vitest";
-import { countProcessStarts, parseStartBudgets, startBudgetBreak } from "@mark1russell7/rigor-testkit/process-starts";
+import { countProcessStarts, parseStartBudgets, ranInFull, startBudgetBreak } from "@mark1russell7/rigor-testkit/process-starts";
 
 const counts = countProcessStarts();
 const source = "test/git-starts.json";
 const budgets = parseStartBudgets(readFileSync(source, "utf8"), source);
 beforeAll(() => counts.clear());
 afterAll((_context, suite) => {
-  const message = startBudgetBreak(suite.file.name, counts, budgets, { source, advice: "Share the fixture repositories." });
+  const options = { source, advice: "Share the fixture repositories.", inFull: ranInFull(suite.tasks) };
+  const message = startBudgetBreak(suite.file.name, counts, budgets, options);
   if (message !== undefined) throw new Error(message);
 });
 ```
 
 - The budget file is JSON: `{ "default": 20, "files": { "test/big.test.ts": 60 } }`. A file with no entry gets `default`.
 - `startBudgetBreak` counts `git` by default. Give `command` to count another command.
+- With `inFull`, a file budget above `budgetOf(count)`, the next multiple of 10 above the count, also breaks. Thus each gain stays held.
+- `ranInFull(suite.tasks)` is false for a run with a name filter, `.only`, `.skip` or a failed test. Such a run gives fewer starts, so it does not lower a budget.
 - A git start counts under `git-<command>`, for example `git-ls-files`. `startsIn(counts, "git")` gives the sum of each key of git.
 - The wrappers also apply to the named imports of `node:child_process`, through `syncBuiltinESMExports`.
 - `startsOf(name)` gives the count since the last clear. A test of a helper compares two reads of it.
