@@ -56,6 +56,7 @@ v.comparison;                                     // the cases that gain and dro
 | `processCaseLine(case)` | One line of a case of `processVerdict`: the outcome, the median, the slow count and the ratio of each process. |
 | `isValidRead(read, noiseCap?)` | True when the A/A band of a process read contains 1 and its noise is at most `noiseCap`. Without a cap, a read with no band is valid. |
 | `readNoise(read)` | The A/A noise of a process read on a log scale: the larger distance from 0 of the logs of the ends of its band. |
+| `processNoiseCap(jobs, options)` | The noise cap of one case from the reads of earlier quiet jobs: a quantile of the read noise, its interval and the decide rate at the cap. |
 | `modelTest(reads, options)` | The read of each CPU model against the rest, for each case: `differs`, `no read`, `too-few` or `not asked`. |
 | `visibleShift(values, rest, level, direction, options)` | The smallest shift in one direction that a test can see at this count and level, and the smallest p of this count. |
 | `modelRowText(row, family)` | The words of one row. No word says that a model is the same as the rest. |
@@ -233,6 +234,25 @@ The rule of the verdict:
 - A case that fails a check for each value of the other processes is `beyond` at once.
 
 Check (b) is the tail rule of `tailLimitVerdict` with the rank `maxSlow + 1`. With `slow` equal to `limit` and `maxSlow` 0, check (b) is "the worst ratio is at most the limit". Thus a read can also be the median ratio of one job, and the verdict reads k jobs. Take each limit from earlier runs with `runLimit`.
+
+### The noise cap from earlier jobs
+
+`processNoiseCap` gives the cap of one case from the reads of 5 or more earlier jobs. The noise of a case changes with the CPU model. So give it the reads of one case on one model:
+
+```ts
+const c = processNoiseCap(jobs, { k: 11 });       // jobs: [{ job: "134957202670", reads: [...] }, ...]
+if (c.source === "jobs") {
+  c.cap;                                          // the noiseCap of the limits
+  c.quantile;                                     // the 0.95 quantile of the read noise, with its interval
+  c.decideRate;                                   // the chance that a quiet run decides at the cap
+}
+```
+
+- A job whose median read noise has a robust z-score above 3.5 is not quiet. The result names it in `dropped`.
+- The cap is the 0.95 quantile of the read noise of the quiet jobs, rounded up. So a quiet read passes the cap 95% of the time.
+- The decide rate is the chance of at least k valid reads in 2k processes, for each quiet job. A gate test can refuse a cap with a decide rate under 0.95.
+- The reads of one job share one runner. So the bootstrap interval draws whole jobs.
+- With fewer than 5 quiet jobs, the result has no cap: its `source` is `too few`.
 
 ## A read of each CPU model
 
