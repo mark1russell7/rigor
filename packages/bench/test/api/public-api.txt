@@ -286,6 +286,7 @@ pooledLimitVerdict: build/index.d.ts#pooledLimitVerdict
 pooledVerdict: build/index.d.ts#pooledVerdict
 processCaseLine: build/index.d.ts#processCaseLine
 processVerdict: build/index.d.ts#processVerdict
+readNoise: build/index.d.ts#readNoise
 resultRows: build/index.d.ts#resultRows
 resultVerdict: build/index.d.ts#resultVerdict
 roundSlope: build/index.d.ts#roundSlope
@@ -991,11 +992,13 @@ interface CaseProcesses {
   readonly limit: number;
   readonly slow: number;
   readonly maxSlow: number | undefined;
+  readonly noiseCap: number | undefined;
   readonly ratios: readonly number[];
   readonly used: readonly string[];
   readonly median: number | undefined;
   readonly slowCount: number;
   readonly invalid: readonly string[];
+  readonly noisy: readonly string[];
   readonly missing: readonly string[];
   readonly faults: readonly string[];
   readonly more: number;
@@ -1941,6 +1944,7 @@ interface ProcessLimits {
   readonly limit: number;
   readonly slow?: number;
   readonly maxSlow?: number;
+  readonly noiseCap?: number;
 }
 
 ### build/index.d.ts#ProcessOptions
@@ -2495,7 +2499,7 @@ export declare function isBlock(outcome: string): boolean;
 export declare function isNoRead(outcome: string): boolean;
 
 ### build/index.d.ts#isValidRead
-export declare function isValidRead(read: ProcessRead): boolean;
+export declare function isValidRead(read: ProcessRead, noiseCap?: number): boolean;
 
 ### build/index.d.ts#jobModels
 export declare function jobModels(envs: readonly JobEnv[], options?: JobModelsOptions): JobModel[];
@@ -2559,6 +2563,9 @@ export declare function processCaseLine(c: CaseProcesses): string;
 
 ### build/index.d.ts#processVerdict
 export declare function processVerdict(reads: readonly ProcessRead[], options: ProcessOptions): ProcessVerdict;
+
+### build/index.d.ts#readNoise
+export declare function readNoise(read: ProcessRead): number | undefined;
 
 ### build/index.d.ts#resultRows
 export declare function resultRows(content: unknown): ResultRow[];

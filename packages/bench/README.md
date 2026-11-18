@@ -54,7 +54,8 @@ v.comparison;                                     // the cases that gain and dro
 | `caseTails(records, rank)` | The value at one rank of the ratios of each case, from the largest. |
 | `processVerdict(reads, options)` | The verdict of each case over its first k valid processes: the median against a limit, and the count above a slow line. |
 | `processCaseLine(case)` | One line of a case of `processVerdict`: the outcome, the median, the slow count and the ratio of each process. |
-| `isValidRead(read)` | True when the A/A band of a process read contains 1, or when the read has no band. |
+| `isValidRead(read, noiseCap?)` | True when the A/A band of a process read contains 1 and its noise is at most `noiseCap`. Without a cap, a read with no band is valid. |
+| `readNoise(read)` | The A/A noise of a process read on a log scale: the larger distance from 0 of the logs of the ends of its band. |
 | `modelTest(reads, options)` | The read of each CPU model against the rest, for each case: `differs`, `no read`, `too-few` or `not asked`. |
 | `visibleShift(values, rest, level, direction, options)` | The smallest shift in one direction that a test can see at this count and level, and the smallest p of this count. |
 | `modelRowText(row, family)` | The words of one row. No word says that a model is the same as the rest. |
@@ -211,6 +212,8 @@ v.cases.map(processCaseLine);                     // one line for each case
 The rule of the verdict:
 
 - A read is `{ process, case, ratio, aa, fault }`. A process counts for a case only when its A/A band contains 1.
+- With `noiseCap` in the limits, a process counts only when `readNoise` of its band is at most the cap. Else it is noisy. A read with no band is then noisy too.
+- A noisy run cannot decide. A case with too many noisy processes is `cannot decide`, and the gate gives `no read`. Take the cap from the A/A noise of earlier quiet runs.
 - Check (a): the median of the first k valid ratios is at most `limit`.
 - Check (b): the count of these ratios above `slow` is at most `maxSlow`. Without `maxSlow`, the count is a record only.
 - A case with a fault is `beyond`. A case with no read from a process of the option `processes` is `cannot decide`.

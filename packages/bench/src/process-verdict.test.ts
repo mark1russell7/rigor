@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { cpuEntry } from "./model.ts";
-import { type ProcessLimits, type ProcessRead, isValidRead, processCaseLine, processVerdict } from "./process-verdict.ts";
+import { type ProcessLimits, type ProcessRead, isValidRead, processCaseLine, processVerdict, readNoise } from "./process-verdict.ts";
 
 const TREE: ProcessLimits = { limit: 1.1, slow: 1.2, maxSlow: 2 };
+/** The limits of TREE with a noise cap. The band of `reads` has the noise 0.0202, and the band of LOUD has 0.2231. */
+const CAPPED: ProcessLimits = { ...TREE, noiseCap: 0.05 };
+const LOUD = [0.8, 1.25] as const;
 
 /** This function gives one read of the case "tree" for each ratio, in the processes p0, p1 and so on. */
 function reads(...ratios: readonly number[]): ProcessRead[] {
@@ -102,12 +105,47 @@ describe("processVerdict", () => {
     expect(() => processVerdict(one, { k: 1, limits: { limit: 0 } })).toThrow(/limit of the case/);
     expect(() => processVerdict(one, { k: 1, limits: { limit: 1, slow: Number.NaN } })).toThrow(/slow line/);
     expect(() => processVerdict(one, { k: 1, limits: { limit: 1, maxSlow: -1 } })).toThrow(/maxSlow/);
+    expect(() => processVerdict(one, { k: 1, limits: { limit: 1, noiseCap: -0.1 } })).toThrow(/noise cap/);
+    expect(() => processVerdict(one, { k: 1, limits: { limit: 1, noiseCap: Number.NaN } })).toThrow(/noise cap/);
     expect(() => processVerdict(reads(0), { k: 1, limits: TREE })).toThrow(/ratio/);
     expect(() => processVerdict(reads(Number.POSITIVE_INFINITY), { k: 1, limits: TREE })).toThrow(/ratio/);
     expect(() => processVerdict([{ process: "p", case: "c", ratio: 1, aa: [1.1, 0.9] }], { k: 1, limits: TREE })).toThrow(/A\/A band/);
     expect(() => processVerdict([...one, ...one], { k: 1, limits: TREE })).toThrow(/two reads/);
     expect(() => processVerdict(one, { k: 1, limits: TREE, processes: ["other"] })).toThrow(/does not name/);
     expect(() => processVerdict(one, { k: 1, limits: TREE, processes: ["p0", "p0"] })).toThrow(/twice/);
+  });
+});
+
+describe("processVerdict with a noise cap", () => {
+  it("leaves out a noisy process, and keeps the facts of the cap", () => {
+    const list: ProcessRead[] = [{ process: "loud", case: "tree", ratio: 0.9, aa: LOUD }, ...reads(1, 1.05)];
+    const [c] = processVerdict(list, { k: 2, limits: CAPPED }).cases;
+    expect(c).toMatchObject({ outcome: "within", ratios: [1, 1.05], used: ["p0", "p1"], noisy: ["loud"], invalid: [], noiseCap: 0.05 });
+  });
+
+  it("never passes a case when each process is noisy: the case cannot decide", () => {
+    const loud: ProcessRead[] = [0.9, 0.95, 0.92].map((ratio, i) => ({ process: `p${i}`, case: "tree", ratio, aa: LOUD }));
+    expect(processVerdict(loud, { k: 3, limits: TREE }).outcome).toBe("pass");
+    const v = processVerdict(loud, { k: 3, limits: CAPPED });
+    expect(v).toMatchObject({ outcome: "no read", noRead: ["tree"], more: 3 });
+    expect(v.cases[0]).toMatchObject({ outcome: "cannot decide", noisy: ["p0", "p1", "p2"], ratios: [] });
+  });
+
+  it("counts a biased process as invalid and not as noisy, and tells the two counts", () => {
+    const list: ProcessRead[] = [...reads(1), { process: "loud", case: "tree", ratio: 1, aa: LOUD }, { process: "bad", case: "tree", ratio: 1, aa: [1.01, 1.3] }];
+    const [c] = processVerdict(list, { k: 3, limits: CAPPED }).cases;
+    expect(c).toMatchObject({ outcome: "cannot decide", more: 2, invalid: ["bad"], noisy: ["loud"] });
+    expect(c?.reason).toBe("The case has 1 valid processes of 3, 1 processes have an A/A band without 1, and 1 processes are noisy for the noise cap 0.05. It needs 2 more.");
+  });
+
+  it("counts a read with no band as noisy, because its noise is not known", () => {
+    const [c] = processVerdict([{ process: "p", case: "tree", ratio: 1 }], { k: 1, limits: CAPPED }).cases;
+    expect(c).toMatchObject({ outcome: "cannot decide", noisy: ["p"], invalid: [] });
+  });
+
+  it("still blocks on a check before k valid processes", () => {
+    const list: ProcessRead[] = [...reads(1.2, 1.15, 1.12), { process: "loud", case: "tree", ratio: 1, aa: LOUD }];
+    expect(processVerdict(list, { k: 5, limits: CAPPED }).cases[0]).toMatchObject({ outcome: "beyond", noisy: ["loud"] });
   });
 });
 
@@ -118,6 +156,23 @@ describe("isValidRead", () => {
     expect(isValidRead({ process: "p", case: "c", ratio: 1, aa: [0.8, 0.99] })).toBe(false);
     expect(isValidRead({ process: "p", case: "c", ratio: 1 })).toBe(true);
   });
+
+  it("counts a read with a noise cap only when its noise is at most the cap", () => {
+    const read: ProcessRead = { process: "p", case: "c", ratio: 1, aa: [0.95, 1.05] };
+    const noise = readNoise(read)!;
+    expect(isValidRead(read, noise)).toBe(true);
+    expect(isValidRead(read, noise - 1e-9)).toBe(false);
+    expect(isValidRead({ process: "p", case: "c", ratio: 1, aa: [1.01, 1.02] }, 1)).toBe(false);
+    expect(isValidRead({ process: "p", case: "c", ratio: 1 }, 1)).toBe(false);
+  });
+});
+
+describe("readNoise", () => {
+  it("gives the larger distance from 0 of the logs of the two ends, and no value for no band", () => {
+    expect(readNoise({ process: "p", case: "c", ratio: 1, aa: [0.9, 1.05] })).toBeCloseTo(Math.log(1 / 0.9), 12);
+    expect(readNoise({ process: "p", case: "c", ratio: 1, aa: [0.98, 1.25] })).toBeCloseTo(Math.log(1.25), 12);
+    expect(readNoise({ process: "p", case: "c", ratio: 1 })).toBeUndefined();
+  });
 });
 
 describe("processCaseLine", () => {
@@ -126,6 +181,11 @@ describe("processCaseLine", () => {
     expect(c === undefined ? "" : processCaseLine(c)).toBe(
       "within tree: median 1.02 of 3 valid processes (limit 1.1), 1 above the slow line 1.2 (at most 2), ratios 1, 1.3, 1.02. The median 1.02 is at most the limit 1.1, and 1 valid processes are above the slow line, and the limit is 2.",
     );
+  });
+
+  it("gives the noise cap and the count of noisy processes when the case has a cap", () => {
+    const [c] = processVerdict([...reads(1), { process: "loud", case: "tree", ratio: 1, aa: LOUD }], { k: 1, limits: CAPPED }).cases;
+    expect(c === undefined ? "" : processCaseLine(c)).toContain("(limit 1.1, noise cap 0.05, 1 noisy)");
   });
 });
 
