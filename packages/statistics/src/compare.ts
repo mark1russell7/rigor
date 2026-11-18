@@ -212,7 +212,10 @@ export interface CalibrationLevel {
   readonly interval: Proportion;
 }
 
-/** The hit rate of each stated level, from the lowest level. */
+/**
+ * The hit rate of each stated level, from the lowest level. Each distinct p is a level. For continuous probabilities,
+ * use `reliability`, because then each prediction is a level.
+ */
 export function calibration(forecasts: readonly Forecast[]): CalibrationLevel[] {
   checkedForecasts("calibration", forecasts);
   const levels = new Map<number, { n: number; hits: number }>();
@@ -225,6 +228,80 @@ export function calibration(forecasts: readonly Forecast[]): CalibrationLevel[] 
   return [...levels]
     .sort((a, b) => a[0] - b[0])
     .map(([stated, { n, hits }]) => ({ stated, n, hits, rate: hits / n, interval: wilson(hits, n) }));
+}
+
+/** The options of `reliability` and `calibrationError`. */
+export interface ReliabilityOptions {
+  /** The number of bins of equal width from 0 to 1. It is a whole number of 1 or more. The default is 10. */
+  readonly bins?: number;
+}
+
+/** The predictions of one bin of stated probabilities. */
+export interface ReliabilityBin {
+  /** The lower end of the bin. A p equal to `low` is in the bin. */
+  readonly low: number;
+  /** The upper end of the bin. Only the last bin holds a p equal to `high`. */
+  readonly high: number;
+  /** The count of predictions in the bin. */
+  readonly n: number;
+  /** The mean stated p of the predictions in the bin. */
+  readonly stated: number;
+  readonly hits: number;
+  /** hits / n. A calibrated bin has a rate near `stated`. */
+  readonly rate: number;
+  /** The Wilson interval of the rate. A bin is overconfident when `stated` is above it. */
+  readonly interval: Proportion;
+}
+
+function checkedBins(name: string, options: ReliabilityOptions): number {
+  const bins = options.bins ?? 10;
+  if (!Number.isInteger(bins) || bins < 1) throw new RangeError(`${name}: bins is a whole number of 1 or more, not ${bins}.`);
+  return bins;
+}
+
+function binsOf(name: string, forecasts: readonly Forecast[], options: ReliabilityOptions): ReliabilityBin[] {
+  checkedForecasts(name, forecasts);
+  const bins = checkedBins(name, options);
+  const sums = new Map<number, { n: number; hits: number; sum: number }>();
+  for (const f of forecasts) {
+    const index = Math.min(bins - 1, Math.floor(f.p * bins));
+    const bin = sums.get(index) ?? { n: 0, hits: 0, sum: 0 };
+    bin.n++;
+    bin.sum += f.p;
+    if (f.hit) bin.hits++;
+    sums.set(index, bin);
+  }
+  return [...sums]
+    .sort((a, b) => a[0] - b[0])
+    .map(([index, { n, hits, sum }]) => ({
+      low: index / bins,
+      high: (index + 1) / bins,
+      n,
+      stated: sum / n,
+      hits,
+      rate: hits / n,
+      interval: wilson(hits, n),
+    }));
+}
+
+/**
+ * This function puts the predictions in `bins` bins of equal width from 0 to 1, and gives the hit rate of each bin. The
+ * bin of a p is `min(bins - 1, floor(p * bins))`, so a p of 1 is in the last bin. The result has only the bins with
+ * predictions, from the lowest bin. It throws a `RangeError` for an empty list, a p outside 0 to 1 or a bad `bins`.
+ */
+export function reliability(forecasts: readonly Forecast[], options: ReliabilityOptions = {}): ReliabilityBin[] {
+  return binsOf("reliability", forecasts, options);
+}
+
+/**
+ * The expected calibration error of predictions: the sum over the bins of `reliability` of `(n / N) * |stated - rate|`.
+ * 0 is perfect, and lower is better. With few predictions in each bin, the value is above 0 also for calibrated
+ * predictions. The function throws a `RangeError` for the same inputs as `reliability`.
+ */
+export function calibrationError(forecasts: readonly Forecast[], options: ReliabilityOptions = {}): number {
+  let sum = 0;
+  for (const bin of binsOf("calibrationError", forecasts, options)) sum += bin.n * Math.abs(bin.stated - bin.rate);
+  return sum / forecasts.length;
 }
 
 /** The count of hits of many predictions, against the sum of their stated chances. */

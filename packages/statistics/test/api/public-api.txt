@@ -95,6 +95,8 @@ type RatingModelChoice: build/index.d.ts#RatingModelChoice
 type RatingModelOptions: build/index.d.ts#RatingModelOptions
 type RatingModelScore: build/index.d.ts#RatingModelScore
 type RatingScale: build/index.d.ts#RatingScale
+type ReliabilityBin: build/index.d.ts#ReliabilityBin
+type ReliabilityOptions: build/index.d.ts#ReliabilityOptions
 type ResponseAbsentPoint: build/index.d.ts#ResponseAbsentPoint
 type ResponseBand: build/index.d.ts#ResponseBand
 type ResponseCurvePoint: build/index.d.ts#ResponseCurvePoint
@@ -177,6 +179,7 @@ bradleyTerry: build/index.d.ts#bradleyTerry
 bradleyTerrySparse: build/index.d.ts#bradleyTerrySparse
 brier: build/index.d.ts#brier
 calibration: build/index.d.ts#calibration
+calibrationError: build/index.d.ts#calibrationError
 choosePair: build/index.d.ts#choosePair
 classScores: build/index.d.ts#classScores
 clopperPearson: build/index.d.ts#clopperPearson
@@ -237,6 +240,7 @@ quantileSorted: build/index.d.ts#quantileSorted
 ranks: build/index.d.ts#ranks
 ratingToStrength: build/index.d.ts#ratingToStrength
 ratingUncertainty: build/index.d.ts#ratingUncertainty
+reliability: build/index.d.ts#reliability
 responseCells: build/index.d.ts#responseCells
 ridgeSolve: build/index.d.ts#ridgeSolve
 runningMean: build/index.d.ts#runningMean
@@ -848,6 +852,22 @@ interface RatingScale {
   readonly base?: number;
 }
 
+### build/index.d.ts#ReliabilityBin
+interface ReliabilityBin {
+  readonly low: number;
+  readonly high: number;
+  readonly n: number;
+  readonly stated: number;
+  readonly hits: number;
+  readonly rate: number;
+  readonly interval: Proportion;
+}
+
+### build/index.d.ts#ReliabilityOptions
+interface ReliabilityOptions {
+  readonly bins?: number;
+}
+
 ### build/index.d.ts#ResponseAbsentPoint
 interface ResponseAbsentPoint {
   readonly id: string;
@@ -1353,6 +1373,9 @@ export declare function brier(forecasts: readonly Forecast[]): number;
 ### build/index.d.ts#calibration
 export declare function calibration(forecasts: readonly Forecast[]): CalibrationLevel[];
 
+### build/index.d.ts#calibrationError
+export declare function calibrationError(forecasts: readonly Forecast[], options?: ReliabilityOptions): number;
+
 ### build/index.d.ts#choosePair
 export declare function choosePair<T extends RatedItem>(items: readonly T[], options: PairChoiceOptions<T>): PairChoice | undefined;
 
@@ -1528,6 +1551,9 @@ export declare function ratingToStrength(rating: number, options?: RatingScale):
 
 ### build/index.d.ts#ratingUncertainty
 export declare function ratingUncertainty(item: Pick<RatedItem, "se" | "picks">): number;
+
+### build/index.d.ts#reliability
+export declare function reliability(forecasts: readonly Forecast[], options?: ReliabilityOptions): ReliabilityBin[];
 
 ### build/index.d.ts#responseCells
 export declare function responseCells(record: Pick<ResponseRecord, "dimensions">, vary: string | readonly [string, string], steps?: number): number;
