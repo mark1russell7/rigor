@@ -226,6 +226,7 @@ In the tests, the series are AR(1) with 200 readings and the slope 0.6. There, t
 | --- | --- |
 | `mean`, `sd`, `median`, `summarize` | The descriptive statistics. `sd` is the sample standard deviation. |
 | `runningOf`, `addToRunning`, `mergeRunning`, `runningMean`, `runningSd` | A running summary of a stream: the count, the sum, the extremes and the spread, one value at a time. `mergeRunning` joins the summaries of two parts. `runningMean` gives exactly `mean` of the values. |
+| `histogramOf`, `addToHistogram`, `addAllToHistogram`, `mergeHistograms`, `histogramQuantile`, `emptyHistogram` | A histogram of a stream (DDSketch). It gives each quantile within a relative error, by the nearest-rank rule of `quantile`. The count of buckets grows with the logarithm of the range. `mergeHistograms` joins the histograms of two parts. |
 | `quantile(values, p, method)`, `quantileSorted` | The `p` quantile, with the `"linear"` method (type 7, the default), the `"nearest-rank"` method (type 1) or the `"higher"` method (`sorted[Math.ceil(p * (n - 1))]`, as NumPy). |
 | `bootstrap(data, statistic, options)` | A percentile bootstrap interval of any statistic. The options are `runs`, `level` or `ends`, `seed`, `method` and `against`. |
 | The option `against` | The interval also gives `pAbove` and `pBelow`, the bootstrap p of each side of the value, from the same draws. The smallest p is 1 / (`finite` + 1). Give `holm` enough runs: with m tests at level a, `runs` is more than m / a. |

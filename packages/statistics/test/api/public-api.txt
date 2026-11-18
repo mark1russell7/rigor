@@ -49,6 +49,9 @@ type Glicko2Game: build/index.d.ts#Glicko2Game
 type Glicko2Options: build/index.d.ts#Glicko2Options
 type Glicko2Rating: build/index.d.ts#Glicko2Rating
 type Glicko2ReplayOptions: build/index.d.ts#Glicko2ReplayOptions
+HISTOGRAM_RELATIVE_ERROR: build/index.d.ts#HISTOGRAM_RELATIVE_ERROR
+type Histogram: build/index.d.ts#Histogram
+type HistogramBucket: build/index.d.ts#HistogramBucket
 type Interval: build/index.d.ts#Interval
 KENDALL_EXACT: build/index.d.ts#KENDALL_EXACT
 type Kappa: build/index.d.ts#Kappa
@@ -154,6 +157,8 @@ type UStatisticMethod: build/index.d.ts#UStatisticMethod
 type UStatisticOptions: build/index.d.ts#UStatisticOptions
 U_STATISTIC_TIGHT_MIN_SAMPLE: build/index.d.ts#U_STATISTIC_TIGHT_MIN_SAMPLE
 Z95: build/index.d.ts#Z95
+addAllToHistogram: build/index.d.ts#addAllToHistogram
+addToHistogram: build/index.d.ts#addToHistogram
 addToRunning: build/index.d.ts#addToRunning
 bestSmoothLaw: build/index.d.ts#bestSmoothLaw
 binomialInterval: build/index.d.ts#binomialInterval
@@ -183,6 +188,7 @@ coverageMinSample: build/index.d.ts#coverageMinSample
 eloExpected: build/index.d.ts#eloExpected
 eloReplay: build/index.d.ts#eloReplay
 eloUpdate: build/index.d.ts#eloUpdate
+emptyHistogram: build/index.d.ts#emptyHistogram
 entropy: build/index.d.ts#entropy
 fitRatings: build/index.d.ts#fitRatings
 fitResponse: build/index.d.ts#fitResponse
@@ -193,6 +199,8 @@ glicko2Replay: build/index.d.ts#glicko2Replay
 glicko2Update: build/index.d.ts#glicko2Update
 heldOutError: build/index.d.ts#heldOutError
 heldOutErrorAt: build/index.d.ts#heldOutErrorAt
+histogramOf: build/index.d.ts#histogramOf
+histogramQuantile: build/index.d.ts#histogramQuantile
 holm: build/index.d.ts#holm
 informationGain: build/index.d.ts#informationGain
 kendallTau: build/index.d.ts#kendallTau
@@ -202,6 +210,7 @@ mean: build/index.d.ts#mean
 meanInterval: build/index.d.ts#meanInterval
 median: build/index.d.ts#median
 medianInterval: build/index.d.ts#medianInterval
+mergeHistograms: build/index.d.ts#mergeHistograms
 mergeRunning: build/index.d.ts#mergeRunning
 modeCount: build/index.d.ts#modeCount
 modifiedZ: build/index.d.ts#modifiedZ
@@ -546,6 +555,27 @@ interface Glicko2Rating {
 ### build/index.d.ts#Glicko2ReplayOptions
 interface Glicko2ReplayOptions extends Glicko2Options {
   readonly start?: Glicko2Rating;
+}
+
+### build/index.d.ts#HISTOGRAM_RELATIVE_ERROR
+export declare const HISTOGRAM_RELATIVE_ERROR = .01;
+
+### build/index.d.ts#Histogram
+interface Histogram {
+  readonly relativeError: number;
+  readonly n: number;
+  readonly sum: number;
+  readonly min: number;
+  readonly max: number;
+  readonly zeros: number;
+  readonly positive: readonly HistogramBucket[];
+  readonly negative: readonly HistogramBucket[];
+}
+
+### build/index.d.ts#HistogramBucket
+interface HistogramBucket {
+  readonly index: number;
+  readonly count: number;
 }
 
 ### build/index.d.ts#Interval
@@ -1263,6 +1293,12 @@ export declare const U_STATISTIC_TIGHT_MIN_SAMPLE: number;
 ### build/index.d.ts#Z95
 export declare const Z95 = 1.959963984540054;
 
+### build/index.d.ts#addAllToHistogram
+export declare function addAllToHistogram(h: Histogram, values: Iterable<number>): Histogram;
+
+### build/index.d.ts#addToHistogram
+export declare function addToHistogram(h: Histogram, value: number): Histogram;
+
 ### build/index.d.ts#addToRunning
 export declare function addToRunning(s: RunningSummary, value: number): RunningSummary;
 
@@ -1350,6 +1386,9 @@ export declare function eloReplay(items: number, comparisons: readonly PairCompa
 ### build/index.d.ts#eloUpdate
 export declare function eloUpdate(ra: number, rb: number, score: number, options?: EloOptions): EloUpdate;
 
+### build/index.d.ts#emptyHistogram
+export declare function emptyHistogram(relativeError?: number): Histogram;
+
 ### build/index.d.ts#entropy
 export declare function entropy(probabilities: readonly number[]): number;
 
@@ -1380,6 +1419,12 @@ export declare function heldOutError(record: Pick<ResponseRecord, "folds">, meas
 ### build/index.d.ts#heldOutErrorAt
 export declare function heldOutErrorAt(record: ResponseRecord, measure: string, ids: readonly string[]): ResponseHeldOutError;
 
+### build/index.d.ts#histogramOf
+export declare function histogramOf(values: Iterable<number>, relativeError?: number): Histogram;
+
+### build/index.d.ts#histogramQuantile
+export declare function histogramQuantile(h: Histogram, p: number): number;
+
 ### build/index.d.ts#holm
 export declare function holm(pValues: readonly number[], level?: number): Corrected[];
 
@@ -1406,6 +1451,9 @@ export declare function median(values: readonly number[]): number;
 
 ### build/index.d.ts#medianInterval
 export declare function medianInterval(values: readonly number[], level?: number): MedianInterval;
+
+### build/index.d.ts#mergeHistograms
+export declare function mergeHistograms(a: Histogram, b: Histogram): Histogram;
 
 ### build/index.d.ts#mergeRunning
 export declare function mergeRunning(a: RunningSummary, b: RunningSummary): RunningSummary;

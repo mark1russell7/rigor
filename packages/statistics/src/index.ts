@@ -1,6 +1,17 @@
 export { type QuantileMethod, type Summary, mean, median, quantile, quantileSorted, sd, sorted, summarize } from "./describe.ts";
 export { type RunningSummary, EMPTY_RUNNING, addToRunning, mergeRunning, runningMean, runningOf, runningSd } from "./running.ts";
 export {
+  type Histogram,
+  type HistogramBucket,
+  HISTOGRAM_RELATIVE_ERROR,
+  addAllToHistogram,
+  addToHistogram,
+  emptyHistogram,
+  histogramOf,
+  histogramQuantile,
+  mergeHistograms,
+} from "./histogram.ts";
+export {
   type BootstrapOptions,
   type Interval,
   type SampleTotalOptions,
