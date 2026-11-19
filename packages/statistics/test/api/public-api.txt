@@ -99,6 +99,7 @@ type RatingModelScore: build/index.d.ts#RatingModelScore
 type RatingScale: build/index.d.ts#RatingScale
 type ReliabilityBin: build/index.d.ts#ReliabilityBin
 type ReliabilityOptions: build/index.d.ts#ReliabilityOptions
+type ReliabilityTestOptions: build/index.d.ts#ReliabilityTestOptions
 type ResponseAbsentPoint: build/index.d.ts#ResponseAbsentPoint
 type ResponseBand: build/index.d.ts#ResponseBand
 type ResponseCurvePoint: build/index.d.ts#ResponseCurvePoint
@@ -151,6 +152,7 @@ type SobolIndices: build/index.d.ts#SobolIndices
 type SobolOptions: build/index.d.ts#SobolOptions
 type Summary: build/index.d.ts#Summary
 type TableResponseModel: build/index.d.ts#TableResponseModel
+type TestedBin: build/index.d.ts#TestedBin
 type TieModel: build/index.d.ts#TieModel
 type TotalCalibration: build/index.d.ts#TotalCalibration
 type TwoSamplePermutationOptions: build/index.d.ts#TwoSamplePermutationOptions
@@ -246,6 +248,7 @@ ranks: build/index.d.ts#ranks
 ratingToStrength: build/index.d.ts#ratingToStrength
 ratingUncertainty: build/index.d.ts#ratingUncertainty
 reliability: build/index.d.ts#reliability
+reliabilityTest: build/index.d.ts#reliabilityTest
 responseCells: build/index.d.ts#responseCells
 ridgeSolve: build/index.d.ts#ridgeSolve
 runningMean: build/index.d.ts#runningMean
@@ -885,6 +888,12 @@ interface ReliabilityOptions {
   readonly bins?: number;
 }
 
+### build/index.d.ts#ReliabilityTestOptions
+interface ReliabilityTestOptions extends ReliabilityOptions {
+  readonly minCount?: number;
+  readonly level?: number;
+}
+
 ### build/index.d.ts#ResponseAbsentPoint
 interface ResponseAbsentPoint {
   readonly id: string;
@@ -1263,6 +1272,13 @@ interface TableResponseModel extends ResponseModelBase {
   readonly fallback: number;
 }
 
+### build/index.d.ts#TestedBin
+interface TestedBin extends ReliabilityBin {
+  readonly p?: number;
+  readonly adjusted?: number;
+  readonly reject: boolean;
+}
+
 ### build/index.d.ts#TieModel
 type TieModel = "davidson" | "half";
 
@@ -1580,6 +1596,9 @@ export declare function ratingUncertainty(item: Pick<RatedItem, "se" | "picks">)
 
 ### build/index.d.ts#reliability
 export declare function reliability(forecasts: readonly Forecast[], options?: ReliabilityOptions): ReliabilityBin[];
+
+### build/index.d.ts#reliabilityTest
+export declare function reliabilityTest(forecasts: readonly Forecast[], options?: ReliabilityTestOptions): TestedBin[];
 
 ### build/index.d.ts#responseCells
 export declare function responseCells(record: Pick<ResponseRecord, "dimensions">, vary: string | readonly [string, string], steps?: number): number;

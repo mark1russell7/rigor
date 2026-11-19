@@ -278,6 +278,7 @@ In the tests, the series are AR(1) with 200 readings and the slope 0.6. There, t
 | `brier`, `calibration` | The Brier score of predictions, and the hit rate of each stated level. |
 | `reliability(forecasts, { bins })`, `calibrationError(forecasts, { bins })` | The hit rate of each bin of equal width from 0 to 1, with its Wilson interval, and the expected calibration error. The default is 10 bins. A p of 1 is in the last bin. Use them for continuous probabilities. |
 | `totalCalibration(forecasts)` | The count of hits of independent predictions against the sum of their chances: `expected`, `hits`, `sd`, `z`, `within2`, and exact p values. |
+| `reliabilityTest(forecasts, { bins, minCount, level })` | The bins of `reliability`, each with a test of its calibration. Each bin with `minCount` (default 30) or more predictions gets the exact two-sided p of `totalCalibration`. The Holm correction over these bins gives `adjusted` and `reject` at `level` (default 0.05). |
 | `logLoss(forecasts)` | The mean log-loss of predictions, with the natural log. A p of 0 for a hit gives Infinity. |
 | `eloExpected(ra, rb, { scale, base })`, `eloUpdate(ra, rb, score, { k, scale, base })` | The expected score of the first item, and the ratings of a pair after one result. The defaults are 400, 10 and a `k` of 32. |
 | `glicko2Update(player, games, { tau, tolerance })`, `glicko2Idle(player)` | The Glicko-2 rating, RD and volatility after one rating period, and after a period with no games. The default `tau` is 0.5. |
