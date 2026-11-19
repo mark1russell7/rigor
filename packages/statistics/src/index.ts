@@ -36,6 +36,15 @@ export { type ModeOptions, type SmoothLaw, type SmoothLawScore, bestSmoothLaw, m
 export { type LeastSquaresFit, type LeastSquaresOptions, leastSquares } from "./regression.ts";
 export { type RidgeOptions, ridgeSolve } from "./ridge.ts";
 export {
+  type ClassForecast,
+  type ScalingForm,
+  type VectorScaling,
+  type VectorScalingFit,
+  type VectorScalingOptions,
+  scaledProbabilities,
+  vectorScaling,
+} from "./recalibration.ts";
+export {
   type ContinuousDimension,
   type CategoricalDimension,
   type OrdinalDimension,

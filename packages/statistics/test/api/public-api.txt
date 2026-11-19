@@ -18,6 +18,7 @@ type BradleyTerrySparseOptions: build/index.d.ts#BradleyTerrySparseOptions
 type BradleyTerryStart: build/index.d.ts#BradleyTerryStart
 type CalibrationLevel: build/index.d.ts#CalibrationLevel
 type CategoricalDimension: build/index.d.ts#CategoricalDimension
+type ClassForecast: build/index.d.ts#ClassForecast
 type ClassScore: build/index.d.ts#ClassScore
 type CompareOptions: build/index.d.ts#CompareOptions
 type Comparison: build/index.d.ts#Comparison
@@ -142,6 +143,7 @@ type RunningSummary: build/index.d.ts#RunningSummary
 SIGN_FLIP_EXACT_LIMIT: build/index.d.ts#SIGN_FLIP_EXACT_LIMIT
 SIGN_FLIP_EXACT_MAX: build/index.d.ts#SIGN_FLIP_EXACT_MAX
 type SampleTotalOptions: build/index.d.ts#SampleTotalOptions
+type ScalingForm: build/index.d.ts#ScalingForm
 type SideP: build/index.d.ts#SideP
 type SignFlipOptions: build/index.d.ts#SignFlipOptions
 type SignFlipResult: build/index.d.ts#SignFlipResult
@@ -162,6 +164,9 @@ type UStatisticMean: build/index.d.ts#UStatisticMean
 type UStatisticMethod: build/index.d.ts#UStatisticMethod
 type UStatisticOptions: build/index.d.ts#UStatisticOptions
 U_STATISTIC_TIGHT_MIN_SAMPLE: build/index.d.ts#U_STATISTIC_TIGHT_MIN_SAMPLE
+type VectorScaling: build/index.d.ts#VectorScaling
+type VectorScalingFit: build/index.d.ts#VectorScalingFit
+type VectorScalingOptions: build/index.d.ts#VectorScalingOptions
 Z95: build/index.d.ts#Z95
 addAllToHistogram: build/index.d.ts#addAllToHistogram
 addToHistogram: build/index.d.ts#addToHistogram
@@ -255,6 +260,7 @@ runningMean: build/index.d.ts#runningMean
 runningOf: build/index.d.ts#runningOf
 runningSd: build/index.d.ts#runningSd
 sampleTotalInterval: build/index.d.ts#sampleTotalInterval
+scaledProbabilities: build/index.d.ts#scaledProbabilities
 sd: build/index.d.ts#sd
 selectRatingModel: build/index.d.ts#selectRatingModel
 signFlipTest: build/index.d.ts#signFlipTest
@@ -272,6 +278,7 @@ tQuantile: build/index.d.ts#tQuantile
 totalCalibration: build/index.d.ts#totalCalibration
 twoSamplePermutation: build/index.d.ts#twoSamplePermutation
 uStatisticInterval: build/index.d.ts#uStatisticInterval
+vectorScaling: build/index.d.ts#vectorScaling
 whenHolds: build/index.d.ts#whenHolds
 wilson: build/index.d.ts#wilson
 wilsonSampleSize: build/index.d.ts#wilsonSampleSize
@@ -361,6 +368,12 @@ interface CalibrationLevel {
 interface CategoricalDimension extends ResponseDimensionBase {
   readonly kind: "categorical";
   readonly levels: readonly string[];
+}
+
+### build/index.d.ts#ClassForecast
+interface ClassForecast {
+  readonly probabilities: readonly number[];
+  readonly label: number;
 }
 
 ### build/index.d.ts#ClassScore
@@ -1190,6 +1203,9 @@ interface SampleTotalOptions extends BootstrapOptions {
   readonly scale?: number;
 }
 
+### build/index.d.ts#ScalingForm
+type ScalingForm = "scalar" | "diagonal";
+
 ### build/index.d.ts#SideP
 interface SideP {
   readonly against: number;
@@ -1342,6 +1358,30 @@ interface UStatisticOptions {
 
 ### build/index.d.ts#U_STATISTIC_TIGHT_MIN_SAMPLE
 export declare const U_STATISTIC_TIGHT_MIN_SAMPLE: number;
+
+### build/index.d.ts#VectorScaling
+interface VectorScaling {
+  readonly slopes: readonly number[];
+  readonly biases: readonly number[];
+}
+
+### build/index.d.ts#VectorScalingFit
+interface VectorScalingFit extends VectorScaling {
+  readonly slopeSe: number[];
+  readonly biasSe: number[];
+  readonly logLikelihood: number;
+  readonly iterations: number;
+  readonly converged: boolean;
+  readonly skipped: number;
+}
+
+### build/index.d.ts#VectorScalingOptions
+interface VectorScalingOptions {
+  readonly form?: ScalingForm;
+  readonly priorSd?: number;
+  readonly maxIterations?: number;
+  readonly tolerance?: number;
+}
 
 ### build/index.d.ts#Z95
 export declare const Z95 = 1.959963984540054;
@@ -1618,6 +1658,9 @@ export declare function runningSd(s: RunningSummary): number;
 ### build/index.d.ts#sampleTotalInterval
 export declare function sampleTotalInterval(values: readonly number[], options: SampleTotalOptions): Interval;
 
+### build/index.d.ts#scaledProbabilities
+export declare function scaledProbabilities(probabilities: readonly number[], scaling: VectorScaling): number[];
+
 ### build/index.d.ts#sd
 export declare function sd(values: readonly number[]): number;
 
@@ -1668,6 +1711,9 @@ export declare function twoSamplePermutation(a: readonly number[], b: readonly n
 
 ### build/index.d.ts#uStatisticInterval
 export declare function uStatisticInterval(totals: readonly number[], options: UStatisticOptions): UStatisticInterval;
+
+### build/index.d.ts#vectorScaling
+export declare function vectorScaling(classes: number, forecasts: readonly ClassForecast[], options?: VectorScalingOptions): VectorScalingFit;
 
 ### build/index.d.ts#whenHolds
 export declare function whenHolds(dimension: ResponseDimension, values: Readonly<Record<string, unknown>>): boolean;
