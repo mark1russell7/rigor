@@ -836,6 +836,23 @@ run.pairs["old~aa"];                              // the records of the A/A pair
 
 A run of many jobs sets `roundOffset` to `job * rounds`. Then the merged records have one record of each case and round. Without it, each job repeats the first orders, and the merge removes more records.
 
+### Warm-up children
+
+The first child of a job can start with a cold file cache and a cold compile cache. Then its time is high, and the A/A spread of the rounds can go above the noise cap. `warmUp` starts untimed children before the first round:
+
+```ts
+const run = await freshRun({ base, candidates: [next], cases, rounds: 6, order: "arms", warmUp: 1 });
+
+run.warmUp;                                       // [{ arm: "base", case, ms: 42300 }, { arm: "next", case, ms: 34100 }]
+```
+
+- Each arm starts `warmUp` children on the first case of the job, through `start`, with the limits of a timed child. The default is 0.
+- In each pass, the base starts first, then each candidate. An A/A copy has the child of its arm, so it gets no warm-up child.
+- The pairs do not include a warm-up child. `run.warmUp` lists the time of each warm-up child for the log.
+- A warm-up child that fails stops the run with an error. Its hash and each later hash of its arm on the case must agree.
+- A skip line of a warm-up child, or a warm-up child over the limit with `overLimit: "skip"`, removes no case. The timed rounds decide the skip.
+- `freshArms` takes `warmUp` too. There, each different child of the arms starts `warmUp` times, and a skip stops the run.
+
 ### One base child for each round
 
 A gate that compares each candidate with one time of the base in the same round uses `order: "arms"`:
@@ -931,6 +948,7 @@ run.fixtures;                                     // the hash of each fixture fi
 - The result keeps the hashes. `fixtureDifferences` gives the files that two records do not share, so a comparison of two records can refuse different fixtures.
 - The fetch of the fixture files is a step of the job before the run. The owner of the files fetches them with its own tool.
 - A child that fails, takes too long, prints no JSON line or skips its case stops the run with an error. Two different hashes from children with the same argv stop it too.
+- With `warmUp`, each different child of the arms starts that count of times before the first round. The two arms of `aa` share their warm-up children. `onProcess` does not get them, and `run.warmUp` lists them.
 
 ### A list of case modules
 

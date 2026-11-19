@@ -379,6 +379,46 @@ describe("freshRun", () => {
     expect([calls[0]!.case, calls[calls.length / 2]!.case]).toEqual(["a", "d"]);
   });
 
+  it("starts warmUp children of each arm on the first case before the first round, and keeps no record of them", async () => {
+    const other = { id: "other", command: ["other"] };
+    const { start, calls } = fake();
+    const result = await run({ start, candidates: [next, other], rounds: 2, warmUp: 2 });
+    // Each pass starts the base, then each candidate. The A/A copy has the child of the base, so it gets no warm-up child.
+    const pass = [["base", "x"], ["next", "x"], ["other", "x"]];
+    expect(calls.slice(0, 6).map((c) => [c.program, c.case])).toEqual([...pass, ...pass]);
+    expect(result.warmUp).toEqual(pass.concat(pass).map(([arm, id], k) => ({ arm, case: id, ms: k + 1 })));
+    // The 3 pairs give 2 children for each case and round.
+    expect(calls.length).toBe(6 + 3 * 2 * 2 * 2);
+    // The records are the records of a run with no warm-up children: only the times of the fake start move by 6.
+    const plain = await run({ start: fake().start, candidates: [next, other], rounds: 2 });
+    expect(plain).not.toHaveProperty("warmUp");
+    for (const [pair, records] of Object.entries(result.pairs)) expect(records.map((r) => ({ ...r, a: r.a - 6, b: r.b - 6 }))).toEqual(plain.pairs[pair]);
+    expect(result.skipped).toEqual([]);
+  });
+
+  it("starts the warm-up children on the first case of the job, with the turn of firstCase and roundOffset", async () => {
+    const { start, calls } = fake();
+    // The step is 1, so the global round 2 starts with the case (2 + 2) % 3 = 1.
+    const result = await run({ start, cases: ["x", "y", "z"], rounds: 3, firstCase: 2, roundOffset: 2, warmUp: 1 });
+    expect(result.warmUp!.map((w) => [w.arm, w.case])).toEqual([["base", "y"], ["next", "y"]]);
+    expect(calls[2]!.case).toBe("y");
+  });
+
+  it("lists a warm-up child that skips or takes too long with its reason, and removes no case for it", async () => {
+    const skip = fake((_p, _c, k) => (k === 0 ? { stdout: JSON.stringify({ skipped: "cold" }) } : k === 1 ? { timedOut: true } : undefined));
+    const result = await run({ start: skip.start, overLimit: "skip", warmUp: 1 });
+    expect(result.warmUp).toEqual([{ arm: "base", case: "x", skipped: "cold" }, { arm: "next", case: "x", skipped: "took more than 600000 ms" }]);
+    expect(result.skipped).toEqual([]);
+    expect(result.pairs["next"]!.length).toBe(2 * 4);
+  });
+
+  it("refuses a warm-up child that fails, and a warm-up hash that differs from a later hash of its arm", async () => {
+    const crash = fake((_p, _c, k) => (k === 1 ? { code: 1, stderr: "cold crash" } : undefined)).start;
+    await expect(run({ start: crash, warmUp: 1 })).rejects.toThrow(/^freshRun: the warm-up child 1 of the arm "next" on the case "x" exited with the code 1\. The tail of stderr: cold crash/);
+    const hashes = fake((program, _c, k) => ({ stdout: JSON.stringify({ ms: 1, hash: program === "base" && k === 0 ? "cold" : "h" }) })).start;
+    await expect(run({ start: hashes, warmUp: 1 })).rejects.toThrow(/gave the hash h, and an earlier child of the arm gave cold/);
+  });
+
   it("refuses two hashes of one arm on one case, and permits other hashes for other arms", async () => {
     const hashOf = (program: string, k: number) => (program === "base" ? (k < 20 ? "h1" : "h2") : "n1");
     const start = fake((program, _c, k) => ({ stdout: JSON.stringify({ ms: 1, hash: hashOf(program, k) }) })).start;
@@ -401,6 +441,8 @@ describe("freshRun", () => {
     await expect(run({ start, order: "both" as unknown as "arms" })).rejects.toThrow(/order is "pairs" or "arms"/);
     await expect(run({ start, firstCase: -1 })).rejects.toThrow(/first case is a whole number/);
     await expect(run({ start, firstCase: 1.5 })).rejects.toThrow(/first case is a whole number/);
+    await expect(run({ start, warmUp: -1 })).rejects.toThrow(/freshRun: warmUp is a whole number of 0 or more, not -1/);
+    await expect(run({ start, warmUp: 1.5 })).rejects.toThrow(/warmUp is a whole number/);
   });
 
   it("starts real child processes", async () => {

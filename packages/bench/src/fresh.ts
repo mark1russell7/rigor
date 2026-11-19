@@ -362,6 +362,28 @@ export interface FreshOptions {
   readonly env?: BenchEnv;
   /** The start of a child. The default is `startProcess`. A test gives its own, and a caller can wrap `startProcess` to write the `stderr` of each child. */
   readonly start?: StartChild;
+  /**
+   * The count of warm-up children of each arm before the first round. The default is 0.
+   * A warm-up child fills the file cache and the compile cache, so the first timed child does not start cold.
+   * Each warm-up child starts on the first case of the job, through `start`, with the limits of a timed child.
+   *
+   * In each pass, the base starts first, then each candidate in its order. An A/A copy has the child of its arm, so it gets no warm-up child.
+   * The run keeps no record of a warm-up child, and a skip line of a warm-up child removes no case.
+   * A fault of a warm-up child is an error. Its hash and each later hash of its arm on the case must agree.
+   */
+  readonly warmUp?: number;
+}
+
+/** One warm-up child of a run. The pairs and the processes of the run do not include it. */
+export interface WarmUpChild {
+  /** The id of the arm. */
+  readonly arm: string;
+  /** The case of the child. */
+  readonly case: string;
+  /** The time of the child line in milliseconds. A child with a skip line has no time. */
+  readonly ms?: number;
+  /** The reason of the skip line of the child. */
+  readonly skipped?: string;
 }
 
 /** One record of a fresh run: a `PairedTime` record with the job and the computer of its job. */
@@ -401,6 +423,8 @@ export interface FreshRun {
   readonly skipped: FreshSkip[];
   /** The order of the children of each case in each round. Only a run with the order `"arms"` has it. A skipped case has no order. */
   readonly orders?: readonly CaseOrder[];
+  /** The warm-up children, in the order of their starts. Only a run with `warmUp` above 0 has them. */
+  readonly warmUp?: readonly WarmUpChild[];
 }
 
 /** The suffix of the id of the A/A pair. */
@@ -414,6 +438,8 @@ const AA_SUFFIX = "~aa";
  * - With the order `"arms"`, each arm starts one child in the order of `armOrder`. The pairs share the base child.
  *   The result keeps the order of each round and case in `orders`.
  * - With `firstCase`, the order of the cases turns in each round. The turn of the arms and the order of the pairs do not change.
+ * - With `warmUp`, each arm starts that count of warm-up children on the first case of the job before the first round.
+ *   The result lists them in `warmUp`, outside the pairs.
  * - A child that exits with an error, takes too long or prints no JSON line is an error. A skip line skips a case.
  *   With `overLimit: "skip"`, a child that takes too long in the first round skips its case too.
  * - A case that an arm skips in the first round of the job leaves each pair, and the runner starts no more children for it.
@@ -430,6 +456,7 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
   const args = options.args ?? ((id: string) => ["--case", id]);
   const start = options.start ?? startProcess;
   const firstCase = options.firstCase;
+  const warmUp = warmUpCount(options.warmUp, "freshRun");
   if (!Number.isSafeInteger(rounds) || rounds < 1) throw new RangeError(`freshRun: the rounds are a whole number of 1 or more, not ${rounds}.`);
   if (firstCase !== undefined && (!Number.isSafeInteger(firstCase) || firstCase < 0)) throw new RangeError(`freshRun: the first case is a whole number of 0 or more, not ${firstCase}.`);
   if (!Number.isSafeInteger(roundOffset) || roundOffset < 0) throw new RangeError(`freshRun: the round offset is a whole number of 0 or more, not ${roundOffset}.`);
@@ -487,9 +514,19 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
 
   // The step of the turn of the cases spreads the first places of the rounds of one job over the cases.
   const step = Math.max(1, Math.floor(cases.length / rounds));
+  const shiftOf = (round: number): number => (firstCase === undefined ? 0 : (firstCase + round * step) % cases.length);
+  // The warm-up children start on the first case of the job, before the first round. They give no record.
+  const warmed: WarmUpChild[] = [];
+  const warmCase = cases[shiftOf(roundOffset)]!;
+  for (let w = 1; w <= warmUp; w++) {
+    for (const arm of [base, ...candidates]) {
+      const line = await timed(arm, warmCase, 0, `the warm-up child ${w} of the arm ${JSON.stringify(arm.id)} on the case ${JSON.stringify(warmCase)}`);
+      warmed.push({ arm: arm.id, case: warmCase, ...(line.skipped === undefined ? { ms: line.ms } : { skipped: line.skipped }) });
+    }
+  }
   for (let r = 0; r < rounds; r++) {
     const round = roundOffset + r;
-    const shift = firstCase === undefined ? 0 : (firstCase + round * step) % cases.length;
+    const shift = shiftOf(round);
     for (let k = 0; k < cases.length; k++) {
       // The index of the case, not its place in the round, gives the turn of the arms and the order of the pairs.
       const i = (shift + k) % cases.length;
@@ -553,7 +590,7 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
       for (const { pair, record } of records) out[pair]!.push(record);
     }
   }
-  return { env, job, pairs: out, skipped, ...(order === "arms" ? { orders } : {}) };
+  return { env, job, pairs: out, skipped, ...(order === "arms" ? { orders } : {}), ...(warmUp > 0 ? { warmUp: warmed } : {}) };
 }
 
 /** One arm of a run of arms: its id, the case that it times, and the argv of its child. */
@@ -603,6 +640,12 @@ export interface FreshArmsOptions {
   readonly start?: StartChild;
   /** This function gets the record of each child when the child ends. A runner prints its progress with it. */
   readonly onProcess?: (record: ArmProcess) => void;
+  /**
+   * The count of warm-up children of each different child of the arms before the first round. The default is 0.
+   * The two arms of the A/A pair have the same child, so they share their warm-up children.
+   * The run keeps no record of a warm-up child, and `onProcess` does not get it. A fault or a skip of a warm-up child is an error.
+   */
+  readonly warmUp?: number;
 }
 
 /** The result of a run of arms. */
@@ -620,6 +663,8 @@ export interface FreshArms {
   readonly aa: readonly FreshRecord[];
   /** The hashes of the fixture files. Only a run with fixtures has them. */
   readonly fixtures?: readonly FixtureHash[];
+  /** The warm-up children, in the order of their starts. Only a run with `warmUp` above 0 has them. */
+  readonly warmUp?: readonly WarmUpChild[];
 }
 
 /** This function examines the options of a run of arms and gives the command of each arm. A bad option is a `RangeError`. */
@@ -654,6 +699,7 @@ function armsCommands(options: FreshArmsOptions): Map<string, readonly string[]>
  * - The arms of a round come in the order of `armOrder`. The default count of rounds is balanced, and another count gives a warning.
  * - With `aa`, each round gives an A/A record. Arm `a` is the first id of `aa`, and `first` is the arm that started first.
  * - With `fixtures`, a file that is not the pinned file stops the run before the first child.
+ * - With `warmUp`, each different child of the arms starts that count of times before the first round. The result lists them in `warmUp`.
  * - A child that exits with an error, takes too long, prints no JSON line or skips its case is an error. A run of arms has no skips.
  * - Two different hashes from children with the same argv and folder are an error.
  */
@@ -668,6 +714,7 @@ export async function freshArms(options: FreshArmsOptions): Promise<FreshArms> {
   const maxBuffer = options.maxBuffer ?? 1 << 24;
   const args = options.args ?? ((id: string) => ["--case", id]);
   const start = options.start ?? startProcess;
+  const warmUp = warmUpCount(options.warmUp, "freshArms");
   if (!Number.isSafeInteger(rounds) || rounds < 1) throw new RangeError(`freshArms: the rounds are a whole number of 1 or more, not ${rounds}.`);
   if (!Number.isSafeInteger(roundOffset) || roundOffset < 0) throw new RangeError(`freshArms: the round offset is a whole number of 0 or more, not ${roundOffset}.`);
   if (!(timeoutMs > 0) || !(maxBuffer > 0)) throw new RangeError("freshArms: the time limit and the output limit are above 0.");
@@ -681,22 +728,43 @@ export async function freshArms(options: FreshArmsOptions): Promise<FreshArms> {
   const processes: ArmProcess[] = [];
   const hashes = new Map<string, string>();
   const aa: FreshRecord[] = [];
+  const argvOf = (arm: CaseArm): string[] => [...commands.get(arm.id)!, ...args(arm.case)];
+  // Two children with the same argv and folder are the same child. The hashes and the warm-up children use this key.
+  const keyOf = (arm: CaseArm): string => `${arm.cwd ?? ""}\u0000${argvOf(arm).join("\u0000")}`;
+  /** This function starts one child of an arm, and examines its skip and its hash. A skip is an error. */
+  const timed = async (arm: CaseArm, where: string): Promise<ChildTime> => {
+    const line = await child(start, argvOf(arm), { timeoutMs, maxBuffer, ...(arm.cwd === undefined ? {} : { cwd: arm.cwd }) }, where, "error", "freshArms");
+    if (line.skipped !== undefined) throw new Error(`freshArms: ${where} skipped the case (${JSON.stringify(line.skipped)}). A run of arms has no skips: remove the arm, or fix its child.`);
+    if (line.hash !== undefined) {
+      const key = keyOf(arm);
+      const known = hashes.get(key);
+      if (known !== undefined && known !== line.hash) throw new Error(`freshArms: ${where} gave the hash ${line.hash}, and an earlier child with the same argv gave ${known}.`);
+      hashes.set(key, line.hash);
+    }
+    return line;
+  };
+
+  // The warm-up children: each different child starts `warmUp` times before the first round. They give no record.
+  const warmed: WarmUpChild[] = [];
+  const different: CaseArm[] = [];
+  const keys = new Set<string>();
+  for (const arm of arms) {
+    if (!keys.has(keyOf(arm))) different.push(arm);
+    keys.add(keyOf(arm));
+  }
+  for (let w = 1; w <= warmUp; w++) {
+    for (const arm of different) {
+      const line = await timed(arm, `the warm-up child ${w} of the arm ${JSON.stringify(arm.id)} on the case ${JSON.stringify(arm.case)}`);
+      warmed.push({ arm: arm.id, case: arm.case, ms: line.ms });
+    }
+  }
   for (let r = 0; r < rounds; r++) {
     const round = roundOffset + r;
     const inRound = new Map<string, ArmProcess>();
     const order = armOrder(arms, round);
     for (let position = 0; position < order.length; position++) {
       const arm = order[position]!;
-      const argv = [...commands.get(arm.id)!, ...args(arm.case)];
-      const where = `the arm ${JSON.stringify(arm.id)} on the case ${JSON.stringify(arm.case)}, round ${round}`;
-      const line = await child(start, argv, { timeoutMs, maxBuffer, ...(arm.cwd === undefined ? {} : { cwd: arm.cwd }) }, where, "error", "freshArms");
-      if (line.skipped !== undefined) throw new Error(`freshArms: ${where} skipped the case (${JSON.stringify(line.skipped)}). A run of arms has no skips: remove the arm, or fix its child.`);
-      if (line.hash !== undefined) {
-        const key = `${arm.cwd ?? ""}\u0000${argv.join("\u0000")}`;
-        const known = hashes.get(key);
-        if (known !== undefined && known !== line.hash) throw new Error(`freshArms: ${where} gave the hash ${line.hash}, and an earlier child with the same argv gave ${known}.`);
-        hashes.set(key, line.hash);
-      }
+      const line = await timed(arm, `the arm ${JSON.stringify(arm.id)} on the case ${JSON.stringify(arm.case)}, round ${round}`);
       const { ms, hash: _hash, skipped: _skipped, ...more } = line;
       const record: ArmProcess = { arm: arm.id, case: arm.case, round, position, ms, ...(Object.keys(more).length > 0 ? { fields: more } : {}) };
       processes.push(record);
@@ -710,7 +778,14 @@ export async function freshArms(options: FreshArmsOptions): Promise<FreshArms> {
       aa.push({ case: a.case, round, first: a.position < b.position ? "a" : "b", a: a.ms, b: b.ms, job, env, ...fields });
     }
   }
-  return { env, job, rounds, balanced, warnings, processes, aa, ...(fixtures === undefined ? {} : { fixtures }) };
+  return { env, job, rounds, balanced, warnings, processes, aa, ...(fixtures === undefined ? {} : { fixtures }), ...(warmUp > 0 ? { warmUp: warmed } : {}) };
+}
+
+/** This function examines the count of warm-up children of a run. The default is 0. A bad count is a `RangeError`. */
+function warmUpCount(value: number | undefined, runner: string): number {
+  const count = value ?? 0;
+  if (!Number.isSafeInteger(count) || count < 0) throw new RangeError(`${runner}: warmUp is a whole number of 0 or more, not ${count}.`);
+  return count;
 }
 
 /** This function gives the field `commits` of the records of a pair, or nothing when no arm of the pair names a commit. */
