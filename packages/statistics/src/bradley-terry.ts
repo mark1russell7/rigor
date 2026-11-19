@@ -6,7 +6,7 @@
  * Ties use the Davidson (1970) model, or count as half a win and half a loss. The fit uses Newton steps with a line search on the negative log posterior. This function is
  * convex, so the steps go to its one minimum.
  */
-import { factor } from "./ridge.ts";
+import { factor, factorInverseDiagonal, factorSolve } from "./ridge.ts";
 import { pairOutcomes } from "./rating.ts";
 
 /** The result of a comparison: the first item wins, the second item wins, or a tie. */
@@ -303,38 +303,10 @@ function factored(hessian: Float64Array, k: number): Float64Array {
 
 /** The Newton step: the solution of `hessian * step = -gradient`. */
 function solve(hessian: Float64Array, gradient: Float64Array, k: number): Float64Array {
-  const l = factored(hessian, k);
-  const y = new Float64Array(k);
-  for (let i = 0; i < k; i++) {
-    let s = -(gradient[i] as number);
-    for (let j = 0; j < i; j++) s -= (l[i * k + j] as number) * (y[j] as number);
-    y[i] = s / (l[i * k + i] as number);
-  }
-  for (let i = k - 1; i >= 0; i--) {
-    let s = y[i] as number;
-    for (let j = i + 1; j < k; j++) s -= (l[j * k + i] as number) * (y[j] as number);
-    y[i] = s / (l[i * k + i] as number);
-  }
-  return y;
+  return factorSolve(factored(hessian, k), gradient.map((g) => -g), k);
 }
 
-/** The diagonal of the inverse of the Hessian: the column sums of the squares of the inverse of its Cholesky factor. */
+/** The diagonal of the inverse of the Hessian. */
 function inverseDiagonal(hessian: Float64Array, k: number): Float64Array {
-  const l = factored(hessian, k);
-  const out = new Float64Array(k);
-  const column = new Float64Array(k);
-  for (let c = 0; c < k; c++) {
-    // Column c of the inverse of L, by forward substitution. Its entries above row c are 0.
-    column.fill(0);
-    for (let i = c; i < k; i++) {
-      let s = i === c ? 1 : 0;
-      for (let j = c; j < i; j++) s -= (l[i * k + j] as number) * (column[j] as number);
-      column[i] = s / (l[i * k + i] as number);
-    }
-    // The inverse of the Hessian is inv(L)' inv(L), so its diagonal entry c is the sum over the rows of column c squared.
-    let sum = 0;
-    for (let i = c; i < k; i++) sum += (column[i] as number) ** 2;
-    out[c] = sum;
-  }
-  return out;
+  return factorInverseDiagonal(factored(hessian, k), k);
 }

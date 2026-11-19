@@ -84,3 +84,45 @@ export function factor(a: Float64Array, k: number): boolean {
   }
   return true;
 }
+
+/**
+ * This function gives the solution `x` of `L L' x = b`, from the Cholesky factor `L` that `factor` wrote into the lower
+ * triangle of `l`. It does not change `l` or `b`.
+ */
+export function factorSolve(l: Float64Array, b: ArrayLike<number>, k: number): Float64Array {
+  const y = new Float64Array(k);
+  for (let i = 0; i < k; i++) {
+    let s = b[i] as number;
+    for (let j = 0; j < i; j++) s -= (l[i * k + j] as number) * (y[j] as number);
+    y[i] = s / (l[i * k + i] as number);
+  }
+  for (let i = k - 1; i >= 0; i--) {
+    let s = y[i] as number;
+    for (let j = i + 1; j < k; j++) s -= (l[j * k + i] as number) * (y[j] as number);
+    y[i] = s / (l[i * k + i] as number);
+  }
+  return y;
+}
+
+/**
+ * This function gives the diagonal of the inverse of `L L'`, from the Cholesky factor `L` in the lower triangle of `l`.
+ * Each value is the sum of the squares of one column of the inverse of `L`.
+ */
+export function factorInverseDiagonal(l: Float64Array, k: number): Float64Array {
+  const out = new Float64Array(k);
+  const column = new Float64Array(k);
+  for (let c = 0; c < k; c++) {
+    // Column c of the inverse of L, by forward substitution. Its entries above row c are 0.
+    column.fill(0);
+    for (let i = c; i < k; i++) {
+      let s = i === c ? 1 : 0;
+      for (let j = c; j < i; j++) s -= (l[i * k + j] as number) * (column[j] as number);
+      column[i] = s / (l[i * k + i] as number);
+    }
+    // The inverse of L L' is inv(L)' inv(L), so its diagonal entry c is the sum over the rows of column c squared.
+    let sum = 0;
+    for (let i = c; i < k; i++) sum += (column[i] as number) ** 2;
+    out[c] = sum;
+  }
+  return out;
+}
