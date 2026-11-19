@@ -369,6 +369,7 @@ ProbeOptions: build/fresh.d.ts#ProbeOptions
 type RepoCommitOptions: build/fresh.d.ts#RepoCommitOptions
 StartChild: build/fresh.d.ts#StartChild
 StartOptions: build/fresh.d.ts#StartOptions
+WarmUpChild: build/fresh.d.ts#WarmUpChild
 armTimes: build/fresh.d.ts#armTimes
 benchEnv: build/fresh.d.ts#benchEnv
 checkFixtures: build/fresh.d.ts#checkFixtures
@@ -610,6 +611,7 @@ export interface FreshArms {
   readonly processes: readonly ArmProcess[];
   readonly aa: readonly FreshRecord[];
   readonly fixtures?: readonly FixtureHash[];
+  readonly warmUp?: readonly WarmUpChild[];
 }
 
 ### build/fresh.d.ts#FreshArmsOptions
@@ -627,6 +629,7 @@ export interface FreshArmsOptions {
   readonly env?: BenchEnv;
   readonly start?: StartChild;
   readonly onProcess?: (record: ArmProcess) => void;
+  readonly warmUp?: number;
 }
 
 ### build/fresh.d.ts#FreshOptions
@@ -646,6 +649,7 @@ export interface FreshOptions {
   readonly job?: string;
   readonly env?: BenchEnv;
   readonly start?: StartChild;
+  readonly warmUp?: number;
 }
 
 ### build/fresh.d.ts#FreshRecord
@@ -669,6 +673,7 @@ export interface FreshRun {
   readonly pairs: Record<string, FreshRecord[]>;
   readonly skipped: FreshSkip[];
   readonly orders?: readonly CaseOrder[];
+  readonly warmUp?: readonly WarmUpChild[];
 }
 
 ### build/fresh.d.ts#FreshSkip
@@ -712,6 +717,14 @@ export interface StartOptions {
   readonly timeoutMs: number;
   readonly maxBuffer: number;
   readonly cwd?: string;
+}
+
+### build/fresh.d.ts#WarmUpChild
+export interface WarmUpChild {
+  readonly arm: string;
+  readonly case: string;
+  readonly ms?: number;
+  readonly skipped?: string;
 }
 
 ### build/fresh.d.ts#armTimes

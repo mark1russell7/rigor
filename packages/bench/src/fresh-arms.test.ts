@@ -116,6 +116,28 @@ describe("freshArms", () => {
     expect(result.aa).toEqual([]);
   });
 
+  it("starts warmUp children of each different child before the first round, and keeps no record of them", async () => {
+    const { start, calls } = fake();
+    const seen: ArmProcess[] = [];
+    const result = await run({ start, warmUp: 2, onProcess: (p) => seen.push(p) });
+    // The A/A arms "same" and "same#aa" have one child, so each pass starts 3 different children.
+    const pass = ["slow", "fast", "same"];
+    expect(calls.slice(0, 6).map((c) => c.argv.at(-1))).toEqual([...pass, ...pass]);
+    expect(result.warmUp!.map((w) => [w.arm, w.case])).toEqual([...pass, ...pass].map((id) => [id, id]));
+    expect(result.warmUp![0]).toEqual({ arm: "slow", case: "slow", ms: 50 });
+    expect(calls).toHaveLength(6 + 32);
+    expect(result.processes).toHaveLength(32);
+    expect(seen).toEqual(result.processes);
+    expect(await run({ start: fake().start })).not.toHaveProperty("warmUp");
+  });
+
+  it("stops on a warm-up child that skips, and on a warm-up hash that differs from a later hash of its argv", async () => {
+    const skip = fake((_, k) => (k === 0 ? { stdout: JSON.stringify({ skipped: "cold" }) } : undefined)).start;
+    await expect(run({ start: skip, warmUp: 1 })).rejects.toThrow(/^freshArms: the warm-up child 1 of the arm "slow" on the case "slow" skipped the case \("cold"\)\. A run of arms has no skips/);
+    const hashOf = (argv: readonly string[], k: number) => ({ stdout: JSON.stringify({ ms: 1, hash: argv.includes("same") && k === 2 ? "cold" : "h" }) });
+    await expect(run({ start: fake(hashOf).start, warmUp: 1 })).rejects.toThrow(/gave the hash h, and an earlier child with the same argv gave cold/);
+  });
+
   it("stops on a failed child, a skip and two hashes of one argv", async () => {
     await expect(run({ start: fake((_, k) => (k === 2 ? { code: 1, stderr: "boom" } : undefined)).start })).rejects.toThrow(/^freshArms: the arm .* exited with the code 1\. The tail of stderr: boom/);
     await expect(run({ start: fake(() => ({ stdout: JSON.stringify({ skipped: "no fonts" }) })).start })).rejects.toThrow(/has no skips/);
@@ -138,6 +160,8 @@ describe("freshArms", () => {
       { rounds: 0 },
       { roundOffset: -1 },
       { timeoutMs: 0 },
+      { warmUp: -1 },
+      { warmUp: 0.5 },
     ];
     for (const options of bad) await expect(run({ start, ...options }), JSON.stringify(options)).rejects.toThrow(RangeError);
   });
