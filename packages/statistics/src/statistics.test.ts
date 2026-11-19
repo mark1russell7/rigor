@@ -22,11 +22,13 @@ import {
   quantileSorted,
   ranks,
   reliability,
+  reliabilityTest,
   sd,
   signTest,
   signTestPower,
   spearman,
   summarize,
+  totalCalibration,
   wilson,
 } from "./index.ts";
 
@@ -569,6 +571,67 @@ describe("the calibration", () => {
         expect(calibrationError(f, { bins: 1 })).toBeCloseTo(Math.abs(meanP - rate), 12);
       }),
       { seed: 61, numRuns: 500 },
+    );
+  });
+});
+
+describe("reliabilityTest", () => {
+  const many = (p: number, n: number, hits: number) => Array.from({ length: n }, (_, i) => ({ p, hit: i < hits }));
+  const plain = ({ p: _p, adjusted: _adjusted, reject: _reject, ...bin }: { p?: number; adjusted?: number; reject: boolean }) => bin;
+
+  it("tests each bin with minCount or more predictions, with the Holm correction over these bins", () => {
+    const calibrated = many(0.25, 40, 10);
+    const sure = many(0.9, 40, 20);
+    const few = many(0.55, 5, 0);
+    const bins = reliabilityTest([...sure, ...few, ...calibrated]);
+    const ps = [totalCalibration(calibrated).pTwoSided, totalCalibration(sure).pTwoSided];
+    const corrected = holm(ps);
+    expect(bins.map((b) => [b.low, b.n, b.p, b.adjusted, b.reject])).toEqual([
+      [0.2, 40, ps[0], corrected[0]!.adjusted, false],
+      [0.5, 5, undefined, undefined, false],
+      [0.9, 40, ps[1], corrected[1]!.adjusted, true],
+    ]);
+    expect(ps[0]).toBe(1);
+    expect(ps[1]).toBeLessThan(1e-6);
+  });
+
+  it("uses the options minCount and level", () => {
+    // 9 hits of 30 at 0.2 is above the expected 6, but one bin with this p is not a rejection at the level 0.05.
+    const f = many(0.2, 30, 9);
+    const p = totalCalibration(f).pTwoSided;
+    expect(p).toBeGreaterThan(0.05);
+    expect(reliabilityTest(f)[0]).toMatchObject({ p, adjusted: p, reject: false });
+    expect(reliabilityTest(f, { level: 0.5 })[0]!.reject).toBe(p < 0.5);
+    expect(reliabilityTest(f, { minCount: 31 })[0]).toEqual({ ...reliability(f)[0], reject: false });
+    expect(reliabilityTest(many(0.9, 1, 0), { minCount: 1 })[0]!.p).toBeCloseTo(0.2, 12);
+  });
+
+  it("throws a RangeError for bad input", () => {
+    const f = [{ p: 0.5, hit: true }];
+    expect(() => reliabilityTest([])).toThrow(RangeError);
+    expect(() => reliabilityTest([{ p: 1.2, hit: true }])).toThrow(RangeError);
+    for (const bins of [0, 2.5]) expect(() => reliabilityTest(f, { bins })).toThrow(RangeError);
+    for (const minCount of [0, -1, 2.5, Number.NaN]) expect(() => reliabilityTest(f, { minCount })).toThrow(RangeError);
+    for (const level of [0, 1, -0.1, Number.NaN]) expect(() => reliabilityTest(f, { level })).toThrow(RangeError);
+  });
+
+  it("gives the bins of reliability, a test only for the bins with minCount or more predictions, and an adjusted p of p or more", () => {
+    const forecast = fc.record({ p: fc.double({ min: 0, max: 1, noNaN: true }), hit: fc.boolean() });
+    fc.assert(
+      fc.property(fc.array(forecast, { minLength: 1, maxLength: 80 }), fc.integer({ min: 1, max: 12 }), fc.integer({ min: 1, max: 20 }), (f, bins, minCount) => {
+        const tested = reliabilityTest(f, { bins, minCount });
+        expect(tested.map(plain)).toEqual(reliability(f, { bins }));
+        for (const bin of tested) {
+          if (bin.n < minCount) {
+            expect([bin.p, bin.adjusted, bin.reject]).toEqual([undefined, undefined, false]);
+            continue;
+          }
+          expect(bin.adjusted!).toBeGreaterThanOrEqual(bin.p!);
+          expect(bin.adjusted!).toBeLessThanOrEqual(1);
+          expect(bin.reject).toBe(bin.adjusted! < 0.05);
+        }
+      }),
+      { seed: 67, numRuns: 300 },
     );
   });
 });

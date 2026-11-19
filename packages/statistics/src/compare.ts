@@ -6,7 +6,7 @@
  */
 import { allEqual, median, quantileSorted, sd, sorted } from "./describe.ts";
 import { poissonBinomialOf, tailsOf } from "./discrete.ts";
-import { type Proportion, signTest, wilson } from "./tests.ts";
+import { holm, type Proportion, signTest, wilson } from "./tests.ts";
 
 export interface NoiseOptions {
   /** The number of standard deviations. The default is 2. */
@@ -259,29 +259,33 @@ function checkedBins(name: string, options: ReliabilityOptions): number {
   return bins;
 }
 
-function binsOf(name: string, forecasts: readonly Forecast[], options: ReliabilityOptions): ReliabilityBin[] {
+/** This function gives the predictions of each bin with predictions, from the lowest bin, in the order of the input. */
+function groupsOf(name: string, forecasts: readonly Forecast[], options: ReliabilityOptions): { bins: number; groups: [number, Forecast[]][] } {
   checkedForecasts(name, forecasts);
   const bins = checkedBins(name, options);
-  const sums = new Map<number, { n: number; hits: number; sum: number }>();
+  const groups = new Map<number, Forecast[]>();
   for (const f of forecasts) {
     const index = Math.min(bins - 1, Math.floor(f.p * bins));
-    const bin = sums.get(index) ?? { n: 0, hits: 0, sum: 0 };
-    bin.n++;
-    bin.sum += f.p;
-    if (f.hit) bin.hits++;
-    sums.set(index, bin);
+    const group = groups.get(index) ?? [];
+    group.push(f);
+    groups.set(index, group);
   }
-  return [...sums]
-    .sort((a, b) => a[0] - b[0])
-    .map(([index, { n, hits, sum }]) => ({
-      low: index / bins,
-      high: (index + 1) / bins,
-      n,
-      stated: sum / n,
-      hits,
-      rate: hits / n,
-      interval: wilson(hits, n),
-    }));
+  return { bins, groups: [...groups].sort((a, b) => a[0] - b[0]) };
+}
+
+function binOf(index: number, bins: number, group: readonly Forecast[]): ReliabilityBin {
+  let [sum, hits] = [0, 0];
+  for (const f of group) {
+    sum += f.p;
+    if (f.hit) hits++;
+  }
+  const n = group.length;
+  return { low: index / bins, high: (index + 1) / bins, n, stated: sum / n, hits, rate: hits / n, interval: wilson(hits, n) };
+}
+
+function binsOf(name: string, forecasts: readonly Forecast[], options: ReliabilityOptions): ReliabilityBin[] {
+  const { bins, groups } = groupsOf(name, forecasts, options);
+  return groups.map(([index, group]) => binOf(index, bins, group));
 }
 
 /**
@@ -357,4 +361,49 @@ export function totalCalibration(forecasts: readonly Forecast[]): TotalCalibrati
     pGreater,
     pTwoSided: Math.min(1, 2 * Math.min(pLess, pGreater)),
   };
+}
+
+/** The options of `reliabilityTest`. */
+export interface ReliabilityTestOptions extends ReliabilityOptions {
+  /** The least count of predictions of a bin with a test. A bin with fewer predictions gets no test. The default is 30. */
+  readonly minCount?: number;
+  /** The level of the family of the tests, more than 0 and less than 1. The default is 0.05. */
+  readonly level?: number;
+}
+
+/** A bin of `reliability`, with its test. */
+export interface TestedBin extends ReliabilityBin {
+  /** The two-sided p of `totalCalibration` on the predictions of the bin. A bin under `minCount` has no p. */
+  readonly p?: number;
+  /** The p after the Holm correction over the bins with a test. A bin under `minCount` has no adjusted p. */
+  readonly adjusted?: number;
+  /** True when the adjusted p is less than the level. Then the stated chances of the bin are not calibrated. */
+  readonly reject: boolean;
+}
+
+/**
+ * This function gives the bins of `reliability`, each with a test of its calibration. The test of a bin is the exact
+ * two-sided test of `totalCalibration` on its predictions. Only a bin with `minCount` or more predictions gets a test.
+ * The Holm correction over these bins keeps the chance of one false rejection or more at most `level`. The tests have no
+ * condition on how the bins depend on each other.
+ *
+ * The time grows as the sum of the squares of the counts of the bins. The function throws a `RangeError` for the inputs that `reliability` refuses, a bad `minCount` and a bad `level`.
+ */
+export function reliabilityTest(forecasts: readonly Forecast[], options: ReliabilityTestOptions = {}): TestedBin[] {
+  const minCount = options.minCount ?? 30;
+  const level = options.level ?? 0.05;
+  if (!Number.isInteger(minCount) || minCount < 1) throw new RangeError(`reliabilityTest: minCount is a whole number of 1 or more, not ${minCount}.`);
+  if (!(level > 0 && level < 1)) throw new RangeError(`reliabilityTest: level is more than 0 and less than 1, not ${level}.`);
+  const { bins, groups } = groupsOf("reliabilityTest", forecasts, options);
+  const tested = groups.filter(([, group]) => group.length >= minCount);
+  const corrected = holm(
+    tested.map(([, group]) => totalCalibration(group).pTwoSided),
+    level,
+  );
+  const tests = new Map(tested.map(([index], i) => [index, corrected[i]]));
+  return groups.map(([index, group]) => {
+    const bin = binOf(index, bins, group);
+    const test = tests.get(index);
+    return test === undefined ? { ...bin, reject: false } : { ...bin, p: test.p, adjusted: test.adjusted, reject: test.reject };
+  });
 }
