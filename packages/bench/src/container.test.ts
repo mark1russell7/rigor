@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type ContainerOptions, MIN_CONTAINER_MEMORY, containerArgv, containerStart } from "./container.ts";
+import { type ContainerOptions, type DiskLimit, type DiskReads, MIN_CONTAINER_MEMORY, PAGE_CACHE_DROP, containerArgv, containerStart, diskOf, dropPageCache } from "./container.ts";
 import type { ChildExit, StartChild, StartOptions } from "./fresh.ts";
 
 /** A target of 1011425280 bytes of memory, 2 GiB of swap and 2 CPUs, with a fixed user. */
@@ -88,6 +88,142 @@ describe("containerArgv", () => {
     ];
     for (const each of bad) expect(() => containerArgv({ ...TARGET, ...each }, "box", ["node"])).toThrow(RangeError);
     expect(() => containerStart({ ...TARGET, memory: 0 })).toThrow(/the memory is a whole number of bytes/);
+  });
+
+  it("puts the limits of each disk after the CPU set and before the user, in the order of the disks and of the four flags", () => {
+    const disks = [
+      { device: "/dev/sda", writeOps: 300, readBytes: 5_242_880 },
+      { device: "/dev/nvme0n1", readOps: 1500, writeBytes: 1_048_576 },
+      { device: "/dev/dm-0", readBytes: 1, readOps: 2, writeBytes: 3, writeOps: 4 },
+    ];
+    const argv = containerArgv({ ...TARGET, disks }, "box", ["node"]);
+    const from = argv.indexOf("--cpuset-cpus") + 2;
+    expect(argv.slice(from, argv.indexOf("--user"))).toEqual([
+      "--device-read-bps",
+      "/dev/sda:5242880",
+      "--device-write-iops",
+      "/dev/sda:300",
+      "--device-read-iops",
+      "/dev/nvme0n1:1500",
+      "--device-write-bps",
+      "/dev/nvme0n1:1048576",
+      "--device-read-bps",
+      "/dev/dm-0:1",
+      "--device-read-iops",
+      "/dev/dm-0:2",
+      "--device-write-bps",
+      "/dev/dm-0:3",
+      "--device-write-iops",
+      "/dev/dm-0:4",
+    ]);
+    // With no CPU set, the limits of the disks follow the swap.
+    const { cpuset: _cpuset, ...rest } = TARGET;
+    const plain = containerArgv({ ...rest, disks: [{ device: "/dev/sda", readBytes: 7 }] }, "box", ["node"]);
+    expect(plain.slice(plain.indexOf("--memory-swap") + 2, plain.indexOf("--user"))).toEqual(["--device-read-bps", "/dev/sda:7"]);
+    expect(containerArgv(TARGET, "box", ["node"]).filter((item) => item.startsWith("--device-"))).toEqual([]);
+    expect(containerArgv({ ...TARGET, disks: [] }, "box", ["node"])).toEqual(containerArgv(TARGET, "box", ["node"]));
+  });
+
+  it("refuses a bad device, a disk with no limit, a limit that is not a whole number of 1 or more, and two entries of one device", () => {
+    const argv = (disks: readonly DiskLimit[]) => () => containerArgv({ ...TARGET, disks }, "box", ["node"]);
+    for (const device of ["sda", "/dev/", "/dev/sd a", "/dev/sda:1", "/dev/a,b", "/sys/sda", " /dev/sda"]) {
+      expect(argv([{ device, readBytes: 1 }])).toThrow(/^containerStart: the device of a disk is a path in \/dev/);
+    }
+    expect(argv([{ device: "/dev/sda" }])).toThrow(new RangeError("containerStart: the disk /dev/sda has no limit. Give readBytes, readOps, writeBytes or writeOps."));
+    for (const value of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 53]) {
+      for (const key of ["readBytes", "readOps", "writeBytes", "writeOps"] as const) {
+        expect(argv([{ device: "/dev/sda", [key]: value }])).toThrow(new RangeError(`containerStart: the ${key} of the disk /dev/sda is a whole number of 1 or more, not ${value}.`));
+      }
+    }
+    expect(argv([{ device: "/dev/sda", readBytes: 1 }, { device: "/dev/sdb", readBytes: 1 }, { device: "/dev/sda", writeBytes: 1 }])).toThrow(/^containerStart: two disks have the device \/dev\/sda\./);
+    expect(() => containerStart({ ...TARGET, disks: [{ device: "/dev/sda", readOps: 0 }] })).toThrow(RangeError);
+  });
+});
+
+/** The device number of a major and a minor number, as `gnu_dev_makedev` of glibc gives it. */
+function makedev(major: bigint, minor: bigint): bigint {
+  return ((major & 0xfffn) << 8n) | ((major & ~0xfffn) << 32n) | (minor & 0xffn) | ((minor & ~0xffn) << 12n);
+}
+
+/** A fake file system for `diskOf`: the device of each path, the links of `/sys`, and the files and folders. */
+function fakeSys(devices: Record<string, bigint | number>, links: Record<string, string>, files: Record<string, string>): { read: DiskReads; reads: string[] } {
+  const reads: string[] = [];
+  const folders = new Set(Object.keys(files).flatMap((file) => file.split("/").map((_, i, parts) => parts.slice(0, i).join("/"))));
+  const read: DiskReads = {
+    stat: (path) => {
+      const dev = devices[path];
+      if (dev === undefined) throw new Error(`ENOENT: ${path}`);
+      return { dev };
+    },
+    realpath: (path) => links[path] ?? path,
+    readFile: (path) => {
+      reads.push(path);
+      const text = files[path];
+      if (text === undefined) throw new Error(`ENOENT: ${path}`);
+      return text;
+    },
+    exists: (path) => path in links || path in files || folders.has(path),
+  };
+  return { read, reads };
+}
+
+const SATA = "/sys/devices/pci0000:00/0000:00:1f.2/ata1/host0/target0:0:0/0:0:0:0/block/sda";
+const NVME = "/sys/devices/pci0000:00/0000:00:1d.0/0000:3d:00.0/nvme/nvme0/nvme0n1";
+
+describe("diskOf", () => {
+  const { read, reads } = fakeSys(
+    { "/work": makedev(8n, 1n), "/srv": Number(makedev(259n, 0n)), "/far": makedev(5000n, 300_000n), "/tmp": makedev(0n, 47n), "/odd": makedev(8n, 16n) },
+    { "/sys/dev/block/8:1": `${SATA}/sda1`, "/sys/dev/block/259:0": NVME, "/sys/dev/block/5000:300000": "/sys/devices/virtual/block/dm-7", "/sys/dev/block/8:16": "/sys/devices/virtual/block/sdb" },
+    {
+      [`${SATA}/uevent`]: "MAJOR=8\nMINOR=0\nDEVNAME=sda\nDEVTYPE=disk\n",
+      [`${SATA}/sda1/partition`]: "1\n",
+      [`${SATA}/sda1/uevent`]: "MAJOR=8\nMINOR=1\nDEVNAME=sda1\nDEVTYPE=partition\nPARTN=1\n",
+      [`${NVME}/uevent`]: "MAJOR=259\nMINOR=0\nDEVNAME=nvme0n1\nDEVTYPE=disk\n",
+      "/sys/devices/virtual/block/dm-7/uevent": "MAJOR=5000\nMINOR=300000\nDEVNAME=dm-7\nDEVTYPE=disk\n",
+      "/sys/devices/virtual/block/sdb/uevent": "MAJOR=8\nMINOR=16\nDEVTYPE=disk\n",
+    },
+  );
+
+  it("gives the whole disk of a path on a partition, from the parent folder of the entry of the partition", () => {
+    expect(diskOf("/work", read)).toBe("/dev/sda");
+    expect(reads.at(-1)).toBe(`${SATA}/uevent`);
+  });
+
+  it("gives the disk of a path on a whole disk, also from a device number that is a number", () => {
+    expect(diskOf("/srv", read)).toBe("/dev/nvme0n1");
+    expect(reads.at(-1)).toBe(`${NVME}/uevent`);
+  });
+
+  it("decodes the high bits of the major and the minor number", () => {
+    expect(diskOf("/far", read)).toBe("/dev/dm-7");
+  });
+
+  it("refuses a device with no entry in /sys/dev/block, and a disk with no DEVNAME line", () => {
+    expect(() => diskOf("/tmp", read)).toThrow("diskOf: the path /tmp is on the device 0:47, and /sys/dev/block/0:47 does not exist.");
+    expect(() => diskOf("/odd", read)).toThrow("diskOf: the file /sys/devices/virtual/block/sdb/uevent of the device 8:16 of the path /odd has no DEVNAME line.");
+    expect(() => diskOf("/none", read)).toThrow("ENOENT: /none");
+  });
+});
+
+describe("dropPageCache", () => {
+  it("runs the command of the drop with a time limit of 60 s", async () => {
+    expect(PAGE_CACHE_DROP).toEqual(["sudo", "-n", "sh", "-c", "sync && echo 3 > /proc/sys/vm/drop_caches"]);
+    expect(Object.isFrozen(PAGE_CACHE_DROP)).toBe(true);
+    const { start, calls } = fake();
+    await dropPageCache(start);
+    expect(calls).toEqual([{ argv: PAGE_CACHE_DROP, options: { timeoutMs: 60_000, maxBuffer: 1 << 16 } }]);
+  });
+
+  it("throws with the tail of stderr when the command fails, takes too long or does not start", async () => {
+    const denied = fake(() => ({ code: 1, stderr: "sudo: a password is required\n" }));
+    await expect(dropPageCache(denied.start)).rejects.toThrow("dropPageCache: the drop of the page cache exited with the code 1. The tail of stderr: sudo: a password is required");
+    await expect(dropPageCache(fake(() => ({ code: null, timedOut: true })).start)).rejects.toThrow("dropPageCache: the drop of the page cache took more than 60000 ms. The tail of stderr: (empty)");
+    await expect(dropPageCache(fake(() => ({ code: null })).start)).rejects.toThrow("stopped on a signal");
+    await expect(dropPageCache(fake(() => ({ code: null, error: "spawn sudo ENOENT" })).start)).rejects.toThrow("dropPageCache: the drop of the page cache failed: spawn sudo ENOENT.");
+    const throws: StartChild = async () => {
+      throw new Error("no start");
+    };
+    await expect(dropPageCache(throws)).rejects.toThrow("dropPageCache: the drop of the page cache did not start: no start");
   });
 });
 

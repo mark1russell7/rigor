@@ -5,6 +5,7 @@ import {
   type BenchEnv,
   type ChildExit,
   type ChildTime,
+  type ChildTurn,
   type FreshOptions,
   type ProcessMemory,
   type StartChild,
@@ -493,6 +494,65 @@ describe("freshRun", () => {
     await expect(run({ start: crash, warmUp: 1 })).rejects.toThrow(/^freshRun: the warm-up child 1 of the arm "next" on the case "x" exited with the code 1\. The tail of stderr: cold crash/);
     const hashes = fake((program, _c, k) => ({ stdout: JSON.stringify({ ms: 1, hash: program === "base" && k === 0 ? "cold" : "h" }) })).start;
     await expect(run({ start: hashes, warmUp: 1 })).rejects.toThrow(/gave the hash h, and an earlier child of the arm gave cold/);
+  });
+
+  it("waits for the step before each child, warm-up children included, with the arm whose command starts and the global round", async () => {
+    const log: string[] = [];
+    const turns: ChildTurn[] = [];
+    const before = async (turn: ChildTurn): Promise<void> => {
+      // The step takes a turn of the event loop. The child starts only after it.
+      await new Promise((done) => setTimeout(done, 1));
+      turns.push(turn);
+      log.push(`before ${turn.arm} ${turn.case}`);
+    };
+    const { start, calls } = fake((program, caseId) => {
+      log.push(`start ${program} ${caseId}`);
+      return undefined;
+    });
+    const result = await run({ start, before, rounds: 2, roundOffset: 4, warmUp: 1 });
+    // Each child has one step, and the step ends before the start of its child.
+    expect(log.length).toBe(2 * calls.length);
+    for (let k = 0; k < calls.length; k++) expect([log[2 * k], log[2 * k + 1]]).toEqual([`before ${calls[k]!.program} ${calls[k]!.case}`, `start ${calls[k]!.program} ${calls[k]!.case}`]);
+    // The warm-up children have the round 0. The A/A copy starts the command of the base, so its arm is the base.
+    expect(turns.slice(0, 2)).toEqual([
+      { arm: "base", case: "x", round: 0, warmUp: true },
+      { arm: "next", case: "x", round: 0, warmUp: true },
+    ]);
+    const timed = turns.slice(2);
+    expect(timed.every((turn) => !turn.warmUp && (turn.arm === "base" || turn.arm === "next"))).toBe(true);
+    expect([...new Set(timed.map((turn) => turn.round))]).toEqual([4, 5]);
+    for (const [k, turn] of timed.entries()) expect([turn.arm, turn.case]).toEqual([calls[k + 2]!.program, calls[k + 2]!.case]);
+    // The step does not change a time: the records are the records of a run with no step.
+    const plain = await run({ start: fake().start, rounds: 2, roundOffset: 4, warmUp: 1 });
+    expect(result).toEqual(plain);
+  });
+
+  it("gives the arm of the copy to the step of each A/A child with the order arms", async () => {
+    const turns: ChildTurn[] = [];
+    const { start, calls } = fake();
+    await run({ start, before: async (turn) => void turns.push(turn), aa: "each", order: "arms", cases: ["x"], rounds: 1, roundOffset: 7 });
+    // The arms are base, next, base~aa and next~aa. The children of the A/A copies start the commands of base and next.
+    expect(turns.map((turn) => turn.arm)).toEqual(calls.map((call) => call.program));
+    expect(turns.map((turn) => turn.arm).sort()).toEqual(["base", "base", "next", "next"]);
+    expect(turns.every((turn) => turn.round === 7 && turn.case === "x" && !turn.warmUp)).toBe(true);
+  });
+
+  it("makes a step that throws an error of its child, and starts no child after it", async () => {
+    const { start, calls } = fake();
+    let steps = 0;
+    const before = async (): Promise<void> => {
+      steps += 1;
+      if (steps === 3) throw new Error("no copy of the state");
+    };
+    const error = await run({ start, before, warmUp: 1, overLimit: "skip" }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toMatch(/^freshRun: the arm "\w+" \(pair "[\w~]+", arm [ab]\) on the case "x", round 0 did not start: the step before the child failed: no copy of the state$/);
+    expect((error as Error).cause).toEqual(new Error("no copy of the state"));
+    expect(calls.length).toBe(2);
+    const warm = async (): Promise<void> => {
+      throw new Error("cold");
+    };
+    await expect(run({ start: fake().start, before: warm, warmUp: 1 })).rejects.toThrow('freshRun: the warm-up child 1 of the arm "base" on the case "x" did not start: the step before the child failed: cold');
   });
 
   it("refuses two hashes of one arm on one case, and permits other hashes for other arms", async () => {
