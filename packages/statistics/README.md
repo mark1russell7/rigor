@@ -206,6 +206,37 @@ choosePair(pool, { seed: "duel-1" });             // the next pair of a duel, th
 
 `choosePair` chooses the next pair of a duel from a pool of rated items. A draw selects the first item with the weight `1 / (1 + picks)`. The second item is the candidate with the most `pairInformation`. A recent pair loses to each pair that is not recent. The option `information` changes the value of a pair, or forbids a pair.
 
+## Fit a separable model
+
+A separable model is a sum of terms. Each term is a linear coefficient times a column of the design. The design reads the point and some shape values. Examples are the knee of a hinge, the exponent of a power and the capacity of a queue.
+
+```ts
+import { bootstrapSeparable, fitSeparable, rankSeparable, type SeparableModel } from "@mark1russell7/rigor-statistics";
+
+// base + slope·x + bend·max(0, x − knee): three coefficients and one shape value.
+const hinge: SeparableModel<number> = {
+  terms: ["base", "slope", "bend"],
+  shapes: [{ id: "knee", candidates: [2, 3, 4, 5, 6, 7, 8] }],
+  design: ([knee], xs) => xs.map((x) => [1, x, Math.max(0, x - knee!)]),
+};
+
+const fit = fitSeparable(hinge, xs, y);                  // null when no combination has a finite fit
+fit.coefficients, fit.shapes, fit.rss;                   // in the order of the terms and of the shapes
+const b = bootstrapSeparable(hinge, xs, y, { runs: 1000, groups: loads }); // each run draws whole groups
+b.intervals;                                             // the coefficients, then the shapes
+rankSeparable({ line, hinge }, xs, y, { groups: loads }); // best first, by the held-out RMSE
+```
+
+- With fixed shape values, the fit of the coefficients is linear least squares with no intercept. Thus the fit searches only the shape values.
+- First, the fit examines each combination of the candidates. The limit is `SEPARABLE_MAX_COMBINATIONS` (10 000).
+- Then, a golden-section search refines each shape in turn, between the candidates next to its best candidate. At an end of the list, the bracket is symmetric.
+- The bounds `min` and `max` of a shape clip the bracket.
+- The cycles stop when one cycle decreases the sum of squares by the share `SEPARABLE_RSS_TOLERANCE` or less, or after `SEPARABLE_MAX_CYCLES` (200).
+- A design gives null when the model has no value at a point, for example at a pole. The fit skips that combination.
+- The option `weights` gives a weighted fit. The weights `1 / y^2` fit the relative residuals.
+- A group is a set of replicates of one load. `bootstrapSeparable` draws whole groups, and `heldOutSeparable` holds out each group together.
+- `fitError` gives the mean absolute residual and the RMSE of the finite residuals. It counts each NaN as missing.
+
 ## A series in time order
 
 A row bootstrap draws each reading alone. For a series with autocorrelation, its interval is too narrow. The moving-block bootstrap draws blocks of readings that follow each other.
@@ -242,6 +273,10 @@ In the tests, the series are AR(1) with 200 readings and the slope 0.6. There, t
 | `bootstrapLeastSquares(x, y, options)` | One bootstrap interval for each coefficient of `leastSquares`, from the same draws of whole rows. A singular draw does not count. |
 | `bootstrapLeastSquaresReplicates(x, y, options)` | The coefficients of each run of `bootstrapLeastSquares`, with the same draws for the same seed. A row keeps the correlation of the coefficients. |
 | `leaveOneOutResiduals(x, y, { intercept })` | The held-out residual of each row: `y` minus the fit of the other rows at that row, from one fit and the hat value of each row. |
+| `fitSeparable(model, xs, y, { weights })` | The fit of a separable model: a grid search over the candidates of its shape values, a golden-section refine, and least squares for its coefficients. |
+| `bootstrapSeparable(model, xs, y, options)` | The coefficients and the shapes of each bootstrap run, and their percentile intervals. With `groups`, each run draws whole groups. Each run is a full fit. |
+| `heldOutSeparable(model, xs, y, options)`, `fitError(residuals)` | The prediction of each group from the fit of the other groups, with absolute or relative residuals. The error of the finite residuals. |
+| `rankSeparable(models, xs, y, options)` | The models in the order of their held-out error, best first. A model with a missing residual ranks after each model with none. |
 | `bootstrapMovingBlockLeastSquares(x, y, options)` | The moving-block form of `bootstrapLeastSquares`, for rows in time order. Without `block`, the block length is `blockLength` of the residuals of the fit of all the rows. |
 | `ridgeSolve(gram, moment, lambda, { free })` | The ridge coefficients from the normal equations `X'X` and `X'y`, with a Cholesky factorization. The `free` coefficients have no penalty. A matrix that is not positive definite gives NaN coefficients. |
 | `signTest(better, worse, sides)`, `signTestPower(n, level)` | The sign test, and the fewest wins out of `n` that the test calls significant. |
