@@ -19,6 +19,7 @@ export {
   bootstrap,
   bootstrapClusters,
   bootstrapLeastSquares,
+  bootstrapLeastSquaresReplicates,
   bootstrapMedian,
   bootstrapMedianRatio,
   bootstrapStrata,
@@ -33,7 +34,7 @@ export {
   bootstrapMovingBlockLeastSquares,
 } from "./moving-block.ts";
 export { type ModeOptions, type SmoothLaw, type SmoothLawScore, bestSmoothLaw, modeCount, smoothLawScores } from "./distribution.ts";
-export { type LeastSquaresFit, type LeastSquaresOptions, leastSquares } from "./regression.ts";
+export { type LeastSquaresFit, type LeastSquaresOptions, leastSquares, leaveOneOutResiduals } from "./regression.ts";
 export { type RidgeOptions, ridgeSolve } from "./ridge.ts";
 export {
   type ClassForecast,

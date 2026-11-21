@@ -4,6 +4,7 @@
  * With the same seed, the draws are equal to the draws of the copies in highways, packing and layout-contract.
  * `bootstrapTwo` draws two independent samples in each run: first the items of `a`, then the items of `b`.
  * `bootstrapLeastSquares` draws whole rows, and gives one interval for each coefficient from the same draws.
+ * `bootstrapLeastSquaresReplicates` gives the coefficients of each of these runs.
  *
  * `sampleTotalInterval` gives the interval of a population total from a sample without replacement.
  */
@@ -128,23 +129,62 @@ export function bootstrapLeastSquares(
 ): Interval[] {
   const intercept = options.intercept ?? true;
   const k = checkedShape("bootstrapLeastSquares", x, y, intercept);
+  return percentiles("bootstrapLeastSquares", options, k, rowDraws(x, y, intercept, k), () => fitRows(x, y, intercept, k).coefficients);
+}
+
+/** The coefficients of each run of a bootstrap of a least-squares fit. */
+export interface LeastSquaresReplicates {
+  /** The coefficients of the fit of all the rows. */
+  readonly estimate: number[];
+  /** The coefficients of each run with a design of full rank, in the order of the runs. */
+  readonly replicates: number[][];
+  /** The number of runs, with the runs that do not count. */
+  readonly runs: number;
+  /** The seed of the draws, as a number. */
+  readonly seed: number;
+}
+
+/**
+ * The coefficients of each run of `bootstrapLeastSquares`, with the same draws for the same seed. Thus the
+ * percentiles of column `j` of the replicates are the ends of interval `j`. A row of the replicates keeps the
+ * correlation of the coefficients. Thus a caller can give the doubt of each value that the coefficients calculate
+ * together. A run with a singular design gives NaN coefficients, so it is not a replicate.
+ */
+export function bootstrapLeastSquaresReplicates(
+  x: readonly (readonly number[])[],
+  y: readonly number[],
+  options: Pick<BootstrapOptions, "runs" | "seed"> & LeastSquaresOptions = {},
+): LeastSquaresReplicates {
+  const name = "bootstrapLeastSquaresReplicates";
+  const intercept = options.intercept ?? true;
+  const k = checkedShape(name, x, y, intercept);
+  const { runs } = settings(name, options);
+  const r = random(options.seed ?? 1);
+  const draw = rowDraws(x, y, intercept, k);
+  const replicates: number[][] = [];
+  for (let i = 0; i < runs; i++) {
+    const coefficients = draw(r);
+    if (coefficients.every(Number.isFinite)) replicates.push(coefficients);
+  }
+  return { estimate: fitRows(x, y, intercept, k).coefficients, replicates, runs, seed: r.seed };
+}
+
+/**
+ * This function gives one run of a bootstrap of a least-squares fit. The run draws `n` row indexes with
+ * replacement, and fits the drawn rows and their `y` values. The caller examined the shape with `checkedShape`.
+ */
+function rowDraws(x: readonly (readonly number[])[], y: readonly number[], intercept: boolean, k: number): (r: Random) => number[] {
   const n = x.length;
   const sampleX = new Array<readonly number[]>(n);
   const sampleY = new Array<number>(n);
-  return percentiles(
-    "bootstrapLeastSquares",
-    options,
-    k,
-    (r) => {
-      for (let i = 0; i < n; i++) {
-        const row = r.below(n);
-        sampleX[i] = x[row] as readonly number[];
-        sampleY[i] = y[row] as number;
-      }
-      return fitRows(sampleX, sampleY, intercept, k).coefficients;
-    },
-    () => fitRows(x, y, intercept, k).coefficients,
-  );
+  return (r) => {
+    for (let i = 0; i < n; i++) {
+      const row = r.below(n);
+      sampleX[i] = x[row] as readonly number[];
+      sampleY[i] = y[row] as number;
+    }
+    return fitRows(sampleX, sampleY, intercept, k).coefficients;
+  };
 }
 
 interface Settings {

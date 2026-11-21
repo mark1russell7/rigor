@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { random } from "@mark1russell7/rigor-generators";
-import { type Interval, bootstrap, bootstrapLeastSquares, leastSquares } from "./index.ts";
+import { type Interval, bootstrap, bootstrapLeastSquares, bootstrapLeastSquaresReplicates, leastSquares, leaveOneOutResiduals, quantile } from "./index.ts";
 
 /* ---------- Helpers ---------- */
 
@@ -284,5 +284,133 @@ describe("bootstrapLeastSquares", () => {
     expect(() => bootstrapLeastSquares(x, y, { runs: 0 })).toThrow("bootstrapLeastSquares: runs is a whole number of 1 or more, not 0.");
     expect(() => bootstrapLeastSquares(x, y, { ends: [0.6, 0.4] })).toThrow("bootstrapLeastSquares: the ends are");
     expect(() => bootstrapLeastSquares(x, y, { level: 1 })).toThrow("bootstrapLeastSquares: level is more than 0");
+  });
+});
+
+/* ---------- bootstrapLeastSquaresReplicates ---------- */
+
+describe("bootstrapLeastSquaresReplicates", () => {
+  const { x, y } = requests(80, 0.4, "bootstrap requests");
+
+  it("gives the coefficients of each run of bootstrapLeastSquares: the percentiles of each column are the ends", () => {
+    const options = { runs: 400, seed: "same runs" };
+    const draws = bootstrapLeastSquaresReplicates(x, y, options);
+    const intervals = bootstrapLeastSquares(x, y, options);
+    expect(draws.replicates).toHaveLength(400);
+    expect(draws.runs).toBe(400);
+    expect(draws.seed).toBe(intervals[0]!.seed);
+    expect(draws.estimate).toEqual(leastSquares(x, y).coefficients);
+    const tail = (1 - 0.95) / 2;
+    intervals.forEach((interval, j) => {
+      const column = draws.replicates.map((row) => row[j]!);
+      expect(quantile(column, tail)).toBe(interval.low);
+      expect(quantile(column, 1 - tail)).toBe(interval.high);
+    });
+  });
+
+  it("keeps the correlation of the coefficients in each row", () => {
+    // The intercept and the slope of a line far from x = 0 move in opposite directions.
+    const r = random("far line");
+    const far = Array.from({ length: 40 }, (_, i) => [1000 + i]);
+    const line = far.map(([v]) => 5 + 0.5 * v! + r.normal(0, 2));
+    const { replicates } = bootstrapLeastSquaresReplicates(far, line, { runs: 300, seed: 4 });
+    const mean = (values: number[]): number => values.reduce((s, v) => s + v, 0) / values.length;
+    const a = replicates.map((row) => row[0]!);
+    const b = replicates.map((row) => row[1]!);
+    const [ma, mb] = [mean(a), mean(b)];
+    const covariance = mean(a.map((v, i) => (v - ma) * (b[i]! - mb)));
+    const correlation = covariance / Math.sqrt(mean(a.map((v) => (v - ma) ** 2)) * mean(b.map((v) => (v - mb) ** 2)));
+    expect(correlation).toBeLessThan(-0.99);
+  });
+
+  it("drops each run with a singular design, and gives the same replicates for the same seed", () => {
+    // Three rows and two coefficients: a run that draws one row three times is singular.
+    const small = bootstrapLeastSquaresReplicates([[1], [2], [3]], [1, 2, 4], { runs: 200, seed: 7 });
+    expect(small.replicates.length).toBeGreaterThan(100);
+    expect(small.replicates.length).toBeLessThan(200);
+    expect(small.replicates.every((row) => row.length === 2 && row.every(Number.isFinite))).toBe(true);
+    expect(bootstrapLeastSquaresReplicates([[1], [2], [3]], [1, 2, 4], { runs: 200, seed: 7 })).toEqual(small);
+    const none = bootstrapLeastSquaresReplicates([[1], [2]], [1, 2], { runs: 20 });
+    expect(none.replicates).toEqual([]);
+    expect(none.estimate.every(Number.isNaN)).toBe(true);
+  });
+
+  it("throws the shape errors and the error of runs with its own name", () => {
+    expect(() => bootstrapLeastSquaresReplicates([], [])).toThrow("bootstrapLeastSquaresReplicates: x is empty.");
+    expect(() => bootstrapLeastSquaresReplicates([[1]], [1, 2])).toThrow("bootstrapLeastSquaresReplicates: x has 1 rows and y has 2 values.");
+    expect(() => bootstrapLeastSquaresReplicates(x, y, { runs: 0 })).toThrow("bootstrapLeastSquaresReplicates: runs is a whole number of 1 or more, not 0.");
+  });
+});
+
+/* ---------- leaveOneOutResiduals ---------- */
+
+/** This function gives the residual of each row from a new fit of the other rows. Only a reference for the tests. */
+function refitResiduals(x: readonly (readonly number[])[], y: readonly number[], intercept = true): number[] {
+  return x.map((row, i) => {
+    const fit = leastSquares(
+      x.filter((_, m) => m !== i),
+      y.filter((_, m) => m !== i),
+      { intercept },
+    );
+    const b = fit.coefficients;
+    const value = (intercept ? b[0]! : 0) + row.reduce((s, v, j) => s + b[j + (intercept ? 1 : 0)]! * v, 0);
+    return y[i]! - value;
+  });
+}
+
+describe("leaveOneOutResiduals", () => {
+  it("gives the residual of a new fit of the other rows, with and without an intercept", () => {
+    const { x, y } = requests(30, 0.4, "held out");
+    for (const intercept of [true, false]) {
+      const fast = leaveOneOutResiduals(x, y, { intercept });
+      const slow = refitResiduals(x, y, intercept);
+      fast.forEach((value, i) => expect(Math.abs(value - slow[i]!)).toBeLessThan(1e-9 * (1 + Math.abs(slow[i]!))));
+    }
+  });
+
+  it("gives a residual of each row with the sign and more than the size of its residual in the fit of all the rows", () => {
+    const { x, y } = requests(25, 1, "larger");
+    const b = leastSquares(x, y).coefficients;
+    const inSample = x.map((row, i) => y[i]! - (b[0]! + b[1]! * row[0]! + b[2]! * row[1]!));
+    leaveOneOutResiduals(x, y).forEach((value, i) => {
+      expect(Math.sign(value)).toBe(Math.sign(inSample[i]!));
+      expect(Math.abs(value)).toBeGreaterThan(Math.abs(inSample[i]!));
+    });
+  });
+
+  it("gives 0 for each row of a line with no noise, and the value of the refit for a known case", () => {
+    expect(leaveOneOutResiduals([[1], [2], [3], [4]], [5, 7, 9, 11]).every((value) => Math.abs(value) < 1e-12)).toBe(true);
+    // Without row 3, the line through (1, 1), (2, 2) and (3, 3) gives 4 at x = 4, and the value is 5.
+    expect(leaveOneOutResiduals([[1], [2], [3], [4]], [1, 2, 3, 5])[3]).toBeCloseTo(1, 12);
+  });
+
+  it("gives NaN for a row that alone fixes a coefficient, and for each row of a design without full rank", () => {
+    // Only row 3 has a value of the second predictor, so the other rows do not fix its coefficient.
+    const residuals = leaveOneOutResiduals(
+      [
+        [1, 0],
+        [2, 0],
+        [3, 0],
+        [4, 5],
+        [5, 0],
+      ],
+      [1, 2, 3, 9, 5.5],
+    );
+    expect(Number.isNaN(residuals[3]!)).toBe(true);
+    expect(residuals.filter((_, i) => i !== 3).every(Number.isFinite)).toBe(true);
+    expect(leaveOneOutResiduals([[1], [2]], [1, 2]).every(Number.isNaN)).toBe(true);
+    const twice = [
+      [1, 2],
+      [2, 4],
+      [3, 6],
+      [4, 8],
+    ];
+    expect(leaveOneOutResiduals(twice, [1, 2, 3, 4]).every(Number.isNaN)).toBe(true);
+  });
+
+  it("throws the shape errors with its own name", () => {
+    expect(() => leaveOneOutResiduals([], [])).toThrow("leaveOneOutResiduals: x is empty.");
+    expect(() => leaveOneOutResiduals([[1], [2, 3]], [1, 2])).toThrow("leaveOneOutResiduals: row 1 of x has 2 values");
+    expect(() => leaveOneOutResiduals([[1], [Number.NaN]], [1, 2])).toThrow("leaveOneOutResiduals: row 1 of x has a value that is not finite.");
   });
 });
