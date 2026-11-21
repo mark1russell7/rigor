@@ -340,9 +340,13 @@ lockClosure: build/code-stamp.d.ts#lockClosure
 type ArmProcess: build/fresh.d.ts#ArmProcess
 type ArmTimes: build/fresh.d.ts#ArmTimes
 ArmsFixtures: build/fresh.d.ts#ArmsFixtures
+type Ballast: build/fresh.d.ts#Ballast
+type BallastOptions: build/fresh.d.ts#BallastOptions
+BeforeChild: build/fresh.d.ts#BeforeChild
 BenchEnv: build/fresh.d.ts#BenchEnv
 CaseArm: build/fresh.d.ts#CaseArm
 CaseOrder: build/fresh.d.ts#CaseOrder
+type CgroupSample: build/fresh.d.ts#CgroupSample
 type CheckoutArm: build/fresh.d.ts#CheckoutArm
 type CheckoutArmOptions: build/fresh.d.ts#CheckoutArmOptions
 ChildEvents: build/fresh.d.ts#ChildEvents
@@ -351,7 +355,10 @@ ChildFields: build/fresh.d.ts#ChildFields
 ChildLine: build/fresh.d.ts#ChildLine
 ChildSkip: build/fresh.d.ts#ChildSkip
 ChildTime: build/fresh.d.ts#ChildTime
+ChildTurn: build/fresh.d.ts#ChildTurn
 type ContainerOptions: build/fresh.d.ts#ContainerOptions
+type DiskLimit: build/fresh.d.ts#DiskLimit
+type DiskReads: build/fresh.d.ts#DiskReads
 EventProbe: build/fresh.d.ts#EventProbe
 type FixtureFile: build/fresh.d.ts#FixtureFile
 type FixtureHash: build/fresh.d.ts#FixtureHash
@@ -370,9 +377,13 @@ HalfTimes: build/fresh.d.ts#HalfTimes
 HeapPeaks: build/fresh.d.ts#HeapPeaks
 HeapWatch: build/fresh.d.ts#HeapWatch
 HeapWatchOptions: build/fresh.d.ts#HeapWatchOptions
+type IoOptions: build/fresh.d.ts#IoOptions
+type IoSample: build/fresh.d.ts#IoSample
+type IoWatch: build/fresh.d.ts#IoWatch
 MIN_CONTAINER_MEMORY: build/fresh.d.ts#MIN_CONTAINER_MEMORY
 MemoryOptions: build/fresh.d.ts#MemoryOptions
 MemoryWatch: build/fresh.d.ts#MemoryWatch
+PAGE_CACHE_DROP: build/fresh.d.ts#PAGE_CACHE_DROP
 PairSlot: build/fresh.d.ts#PairSlot
 ProbeOptions: build/fresh.d.ts#ProbeOptions
 ProcessMemory: build/fresh.d.ts#ProcessMemory
@@ -391,6 +402,8 @@ checkoutArm: build/fresh.d.ts#checkoutArm
 childLine: build/fresh.d.ts#childLine
 containerArgv: build/fresh.d.ts#containerArgv
 containerStart: build/fresh.d.ts#containerStart
+diskOf: build/fresh.d.ts#diskOf
+dropPageCache: build/fresh.d.ts#dropPageCache
 eventProbe: build/fresh.d.ts#eventProbe
 fixtureDifferences: build/fresh.d.ts#fixtureDifferences
 freshArms: build/fresh.d.ts#freshArms
@@ -399,11 +412,14 @@ heapAfterGc: build/fresh.d.ts#heapAfterGc
 memoryPeak: build/fresh.d.ts#memoryPeak
 pairOrder: build/fresh.d.ts#pairOrder
 peakRss: build/fresh.d.ts#peakRss
+processIo: build/fresh.d.ts#processIo
 processMemory: build/fresh.d.ts#processMemory
 repoCommit: build/fresh.d.ts#repoCommit
+startBallast: build/fresh.d.ts#startBallast
 startProcess: build/fresh.d.ts#startProcess
 statusMemory: build/fresh.d.ts#statusMemory
 watchHeap: build/fresh.d.ts#watchHeap
+watchIo: build/fresh.d.ts#watchIo
 watchMemory: build/fresh.d.ts#watchMemory
 
 ## ./supervise (build/supervise.d.ts): names
@@ -507,6 +523,22 @@ export interface ArmsFixtures {
   readonly read?: (path: string) => Uint8Array;
 }
 
+### build/fresh.d.ts#Ballast
+interface Ballast {
+  readonly pid: number;
+  readonly rss: number;
+  readonly ms: number;
+  readonly stop: () => Promise<void>;
+}
+
+### build/fresh.d.ts#BallastOptions
+interface BallastOptions {
+  readonly execPath?: string;
+}
+
+### build/fresh.d.ts#BeforeChild
+export type BeforeChild = (turn: ChildTurn) => Promise<void>;
+
 ### build/fresh.d.ts#BenchEnv
 export interface BenchEnv {
   readonly cpu: string;
@@ -530,6 +562,16 @@ export interface CaseOrder {
   readonly case: string;
   readonly round: number;
   readonly arms: readonly string[];
+}
+
+### build/fresh.d.ts#CgroupSample
+interface CgroupSample {
+  readonly memory: number | null;
+  readonly swap: number | null;
+  readonly readBytes: number | null;
+  readonly writeBytes: number | null;
+  readonly reads: number | null;
+  readonly writes: number | null;
 }
 
 ### build/fresh.d.ts#CheckoutArm
@@ -594,18 +636,46 @@ export interface ChildTime extends ChildFields {
   readonly skipped?: undefined;
 }
 
+### build/fresh.d.ts#ChildTurn
+export interface ChildTurn {
+  readonly arm: string;
+  readonly case: string;
+  readonly round: number;
+  readonly warmUp: boolean;
+}
+
 ### build/fresh.d.ts#ContainerOptions
 interface ContainerOptions {
   readonly image: string;
   readonly memory: number;
   readonly swap?: number;
   readonly cpuset?: string;
+  readonly disks?: readonly DiskLimit[];
   readonly mounts?: readonly string[];
   readonly env?: Readonly<Record<string, string>>;
   readonly network?: string;
   readonly user?: string;
   readonly docker?: string;
   readonly start?: StartChild;
+}
+
+### build/fresh.d.ts#DiskLimit
+interface DiskLimit {
+  readonly device: string;
+  readonly readBytes?: number;
+  readonly readOps?: number;
+  readonly writeBytes?: number;
+  readonly writeOps?: number;
+}
+
+### build/fresh.d.ts#DiskReads
+interface DiskReads {
+  readonly stat: (path: string) => {
+    readonly dev: bigint | number;
+  };
+  readonly realpath: (path: string) => string;
+  readonly readFile: (path: string) => string;
+  readonly exists: (path: string) => boolean;
 }
 
 ### build/fresh.d.ts#EventProbe
@@ -665,6 +735,7 @@ export interface FreshArmsOptions {
   readonly job?: string;
   readonly env?: BenchEnv;
   readonly start?: StartChild;
+  readonly before?: BeforeChild;
   readonly onProcess?: (record: ArmProcess) => void;
   readonly warmUp?: number;
 }
@@ -687,6 +758,7 @@ export interface FreshOptions {
   readonly job?: string;
   readonly env?: BenchEnv;
   readonly start?: StartChild;
+  readonly before?: BeforeChild;
   readonly warmUp?: number;
 }
 
@@ -771,6 +843,27 @@ export interface HeapWatchOptions {
   };
 }
 
+### build/fresh.d.ts#IoOptions
+interface IoOptions {
+  readonly proc?: string;
+  readonly cgroup?: string;
+}
+
+### build/fresh.d.ts#IoSample
+interface IoSample {
+  readonly at: number;
+  readonly readBytes: number | null;
+  readonly writeBytes: number | null;
+  readonly majorFaults: number | null;
+  readonly rss: number | null;
+  readonly cgroup: CgroupSample;
+}
+
+### build/fresh.d.ts#IoWatch
+interface IoWatch {
+  readonly stop: () => Promise<readonly IoSample[]>;
+}
+
 ### build/fresh.d.ts#MIN_CONTAINER_MEMORY
 export declare const MIN_CONTAINER_MEMORY: number;
 
@@ -784,6 +877,9 @@ export interface MemoryWatch {
   readonly peak: () => ProcessMemory;
   readonly stop: () => void;
 }
+
+### build/fresh.d.ts#PAGE_CACHE_DROP
+export declare const PAGE_CACHE_DROP: readonly string[];
 
 ### build/fresh.d.ts#PairSlot
 export interface PairSlot {
@@ -874,6 +970,12 @@ export declare function containerArgv(options: ContainerOptions, name: string, a
 ### build/fresh.d.ts#containerStart
 export declare function containerStart(options: ContainerOptions): StartChild;
 
+### build/fresh.d.ts#diskOf
+export declare function diskOf(path: string, read?: DiskReads): string;
+
+### build/fresh.d.ts#dropPageCache
+export declare function dropPageCache(start?: StartChild): Promise<void>;
+
 ### build/fresh.d.ts#eventProbe
 export declare function eventProbe(options?: ProbeOptions): EventProbe;
 
@@ -898,11 +1000,17 @@ export declare function pairOrder(pairs: number, round: number, caseIndex: numbe
 ### build/fresh.d.ts#peakRss
 export declare function peakRss(): number;
 
+### build/fresh.d.ts#processIo
+export declare function processIo(options?: IoOptions): IoSample;
+
 ### build/fresh.d.ts#processMemory
 export declare function processMemory(options?: MemoryOptions): ProcessMemory;
 
 ### build/fresh.d.ts#repoCommit
 export declare function repoCommit(ref: string, options?: RepoCommitOptions): Promise<string>;
+
+### build/fresh.d.ts#startBallast
+export declare function startBallast(bytes: number, options?: BallastOptions): Promise<Ballast>;
 
 ### build/fresh.d.ts#startProcess
 export declare function startProcess(argv: readonly string[], options: StartOptions): Promise<ChildExit>;
@@ -912,6 +1020,9 @@ export declare function statusMemory(text: string): StatusMemory | null;
 
 ### build/fresh.d.ts#watchHeap
 export declare function watchHeap(options?: HeapWatchOptions): HeapWatch;
+
+### build/fresh.d.ts#watchIo
+export declare function watchIo(intervalMs: number, options?: IoOptions): IoWatch;
 
 ### build/fresh.d.ts#watchMemory
 export declare function watchMemory(options?: WatchOptions): MemoryWatch;

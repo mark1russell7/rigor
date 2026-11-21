@@ -13,9 +13,21 @@ import { type Arm, type PairedTime, armOrder, balancedRounds, firstArm } from ".
 import { startProcess, stderrTail } from "./start.ts";
 
 export { type ArmProcess, type ArmTimes, armTimes } from "./arm-times.ts";
+export { type Ballast, type BallastOptions, startBallast } from "./ballast.ts";
 export { type CheckoutArm, type CheckoutArmOptions, type RepoCommitOptions, checkoutArm, repoCommit } from "./checkout.ts";
-export { type ContainerOptions, MIN_CONTAINER_MEMORY, containerArgv, containerStart } from "./container.ts";
+export {
+  type ContainerOptions,
+  type DiskLimit,
+  type DiskReads,
+  MIN_CONTAINER_MEMORY,
+  PAGE_CACHE_DROP,
+  containerArgv,
+  containerStart,
+  diskOf,
+  dropPageCache,
+} from "./container.ts";
 export { type FixtureFile, type FixtureHash, type FixtureOptions, checkFixtures, fixtureDifferences } from "./fixtures.ts";
+export { type CgroupSample, type IoOptions, type IoSample, type IoWatch, processIo, watchIo } from "./process-io.ts";
 export { startProcess } from "./start.ts";
 
 /** The computer of a run. The `cpu` is the model of the first CPU. */
@@ -516,6 +528,25 @@ export interface ChildExit {
 /** The start of one child: it gives the end of the child. The default starts a process with `spawn`, without a shell. */
 export type StartChild = (argv: readonly string[], options: StartOptions) => Promise<ChildExit>;
 
+/** The child that the step `before` of a run prepares: the arm whose command starts, the case and the round. */
+export interface ChildTurn {
+  /** The id of the arm whose command starts. For a child of an A/A copy in `freshRun`, it is the id of the arm of the copy, not the id of the pair. */
+  readonly arm: string;
+  /** The id of the case. */
+  readonly case: string;
+  /** The global round, with `roundOffset` in it. A warm-up child has the round 0. */
+  readonly round: number;
+  /** The value is `true` for a warm-up child. */
+  readonly warmUp: boolean;
+}
+
+/**
+ * The step before each child of a run, warm-up children included. The run waits for the step, and then it starts the child.
+ * The time limit of the child starts after the step, and no time of the child includes the step.
+ * A step that throws is an error of its child, as a start that throws is.
+ */
+export type BeforeChild = (turn: ChildTurn) => Promise<void>;
+
 /** The options of a fresh run. */
 export interface FreshOptions {
   /** The base arm. It is arm `a` of each pair. */
@@ -589,6 +620,12 @@ export interface FreshOptions {
   readonly env?: BenchEnv;
   /** The start of a child. The default is `startProcess`. A test gives its own, and a caller can wrap `startProcess` to write the `stderr` of each child. */
   readonly start?: StartChild;
+  /**
+   * The step before each child, warm-up children included, for example a fresh copy of the state of the child and `dropPageCache`.
+   * The run waits for the step. Then the child and its time limit start. A step that throws is an error of its child.
+   * The arm of the turn is the id of the arm whose command starts. For an A/A copy, it is the base, or the candidate of the copy.
+   */
+  readonly before?: BeforeChild;
   /**
    * The count of warm-up children of each arm before the first round. The default is 0.
    * A warm-up child fills the file cache and the compile cache, so the first timed child does not start cold.
@@ -763,9 +800,14 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
   // The arms of the order "arms": the base, then arm `b` of each pair with the id of the pair.
   const slots: { id: string; arm: FreshArm }[] = [{ id: base.id, arm: base }, ...pairs.map((p) => ({ id: p.id, arm: p.b }))];
 
-  /** This function starts one child of an arm on a case, and examines its skip and its hash. With the scope "case", a skip after the first round is an error. */
-  const timed = async (who: FreshArm, id: string, r: number, where: string): Promise<ChildEnd> => {
-    const line = await child(start, [...who.command, ...args(id)], { timeoutMs, maxBuffer, ...(who.cwd === undefined ? {} : { cwd: who.cwd }) }, where, overLimit, "freshRun");
+  const before = options.before;
+  /**
+   * This function starts one child of an arm on a case, after the step `before`, and examines its skip and its hash.
+   * With the scope "case", a skip after the first round is an error. A warm-up child gets the round 0 in its turn.
+   */
+  const timed = async (who: FreshArm, id: string, r: number, where: string, warm = false): Promise<ChildEnd> => {
+    const prepare = before === undefined ? undefined : () => before({ arm: who.id, case: id, round: warm ? 0 : roundOffset + r, warmUp: warm });
+    const line = await child(start, [...who.command, ...args(id)], { timeoutMs, maxBuffer, ...(who.cwd === undefined ? {} : { cwd: who.cwd }) }, where, overLimit, "freshRun", prepare);
     if (line.skipped !== undefined) {
       if (r > 0 && skipScope === "case") throw new Error(`freshRun: ${where} skipped the case after the first round of the job (${JSON.stringify(line.skipped)}). A child that skips only in a later round is not deterministic.`);
       return line;
@@ -787,7 +829,7 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
   const warmCase = cases[shiftOf(roundOffset)]!;
   for (let w = 1; w <= warmUp; w++) {
     for (const arm of [base, ...candidates]) {
-      const line = await timed(arm, warmCase, 0, `the warm-up child ${w} of the arm ${JSON.stringify(arm.id)} on the case ${JSON.stringify(warmCase)}`);
+      const line = await timed(arm, warmCase, 0, `the warm-up child ${w} of the arm ${JSON.stringify(arm.id)} on the case ${JSON.stringify(warmCase)}`, true);
       warmed.push({ arm: arm.id, case: warmCase, ...(line.skipped === undefined ? { ms: line.ms } : { skipped: line.skipped }) });
     }
   }
@@ -909,6 +951,11 @@ export interface FreshArmsOptions {
   readonly env?: BenchEnv;
   /** The start of a child. The default starts a process. A test gives its own. */
   readonly start?: StartChild;
+  /**
+   * The step before each child, warm-up children included, as in `freshRun`. The run waits for the step, and then it starts the child.
+   * The arm of the turn is the id of the arm. A step that throws is an error of its child.
+   */
+  readonly before?: BeforeChild;
   /** This function gets the record of each child when the child ends. A runner prints its progress with it. */
   readonly onProcess?: (record: ArmProcess) => void;
   /**
@@ -1002,9 +1049,11 @@ export async function freshArms(options: FreshArmsOptions): Promise<FreshArms> {
   const argvOf = (arm: CaseArm): string[] => [...commands.get(arm.id)!, ...args(arm.case)];
   // Two children with the same argv and folder are the same child. The hashes and the warm-up children use this key.
   const keyOf = (arm: CaseArm): string => `${arm.cwd ?? ""}\u0000${argvOf(arm).join("\u0000")}`;
-  /** This function starts one child of an arm, and examines its skip and its hash. A skip is an error. */
-  const timed = async (arm: CaseArm, where: string): Promise<ChildTime> => {
-    const line = await child(start, argvOf(arm), { timeoutMs, maxBuffer, ...(arm.cwd === undefined ? {} : { cwd: arm.cwd }) }, where, "error", "freshArms");
+  const before = options.before;
+  /** This function starts one child of an arm, after the step `before`, and examines its skip and its hash. A skip is an error. */
+  const timed = async (arm: CaseArm, where: string, round: number, warm: boolean): Promise<ChildTime> => {
+    const prepare = before === undefined ? undefined : () => before({ arm: arm.id, case: arm.case, round, warmUp: warm });
+    const line = await child(start, argvOf(arm), { timeoutMs, maxBuffer, ...(arm.cwd === undefined ? {} : { cwd: arm.cwd }) }, where, "error", "freshArms", prepare);
     if (line.skipped !== undefined) throw new Error(`freshArms: ${where} skipped the case (${JSON.stringify(line.skipped)}). A run of arms has no skips: remove the arm, or fix its child.`);
     if (line.hash !== undefined) {
       const key = keyOf(arm);
@@ -1025,7 +1074,7 @@ export async function freshArms(options: FreshArmsOptions): Promise<FreshArms> {
   }
   for (let w = 1; w <= warmUp; w++) {
     for (const arm of different) {
-      const line = await timed(arm, `the warm-up child ${w} of the arm ${JSON.stringify(arm.id)} on the case ${JSON.stringify(arm.case)}`);
+      const line = await timed(arm, `the warm-up child ${w} of the arm ${JSON.stringify(arm.id)} on the case ${JSON.stringify(arm.case)}`, 0, true);
       warmed.push({ arm: arm.id, case: arm.case, ms: line.ms });
     }
   }
@@ -1035,7 +1084,7 @@ export async function freshArms(options: FreshArmsOptions): Promise<FreshArms> {
     const order = armOrder(arms, round);
     for (let position = 0; position < order.length; position++) {
       const arm = order[position]!;
-      const line = await timed(arm, `the arm ${JSON.stringify(arm.id)} on the case ${JSON.stringify(arm.case)}, round ${round}`);
+      const line = await timed(arm, `the arm ${JSON.stringify(arm.id)} on the case ${JSON.stringify(arm.case)}, round ${round}`, round, false);
       const { ms, hash: _hash, skipped: _skipped, ...more } = line;
       const record: ArmProcess = { arm: arm.id, case: arm.case, round, position, ms, ...(Object.keys(more).length > 0 ? { fields: more } : {}) };
       processes.push(record);
@@ -1080,8 +1129,26 @@ const HEAP_TAIL = 300;
 /** The end of one child: its line, and the kind of a skip at a limit. A skip line of the child has no kind. */
 type ChildEnd = ChildLine & { readonly kind?: SkipKind };
 
-/** This function starts one child and reads its JSON line. A fault gives an error that names the arm, the case, the round and the tail of `stderr`. */
-async function child(start: StartChild, argv: readonly string[], limits: StartOptions, where: string, overLimit: "error" | "skip", runner: string): Promise<ChildEnd> {
+/**
+ * This function waits for the step `prepare`, then it starts one child and reads its JSON line. A fault gives an error that
+ * names the arm, the case, the round and the tail of `stderr`. A step that throws is an error, as a start that throws is.
+ */
+async function child(
+  start: StartChild,
+  argv: readonly string[],
+  limits: StartOptions,
+  where: string,
+  overLimit: "error" | "skip",
+  runner: string,
+  prepare?: () => Promise<void>,
+): Promise<ChildEnd> {
+  if (prepare !== undefined) {
+    try {
+      await prepare();
+    } catch (error) {
+      throw new Error(`${runner}: ${where} did not start: the step before the child failed: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
+    }
+  }
   let exit: ChildExit;
   try {
     exit = await start(argv, limits);

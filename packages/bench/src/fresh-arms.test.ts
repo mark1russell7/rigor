@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type ArmProcess, type BenchEnv, type ChildExit, type FreshArmsOptions, type StartChild, type StartOptions, armTimes, freshArms } from "./fresh.ts";
+import { type ArmProcess, type BenchEnv, type ChildExit, type ChildTurn, type FreshArmsOptions, type StartChild, type StartOptions, armTimes, freshArms } from "./fresh.ts";
 import { aaOrders, armOrder, balancedRounds } from "./index.ts";
 
 const ENV: BenchEnv = { cpu: "test cpu", cores: 4, os: "linux", arch: "x64", node: "v24.0.0" };
@@ -136,6 +136,40 @@ describe("freshArms", () => {
     await expect(run({ start: skip, warmUp: 1 })).rejects.toThrow(/^freshArms: the warm-up child 1 of the arm "slow" on the case "slow" skipped the case \("cold"\)\. A run of arms has no skips/);
     const hashOf = (argv: readonly string[], k: number) => ({ stdout: JSON.stringify({ ms: 1, hash: argv.includes("same") && k === 2 ? "cold" : "h" }) });
     await expect(run({ start: fake(hashOf).start, warmUp: 1 })).rejects.toThrow(/gave the hash h, and an earlier child with the same argv gave cold/);
+  });
+
+  it("waits for the step before each child, warm-up children included, with the id of the arm and the global round", async () => {
+    const log: string[] = [];
+    const turns: ChildTurn[] = [];
+    const before = async (turn: ChildTurn): Promise<void> => {
+      await new Promise((done) => setTimeout(done, 1));
+      turns.push(turn);
+      log.push(`before ${turn.case}`);
+    };
+    const { start, calls } = fake((argv) => {
+      log.push(`start ${argv.at(-1)}`);
+      return undefined;
+    });
+    const result = await run({ start, before, rounds: 8, roundOffset: 16, warmUp: 1 });
+    expect(log.length).toBe(2 * calls.length);
+    for (let k = 0; k < calls.length; k++) expect([log[2 * k], log[2 * k + 1]]).toEqual([`before ${calls[k]!.argv.at(-1)}`, `start ${calls[k]!.argv.at(-1)}`]);
+    // The warm-up pass starts each different child one time, with the round 0.
+    expect(turns.slice(0, 3)).toEqual(["slow", "fast", "same"].map((id) => ({ arm: id, case: id, round: 0, warmUp: true })));
+    // Each timed child gets the id of its arm, so the A/A arms "same" and "same#aa" each get their own turn.
+    expect(turns.slice(3)).toEqual(result.processes.map((p) => ({ arm: p.arm, case: p.case, round: p.round, warmUp: false })));
+    expect(result.processes[0]!.round).toBe(16);
+    expect(result).toEqual(await run({ start: fake().start, rounds: 8, roundOffset: 16, warmUp: 1 }));
+  });
+
+  it("makes a step that throws an error of its child, and starts no child after it", async () => {
+    const { start, calls } = fake();
+    let steps = 0;
+    const before = async (): Promise<void> => {
+      steps += 1;
+      if (steps === 2) throw new Error("no drop of the page cache");
+    };
+    await expect(run({ start, before })).rejects.toThrow(/^freshArms: the arm "\w+" on the case "\w+", round 0 did not start: the step before the child failed: no drop of the page cache$/);
+    expect(calls).toHaveLength(1);
   });
 
   it("stops on a failed child, a skip and two hashes of one argv", async () => {

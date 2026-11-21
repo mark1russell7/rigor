@@ -122,6 +122,11 @@ v.comparison;                                     // the cases that gain and dro
 | `watchHeap(options)` | From `/fresh`: the peaks of the used heap and of the live heap, and the GC time, over the GC events of a watch. |
 | `containerStart(options)` | From `/fresh`: a start of each child in a Docker container with the image, the memory, the swap and the CPUs of a target machine. |
 | `containerArgv(options, name, argv, cwd)` | From `/fresh`: the argv of `docker run` for one child of `containerStart`. |
+| `diskOf(path, read)` | From `/fresh`: the whole disk of the host that holds a path, as `/dev/<name>`, for the disk limits of a container. |
+| `dropPageCache(start)` | From `/fresh`: a drop of the page cache of the host with `PAGE_CACHE_DROP`. A failure is an error. |
+| `startBallast(bytes, options)` | From `/fresh`: a second Node process that holds a resident set of a given size, and stops with its parent. |
+| `processIo(options)` | From `/fresh`: one read of the disk counters, the major faults, the resident set and the cgroup counters of this process. |
+| `watchIo(intervalMs, options)` | From `/fresh`: the samples of `processIo` at an interval, from a worker thread. |
 | `checkoutArm(options)` | From `/fresh`: an arm on a git worktree of a commit, built by its setup commands. |
 | `repoCommit(ref, options)` | From `/fresh`: the full hash of the commit of a ref, for the arm of the job. |
 | `eventProbe(options)` | From `/fresh`: the GC events, the GC time and the deopts of a child in each half of its counted samples. |
@@ -912,6 +917,58 @@ run.skipped;                                     // [{ arm: "base", case: "log-1
 - The container has no network by default, and the user of this process. `--pull never` refuses an image that is not on the host. Pull the image before the run.
 - After each child, the start reads `OOMKilled` and removes the container. A removal also stops a container after the time limit.
 - `watchHeap` gives the peaks of the heap of a child from the GC profiler of V8. A reading at an interval needs a free event loop. The profiler sees each GC event.
+
+### Cold starts on a slow disk
+
+The start of an app on a small cloud machine reads its files from a slow disk with a cold page cache. A bench of such a start needs three parts. These are disk limits for the container, a fresh state for each child, and a cold cache:
+
+```ts
+const disk = diskOf(work);                        // the whole disk of the folder, for example /dev/nvme0n1
+
+const child = containerStart({
+  image: "node:24.21.0-bookworm-slim",
+  memory: 1_011_425_280,
+  cpuset: "0-1",
+  mounts: [work, repo],
+  disks: [{ device: disk, readBytes: 10 * 1024 ** 2, readOps: 1500, writeBytes: 10 * 1024 ** 2, writeOps: 1500 }],
+});
+
+const before = async (turn: ChildTurn): Promise<void> => {
+  copyState(turn.arm, turn.case);                 // a fresh copy of the state of the child
+  await dropPageCache();                          // the child reads its files from the disk
+};
+
+const run = await freshRun({ base, candidates, cases, rounds: 4, order: "arms", start: child, before });
+```
+
+- `disks` adds `--device-read-bps`, `--device-read-iops`, `--device-write-bps` and `--device-write-iops` to `docker run`. Each rate is for each second.
+- Docker sets the limits of a whole disk, not of a partition. `diskOf` gives the whole disk of a folder from `/sys/dev/block`. A tmpfs or an overlay has no disk, and `diskOf` gives an error.
+- A read that the page cache serves does not go to the disk. Thus the limits apply only to a cold read.
+- The step `before` operates before each child, warm-up children included. The run waits for it, and then the child and its time limit start.
+- The turn names the arm whose command starts, the case and the global round. A warm-up child has the round 0 and `warmUp: true`.
+- A step that throws stops the run with an error of its child. `freshArms` takes `before` too.
+- `dropPageCache` starts `sudo -n sh -c "sync && echo 3 > /proc/sys/vm/drop_caches"`. The user needs `sudo` with no password for it.
+- A failed drop is an error with the tail of `stderr`. A child that needs a cold cache must not start on a warm cache.
+
+In the child, `startBallast` holds a part of the memory of the container, so less memory is free for the page cache. `processIo` and `watchIo` read the disk work of the start:
+
+```ts
+const ballast = await startBallast(512 * 1024 ** 2); // a resident set of 512 MiB or more
+const watch = watchIo(50);                        // a sample each 50 ms, from a worker thread
+const from = performance.now();
+await startApp();
+const ms = performance.now() - from;
+const ready = processIo();                        // the totals at ready
+const samples = await watch.stop();
+await ballast.stop();
+console.log(JSON.stringify({ ms, ballast: ballast.rss, readBytes: ready.readBytes, majorFaults: ready.majorFaults, samples }));
+```
+
+- The ballast is a second Node process with an inline program. It fills chunks of 1 MiB until its resident set is the target or more.
+- The ballast exits when the `stdin` pipe from its parent closes. Thus it does not live after the child, and it does not keep the child alive.
+- A sample has the disk reads and writes of `/proc/self/io`, the major faults, the resident set and the counters of the cgroup. A file that a read cannot get gives `null`.
+- The worker of `watchIo` takes its samples while the main thread waits in a page fault or a synchronous read. The worker adds approximately a few MiB to the resident set.
+- `processIo` and the worker of `watchIo` run one reader. Thus their fields agree.
 
 ### Children that pass a limit
 
