@@ -6,7 +6,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { arch, cpus, platform, tmpdir } from "node:os";
 import { join } from "node:path";
 import { PerformanceObserver } from "node:perf_hooks";
-import { setFlagsFromString } from "node:v8";
+import { GCProfiler, getHeapStatistics, setFlagsFromString } from "node:v8";
 import type { ArmProcess } from "./arm-times.ts";
 import { type FixtureFile, type FixtureHash, checkFixtures } from "./fixtures.ts";
 import { type Arm, type PairedTime, armOrder, balancedRounds, firstArm } from "./paired.ts";
@@ -14,6 +14,7 @@ import { startProcess, stderrTail } from "./start.ts";
 
 export { type ArmProcess, type ArmTimes, armTimes } from "./arm-times.ts";
 export { type CheckoutArm, type CheckoutArmOptions, type RepoCommitOptions, checkoutArm, repoCommit } from "./checkout.ts";
+export { type ContainerOptions, MIN_CONTAINER_MEMORY, containerArgv, containerStart } from "./container.ts";
 export { type FixtureFile, type FixtureHash, type FixtureOptions, checkFixtures, fixtureDifferences } from "./fixtures.ts";
 export { startProcess } from "./start.ts";
 
@@ -288,6 +289,94 @@ export function watchMemory(options: WatchOptions = {}): MemoryWatch {
   return { peak: read, stop: () => clearInterval(timer) };
 }
 
+/** The peaks of the heap of V8 over a heap watch, in bytes, and the counts of its GC events. `watchHeap` gives them. */
+export interface HeapPeaks {
+  /** The peak of the used heap with its garbage: the largest used heap before a GC event or at the stop. */
+  readonly used: number;
+  /** The peak of the live heap: the largest used heap after a full GC. The value is `null` when no full GC ran in the watch. */
+  readonly live: number | null;
+  /** The count of the GC events of the watch. */
+  readonly gc: number;
+  /** The count of the full GC events of the watch: the mark-compact events of the whole heap. */
+  readonly fullGc: number;
+  /** The GC time of the watch in milliseconds: the sum of the costs of its GC events. */
+  readonly gcMs: number;
+  /** The heap size limit of V8 at the stop. */
+  readonly limit: number;
+}
+
+/** The heap statistics of one side of a GC event in a profile of `v8.GCProfiler`. */
+export interface GcSide {
+  readonly heapStatistics: { readonly usedHeapSize: number };
+}
+
+/** The part of a profile of `v8.GCProfiler` that `watchHeap` reads. It has the type and the cost of each GC event, and the used heap before and after it. The cost is in microseconds. */
+export interface GcProfile {
+  readonly statistics: readonly { readonly gcType: string; readonly cost: number; readonly beforeGC: GcSide; readonly afterGC: GcSide }[];
+}
+
+/** The options of `watchHeap`. A test gives its own profile and heap. */
+export interface HeapWatchOptions {
+  /** This function starts a profile of the GC events, and it gives the function that stops the profile. The default uses `v8.GCProfiler`. */
+  readonly profile?: () => () => GcProfile | undefined;
+  /** This function gives the used heap and the heap size limit at the time of the call. The default reads `v8.getHeapStatistics()`. */
+  readonly heap?: () => { readonly used: number; readonly limit: number };
+}
+
+/** A watch of the heap of V8. `watchHeap` gives it. */
+export interface HeapWatch {
+  /** This function stops the watch, and it gives the peaks over the GC events of the watch. A second call is an error. */
+  readonly stop: () => HeapPeaks;
+}
+
+/** The type of a full GC in a profile of `v8.GCProfiler`. */
+const FULL_GC = "MarkSweepCompact";
+
+/** This function starts a profile of `v8.GCProfiler`, and it gives the function that stops it. */
+const gcProfile = (): (() => GcProfile | undefined) => {
+  const profiler = new GCProfiler();
+  profiler.start();
+  return () => profiler.stop() as GcProfile | undefined;
+};
+
+/** This function gives the used heap and the heap size limit of V8 at the time of the call. */
+const heapNow = (): { used: number; limit: number } => {
+  const statistics = getHeapStatistics();
+  return { used: statistics.used_heap_size, limit: statistics.heap_size_limit };
+};
+
+/**
+ * This function starts a watch of the heap of V8 with `v8.GCProfiler`. V8 records each GC event, also when work blocks the event loop.
+ * Thus the watch sees the peaks that a reading at an interval can miss.
+ *
+ * - Between two GC events the used heap only grows. Thus its peak is the used heap before a GC event, or at the stop.
+ * - The live heap is the used heap after a full GC. To include the live heap at the end, call `heapAfterGc()` before the stop.
+ */
+export function watchHeap(options: HeapWatchOptions = {}): HeapWatch {
+  const stopProfile = (options.profile ?? gcProfile)();
+  let stopped = false;
+  return {
+    stop: () => {
+      if (stopped) throw new Error("watchHeap: the watch stopped before.");
+      stopped = true;
+      const events = stopProfile()?.statistics ?? [];
+      const now = (options.heap ?? heapNow)();
+      let used = now.used;
+      let live: number | null = null;
+      let fullGc = 0;
+      let cost = 0;
+      for (const event of events) {
+        cost += event.cost;
+        used = Math.max(used, event.beforeGC.heapStatistics.usedHeapSize);
+        if (event.gcType !== FULL_GC) continue;
+        fullGc += 1;
+        live = Math.max(live ?? 0, event.afterGC.heapStatistics.usedHeapSize);
+      }
+      return { used, live, gc: events.length, fullGc, gcMs: cost / 1000, limit: now.limit };
+    },
+  };
+}
+
 /** The options of an event probe. */
 export interface ProbeOptions {
   /** The value `true` also counts the deopts with the V8 flag `--trace-deopt`. The default is `false`. */
@@ -420,6 +509,8 @@ export interface ChildExit {
   readonly timedOut?: boolean;
   /** The reason of a fault outside the child, for example a program that does not exist or too much output. */
   readonly error?: string;
+  /** The value is `true` when the memory limit of the container of the child stopped the child. `containerStart` gives it. */
+  readonly oomKilled?: boolean;
 }
 
 /** The start of one child: it gives the end of the child. The default starts a process with `spawn`, without a shell. */
@@ -474,8 +565,22 @@ export interface FreshOptions {
    * With `"skip"`, a child over the limit in the first round of the job skips its case, with the reason
    * `took more than <timeoutMs> ms`. Thus a case that does not end is a result with a reason, and the job ends in time.
    * A child over the limit in a later round is an error, as each skip after the first round is.
+   *
+   * Two more limits follow the same rule. Each skip has the kind of its limit.
+   * - A child that the memory limit of its container stopped (`oomKilled`) has the reason `passed the memory limit of its container`.
+   * - A child that V8 stopped at the heap limit has the reason `reached the heap limit of V8`, and the tail of its `stderr`.
    */
   readonly overLimit?: "error" | "skip";
+  /**
+   * The part of the run that a skip removes. The default `"case"` removes the case from each pair, and the runner starts no more children for it.
+   *
+   * With `"child"`, a skip removes only its child. This scope needs the order `"arms"`, where each child of a round is one arm.
+   * - The other arms of the case still start, and each later round starts each arm again.
+   * - A pair gets a record only when its two children give a time. A skip in a later round is a result, not an error.
+   * - Use it when a child can pass a limit on a case, and the other arms are the measure. An example is a start near a memory limit.
+   * - `poolRecords` still removes each case with a skip from the pool of the jobs. Thus a time verdict reads only the cases that each child timed.
+   */
+  readonly skipScope?: "case" | "child";
   /** The most bytes of the output of one child. The default is 16 MiB. */
   readonly maxBuffer?: number;
   /** The label of the job. The default is `"0"`. */
@@ -518,13 +623,27 @@ export interface FreshRecord extends PairedTime {
   readonly commits?: { readonly a?: string; readonly b?: string };
 }
 
-/** A case that an arm skipped. The case is in no pair. */
+/**
+ * The kind of a skip: the cause that the child gave no time.
+ *
+ * - `line`: the child printed a skip line.
+ * - `time`: the child took more time than `timeoutMs`.
+ * - `memory`: the memory limit of the container of the child stopped the child (`oomKilled`).
+ * - `heap`: V8 stopped the child at the heap limit, with the error `JavaScript heap out of memory`.
+ */
+export type SkipKind = "line" | "time" | "memory" | "heap";
+
+/**
+ * A case that an arm skipped. With the scope `"case"`, the case is in no pair. With the scope `"child"`, only the pairs of the child lose the round.
+ * In the order `"arms"`, the arm of the A/A copy is the id of its pair, as in `orders`.
+ */
 export interface FreshSkip {
   readonly arm: string;
   readonly case: string;
-  /** The global round of the skip. A skip is in the first round of its job. */
+  /** The global round of the skip. With the scope `"case"`, a skip is in the first round of its job. */
   readonly round: number;
   readonly reason: string;
+  readonly kind: SkipKind;
 }
 
 /** The order of the children of one case in one round of a fresh run with the order `"arms"`. */
@@ -536,6 +655,24 @@ export interface CaseOrder {
   readonly arms: readonly string[];
 }
 
+/**
+ * A timed child is the time and the fields of one child of a run with the order `"arms"`. A pair gets a record only
+ * when its two children give a time. Thus with `skipScope: "child"`, the child of an arm can have no record of a pair.
+ */
+export interface TimedChild {
+  /** The id of the arm. The id of an A/A copy is the id of its pair, as in `orders`. */
+  readonly arm: string;
+  readonly case: string;
+  /** The global round. */
+  readonly round: number;
+  /** The place of the child in the order of its case and round, from 0. */
+  readonly position: number;
+  /** The time of the child line in milliseconds. */
+  readonly ms: number;
+  /** The fields of the child line in addition to its time. Only a child that gives a field has them. */
+  readonly fields?: ChildFields;
+}
+
 /** The result of a fresh run. */
 export interface FreshRun {
   readonly env: BenchEnv;
@@ -545,6 +682,8 @@ export interface FreshRun {
   readonly skipped: FreshSkip[];
   /** The order of the children of each case in each round. Only a run with the order `"arms"` has it. A skipped case has no order. */
   readonly orders?: readonly CaseOrder[];
+  /** Each child that gave a time, in the order of the starts. Only a run with the order `"arms"` has it. A skipped case has no child. */
+  readonly children?: readonly TimedChild[];
   /** The warm-up children, in the order of their starts. Only a run with `warmUp` above 0 has them. */
   readonly warmUp?: readonly WarmUpChild[];
 }
@@ -558,7 +697,7 @@ const AA_SUFFIX = "~aa";
  * - With the default order `"pairs"`, the pairs of a round and case come in the order of `pairOrder`.
  *   Each pair has its own base child, and the first arm of a pair starts first.
  * - With the order `"arms"`, each arm starts one child in the order of `armOrder`. The pairs share the base child.
- *   The result keeps the order of each round and case in `orders`.
+ *   The result keeps the order of each round and case in `orders`, and each child with a time in `children`.
  * - With `firstCase`, the order of the cases turns in each round. The turn of the arms and the order of the pairs do not change.
  * - With `warmUp`, each arm starts that count of warm-up children on the first case of the job before the first round.
  *   The result lists them in `warmUp`, outside the pairs.
@@ -566,6 +705,7 @@ const AA_SUFFIX = "~aa";
  *   With `overLimit: "skip"`, a child that takes too long in the first round skips its case too.
  * - A case that an arm skips in the first round of the job leaves each pair, and the runner starts no more children for it.
  * - A skip after the first round is an error. It shows a child that is not deterministic, and it drops paid data.
+ * - With `skipScope: "child"`, a skip removes only its child, and the two rules above do not apply.
  * - Two different hashes of one arm on one case are an error.
  */
 export async function freshRun(options: FreshOptions): Promise<FreshRun> {
@@ -594,6 +734,10 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
   if (aa === "each") for (const c of candidates) pairs.push({ id: `${c.id}${AA_SUFFIX}`, a: c, b: c });
   const order = options.order ?? "pairs";
   if (order !== "pairs" && order !== "arms") throw new RangeError(`freshRun: order is "pairs" or "arms", not ${JSON.stringify(order)}.`);
+  const skipScope = options.skipScope ?? "case";
+  if (skipScope !== "case" && skipScope !== "child") throw new RangeError(`freshRun: skipScope is "case" or "child", not ${JSON.stringify(skipScope)}.`);
+  // In the order "pairs", the base starts once in each pair. Thus one arm has many children in a round, and a skip does not name one child.
+  if (skipScope === "child" && order !== "arms") throw new RangeError('freshRun: skipScope "child" needs the order "arms".');
   if (pairs.length === 0) throw new RangeError("freshRun: the run has no pairs. Give a candidate, or keep the A/A pair.");
   for (const arm of [base, ...candidates]) {
     if (typeof arm.id !== "string" || arm.id === "") throw new RangeError("freshRun: the id of an arm is a string that is not empty.");
@@ -615,14 +759,15 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
   const gone = new Set<string>();
   const hashes = new Map<string, string>();
   const orders: CaseOrder[] = [];
+  const children: TimedChild[] = [];
   // The arms of the order "arms": the base, then arm `b` of each pair with the id of the pair.
   const slots: { id: string; arm: FreshArm }[] = [{ id: base.id, arm: base }, ...pairs.map((p) => ({ id: p.id, arm: p.b }))];
 
-  /** This function starts one child of an arm on a case, and examines its skip and its hash. A skip after the first round is an error. */
-  const timed = async (who: FreshArm, id: string, r: number, where: string): Promise<ChildLine> => {
+  /** This function starts one child of an arm on a case, and examines its skip and its hash. With the scope "case", a skip after the first round is an error. */
+  const timed = async (who: FreshArm, id: string, r: number, where: string): Promise<ChildEnd> => {
     const line = await child(start, [...who.command, ...args(id)], { timeoutMs, maxBuffer, ...(who.cwd === undefined ? {} : { cwd: who.cwd }) }, where, overLimit, "freshRun");
     if (line.skipped !== undefined) {
-      if (r > 0) throw new Error(`freshRun: ${where} skipped the case after the first round of the job (${JSON.stringify(line.skipped)}). A child that skips only in a later round is not deterministic.`);
+      if (r > 0 && skipScope === "case") throw new Error(`freshRun: ${where} skipped the case after the first round of the job (${JSON.stringify(line.skipped)}). A child that skips only in a later round is not deterministic.`);
       return line;
     }
     if (line.hash !== undefined) {
@@ -658,25 +803,29 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
         const turn = i % slots.length;
         const sequence = armOrder([...slots.slice(turn), ...slots.slice(0, turn)], round);
         const times = new Map<string, { ms: number; fields: ChildFields; position: number }>();
-        let skip: FreshSkip | undefined;
+        const skips: FreshSkip[] = [];
         for (const [position, slot] of sequence.entries()) {
           const line = await timed(slot.arm, id, r, `the arm ${JSON.stringify(slot.id)} on the case ${JSON.stringify(id)}, round ${round}`);
           if (line.skipped !== undefined) {
-            skip = { arm: slot.arm.id, case: id, round, reason: line.skipped };
-            break;
+            skips.push({ arm: slot.id, case: id, round, reason: line.skipped, kind: line.kind ?? "line" });
+            if (skipScope === "case") break;
+            continue;
           }
           const { ms, hash: _hash, skipped: _skipped, ...more } = line;
           times.set(slot.id, { ms, fields: more, position });
         }
-        if (skip !== undefined) {
-          skipped.push(skip);
+        skipped.push(...skips);
+        if (skips.length > 0 && skipScope === "case") {
           gone.add(id);
           continue;
         }
         orders.push({ case: id, round, arms: sequence.map((slot) => slot.id) });
+        for (const [arm, each] of times) children.push({ arm, case: id, round, position: each.position, ms: each.ms, ...(Object.keys(each.fields).length > 0 ? { fields: each.fields } : {}) });
         for (const pair of pairs) {
-          const a = times.get(pair.a.id)!;
-          const b = times.get(pair.id)!;
+          const a = times.get(pair.a.id);
+          const b = times.get(pair.id);
+          // With the scope "child", a pair with a skipped child has no record of the round.
+          if (a === undefined || b === undefined) continue;
           const extra = Object.keys(a.fields).length + Object.keys(b.fields).length > 0 ? { fields: { a: a.fields, b: b.fields } } : {};
           out[pair.id]!.push({ case: id, round, first: a.position < b.position ? "a" : "b", a: a.ms, b: b.ms, job, env, ...extra, ...commitsOf(pair) });
         }
@@ -693,7 +842,7 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
           const where = `the arm ${JSON.stringify(who.id)} (pair ${JSON.stringify(pair.id)}, arm ${arm}) on the case ${JSON.stringify(id)}, round ${round}`;
           const line = await timed(who, id, r, where);
           if (line.skipped !== undefined) {
-            skip = { arm: who.id, case: id, round, reason: line.skipped };
+            skip = { arm: who.id, case: id, round, reason: line.skipped, kind: line.kind ?? "line" };
             break;
           }
           times[arm] = line.ms;
@@ -712,7 +861,7 @@ export async function freshRun(options: FreshOptions): Promise<FreshRun> {
       for (const { pair, record } of records) out[pair]!.push(record);
     }
   }
-  return { env, job, pairs: out, skipped, ...(order === "arms" ? { orders } : {}), ...(warmUp > 0 ? { warmUp: warmed } : {}) };
+  return { env, job, pairs: out, skipped, ...(order === "arms" ? { orders, children } : {}), ...(warmUp > 0 ? { warmUp: warmed } : {}) };
 }
 
 /** One arm of a run of arms: its id, the case that it times, and the argv of its child. */
@@ -916,8 +1065,23 @@ function commitsOf(pair: { a: FreshArm; b: FreshArm }): { commits?: { a?: string
   return { commits: { ...(pair.a.commit === undefined ? {} : { a: pair.a.commit }), ...(pair.b.commit === undefined ? {} : { b: pair.b.commit }) } };
 }
 
+/** The reason of a child that the memory limit of its container stopped. */
+const MEMORY_LIMIT = "passed the memory limit of its container";
+
+/** The reason of a child that V8 stopped at the heap limit. */
+const HEAP_LIMIT = "reached the heap limit of V8";
+
+/** This rule finds the fatal error of V8 at the heap limit in the `stderr` of a child. */
+const HEAP_OUT = /JavaScript heap out of memory|Reached heap limit/;
+
+/** The longest tail of `stderr` in the reason of a heap skip. */
+const HEAP_TAIL = 300;
+
+/** The end of one child: its line, and the kind of a skip at a limit. A skip line of the child has no kind. */
+type ChildEnd = ChildLine & { readonly kind?: SkipKind };
+
 /** This function starts one child and reads its JSON line. A fault gives an error that names the arm, the case, the round and the tail of `stderr`. */
-async function child(start: StartChild, argv: readonly string[], limits: StartOptions, where: string, overLimit: "error" | "skip", runner: string): Promise<ChildLine> {
+async function child(start: StartChild, argv: readonly string[], limits: StartOptions, where: string, overLimit: "error" | "skip", runner: string): Promise<ChildEnd> {
   let exit: ChildExit;
   try {
     exit = await start(argv, limits);
@@ -929,8 +1093,16 @@ async function child(start: StartChild, argv: readonly string[], limits: StartOp
   };
   if (exit.error !== undefined) throw fail(`failed: ${exit.error}`);
   if (exit.timedOut === true) {
-    if (overLimit === "skip") return { skipped: `took more than ${limits.timeoutMs} ms` };
+    if (overLimit === "skip") return { skipped: `took more than ${limits.timeoutMs} ms`, kind: "time" };
     throw fail(`took more than ${limits.timeoutMs} ms`);
+  }
+  if (exit.oomKilled === true) {
+    if (overLimit === "skip") return { skipped: MEMORY_LIMIT, kind: "memory" };
+    throw fail(MEMORY_LIMIT);
+  }
+  if (exit.code !== 0 && HEAP_OUT.test(exit.stderr)) {
+    if (overLimit === "skip") return { skipped: `${HEAP_LIMIT}: ${exit.stderr.slice(-HEAP_TAIL).replaceAll(/\s+/g, " ").trim()}`, kind: "heap" };
+    throw fail(HEAP_LIMIT);
   }
   if (exit.code !== 0) throw fail(exit.code === null ? "stopped on a signal" : `exited with the code ${exit.code}`);
   try {
