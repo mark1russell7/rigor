@@ -35,6 +35,31 @@ export {
 } from "./moving-block.ts";
 export { type ModeOptions, type SmoothLaw, type SmoothLawScore, bestSmoothLaw, modeCount, smoothLawScores } from "./distribution.ts";
 export { type LeastSquaresFit, type LeastSquaresOptions, leastSquares, leaveOneOutResiduals } from "./regression.ts";
+export {
+  type FitError,
+  type HeldOutSeparable,
+  type HeldOutSeparableOptions,
+  type RankSeparableOptions,
+  type SeparableBootstrapOptions,
+  type SeparableFit,
+  type SeparableGroup,
+  type SeparableModel,
+  type SeparableOptions,
+  type SeparableRank,
+  type SeparableReplicates,
+  type SeparableResidual,
+  type ShapeParameter,
+  SEPARABLE_BOOTSTRAP_RUNS,
+  SEPARABLE_MAX_COMBINATIONS,
+  SEPARABLE_MAX_CYCLES,
+  SEPARABLE_RSS_TOLERANCE,
+  SEPARABLE_SEARCH_TOLERANCE,
+  bootstrapSeparable,
+  fitError,
+  fitSeparable,
+  heldOutSeparable,
+  rankSeparable,
+} from "./separable.ts";
 export { type RidgeOptions, ridgeSolve } from "./ridge.ts";
 export {
   type ClassForecast,

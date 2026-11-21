@@ -187,7 +187,8 @@ function rowDraws(x: readonly (readonly number[])[], y: readonly number[], inter
   };
 }
 
-interface Settings {
+/** The checked options of a bootstrap. The index does not export it. `separable.ts` uses it. */
+export interface Settings {
   readonly runs: number;
   readonly lowEnd: number;
   readonly highEnd: number;
@@ -196,8 +197,11 @@ interface Settings {
   readonly against: number | undefined;
 }
 
-/** This function examines the options of a bootstrap, and gives the defaults. It throws a RangeError for each fault. */
-function settings(name: string, options: BootstrapOptions): Settings {
+/**
+ * This function examines the options of a bootstrap, and gives the defaults. It throws a RangeError for each fault.
+ * The index does not export it. `separable.ts` uses it.
+ */
+export function settings(name: string, options: BootstrapOptions): Settings {
   const runs = options.runs ?? 10_000;
   if (!Number.isSafeInteger(runs) || runs < 1) throw new RangeError(`${name}: runs is a whole number of 1 or more, not ${runs}.`);
   const tail = (1 - (options.level ?? 0.95)) / 2;
@@ -223,8 +227,11 @@ function sides(values: readonly number[], against: number | undefined): SideP | 
   return { against, pAbove: (1 + atOrBelow) / n, pBelow: (1 + atOrAbove) / n };
 }
 
-/** The interval of the finite statistics of the runs. When no run is finite, low and high are equal to the estimate. */
-function ends(values: number[], estimate: number, s: Settings, seed: number): Interval {
+/**
+ * The interval of the finite statistics of the runs. When no run is finite, low and high are equal to the estimate.
+ * The index does not export it. `separable.ts` uses it.
+ */
+export function ends(values: number[], estimate: number, s: Settings, seed: number): Interval {
   const { runs, level } = s;
   const p = sides(values, s.against);
   if (values.length === 0) return { estimate, low: estimate, high: estimate, level, runs, finite: 0, seed, ...p };
