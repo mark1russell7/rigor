@@ -17,12 +17,12 @@
     "@mark1russell7/rigor-generators": "workspace:*",
     "@mark1russell7/rigor-proxy": "workspace:*",
     "@mark1russell7/rigor-statistics": "workspace:*",
-    "@mark1russell7/text": "^0.0.13",
+    "@mark1russell7/text": "^0.0.17",
     "tsdown": "^0.23.1"
   },
   "devDependencies": {
     "@mark1russell7/cue": "^2.0.0",
-    "@mark1russell7/site-pages": "^0.7.0",
+    "@mark1russell7/site-pages": "^0.8.1",
     "@types/node": "^26.6.5",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3"
