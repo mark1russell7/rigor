@@ -178,6 +178,7 @@ blockLength: build/index.d.ts#blockLength
 bootstrap: build/index.d.ts#bootstrap
 bootstrapClusters: build/index.d.ts#bootstrapClusters
 bootstrapLeastSquares: build/index.d.ts#bootstrapLeastSquares
+bootstrapLeastSquaresReplicates: build/index.d.ts#bootstrapLeastSquaresReplicates
 bootstrapMedian: build/index.d.ts#bootstrapMedian
 bootstrapMedianRatio: build/index.d.ts#bootstrapMedianRatio
 bootstrapMovingBlock: build/index.d.ts#bootstrapMovingBlock
@@ -218,6 +219,7 @@ holm: build/index.d.ts#holm
 informationGain: build/index.d.ts#informationGain
 kendallTau: build/index.d.ts#kendallTau
 leastSquares: build/index.d.ts#leastSquares
+leaveOneOutResiduals: build/index.d.ts#leaveOneOutResiduals
 logLoss: build/index.d.ts#logLoss
 mean: build/index.d.ts#mean
 meanInterval: build/index.d.ts#meanInterval
@@ -1416,6 +1418,9 @@ export declare function bootstrapClusters<T>(rows: readonly T[], cluster: (row: 
 ### build/index.d.ts#bootstrapLeastSquares
 export declare function bootstrapLeastSquares(x: readonly (readonly number[])[], y: readonly number[], options?: BootstrapOptions & LeastSquaresOptions): Interval[];
 
+### build/index.d.ts#bootstrapLeastSquaresReplicates
+export declare function bootstrapLeastSquaresReplicates(x: readonly (readonly number[])[], y: readonly number[], options?: Pick<BootstrapOptions, "runs" | "seed"> & LeastSquaresOptions): LeastSquaresReplicates;
+
 ### build/index.d.ts#bootstrapMedian
 export declare function bootstrapMedian(values: readonly number[], options?: BootstrapOptions): Interval;
 
@@ -1535,6 +1540,9 @@ export declare function kendallTau(a: readonly number[], b: readonly number[], s
 
 ### build/index.d.ts#leastSquares
 export declare function leastSquares(x: readonly (readonly number[])[], y: readonly number[], options?: LeastSquaresOptions): LeastSquaresFit;
+
+### build/index.d.ts#leaveOneOutResiduals
+export declare function leaveOneOutResiduals(x: readonly (readonly number[])[], y: readonly number[], options?: LeastSquaresOptions): number[];
 
 ### build/index.d.ts#logLoss
 export declare function logLoss(forecasts: readonly Forecast[]): number;

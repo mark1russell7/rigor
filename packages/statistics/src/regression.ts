@@ -66,13 +66,22 @@ export function checkedShape(name: string, x: readonly (readonly number[])[], y:
 }
 
 /**
- * The fit of rows with a known shape. The caller examined the shape with `checkedShape`. The design is a matrix of
- * `n` rows and `k` columns, kept by column.
+ * The QR decomposition of a design of full rank. `a` keeps the design by column: below the diagonal are the
+ * Householder vectors, and above the diagonal is R. `diagonal` is the diagonal of R, and `b` gives the coefficients.
  */
-export function fitRows(x: readonly (readonly number[])[], y: readonly number[], intercept: boolean, k: number): LeastSquaresFit {
+interface Decomposition {
+  readonly a: Float64Array;
+  readonly diagonal: Float64Array;
+  readonly b: number[];
+}
+
+/**
+ * This function decomposes the design of rows with a known shape, and solves for the coefficients. The design is a
+ * matrix of `n` rows and `k` columns, kept by column. It gives null when `n <= k` or when the rank is not full.
+ */
+function decompose(x: readonly (readonly number[])[], y: readonly number[], intercept: boolean, k: number): Decomposition | null {
   const n = x.length;
-  const failed = (): LeastSquaresFit => ({ coefficients: new Array<number>(k).fill(Number.NaN), residualSd: Number.NaN, r2: Number.NaN, n, k });
-  if (n <= k) return failed();
+  if (n <= k) return null;
   const offset = intercept ? 1 : 0;
   const a = new Float64Array(n * k);
   for (let i = 0; i < n; i++) {
@@ -91,7 +100,7 @@ export function fitRows(x: readonly (readonly number[])[], y: readonly number[],
     for (let i = j; i < n; i++) tail2 += (a[c + i] as number) ** 2;
     // The tail is the part of column j that is orthogonal to the columns before it.
     const tail = Math.sqrt(tail2);
-    if (!(tail > RANK_TOLERANCE * Math.sqrt(head + tail2))) return failed();
+    if (!(tail > RANK_TOLERANCE * Math.sqrt(head + tail2))) return null;
     const alpha = (a[c + j] as number) > 0 ? -tail : tail;
     // The Householder vector v is the tail of column j minus alpha times the first unit vector. It is kept in place.
     a[c + j] = (a[c + j] as number) - alpha;
@@ -114,6 +123,26 @@ export function fitRows(x: readonly (readonly number[])[], y: readonly number[],
     for (let m = j + 1; m < k; m++) s -= (a[m * n + j] as number) * (b[m] as number);
     b[j] = s / (diagonal[j] as number);
   }
+  return { a, diagonal, b };
+}
+
+/** This function gives the value of the fit with the coefficients `b` at one row of predictors. */
+function fittedAt(b: readonly number[], row: readonly number[], intercept: boolean): number {
+  const offset = intercept ? 1 : 0;
+  let fitted = intercept ? (b[0] as number) : 0;
+  for (let j = offset; j < b.length; j++) fitted += (b[j] as number) * (row[j - offset] as number);
+  return fitted;
+}
+
+/**
+ * The fit of rows with a known shape. The caller examined the shape with `checkedShape`. The design is a matrix of
+ * `n` rows and `k` columns, kept by column.
+ */
+export function fitRows(x: readonly (readonly number[])[], y: readonly number[], intercept: boolean, k: number): LeastSquaresFit {
+  const n = x.length;
+  const qr = decompose(x, y, intercept, k);
+  if (qr === null) return { coefficients: new Array<number>(k).fill(Number.NaN), residualSd: Number.NaN, r2: Number.NaN, n, k };
+  const { b } = qr;
   let center = 0;
   if (intercept) {
     for (const v of y) center += v;
@@ -122,11 +151,42 @@ export function fitRows(x: readonly (readonly number[])[], y: readonly number[],
   let rss = 0;
   let tss = 0;
   for (let i = 0; i < n; i++) {
-    const row = x[i] as readonly number[];
-    let fitted = intercept ? (b[0] as number) : 0;
-    for (let j = offset; j < k; j++) fitted += (b[j] as number) * (row[j - offset] as number);
-    rss += ((y[i] as number) - fitted) ** 2;
+    rss += ((y[i] as number) - fittedAt(b, x[i] as readonly number[], intercept)) ** 2;
     tss += ((y[i] as number) - center) ** 2;
   }
   return { coefficients: b, residualSd: Math.sqrt(rss / (n - k)), r2: tss > 0 ? 1 - rss / tss : Number.NaN, n, k };
+}
+
+/**
+ * The held-out residual of each row of a least-squares fit: `y[i]` minus the value at row `i` of the fit of the
+ * other rows. The sum of their squares is the PRESS statistic. The function fits all the rows one time. Then the
+ * residual of row `i` is `e / (1 - h)`. Here `e` is the residual of row `i` in the fit of all the rows. `h` is the
+ * hat value of row `i`: entry `i` of the diagonal of the hat matrix. This value is equal to the residual from a
+ * new fit of the other rows, to the rounding.
+ *
+ * When the fit of all the rows does not have full rank, or when `n <= k`, each residual is NaN. The hat value of a
+ * row can be 1 to the tolerance of the rank test. Then the other rows do not fix the fit at that row, and its
+ * residual is NaN. The shape errors are the errors of `leastSquares`.
+ */
+export function leaveOneOutResiduals(x: readonly (readonly number[])[], y: readonly number[], options: LeastSquaresOptions = {}): number[] {
+  const intercept = options.intercept ?? true;
+  const k = checkedShape("leaveOneOutResiduals", x, y, intercept);
+  const n = x.length;
+  const qr = decompose(x, y, intercept, k);
+  if (qr === null) return new Array<number>(n).fill(Number.NaN);
+  const { a, diagonal, b } = qr;
+  const offset = intercept ? 1 : 0;
+  const z = new Float64Array(k);
+  return x.map((row, i) => {
+    // The hat value of row i is the squared length of z, where R'z is row i of the design. R' is lower triangular.
+    let hat = 0;
+    for (let j = 0; j < k; j++) {
+      let s = j < offset ? 1 : (row[j - offset] as number);
+      for (let m = 0; m < j; m++) s -= (a[j * n + m] as number) * (z[m] as number);
+      z[j] = s / (diagonal[j] as number);
+      hat += (z[j] as number) ** 2;
+    }
+    const rest = 1 - hat;
+    return rest > RANK_TOLERANCE ? ((y[i] as number) - fittedAt(b, row, intercept)) / rest : Number.NaN;
+  });
 }
