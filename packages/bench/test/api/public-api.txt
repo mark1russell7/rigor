@@ -351,6 +351,7 @@ ChildFields: build/fresh.d.ts#ChildFields
 ChildLine: build/fresh.d.ts#ChildLine
 ChildSkip: build/fresh.d.ts#ChildSkip
 ChildTime: build/fresh.d.ts#ChildTime
+type ContainerOptions: build/fresh.d.ts#ContainerOptions
 EventProbe: build/fresh.d.ts#EventProbe
 type FixtureFile: build/fresh.d.ts#FixtureFile
 type FixtureHash: build/fresh.d.ts#FixtureHash
@@ -362,17 +363,25 @@ FreshOptions: build/fresh.d.ts#FreshOptions
 FreshRecord: build/fresh.d.ts#FreshRecord
 FreshRun: build/fresh.d.ts#FreshRun
 FreshSkip: build/fresh.d.ts#FreshSkip
+GcProfile: build/fresh.d.ts#GcProfile
+GcSide: build/fresh.d.ts#GcSide
 HalfCounts: build/fresh.d.ts#HalfCounts
 HalfTimes: build/fresh.d.ts#HalfTimes
+HeapPeaks: build/fresh.d.ts#HeapPeaks
+HeapWatch: build/fresh.d.ts#HeapWatch
+HeapWatchOptions: build/fresh.d.ts#HeapWatchOptions
+MIN_CONTAINER_MEMORY: build/fresh.d.ts#MIN_CONTAINER_MEMORY
 MemoryOptions: build/fresh.d.ts#MemoryOptions
 MemoryWatch: build/fresh.d.ts#MemoryWatch
 PairSlot: build/fresh.d.ts#PairSlot
 ProbeOptions: build/fresh.d.ts#ProbeOptions
 ProcessMemory: build/fresh.d.ts#ProcessMemory
 type RepoCommitOptions: build/fresh.d.ts#RepoCommitOptions
+SkipKind: build/fresh.d.ts#SkipKind
 StartChild: build/fresh.d.ts#StartChild
 StartOptions: build/fresh.d.ts#StartOptions
 StatusMemory: build/fresh.d.ts#StatusMemory
+TimedChild: build/fresh.d.ts#TimedChild
 WarmUpChild: build/fresh.d.ts#WarmUpChild
 WatchOptions: build/fresh.d.ts#WatchOptions
 armTimes: build/fresh.d.ts#armTimes
@@ -380,6 +389,8 @@ benchEnv: build/fresh.d.ts#benchEnv
 checkFixtures: build/fresh.d.ts#checkFixtures
 checkoutArm: build/fresh.d.ts#checkoutArm
 childLine: build/fresh.d.ts#childLine
+containerArgv: build/fresh.d.ts#containerArgv
+containerStart: build/fresh.d.ts#containerStart
 eventProbe: build/fresh.d.ts#eventProbe
 fixtureDifferences: build/fresh.d.ts#fixtureDifferences
 freshArms: build/fresh.d.ts#freshArms
@@ -392,6 +403,7 @@ processMemory: build/fresh.d.ts#processMemory
 repoCommit: build/fresh.d.ts#repoCommit
 startProcess: build/fresh.d.ts#startProcess
 statusMemory: build/fresh.d.ts#statusMemory
+watchHeap: build/fresh.d.ts#watchHeap
 watchMemory: build/fresh.d.ts#watchMemory
 
 ## ./supervise (build/supervise.d.ts): names
@@ -554,6 +566,7 @@ export interface ChildExit {
   readonly code: number | null;
   readonly timedOut?: boolean;
   readonly error?: string;
+  readonly oomKilled?: boolean;
 }
 
 ### build/fresh.d.ts#ChildFields
@@ -579,6 +592,20 @@ export interface ChildTime extends ChildFields {
   readonly ms: number;
   readonly hash?: string;
   readonly skipped?: undefined;
+}
+
+### build/fresh.d.ts#ContainerOptions
+interface ContainerOptions {
+  readonly image: string;
+  readonly memory: number;
+  readonly swap?: number;
+  readonly cpuset?: string;
+  readonly mounts?: readonly string[];
+  readonly env?: Readonly<Record<string, string>>;
+  readonly network?: string;
+  readonly user?: string;
+  readonly docker?: string;
+  readonly start?: StartChild;
 }
 
 ### build/fresh.d.ts#EventProbe
@@ -655,6 +682,7 @@ export interface FreshOptions {
   readonly args?: (caseId: string) => readonly string[];
   readonly timeoutMs?: number;
   readonly overLimit?: "error" | "skip";
+  readonly skipScope?: "case" | "child";
   readonly maxBuffer?: number;
   readonly job?: string;
   readonly env?: BenchEnv;
@@ -683,6 +711,7 @@ export interface FreshRun {
   readonly pairs: Record<string, FreshRecord[]>;
   readonly skipped: FreshSkip[];
   readonly orders?: readonly CaseOrder[];
+  readonly children?: readonly TimedChild[];
   readonly warmUp?: readonly WarmUpChild[];
 }
 
@@ -692,6 +721,24 @@ export interface FreshSkip {
   readonly case: string;
   readonly round: number;
   readonly reason: string;
+  readonly kind: SkipKind;
+}
+
+### build/fresh.d.ts#GcProfile
+export interface GcProfile {
+  readonly statistics: readonly {
+    readonly gcType: string;
+    readonly cost: number;
+    readonly beforeGC: GcSide;
+    readonly afterGC: GcSide;
+  }[];
+}
+
+### build/fresh.d.ts#GcSide
+export interface GcSide {
+  readonly heapStatistics: {
+    readonly usedHeapSize: number;
+  };
 }
 
 ### build/fresh.d.ts#HalfCounts
@@ -699,6 +746,33 @@ export type HalfCounts = readonly [early: number, late: number];
 
 ### build/fresh.d.ts#HalfTimes
 export type HalfTimes = readonly [early: number, late: number];
+
+### build/fresh.d.ts#HeapPeaks
+export interface HeapPeaks {
+  readonly used: number;
+  readonly live: number | null;
+  readonly gc: number;
+  readonly fullGc: number;
+  readonly gcMs: number;
+  readonly limit: number;
+}
+
+### build/fresh.d.ts#HeapWatch
+export interface HeapWatch {
+  readonly stop: () => HeapPeaks;
+}
+
+### build/fresh.d.ts#HeapWatchOptions
+export interface HeapWatchOptions {
+  readonly profile?: () => () => GcProfile | undefined;
+  readonly heap?: () => {
+    readonly used: number;
+    readonly limit: number;
+  };
+}
+
+### build/fresh.d.ts#MIN_CONTAINER_MEMORY
+export declare const MIN_CONTAINER_MEMORY: number;
 
 ### build/fresh.d.ts#MemoryOptions
 export interface MemoryOptions {
@@ -740,6 +814,9 @@ interface RepoCommitOptions {
   readonly start?: StartChild;
 }
 
+### build/fresh.d.ts#SkipKind
+export type SkipKind = "line" | "time" | "memory" | "heap";
+
 ### build/fresh.d.ts#StartChild
 export type StartChild = (argv: readonly string[], options: StartOptions) => Promise<ChildExit>;
 
@@ -752,6 +829,16 @@ export interface StartOptions {
 
 ### build/fresh.d.ts#StatusMemory
 export type StatusMemory = Pick<ProcessMemory, "rss" | "peakRss" | "anon" | "file">;
+
+### build/fresh.d.ts#TimedChild
+export interface TimedChild {
+  readonly arm: string;
+  readonly case: string;
+  readonly round: number;
+  readonly position: number;
+  readonly ms: number;
+  readonly fields?: ChildFields;
+}
 
 ### build/fresh.d.ts#WarmUpChild
 export interface WarmUpChild {
@@ -780,6 +867,12 @@ export declare function checkoutArm(options: CheckoutArmOptions): Promise<Checko
 
 ### build/fresh.d.ts#childLine
 export declare function childLine(stdout: string): ChildLine;
+
+### build/fresh.d.ts#containerArgv
+export declare function containerArgv(options: ContainerOptions, name: string, argv: readonly string[], cwd?: string): string[];
+
+### build/fresh.d.ts#containerStart
+export declare function containerStart(options: ContainerOptions): StartChild;
 
 ### build/fresh.d.ts#eventProbe
 export declare function eventProbe(options?: ProbeOptions): EventProbe;
@@ -816,6 +909,9 @@ export declare function startProcess(argv: readonly string[], options: StartOpti
 
 ### build/fresh.d.ts#statusMemory
 export declare function statusMemory(text: string): StatusMemory | null;
+
+### build/fresh.d.ts#watchHeap
+export declare function watchHeap(options?: HeapWatchOptions): HeapWatch;
 
 ### build/fresh.d.ts#watchMemory
 export declare function watchMemory(options?: WatchOptions): MemoryWatch;

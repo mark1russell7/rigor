@@ -15,6 +15,7 @@ import {
   pairOrder,
   processMemory,
   statusMemory,
+  watchHeap,
   watchMemory,
 } from "./fresh.ts";
 
@@ -229,7 +230,7 @@ describe("freshRun", () => {
   it("removes a case that an arm skips in the first round from each pair, and starts no more children for it", async () => {
     const { start, calls } = fake((program, caseId, k) => (program === "next" && caseId === "y" && k <= 8 ? { stdout: '{"skipped":"too large"}' } : undefined));
     const result = await run({ start, roundOffset: 4 });
-    expect(result.skipped).toEqual([{ arm: "next", case: "y", round: 4, reason: "too large" }]);
+    expect(result.skipped).toEqual([{ arm: "next", case: "y", round: 4, reason: "too large", kind: "line" }]);
     for (const records of Object.values(result.pairs)) {
       expect(records.some((r) => r.case === "y")).toBe(false);
       expect(records.filter((r) => r.case === "x").length).toBe(4);
@@ -248,7 +249,7 @@ describe("freshRun", () => {
   it("skips a case whose child takes too long in the first round, with overLimit skip", async () => {
     const { start, calls } = fake((program, caseId) => (program === "next" && caseId === "y" ? { code: null, timedOut: true } : undefined));
     const result = await run({ start, timeoutMs: 5000, overLimit: "skip" });
-    expect(result.skipped).toEqual([{ arm: "next", case: "y", round: 0, reason: "took more than 5000 ms" }]);
+    expect(result.skipped).toEqual([{ arm: "next", case: "y", round: 0, reason: "took more than 5000 ms", kind: "time" }]);
     for (const records of Object.values(result.pairs)) {
       expect(records.some((r) => r.case === "y")).toBe(false);
       expect(records.filter((r) => r.case === "x").length).toBe(4);
@@ -259,6 +260,61 @@ describe("freshRun", () => {
   it("refuses a child over the limit after the first round, with overLimit skip", async () => {
     const { start } = fake((program, caseId, k) => (program === "next" && caseId === "y" && k > 16 ? { code: null, timedOut: true } : undefined));
     await expect(run({ start, timeoutMs: 5000, overLimit: "skip" })).rejects.toThrow(/case "y", round 2 skipped the case after the first round of the job \("took more than 5000 ms"\)/);
+  });
+
+  it("skips a case whose child passed the memory limit of its container, with overLimit skip, and refuses it with overLimit error", async () => {
+    const killed = () => fake((program, caseId) => (program === "next" && caseId === "y" ? { code: 137, oomKilled: true } : undefined)).start;
+    const result = await run({ start: killed(), overLimit: "skip" });
+    expect(result.skipped).toEqual([{ arm: "next", case: "y", round: 0, reason: "passed the memory limit of its container", kind: "memory" }]);
+    await expect(run({ start: killed() })).rejects.toThrow(/case "y", round 0 passed the memory limit of its container\. The tail of stderr/);
+  });
+
+  it("skips a case whose child V8 stopped at the heap limit, with the tail of stderr, and refuses it with overLimit error", async () => {
+    const stderr = "<--- Last few GCs --->\n[9:0x1]  512 ms: Mark-Compact 480.1 (497.2) -> 479.9 (497.4) MB\nFATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory\n";
+    const aborted = () => fake((program, caseId) => (program === "next" && caseId === "y" ? { code: 134, stderr } : undefined)).start;
+    const result = await run({ start: aborted(), overLimit: "skip" });
+    expect(result.skipped).toEqual([
+      { arm: "next", case: "y", round: 0, kind: "heap", reason: "reached the heap limit of V8: <--- Last few GCs ---> [9:0x1] 512 ms: Mark-Compact 480.1 (497.2) -> 479.9 (497.4) MB FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory" },
+    ]);
+    await expect(run({ start: aborted() })).rejects.toThrow(/case "y", round 0 reached the heap limit of V8\. The tail of stderr: <--- Last few GCs/);
+    // A child that exits with 0 is not a heap skip, also with the text in its stderr.
+    const fine = fake((program) => (program === "next" ? { stderr } : undefined)).start;
+    expect((await run({ start: fine, overLimit: "skip" })).skipped).toEqual([]);
+  });
+
+  it("with skipScope child, starts each other arm after a skip, in each round, and keeps the pairs whose two children gave a time", async () => {
+    const { start, calls } = fake((program, caseId) => (program === "next" && caseId === "y" ? { code: 137, oomKilled: true } : undefined));
+    const result = await run({ start, order: "arms", overLimit: "skip", skipScope: "child" });
+    expect(result.skipped).toEqual([0, 1, 2, 3].map((round) => ({ arm: "next", case: "y", round, reason: "passed the memory limit of its container", kind: "memory" })));
+    expect(calls.length).toBe(4 * 2 * 3);
+    expect(result.orders!.map((o) => o.case).sort()).toEqual(["x", "x", "x", "x", "y", "y", "y", "y"]);
+    expect(result.pairs["next"]!.map((r) => r.case)).toEqual(["x", "x", "x", "x"]);
+    expect(result.pairs["base~aa"]!.filter((r) => r.case === "y").map((r) => r.round)).toEqual([0, 1, 2, 3]);
+    expect(result.children!.filter((c) => c.case === "y").map((c) => c.arm).sort()).toEqual(["base", "base", "base", "base", "base~aa", "base~aa", "base~aa", "base~aa"]);
+  });
+
+  it("with skipScope child, names the A/A copy by its pair, and drops each pair of a skipped base child", async () => {
+    // The second base child on the case y in each round skips. It is the base or its A/A copy, in the turn of armOrder.
+    let seen = 0;
+    const { start } = fake((program, caseId) => (program === "base" && caseId === "y" && seen++ % 2 === 1 ? { stdout: '{"skipped":"late"}' } : undefined));
+    const result = await run({ start, order: "arms", skipScope: "child" });
+    expect(result.skipped).toHaveLength(4);
+    for (const skip of result.skipped) {
+      const arms = result.orders!.find((o) => o.case === "y" && o.round === skip.round)!.arms;
+      const other = skip.arm === "base" ? "base~aa" : "base";
+      expect(arms.indexOf(skip.arm)).toBeGreaterThan(arms.indexOf(other));
+      const kept = Object.entries(result.pairs).filter(([, records]) => records.some((r) => r.case === "y" && r.round === skip.round)).map(([pair]) => pair);
+      expect(kept).toEqual(skip.arm === "base" ? [] : ["next"]);
+    }
+    expect(new Set(result.skipped.map((skip) => skip.arm))).toEqual(new Set(["base", "base~aa"]));
+    // The child of next gives a time in each round, also in a round with no record of its pair.
+    expect(result.children!.filter((c) => c.case === "y" && c.arm === "next").map((c) => c.round)).toEqual([0, 1, 2, 3]);
+  });
+
+  it("refuses a bad skipScope, and skipScope child with the order pairs", async () => {
+    const { start } = fake();
+    await expect(run({ start, skipScope: "all" as "case" })).rejects.toThrow(/skipScope is "case" or "child"/);
+    await expect(run({ start, skipScope: "child" })).rejects.toThrow(/skipScope "child" needs the order "arms"/);
   });
 
   it("refuses an overLimit that is not error or skip", async () => {
@@ -306,6 +362,7 @@ describe("freshRun", () => {
     const program: Record<string, string> = { base: "base", next: "next", other: "other", "base~aa": "base" };
     let k = 0;
     const orders: unknown[] = [];
+    const children: unknown[] = [];
     for (let round = 0; round < 8; round++) {
       for (const [i, id] of ["x", "y"].entries()) {
         const sequence = armOrder([...ids.slice(i), ...ids.slice(0, i)], round);
@@ -314,6 +371,7 @@ describe("freshRun", () => {
           const call = calls[k++]!;
           expect([call.program, call.case]).toEqual([program[arm], id]);
           ms[arm] = call.ms;
+          children.push({ arm, case: id, round, position: sequence.indexOf(arm), ms: call.ms });
         }
         orders.push({ case: id, round, arms: sequence });
         for (const pair of ["next", "other", "base~aa"]) {
@@ -324,11 +382,14 @@ describe("freshRun", () => {
       }
     }
     expect(result.orders).toEqual(orders);
+    expect(result.children).toEqual(children);
     // 8 rounds balance 4 arms: in each case, each pair has each first arm in 4 rounds.
     for (const records of Object.values(result.pairs)) {
       for (const id of ["x", "y"]) expect(records.filter((r) => r.case === id && r.first === "a").length).toBe(4);
     }
-    expect(await run({ start: fake().start, rounds: 1 })).not.toHaveProperty("orders");
+    const pairs = await run({ start: fake().start, rounds: 1 });
+    expect(pairs).not.toHaveProperty("orders");
+    expect(pairs).not.toHaveProperty("children");
   });
 
   it("gives each A/A copy its own child with order arms, and checks its hash with the hash of its arm", async () => {
@@ -350,7 +411,7 @@ describe("freshRun", () => {
   it("removes a case that an arm skips in the first round with order arms, and refuses a later skip", async () => {
     const { start, calls } = fake((program, caseId) => (program === "next" && caseId === "y" ? { stdout: '{"skipped":"too large"}' } : undefined));
     const result = await run({ start, order: "arms" });
-    expect(result.skipped).toEqual([{ arm: "next", case: "y", round: 0, reason: "too large" }]);
+    expect(result.skipped).toEqual([{ arm: "next", case: "y", round: 0, reason: "too large", kind: "line" }]);
     expect(result.orders!.map((o) => o.case)).toEqual(["x", "x", "x", "x"]);
     for (const records of Object.values(result.pairs)) expect(records.map((r) => r.case)).toEqual(["x", "x", "x", "x"]);
     expect(calls.filter((c) => c.case === "y").length).toBe(1);
@@ -546,7 +607,7 @@ describe("freshRun", () => {
     const node = { id: "node", command: [process.execPath, "-e", "setInterval(() => {}, 1000);", "--"] };
     const t0 = performance.now();
     const result = await freshRun({ base: node, candidates: [], cases: ["x"], rounds: 2, timeoutMs: 300, overLimit: "skip", env: ENV });
-    expect(result.skipped).toEqual([{ arm: "node", case: "x", round: 0, reason: "took more than 300 ms" }]);
+    expect(result.skipped).toEqual([{ arm: "node", case: "x", round: 0, reason: "took more than 300 ms", kind: "time" }]);
     expect(result.pairs["node~aa"]).toEqual([]);
     expect(performance.now() - t0).toBeLessThan(6000);
   }, 15000);
@@ -608,6 +669,46 @@ describe("the memory of a process", () => {
     expect(watch.peak().anon).toBe(70_000 * 1024);
     expect(index).toBeGreaterThanOrEqual(3);
     expect(() => watchMemory({ every: 0 })).toThrow(RangeError);
+  });
+
+  it("gives the peak of the used heap before each GC event and at the stop, and the peak of the live heap after each full GC", () => {
+    const side = (used: number) => ({ heapStatistics: { usedHeapSize: used } });
+    const statistics = [
+      { gcType: "Scavenge", cost: 500, beforeGC: side(90), afterGC: side(60) },
+      { gcType: "MarkSweepCompact", cost: 4000, beforeGC: side(120), afterGC: side(40) },
+      { gcType: "IncrementalMarking", cost: 250, beforeGC: side(70), afterGC: side(70) },
+      { gcType: "MarkSweepCompact", cost: 3250, beforeGC: side(80), afterGC: side(55) },
+    ];
+    let used = 100;
+    const watch = watchHeap({ profile: () => () => ({ statistics }), heap: () => ({ used, limit: 500 }) });
+    expect(watch.stop()).toEqual({ used: 120, live: 55, gc: 4, fullGc: 2, gcMs: 8, limit: 500 });
+    expect(() => watch.stop()).toThrow(/stopped before/);
+    used = 130;
+    // With no full GC, the watch has no live heap. A heap that grew after the last GC event gives the peak at the stop.
+    expect(watchHeap({ profile: () => () => ({ statistics: statistics.slice(0, 1) }), heap: () => ({ used, limit: 500 }) }).stop()).toEqual({ used: 130, live: null, gc: 1, fullGc: 0, gcMs: 0.5, limit: 500 });
+    expect(watchHeap({ profile: () => () => undefined, heap: () => ({ used: 7, limit: 9 }) }).stop()).toEqual({ used: 7, live: null, gc: 0, fullGc: 0, gcMs: 0, limit: 9 });
+  });
+
+  it("sees a heap peak that the GC freed before the stop, in a child with the GC profiler of V8", () => {
+    const script = [
+      `const { heapAfterGc, watchHeap } = await import(${JSON.stringify(new URL("./fresh.ts", import.meta.url).href)});`,
+      "const watch = watchHeap();",
+      "globalThis.keep = Array.from({ length: 400000 }, (_, i) => ({ i, text: 'x' + i }));",
+      "const held = heapAfterGc();",
+      "globalThis.keep = undefined;",
+      "const freed = heapAfterGc();",
+      "console.log(JSON.stringify({ ms: 1, held, freed, peaks: watch.stop() }));",
+    ].join("\n");
+    const line = childLine(execFileSync(process.execPath, ["--expose-gc", "--input-type=module", "-e", script], { encoding: "utf8" }));
+    if (line.skipped !== undefined) throw new Error("the child skipped");
+    const { held, freed, peaks } = line.extra as { held: number; freed: number; peaks: { used: number; live: number; fullGc: number; gcMs: number; limit: number } };
+    // The live heap peak is the heap after the first full GC, when the objects were still held. The end of the watch does not hide it.
+    expect(peaks.live).toBe(held);
+    expect(peaks.used).toBeGreaterThanOrEqual(held);
+    expect(held - freed).toBeGreaterThan(10_000_000);
+    expect(peaks.fullGc).toBeGreaterThanOrEqual(2);
+    expect(peaks.gcMs).toBeGreaterThan(0);
+    expect(peaks.limit).toBeGreaterThan(peaks.used);
   });
 
   it("gives the live heap after a full GC in a child with --expose-gc, and throws in a child with no such flag", () => {

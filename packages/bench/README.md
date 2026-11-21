@@ -119,6 +119,9 @@ v.comparison;                                     // the cases that gain and dro
 | `heapAfterGc()` | From `/fresh`: the used heap after a full garbage collection, in a child with the Node flag `--expose-gc`. |
 | `memoryPeak(a, b)` | From `/fresh`: the larger value of each field of two memory readings. |
 | `watchMemory(options)` | From `/fresh`: a reading of the memory at an interval, with the peak of each field. |
+| `watchHeap(options)` | From `/fresh`: the peaks of the used heap and of the live heap, and the GC time, over the GC events of a watch. |
+| `containerStart(options)` | From `/fresh`: a start of each child in a Docker container with the image, the memory, the swap and the CPUs of a target machine. |
+| `containerArgv(options, name, argv, cwd)` | From `/fresh`: the argv of `docker run` for one child of `containerStart`. |
 | `checkoutArm(options)` | From `/fresh`: an arm on a git worktree of a commit, built by its setup commands. |
 | `repoCommit(ref, options)` | From `/fresh`: the full hash of the commit of a ref, for the arm of the job. |
 | `eventProbe(options)` | From `/fresh`: the GC events, the GC time and the deopts of a child in each half of its counted samples. |
@@ -873,6 +876,7 @@ const run = await freshRun({
 
 run.pairs["rows"];                                // (portfolio, rows), with the base child of each round
 run.orders;                                      // the order of the children of each case and round
+run.children;                                    // the time and the fields of each child, in the order of the starts
 ```
 
 - The arms are the base, each candidate and each A/A copy. Each arm starts one child for each case and round.
@@ -884,6 +888,48 @@ run.orders;                                      // the order of the children of
 - `firstCase` turns the order of the cases in each round. Global round `r` starts with the case `(firstCase + r * max(1, floor(cases / rounds))) % cases`.
 - The first place of a round can cost more. With `firstCase`, this cost does not stay on one case. The turn of the arms keeps the index of each case.
 - The default start pipes the `stderr` of each child, and shows its tail in the error of a failed child. To write each `stderr` to the log, wrap `startProcess` in `start`.
+
+### Children on a target machine
+
+A memory bench on a large host can measure a child as it runs on a small machine. `containerStart` starts each child in a Docker container with the limits of that machine:
+
+```ts
+const child = containerStart({
+  image: "node:24.21.0-bookworm-slim",            // the Node of the target
+  memory: 1_011_425_280,                          // the memory of the target, in bytes
+  swap: 2 * 1024 ** 3,                            // the swap of the target
+  cpuset: "0-1",                                  // 2 CPUs of the host
+  mounts: [work, repo],                           // the folders of the arms, at the same paths
+});
+
+const run = await freshRun({ base, candidates, cases, rounds: 2, order: "arms", start: child, overLimit: "skip", skipScope: "child" });
+
+run.skipped;                                     // [{ arm: "base", case: "log-196", round: 0, kind: "memory", reason }]
+```
+
+- The memory limit is the field `memory.max` of the cgroup of the container. Node sizes the heap of V8 from it. Thus the heap size limit is the limit of the target, with no Node flag.
+- The first item of the command of an arm is the program in the image, for example `node`.
+- The container has no network by default, and the user of this process. `--pull never` refuses an image that is not on the host. Pull the image before the run.
+- After each child, the start reads `OOMKilled` and removes the container. A removal also stops a container after the time limit.
+- `watchHeap` gives the peaks of the heap of a child from the GC profiler of V8. A reading at an interval needs a free event loop. The profiler sees each GC event.
+
+### Children that pass a limit
+
+With `overLimit: "skip"`, a child that passes a limit skips its case. Each skip has a `kind`:
+
+| Kind | The cause |
+| --- | --- |
+| `line` | The child printed a skip line. |
+| `time` | The child took more time than `timeoutMs`. |
+| `memory` | The memory limit of the container stopped the child (`oomKilled`). |
+| `heap` | V8 stopped the child at the heap limit. The reason has the tail of `stderr`. |
+
+- With the default `skipScope: "case"`, a skip removes the case from each pair. A skip after the first round is an error.
+- With `skipScope: "child"` and `order: "arms"`, a skip removes only its child. The other arms start, and each round starts each arm again.
+- Thus a bench can find the case where one arm does not fit and another arm fits. A pair gets a record only when its two children give a time.
+- `run.children` has each child that gave a time, also a child whose pair has no record. Read the result of each arm there.
+- In the order `"arms"`, the arm of a skip of the A/A copy is the id of its pair, as in `orders`.
+- `poolRecords` removes each case with a skip from the pool of the jobs. Thus a time verdict reads only the cases that each child timed.
 
 ### Why pairs, and not a plain rotation of all arms
 
