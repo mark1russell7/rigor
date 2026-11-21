@@ -166,6 +166,128 @@ export function peakRss(): number {
   return process.resourceUsage().maxRSS * 1024;
 }
 
+/**
+ * The memory of a process at one time, in bytes. On Linux, the fields of the resident set come from `/proc/self/status`.
+ * A field that the system does not give is `null`.
+ */
+export interface ProcessMemory {
+  /** The resident set: `VmRSS` on Linux, and `process.memoryUsage().rss` on a different system. */
+  readonly rss: number;
+  /** The peak of the resident set from the start of the process: `VmHWM` on Linux, and `peakRss()` on a different system. */
+  readonly peakRss: number;
+  /** The anonymous part of the resident set: `RssAnon`. It holds the heaps and the other private memory, and no file. */
+  readonly anon: number | null;
+  /** The part of the resident set that maps files: `RssFile`. The system can drop these pages when it needs memory. */
+  readonly file: number | null;
+  /** The used heap of V8. */
+  readonly heapUsed: number;
+  /** The memory outside the heap that V8 knows: the objects of C++ and the buffers. */
+  readonly external: number;
+}
+
+/** The fields of the resident set in `/proc/<pid>/status`. */
+export type StatusMemory = Pick<ProcessMemory, "rss" | "peakRss" | "anon" | "file">;
+
+/** The names of the fields in `/proc/<pid>/status`, by the name of the field of `StatusMemory`. */
+const STATUS_FIELDS = { rss: "VmRSS", peakRss: "VmHWM", anon: "RssAnon", file: "RssFile" } as const;
+
+/**
+ * This function reads the fields of the resident set from the text of `/proc/<pid>/status`, in bytes. The file gives
+ * each field in kibibytes. The function gives `null` when the text has no `VmRSS` or no `VmHWM`. A text with no
+ * `RssAnon` or no `RssFile`, from a kernel before 4.5, gives `null` for that field.
+ */
+export function statusMemory(text: string): StatusMemory | null {
+  const read = (name: string): number | null => {
+    const match = new RegExp(`^${name}:\\s+(\\d+)\\s+kB\\s*$`, "m").exec(text);
+    return match === null ? null : Number(match[1]) * 1024;
+  };
+  const rss = read(STATUS_FIELDS.rss);
+  const peak = read(STATUS_FIELDS.peakRss);
+  if (rss === null || peak === null) return null;
+  return { rss, peakRss: peak, anon: read(STATUS_FIELDS.anon), file: read(STATUS_FIELDS.file) };
+}
+
+/** The options of `processMemory` and `watchMemory`. */
+export interface MemoryOptions {
+  /** This function gives the text of `/proc/self/status`. The default reads the file. A system with no such file throws. */
+  readonly status?: () => string;
+}
+
+/** This function gives the text of `/proc/self/status` of this process. */
+const readStatus = (): string => readFileSync("/proc/self/status", "utf8");
+
+/**
+ * This function gives the memory of this process at the time of the call. On a system with no `/proc/self/status`, the resident set comes
+ * from Node, and the fields `anon` and `file` are `null`. Print it in the child line as `memory`. The runner keeps it in `extra`.
+ */
+export function processMemory(options: MemoryOptions = {}): ProcessMemory {
+  let status: StatusMemory | null = null;
+  try {
+    status = statusMemory((options.status ?? readStatus)());
+  } catch {
+    status = null;
+  }
+  const usage = process.memoryUsage();
+  const resident = status ?? { rss: usage.rss, peakRss: peakRss(), anon: null, file: null };
+  return { ...resident, heapUsed: usage.heapUsed, external: usage.external };
+}
+
+/**
+ * This function starts a full garbage collection, and it gives the used heap of V8 after it, in bytes. Thus the value
+ * is the live heap, with no garbage. The child needs the Node flag `--expose-gc`. With no such flag, the function throws.
+ */
+export function heapAfterGc(): number {
+  const gc = (globalThis as { gc?: () => void }).gc;
+  if (typeof gc !== "function") throw new Error("heapAfterGc: the child needs the Node flag --expose-gc.");
+  gc();
+  return process.memoryUsage().heapUsed;
+}
+
+/** This function gives the larger value of each field of two readings. A field that is `null` in one reading stays `null`. */
+export function memoryPeak(a: ProcessMemory, b: ProcessMemory): ProcessMemory {
+  const larger = (x: number | null, y: number | null): number | null => (x === null || y === null ? null : Math.max(x, y));
+  return {
+    rss: Math.max(a.rss, b.rss),
+    peakRss: Math.max(a.peakRss, b.peakRss),
+    anon: larger(a.anon, b.anon),
+    file: larger(a.file, b.file),
+    heapUsed: Math.max(a.heapUsed, b.heapUsed),
+    external: Math.max(a.external, b.external),
+  };
+}
+
+/** The options of `watchMemory`. */
+export interface WatchOptions extends MemoryOptions {
+  /** The time between two readings, in milliseconds, above 0. The default is 100. */
+  readonly every?: number;
+}
+
+/** A watch of the memory of this process. `watchMemory` gives it. */
+export interface MemoryWatch {
+  /** This function reads the memory at the time of the call, and it gives the peak of each field over each reading of the watch. */
+  readonly peak: () => ProcessMemory;
+  /** This function stops the readings. The peak stays. */
+  readonly stop: () => void;
+}
+
+/**
+ * This function reads the memory of this process at once and then each `every` milliseconds, and it keeps the peak of
+ * each field. A reading needs a free event loop. Thus work that blocks the loop for a long time can hide a short peak.
+ * The timer does not keep the process alive.
+ */
+export function watchMemory(options: WatchOptions = {}): MemoryWatch {
+  const every = options.every ?? 100;
+  if (!(Number.isFinite(every) && every > 0)) throw new RangeError(`watchMemory: the time between two readings is a finite number above 0, not ${every}.`);
+  let peak = processMemory(options);
+  const read = (): ProcessMemory => {
+    peak = memoryPeak(peak, processMemory(options));
+    return peak;
+  };
+  const timer = setInterval(read, every);
+  timer.unref();
+  return { peak: read, stop: () => clearInterval(timer) };
+}
+
 /** The options of an event probe. */
 export interface ProbeOptions {
   /** The value `true` also counts the deopts with the V8 flag `--trace-deopt`. The default is `false`. */

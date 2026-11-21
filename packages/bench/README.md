@@ -114,6 +114,11 @@ v.comparison;                                     // the cases that gain and dro
 | `fixtureDifferences(a, b)` | From `/fresh`: the fixture files that two records do not share with the same hash. |
 | `timeArm(run, options)` | The child side of `freshRun`: the median time of one call of one arm, over calibrated samples. |
 | `peakRss()` | From `/fresh`: the memory peak of this process in bytes, for the child line. |
+| `processMemory(options)` | From `/fresh`: the memory of this process at the time of the call: the resident set, its peak, its anonymous part and its file part from `/proc/self/status`, and the heap. |
+| `statusMemory(text)` | From `/fresh`: the fields of the resident set in bytes from the text of `/proc/<pid>/status`, or `null`. |
+| `heapAfterGc()` | From `/fresh`: the used heap after a full garbage collection, in a child with the Node flag `--expose-gc`. |
+| `memoryPeak(a, b)` | From `/fresh`: the larger value of each field of two memory readings. |
+| `watchMemory(options)` | From `/fresh`: a reading of the memory at an interval, with the peak of each field. |
 | `checkoutArm(options)` | From `/fresh`: an arm on a git worktree of a commit, built by its setup commands. |
 | `repoCommit(ref, options)` | From `/fresh`: the full hash of the commit of a ref, for the arm of the job. |
 | `eventProbe(options)` | From `/fresh`: the GC events, the GC time and the deopts of a child in each half of its counted samples. |

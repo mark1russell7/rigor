@@ -364,12 +364,17 @@ FreshRun: build/fresh.d.ts#FreshRun
 FreshSkip: build/fresh.d.ts#FreshSkip
 HalfCounts: build/fresh.d.ts#HalfCounts
 HalfTimes: build/fresh.d.ts#HalfTimes
+MemoryOptions: build/fresh.d.ts#MemoryOptions
+MemoryWatch: build/fresh.d.ts#MemoryWatch
 PairSlot: build/fresh.d.ts#PairSlot
 ProbeOptions: build/fresh.d.ts#ProbeOptions
+ProcessMemory: build/fresh.d.ts#ProcessMemory
 type RepoCommitOptions: build/fresh.d.ts#RepoCommitOptions
 StartChild: build/fresh.d.ts#StartChild
 StartOptions: build/fresh.d.ts#StartOptions
+StatusMemory: build/fresh.d.ts#StatusMemory
 WarmUpChild: build/fresh.d.ts#WarmUpChild
+WatchOptions: build/fresh.d.ts#WatchOptions
 armTimes: build/fresh.d.ts#armTimes
 benchEnv: build/fresh.d.ts#benchEnv
 checkFixtures: build/fresh.d.ts#checkFixtures
@@ -379,10 +384,15 @@ eventProbe: build/fresh.d.ts#eventProbe
 fixtureDifferences: build/fresh.d.ts#fixtureDifferences
 freshArms: build/fresh.d.ts#freshArms
 freshRun: build/fresh.d.ts#freshRun
+heapAfterGc: build/fresh.d.ts#heapAfterGc
+memoryPeak: build/fresh.d.ts#memoryPeak
 pairOrder: build/fresh.d.ts#pairOrder
 peakRss: build/fresh.d.ts#peakRss
+processMemory: build/fresh.d.ts#processMemory
 repoCommit: build/fresh.d.ts#repoCommit
 startProcess: build/fresh.d.ts#startProcess
+statusMemory: build/fresh.d.ts#statusMemory
+watchMemory: build/fresh.d.ts#watchMemory
 
 ## ./supervise (build/supervise.d.ts): names
 
@@ -690,6 +700,17 @@ export type HalfCounts = readonly [early: number, late: number];
 ### build/fresh.d.ts#HalfTimes
 export type HalfTimes = readonly [early: number, late: number];
 
+### build/fresh.d.ts#MemoryOptions
+export interface MemoryOptions {
+  readonly status?: () => string;
+}
+
+### build/fresh.d.ts#MemoryWatch
+export interface MemoryWatch {
+  readonly peak: () => ProcessMemory;
+  readonly stop: () => void;
+}
+
 ### build/fresh.d.ts#PairSlot
 export interface PairSlot {
   readonly pair: number;
@@ -700,6 +721,16 @@ export interface PairSlot {
 export interface ProbeOptions {
   readonly deopt?: boolean;
   readonly dir?: string;
+}
+
+### build/fresh.d.ts#ProcessMemory
+export interface ProcessMemory {
+  readonly rss: number;
+  readonly peakRss: number;
+  readonly anon: number | null;
+  readonly file: number | null;
+  readonly heapUsed: number;
+  readonly external: number;
 }
 
 ### build/fresh.d.ts#RepoCommitOptions
@@ -719,12 +750,20 @@ export interface StartOptions {
   readonly cwd?: string;
 }
 
+### build/fresh.d.ts#StatusMemory
+export type StatusMemory = Pick<ProcessMemory, "rss" | "peakRss" | "anon" | "file">;
+
 ### build/fresh.d.ts#WarmUpChild
 export interface WarmUpChild {
   readonly arm: string;
   readonly case: string;
   readonly ms?: number;
   readonly skipped?: string;
+}
+
+### build/fresh.d.ts#WatchOptions
+export interface WatchOptions extends MemoryOptions {
+  readonly every?: number;
 }
 
 ### build/fresh.d.ts#armTimes
@@ -754,17 +793,32 @@ export declare function freshArms(options: FreshArmsOptions): Promise<FreshArms>
 ### build/fresh.d.ts#freshRun
 export declare function freshRun(options: FreshOptions): Promise<FreshRun>;
 
+### build/fresh.d.ts#heapAfterGc
+export declare function heapAfterGc(): number;
+
+### build/fresh.d.ts#memoryPeak
+export declare function memoryPeak(a: ProcessMemory, b: ProcessMemory): ProcessMemory;
+
 ### build/fresh.d.ts#pairOrder
 export declare function pairOrder(pairs: number, round: number, caseIndex: number): PairSlot[];
 
 ### build/fresh.d.ts#peakRss
 export declare function peakRss(): number;
 
+### build/fresh.d.ts#processMemory
+export declare function processMemory(options?: MemoryOptions): ProcessMemory;
+
 ### build/fresh.d.ts#repoCommit
 export declare function repoCommit(ref: string, options?: RepoCommitOptions): Promise<string>;
 
 ### build/fresh.d.ts#startProcess
 export declare function startProcess(argv: readonly string[], options: StartOptions): Promise<ChildExit>;
+
+### build/fresh.d.ts#statusMemory
+export declare function statusMemory(text: string): StatusMemory | null;
+
+### build/fresh.d.ts#watchMemory
+export declare function watchMemory(options?: WatchOptions): MemoryWatch;
 
 ### build/index.d.ts#AaLimitOptions
 interface AaLimitOptions {
