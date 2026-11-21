@@ -377,6 +377,9 @@ importers:
       '@mark1russell7/text':
         specifier: ^0.0.13
         version: 0.0.13
+      tsdown:
+        specifier: ^0.23.1
+        version: 0.23.7(publint@0.3.25)(tsx@4.23.15)(typescript@7.0.2)
     devDependencies:
       '@mark1russell7/cue':
         specifier: ^2.0.0
@@ -387,9 +390,6 @@ importers:
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.6
-      tsdown:
-        specifier: ^0.23.1
-        version: 0.23.7(publint@0.3.25)(tsx@4.23.15)(typescript@7.0.2)
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
