@@ -1,7 +1,22 @@
 import { execFileSync } from "node:child_process";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { type Arm, armOrder, firstArm } from "./index.ts";
-import { type BenchEnv, type ChildExit, type ChildTime, type FreshOptions, type StartChild, benchEnv, childLine, freshRun, pairOrder } from "./fresh.ts";
+import {
+  type BenchEnv,
+  type ChildExit,
+  type ChildTime,
+  type FreshOptions,
+  type ProcessMemory,
+  type StartChild,
+  benchEnv,
+  childLine,
+  freshRun,
+  memoryPeak,
+  pairOrder,
+  processMemory,
+  statusMemory,
+  watchMemory,
+} from "./fresh.ts";
 
 const ENV: BenchEnv = { cpu: "test cpu", cores: 4, os: "linux", arch: "x64", node: "v24.0.0" };
 
@@ -535,4 +550,79 @@ describe("freshRun", () => {
     expect(result.pairs["node~aa"]).toEqual([]);
     expect(performance.now() - t0).toBeLessThan(6000);
   }, 15000);
+});
+
+/** The text of `/proc/self/status` of a Node process on Linux, with the lines that the readings do not use. */
+const STATUS = ["Name:\tnode", "VmPeak:\t 1200000 kB", "VmHWM:\t   90000 kB", "VmRSS:\t   80000 kB", "RssAnon:\t   60000 kB", "RssFile:\t   19000 kB", "RssShmem:\t    1000 kB", "Threads:\t7"].join("\n");
+
+/** This function gives a reading with each field `value`, and the fields `anon` and `file` from `rest`. */
+const reading = (value: number, rest: Partial<ProcessMemory> = {}): ProcessMemory => ({ rss: value, peakRss: value, anon: value, file: value, heapUsed: value, external: value, ...rest });
+
+describe("the memory of a process", () => {
+  it("reads the resident set from the text of /proc/self/status, in bytes", () => {
+    expect(statusMemory(STATUS)).toEqual({ rss: 80_000 * 1024, peakRss: 90_000 * 1024, anon: 60_000 * 1024, file: 19_000 * 1024 });
+  });
+
+  it("gives null with no VmRSS or no VmHWM, and null for a field that an old kernel does not give", () => {
+    expect(statusMemory("Name:\tnode")).toBeNull();
+    expect(statusMemory(STATUS.replace(/^VmHWM.*$/m, ""))).toBeNull();
+    expect(statusMemory(STATUS.replace(/^RssAnon.*$/m, "").replace(/^RssFile.*$/m, ""))).toEqual({ rss: 80_000 * 1024, peakRss: 90_000 * 1024, anon: null, file: null });
+  });
+
+  it("takes the resident set from the status text, and the heap from Node", () => {
+    const memory = processMemory({ status: () => STATUS });
+    expect(memory).toMatchObject({ rss: 80_000 * 1024, peakRss: 90_000 * 1024, anon: 60_000 * 1024, file: 19_000 * 1024 });
+    expect(memory.heapUsed).toBeGreaterThan(0);
+    expect(memory.external).toBeGreaterThan(0);
+  });
+
+  it("takes the resident set from Node on a system with no status file", () => {
+    const memory = processMemory({
+      status: () => {
+        throw new Error("ENOENT");
+      },
+    });
+    expect(memory.rss).toBeGreaterThan(0);
+    expect(memory.peakRss).toBeGreaterThan(0);
+    expect(memory.anon).toBeNull();
+    expect(memory.file).toBeNull();
+  });
+
+  it.skipIf(process.platform !== "linux")("reads the real status file on Linux", () => {
+    const memory = processMemory();
+    expect(memory.anon).toBeGreaterThan(0);
+    expect(memory.file).toBeGreaterThan(0);
+    expect(memory.peakRss).toBeGreaterThanOrEqual(memory.rss);
+  });
+
+  it("gives the larger value of each field, and null when one reading has null", () => {
+    expect(memoryPeak(reading(1, { heapUsed: 9 }), reading(2, { anon: null }))).toEqual({ rss: 2, peakRss: 2, anon: null, file: 2, heapUsed: 9, external: 2 });
+  });
+
+  it("keeps the peak of each reading of a watch, and a reading after the stop", async () => {
+    const values = [STATUS, STATUS.replace("RssAnon:\t   60000", "RssAnon:\t   70000"), STATUS.replace("RssAnon:\t   60000", "RssAnon:\t   50000")];
+    let index = 0;
+    const watch = watchMemory({ every: 5, status: () => values[Math.min(index++, values.length - 1)]! });
+    await new Promise((done) => setTimeout(done, 40));
+    watch.stop();
+    expect(watch.peak().anon).toBe(70_000 * 1024);
+    expect(index).toBeGreaterThanOrEqual(3);
+    expect(() => watchMemory({ every: 0 })).toThrow(RangeError);
+  });
+
+  it("gives the live heap after a full GC in a child with --expose-gc, and throws in a child with no such flag", () => {
+    const script = [
+      `const { heapAfterGc } = await import(${JSON.stringify(new URL("./fresh.ts", import.meta.url).href)});`,
+      "globalThis.keep = Array.from({ length: 200000 }, (_, i) => ({ i }));",
+      "const held = heapAfterGc();",
+      "globalThis.keep = undefined;",
+      "console.log(JSON.stringify({ ms: 1, held, freed: heapAfterGc() }));",
+    ].join("\n");
+    const line = childLine(execFileSync(process.execPath, ["--expose-gc", "--input-type=module", "-e", script], { encoding: "utf8" }));
+    if (line.skipped !== undefined) throw new Error("the child skipped");
+    const { held, freed } = line.extra as { held: number; freed: number };
+    // The 200 000 objects hold at least 3 MB, and the GC frees them when no name holds them.
+    expect(held - freed).toBeGreaterThan(3_000_000);
+    expect(() => execFileSync(process.execPath, ["--input-type=module", "-e", script], { encoding: "utf8", stdio: "pipe" })).toThrow(/--expose-gc/);
+  });
 });
