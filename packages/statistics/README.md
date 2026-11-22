@@ -312,6 +312,8 @@ In the tests, the series are AR(1) with 200 readings and the slope 0.6. There, t
 | `normalCdf(x)`, `normalQuantile(p)` | The distribution function of the standard normal law and its quantile (AS 241 of Wichura). They come from `rigor-generators`. Both keep their relative digits in the lower tail, to `p = 1e-300`. |
 | `modeCount(values, { minShare, valleyRatio })` | The count of the modes of a sample, from a kernel density estimate. |
 | `smoothLawScores(values)`, `bestSmoothLaw(values)` | The mean log density of the uniform, normal, exponential, log-normal and Pareto laws at their fits, and the best of them. |
+| `kaplanMeier(observations)` | The Kaplan-Meier survival curve of times to an event, with right censoring and grouped counts. Each step has its Greenwood standard error. |
+| `survivalAt(curve, time)`, `survivalQuantile(curve, p)` | The chance that the time is more than `time`, and the earliest time with a chance of `p` or less. After the data, each one gives `undefined`: no read. |
 | `brier`, `calibration` | The Brier score of predictions, and the hit rate of each stated level. |
 | `reliability(forecasts, { bins })`, `calibrationError(forecasts, { bins })` | The hit rate of each bin of equal width from 0 to 1, with its Wilson interval, and the expected calibration error. The default is 10 bins. A p of 1 is in the last bin. Use them for continuous probabilities. |
 | `totalCalibration(forecasts)` | The count of hits of independent predictions against the sum of their chances: `expected`, `hits`, `sd`, `z`, `within2`, and exact p values. |
