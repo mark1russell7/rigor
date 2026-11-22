@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { PerformanceObserver } from "node:perf_hooks";
 import { GCProfiler, getHeapStatistics, setFlagsFromString } from "node:v8";
 import type { ArmProcess } from "./arm-times.ts";
+import type { SidecarEnd } from "./container.ts";
 import { type FixtureFile, type FixtureHash, checkFixtures } from "./fixtures.ts";
 import { type Arm, type PairedTime, armOrder, balancedRounds, firstArm } from "./paired.ts";
 import { startProcess, stderrTail } from "./start.ts";
@@ -19,6 +20,8 @@ export {
   type ContainerOptions,
   type DiskLimit,
   type DiskReads,
+  type Sidecar,
+  type SidecarEnd,
   MIN_CONTAINER_MEMORY,
   PAGE_CACHE_DROP,
   containerArgv,
@@ -523,6 +526,8 @@ export interface ChildExit {
   readonly error?: string;
   /** The value is `true` when the memory limit of the container of the child stopped the child. `containerStart` gives it. */
   readonly oomKilled?: boolean;
+  /** The output of each sidecar of the child, in the order of the sidecars. `containerStart` gives it for a child with sidecars. */
+  readonly sidecars?: readonly SidecarEnd[];
 }
 
 /** The start of one child: it gives the end of the child. The default starts a process with `spawn`, without a shell. */

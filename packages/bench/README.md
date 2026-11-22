@@ -120,7 +120,7 @@ v.comparison;                                     // the cases that gain and dro
 | `memoryPeak(a, b)` | From `/fresh`: the larger value of each field of two memory readings. |
 | `watchMemory(options)` | From `/fresh`: a reading of the memory at an interval, with the peak of each field. |
 | `watchHeap(options)` | From `/fresh`: the peaks of the used heap and of the live heap, and the GC time, over the GC events of a watch. |
-| `containerStart(options)` | From `/fresh`: a start of each child in a Docker container with the image, the memory, the swap and the CPUs of a target machine. |
+| `containerStart(options)` | From `/fresh`: a start of each child in a Docker container with the image, the memory, the swap and the CPUs of a target machine, and its sidecars. |
 | `containerArgv(options, name, argv, cwd)` | From `/fresh`: the argv of `docker run` for one child of `containerStart`. |
 | `diskOf(path, read)` | From `/fresh`: the whole disk of the host that holds a path, as `/dev/<name>`, for the disk limits of a container. |
 | `dropPageCache(start)` | From `/fresh`: a drop of the page cache of the host with `PAGE_CACHE_DROP`. A failure is an error. |
@@ -969,6 +969,37 @@ console.log(JSON.stringify({ ms, ballast: ballast.rss, readBytes: ready.readByte
 - A sample has the disk reads and writes of `/proc/self/io`, the major faults, the resident set and the counters of the cgroup. A file that a read cannot get gives `null`.
 - The worker of `watchIo` takes its samples while the main thread waits in a page fault or a synchronous read. The worker adds approximately a few MiB to the resident set.
 - `processIo` and the worker of `watchIo` run one reader. Thus their fields agree.
+
+### Fake servers in sidecars
+
+A child that calls a server needs that server in each bench. A fake server in the container of the child adds its memory to the cgroup of the child. A sidecar is a second container that starts before each child, with its own limits. The child joins the network of the sidecar:
+
+```ts
+const child = containerStart({
+  image: "node:24.21.0-bookworm-slim",
+  memory: 1_011_425_280,
+  cpuset: "0-1",
+  mounts: [work, repo],
+  sidecars: [
+    {
+      argv: ["node", `${repo}/fakes.ts`, "--port", "4100"],  // the fake of the server, on 127.0.0.1:4100
+      memory: 256 * 1024 ** 2,                               // the memory of the sidecar, not of the child
+      cpuset: "2",                                           // a CPU that the child does not use
+      mounts: [repo],
+      ready: ["node", `${repo}/ready.ts`, "4100"],           // exits with the code 0 when the fake answers
+    },
+  ],
+});
+
+const run = await freshRun({ base, candidates, cases, rounds: 4, order: "arms", start: child });
+```
+
+- Each sidecar starts with `docker run --detach` before each child. Thus each child gets a fresh fake.
+- The command `ready` starts in the sidecar with `docker exec`. The child starts after it exits with the code 0. The default time limit of `ready` is 60 s.
+- The first sidecar has the network of the options, by default `none`. The child and the other sidecars join it with `--network container:<name>`. Thus the child reaches each fake on `127.0.0.1`, and no other host.
+- A sidecar that does not start, is not ready or stops before the end of the child gives the field `error` of the end. `freshRun` then fails, because a child with no server gives no good reading.
+- The end of the child has the output of each sidecar in the field `sidecars`, from `docker logs`. A fake can write its counts there.
+- After the child, the start removes the child and each sidecar.
 
 ### Children that pass a limit
 

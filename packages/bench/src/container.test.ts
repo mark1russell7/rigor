@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type ContainerOptions, type DiskLimit, type DiskReads, MIN_CONTAINER_MEMORY, PAGE_CACHE_DROP, containerArgv, containerStart, diskOf, dropPageCache } from "./container.ts";
+import { type ContainerOptions, type DiskLimit, type DiskReads, type Sidecar, MIN_CONTAINER_MEMORY, PAGE_CACHE_DROP, containerArgv, containerStart, diskOf, dropPageCache } from "./container.ts";
 import type { ChildExit, StartChild, StartOptions } from "./fresh.ts";
 
 /** A target of 1011425280 bytes of memory, 2 GiB of swap and 2 CPUs, with a fixed user. */
@@ -261,5 +261,85 @@ describe("containerStart", () => {
     };
     await expect(containerStart({ ...TARGET, start: throws })(["node"], { timeoutMs: 1, maxBuffer: 1 })).rejects.toThrow("no run");
     expect(calls).toEqual(["run", "inspect", "rm"]);
+  });
+});
+
+describe("containerStart with sidecars", () => {
+  const FAKE: Sidecar = { argv: ["node", "fake.ts", "--port", "4100"], memory: 64 * 1024 * 1024, cpuset: "2", mounts: ["/repo"], cwd: "/repo", ready: ["node", "ready.ts"], readyMs: 5000 };
+  const PROXY: Sidecar = { argv: ["proxy"], image: "proxy:1", memory: MIN_CONTAINER_MEMORY };
+  /** The reply of Docker to a child with sidecars that each start, are ready and still run at the end of the child. */
+  const running = (argv: readonly string[]): Partial<ChildExit> =>
+    argv[1] === "run" && !argv.includes("--detach")
+      ? { stdout: '{"ms":5}\n' }
+      : argv[1] === "inspect"
+        ? { stdout: argv[3]!.includes("Running") ? "true false 0\n" : "false\n" }
+        : argv[1] === "logs"
+          ? { stdout: `out of ${argv[2]!}\n`, stderr: "" }
+          : {};
+
+  it("starts each sidecar and waits for it, starts the child in the network of the first sidecar, then reads and removes each container", async () => {
+    const { start, calls } = fake(running);
+    const exit = await containerStart({ ...TARGET, network: "lab", sidecars: [FAKE, PROXY], start })(["node", "child.ts"], { timeoutMs: 9000, maxBuffer: 1024 });
+    const name = calls[0]!.argv[4]!.replace(/-sidecar-0$/, "");
+    expect(name).toMatch(new RegExp(`^rigor-bench-${process.pid}-\\d+$`));
+    const [first, second] = [`${name}-sidecar-0`, `${name}-sidecar-1`];
+    expect(calls.map((call) => call.argv.slice(1, 3).join(" "))).toEqual([
+      "run --detach",
+      `exec ${first}`,
+      "run --detach",
+      `run --name`,
+      `inspect --format`,
+      `logs ${first}`,
+      `inspect --format`,
+      `logs ${second}`,
+      "inspect --format",
+      `rm --force`,
+      `rm --force`,
+      `rm --force`,
+    ]);
+    // The first sidecar has the network of the options, its own limits, and the user of the child. The second joins the first.
+    expect(calls[0]!.argv).toEqual(["docker", "run", "--detach", ...containerArgv({ image: TARGET.image, memory: FAKE.memory, cpuset: "2", mounts: ["/repo"], network: "lab", user: "1001:118" }, first, FAKE.argv, "/repo").slice(2)]);
+    expect(calls[1]!.argv).toEqual(["docker", "exec", first, "node", "ready.ts"]);
+    expect(calls[1]!.options).toEqual({ timeoutMs: 5000, maxBuffer: 1 << 16 });
+    expect(calls[2]!.argv).toContain(`container:${first}`);
+    expect(calls[2]!.argv).toContain("proxy:1");
+    expect(calls[3]!.argv).toEqual(containerArgv({ ...TARGET, network: `container:${first}` }, name, ["node", "child.ts"]));
+    expect(calls[3]!.options).toEqual({ timeoutMs: 9000, maxBuffer: 1024 });
+    expect(calls[5]!.options).toEqual({ timeoutMs: 60_000, maxBuffer: 1024 });
+    expect(calls.slice(-3).map((call) => call.argv[3])).toEqual([name, first, second]);
+    expect(exit).toEqual({ stdout: '{"ms":5}\n', stderr: "", code: 0, sidecars: [{ stdout: `out of ${first}\n`, stderr: "" }, { stdout: `out of ${second}\n`, stderr: "" }] });
+  });
+
+  it("gives a fault outside the child for a sidecar that does not start or is not ready, and starts no child after it", async () => {
+    const failed = fake((argv) => (argv.includes("--detach") ? { code: 125, stderr: "no such image" } : running(argv)));
+    const exit = await containerStart({ ...TARGET, sidecars: [FAKE], start: failed.start })(["node"], { timeoutMs: 1, maxBuffer: 1 });
+    expect(exit).toMatchObject({ code: null, stderr: "no such image", error: "the sidecar 0 did not start: the command exited with the code 125" });
+    expect(failed.calls.some((call) => call.argv[1] === "run" && !call.argv.includes("--detach"))).toBe(false);
+    expect(failed.calls.filter((call) => call.argv[1] === "rm")).toHaveLength(2);
+    const slow = fake((argv) => (argv[1] === "exec" ? { code: null, timedOut: true } : running(argv)));
+    const late = await containerStart({ ...TARGET, sidecars: [FAKE], start: slow.start })(["node"], { timeoutMs: 1, maxBuffer: 1 });
+    expect(late.error).toBe("the sidecar 0 was not ready: the command took more than 5000 ms");
+    expect(late.sidecars).toEqual([{ stdout: `out of ${slow.calls[0]!.argv[4]!}\n`, stderr: "" }]);
+  });
+
+  it("gives a fault for a sidecar that stopped or passed its memory limit before the end of the child, and keeps a fault of the child", async () => {
+    const endOf = async (state: string, child: Partial<ChildExit> = {}): Promise<ChildExit> => {
+      const { start } = fake((argv) => (argv[1] === "inspect" && argv[3]!.includes("Running") ? { stdout: state } : argv[1] === "run" && !argv.includes("--detach") ? child : running(argv)));
+      return containerStart({ ...TARGET, sidecars: [FAKE], start })(["node"], { timeoutMs: 1, maxBuffer: 1 });
+    };
+    expect((await endOf("false false 1\n")).error).toBe("the sidecar 0 stopped with the code 1 before the end of the child");
+    expect((await endOf("false true 137\n")).error).toBe("the sidecar 0 passed its memory limit before the end of the child");
+    expect((await endOf("")).error).toBe("the state of the sidecar 0 is not known");
+    expect((await endOf("false false 1\n", { error: "spawn docker ENOENT" })).error).toBe("spawn docker ENOENT");
+    expect((await endOf("true false 0\n")).error).toBeUndefined();
+  });
+
+  it("refuses a sidecar with no argv, a bad command ready or readyMs, and a bad limit, with the index of the sidecar", () => {
+    const refused = (sidecar: Partial<Sidecar>): (() => StartChild) => () => containerStart({ ...TARGET, sidecars: [FAKE, { ...FAKE, ...sidecar } as Sidecar] });
+    expect(refused({ argv: [] })).toThrow("the argv of the sidecar 1 is a list of one text or more.");
+    expect(refused({ ready: [] })).toThrow("the command ready of the sidecar 1");
+    expect(refused({ readyMs: 0 })).toThrow("the readyMs of the sidecar 1");
+    expect(refused({ memory: 1 })).toThrow(/^containerStart: the sidecar 1: the memory is a whole number/);
+    expect(refused({ mounts: ["repo"] })).toThrow("the sidecar 1: a mount is an absolute POSIX path");
   });
 });
