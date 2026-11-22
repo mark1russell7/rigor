@@ -35,6 +35,41 @@ const DISK_FLAGS = [
   ["writeOps", "--device-write-iops"],
 ] as const;
 
+/**
+ * A container that starts before each child of `containerStart` and stops after the child. The child and the other
+ * sidecars join the network of the first sidecar. Thus the child reaches a fake server of a sidecar on `127.0.0.1`.
+ * The memory of the sidecar is not in the cgroup of the child.
+ */
+export interface Sidecar {
+  /** The program of the sidecar and its arguments. The first item is the program in the image. */
+  readonly argv: readonly string[];
+  /** The image of the sidecar. The default is the image of the child. */
+  readonly image?: string;
+  /** The memory limit of the container of the sidecar, in bytes. The sidecar has no swap. */
+  readonly memory: number;
+  /** The CPUs of the host for the sidecar, in the form of `--cpuset-cpus`. The default is each CPU. */
+  readonly cpuset?: string;
+  /** The folders that the sidecar reads or writes. Each folder is an absolute POSIX path, and it mounts at the same path. */
+  readonly mounts?: readonly string[];
+  /** The environment variables of the sidecar, in addition to the variables of the image. */
+  readonly env?: Readonly<Record<string, string>>;
+  /** The folder where the sidecar starts, in its container. */
+  readonly cwd?: string;
+  /**
+   * This argv starts in the sidecar with `docker exec` after the start of the sidecar. The sidecar is ready when it
+   * exits with the code 0. The default is no ready command: the child starts after `docker run`.
+   */
+  readonly ready?: readonly string[];
+  /** The longest time of the command `ready` in milliseconds. The default is 60000. */
+  readonly readyMs?: number;
+}
+
+/** The output of a sidecar at the end of its child, from `docker logs`. */
+export interface SidecarEnd {
+  readonly stdout: string;
+  readonly stderr: string;
+}
+
 /** The options of `containerStart`. The sizes are in bytes. */
 export interface ContainerOptions {
   /** The image of each child, for example `node:24.21.0-bookworm-slim`. The image must be on the host before the start. */
@@ -51,8 +86,10 @@ export interface ContainerOptions {
   readonly mounts?: readonly string[];
   /** The environment variables of the child, in addition to the variables of the image. */
   readonly env?: Readonly<Record<string, string>>;
-  /** The network of the container. The default is `none`. Thus a child has no network. */
+  /** The network of the container. The default is `none`. Thus a child has no network. With sidecars, it is the network of the first sidecar. */
   readonly network?: string;
+  /** The sidecars of each child, in the order of their start. The default is no sidecar. */
+  readonly sidecars?: readonly Sidecar[];
   /** The user of the child as `uid:gid`. The default is the user of this process on POSIX, and the user of the image on Windows. */
   readonly user?: string;
   /** The program of Docker. The default is `docker`. */
@@ -99,6 +136,91 @@ function check(options: ContainerOptions): void {
   }
   if (options.network !== undefined && !/^\S+$/.test(options.network)) fail(`the network is a name with no space, not ${JSON.stringify(options.network)}.`);
   if (options.user !== undefined && !/^\d+(?::\d+)?$/.test(options.user)) fail(`the user is uid or uid:gid, not ${JSON.stringify(options.user)}.`);
+  const argvOf = (value: unknown): boolean => Array.isArray(value) && value.length > 0 && value.every((each) => typeof each === "string");
+  for (const [index, sidecar] of (options.sidecars ?? []).entries()) {
+    if (!argvOf(sidecar.argv)) fail(`the argv of the sidecar ${index} is a list of one text or more.`);
+    if (sidecar.ready !== undefined && !argvOf(sidecar.ready)) fail(`the command ready of the sidecar ${index} is a list of one text or more.`);
+    const readyMs = sidecar.readyMs ?? READY_MS;
+    if (!(Number.isSafeInteger(readyMs) && readyMs >= 1)) fail(`the readyMs of the sidecar ${index} is a whole number of 1 or more, not ${readyMs}.`);
+    try {
+      check(sidecarOptions(options, sidecar, undefined));
+    } catch (error) {
+      fail(`the sidecar ${index}: ${error instanceof Error ? error.message.replace(/^containerStart: /, "") : String(error)}`);
+    }
+  }
+}
+
+/** The longest time of the command `ready` of a sidecar, in milliseconds, when the sidecar gives none. */
+const READY_MS = 60_000;
+
+/** This function gives the options of the container of a sidecar: its own limits, and the user and Docker of the child. */
+const sidecarOptions = (options: ContainerOptions, sidecar: Sidecar, network: string | undefined): ContainerOptions => ({
+  image: sidecar.image ?? options.image,
+  memory: sidecar.memory,
+  ...(sidecar.cpuset === undefined ? {} : { cpuset: sidecar.cpuset }),
+  ...(sidecar.mounts === undefined ? {} : { mounts: sidecar.mounts }),
+  ...(sidecar.env === undefined ? {} : { env: sidecar.env }),
+  ...(network === undefined ? {} : { network }),
+  ...(options.user === undefined ? {} : { user: options.user }),
+  ...(options.docker === undefined ? {} : { docker: options.docker }),
+});
+
+/** This function tells why a command of Docker failed: its time limit, its fault, a signal or its exit code. */
+const failureOf = (exit: ChildExit, timeoutMs: number): string =>
+  exit.timedOut === true
+    ? `the command took more than ${timeoutMs} ms`
+    : exit.error !== undefined
+      ? exit.error
+      : exit.code === null
+        ? "a signal stopped the command"
+        : `the command exited with the code ${exit.code}`;
+
+/**
+ * This function starts the sidecars of a child in their order, each with `docker run --detach`, then its command
+ * `ready`. It gives the end of the first failed start as a fault outside the child, or `undefined` when each sidecar is ready.
+ */
+async function startSidecars(start: StartChild, options: ContainerOptions, names: readonly string[]): Promise<ChildExit | undefined> {
+  for (const [index, sidecar] of (options.sidecars ?? []).entries()) {
+    const name = names[index]!;
+    const network = index === 0 ? options.network : `container:${names[0]!}`;
+    const argv = containerArgv(sidecarOptions(options, sidecar, network), name, sidecar.argv, sidecar.cwd);
+    argv.splice(2, 0, "--detach");
+    const run = await start(argv, AFTER);
+    if (run.code !== 0 || run.timedOut === true || run.error !== undefined) {
+      return { stdout: "", stderr: run.stderr, code: null, error: `the sidecar ${index} did not start: ${failureOf(run, AFTER.timeoutMs)}` };
+    }
+    if (sidecar.ready === undefined) continue;
+    const timeoutMs = sidecar.readyMs ?? READY_MS;
+    const ready = await start([options.docker ?? "docker", "exec", name, ...sidecar.ready], { timeoutMs, maxBuffer: AFTER.maxBuffer });
+    if (ready.code !== 0 || ready.timedOut === true || ready.error !== undefined) {
+      return { stdout: "", stderr: ready.stderr, code: null, error: `the sidecar ${index} was not ready: ${failureOf(ready, timeoutMs)}` };
+    }
+  }
+  return undefined;
+}
+
+/**
+ * This function reads the state and the output of each sidecar at the end of its child. A sidecar that stopped before
+ * the end of the child makes the end a fault. The child lost a server that it used.
+ */
+async function sidecarEnds(start: StartChild, docker: string, names: readonly string[], exit: ChildExit, maxBuffer: number): Promise<ChildExit> {
+  const ends: SidecarEnd[] = [];
+  let stopped: string | undefined;
+  for (const [index, name] of names.entries()) {
+    const state = await start([docker, "inspect", "--format", "{{.State.Running}} {{.State.OOMKilled}} {{.State.ExitCode}}", name], AFTER).catch(() => undefined);
+    const [running, oom, code] = state !== undefined && state.code === 0 ? state.stdout.split(/\s+/).filter((each) => each !== "") : [];
+    if (stopped === undefined && running !== "true") {
+      stopped =
+        running === undefined
+          ? `the state of the sidecar ${index} is not known`
+          : oom === "true"
+            ? `the sidecar ${index} passed its memory limit before the end of the child`
+            : `the sidecar ${index} stopped with the code ${String(code)} before the end of the child`;
+    }
+    const logs = await start([docker, "logs", name], { timeoutMs: AFTER.timeoutMs, maxBuffer }).catch(() => undefined);
+    ends.push({ stdout: logs?.stdout ?? "", stderr: logs?.stderr ?? "" });
+  }
+  return { ...exit, sidecars: ends, ...(stopped === undefined || exit.error !== undefined ? {} : { error: stopped }) };
 }
 
 /**
@@ -142,6 +264,9 @@ export function containerArgv(options: ContainerOptions, name: string, argv: rea
  * - The time limit and the output limit of the child are the limits of the command `docker run`.
  * - After each child, the start reads the field `OOMKilled` of the container, and it removes the container. A
  *   child that the memory limit stopped gives `oomKilled: true`. A removal also stops a container after a time limit.
+ * - Each sidecar of the options starts before each child, and its command `ready` ends before the child starts. The
+ *   child joins the network of the first sidecar. The end has the output of each sidecar.
+ * - A sidecar can fail to start, fail its command `ready`, or stop before the end of the child. Then the field `error` of the end tells it.
  * - The options are examined at once. A bad option is a `RangeError`.
  */
 export function containerStart(options: ContainerOptions): StartChild {
@@ -151,17 +276,20 @@ export function containerStart(options: ContainerOptions): StartChild {
   return async (argv, limits) => {
     containers += 1;
     const name = `rigor-bench-${process.pid}-${containers}`;
+    const names = (options.sidecars ?? []).map((_, index) => `${name}-sidecar-${index}`);
+    const child: ContainerOptions = names.length === 0 ? options : { ...options, network: `container:${names[0]!}` };
     const { cwd, ...rest } = limits;
     let exit: ChildExit | undefined;
     let fault: unknown;
     try {
-      exit = await start(containerArgv(options, name, argv, cwd), rest);
+      exit = (await startSidecars(start, options, names)) ?? (await start(containerArgv(child, name, argv, cwd), rest));
+      if (names.length > 0) exit = await sidecarEnds(start, docker, names, exit, rest.maxBuffer);
     } catch (error) {
       fault = error;
     }
     // The container can exist after each start of `docker run`, also after a failure. The removal of a container that does not exist fails, and it changes nothing.
     const state = await start([docker, "inspect", "--format", "{{.State.OOMKilled}}", name], AFTER).catch(() => undefined);
-    await start([docker, "rm", "--force", name], AFTER).catch(() => undefined);
+    for (const each of [name, ...names]) await start([docker, "rm", "--force", each], AFTER).catch(() => undefined);
     if (exit === undefined) throw fault;
     return state !== undefined && state.code === 0 && state.stdout.trim() === "true" ? { ...exit, oomKilled: true } : exit;
   };

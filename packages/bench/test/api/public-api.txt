@@ -388,6 +388,8 @@ PairSlot: build/fresh.d.ts#PairSlot
 ProbeOptions: build/fresh.d.ts#ProbeOptions
 ProcessMemory: build/fresh.d.ts#ProcessMemory
 type RepoCommitOptions: build/fresh.d.ts#RepoCommitOptions
+type Sidecar: build/fresh.d.ts#Sidecar
+type SidecarEnd: build/fresh.d.ts#SidecarEnd
 SkipKind: build/fresh.d.ts#SkipKind
 StartChild: build/fresh.d.ts#StartChild
 StartOptions: build/fresh.d.ts#StartOptions
@@ -609,6 +611,7 @@ export interface ChildExit {
   readonly timedOut?: boolean;
   readonly error?: string;
   readonly oomKilled?: boolean;
+  readonly sidecars?: readonly SidecarEnd[];
 }
 
 ### build/fresh.d.ts#ChildFields
@@ -654,6 +657,7 @@ interface ContainerOptions {
   readonly mounts?: readonly string[];
   readonly env?: Readonly<Record<string, string>>;
   readonly network?: string;
+  readonly sidecars?: readonly Sidecar[];
   readonly user?: string;
   readonly docker?: string;
   readonly start?: StartChild;
@@ -908,6 +912,25 @@ interface RepoCommitOptions {
   readonly repo?: string;
   readonly timeoutMs?: number;
   readonly start?: StartChild;
+}
+
+### build/fresh.d.ts#Sidecar
+interface Sidecar {
+  readonly argv: readonly string[];
+  readonly image?: string;
+  readonly memory: number;
+  readonly cpuset?: string;
+  readonly mounts?: readonly string[];
+  readonly env?: Readonly<Record<string, string>>;
+  readonly cwd?: string;
+  readonly ready?: readonly string[];
+  readonly readyMs?: number;
+}
+
+### build/fresh.d.ts#SidecarEnd
+interface SidecarEnd {
+  readonly stdout: string;
+  readonly stderr: string;
 }
 
 ### build/fresh.d.ts#SkipKind
