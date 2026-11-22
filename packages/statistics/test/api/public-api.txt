@@ -171,9 +171,12 @@ type SobolIndex: build/index.d.ts#SobolIndex
 type SobolIndices: build/index.d.ts#SobolIndices
 type SobolOptions: build/index.d.ts#SobolOptions
 type Summary: build/index.d.ts#Summary
+type SurvivalCurve: build/index.d.ts#SurvivalCurve
+type SurvivalStep: build/index.d.ts#SurvivalStep
 type TableResponseModel: build/index.d.ts#TableResponseModel
 type TestedBin: build/index.d.ts#TestedBin
 type TieModel: build/index.d.ts#TieModel
+type TimeToEvent: build/index.d.ts#TimeToEvent
 type TotalCalibration: build/index.d.ts#TotalCalibration
 type TwoSamplePermutationOptions: build/index.d.ts#TwoSamplePermutationOptions
 type TwoSamplePermutationResult: build/index.d.ts#TwoSamplePermutationResult
@@ -239,6 +242,7 @@ histogramOf: build/index.d.ts#histogramOf
 histogramQuantile: build/index.d.ts#histogramQuantile
 holm: build/index.d.ts#holm
 informationGain: build/index.d.ts#informationGain
+kaplanMeier: build/index.d.ts#kaplanMeier
 kendallTau: build/index.d.ts#kendallTau
 leastSquares: build/index.d.ts#leastSquares
 leaveOneOutResiduals: build/index.d.ts#leaveOneOutResiduals
@@ -299,6 +303,8 @@ spearman: build/index.d.ts#spearman
 strengthToRating: build/index.d.ts#strengthToRating
 summarize: build/index.d.ts#summarize
 surfaceResponse: build/index.d.ts#surfaceResponse
+survivalAt: build/index.d.ts#survivalAt
+survivalQuantile: build/index.d.ts#survivalQuantile
 tQuantile: build/index.d.ts#tQuantile
 totalCalibration: build/index.d.ts#totalCalibration
 twoSamplePermutation: build/index.d.ts#twoSamplePermutation
@@ -1400,6 +1406,24 @@ interface Summary {
   readonly iqr: number;
 }
 
+### build/index.d.ts#SurvivalCurve
+interface SurvivalCurve {
+  readonly steps: readonly SurvivalStep[];
+  readonly count: number;
+  readonly events: number;
+  readonly censored: number;
+  readonly last: number;
+}
+
+### build/index.d.ts#SurvivalStep
+interface SurvivalStep {
+  readonly time: number;
+  readonly atRisk: number;
+  readonly events: number;
+  readonly chance: number;
+  readonly se: number;
+}
+
 ### build/index.d.ts#TableResponseModel
 interface TableResponseModel extends ResponseModelBase {
   readonly kind: "table";
@@ -1418,6 +1442,13 @@ interface TestedBin extends ReliabilityBin {
 
 ### build/index.d.ts#TieModel
 type TieModel = "davidson" | "half";
+
+### build/index.d.ts#TimeToEvent
+interface TimeToEvent {
+  readonly time: number;
+  readonly censored?: boolean | undefined;
+  readonly count?: number | undefined;
+}
 
 ### build/index.d.ts#TotalCalibration
 interface TotalCalibration {
@@ -1666,6 +1697,9 @@ export declare function holm(pValues: readonly number[], level?: number): Correc
 ### build/index.d.ts#informationGain
 export declare function informationGain(prior: readonly number[], likelihood: readonly (readonly number[])[]): number;
 
+### build/index.d.ts#kaplanMeier
+export declare function kaplanMeier(observations: readonly TimeToEvent[]): SurvivalCurve;
+
 ### build/index.d.ts#kendallTau
 export declare function kendallTau(a: readonly number[], b: readonly number[], seed?: number | string): number;
 
@@ -1841,6 +1875,12 @@ export declare function summarize(values: readonly number[]): Summary;
 
 ### build/index.d.ts#surfaceResponse
 export declare function surfaceResponse(record: ResponseRecord, measure: string, options: ResponseSurfaceOptions): ResponseSurface;
+
+### build/index.d.ts#survivalAt
+export declare function survivalAt(curve: SurvivalCurve, time: number): number | undefined;
+
+### build/index.d.ts#survivalQuantile
+export declare function survivalQuantile(curve: SurvivalCurve, p: number): number | undefined;
 
 ### build/index.d.ts#tQuantile
 export declare function tQuantile(p: number, df: number): number;
