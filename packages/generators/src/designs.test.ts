@@ -202,10 +202,12 @@ describe("the design of one dimension at a time", () => {
     expect(more.slice(0, 18).map(({ age, ...rest }) => (expect(age).toBe(0), rest))).toEqual(points);
   });
 
-  it("refuses a base with a missing value, a value out of the range, a fraction of an integer dimension or an unknown name", () => {
+  it("refuses a base with a missing value, a value that is not finite, a fraction of an integer dimension or an unknown name", () => {
     const r = random(1);
     expect(() => oneAtATimePoints(family, 4, { rate: 0.5, bytes: 0 }, r)).toThrow(/wait: the base value undefined/);
-    expect(() => oneAtATimePoints(family, 4, { ...base, rate: 2 }, r)).toThrow(RangeError);
+    expect(() => oneAtATimePoints(family, 4, { ...base, rate: Number.NaN }, r)).toThrow(RangeError);
+    // A held value can be out of the range: 0 holds a log dimension at none.
+    expect(oneAtATimePoints(family, 4, { ...base, wait: 0 }, r).slice(0, 8).every((point) => point["wait"] === 0)).toBe(true);
     expect(() => oneAtATimePoints(family, 4, { ...base, bytes: 1.5 }, r)).toThrow(RangeError);
     expect(() => oneAtATimePoints(family, 4, { ...base, size: 1 }, r)).toThrow(/no dimension with this name/);
     expect(() => oneAtATimePoints(family, 0, base, r)).toThrow(RangeError);

@@ -204,8 +204,9 @@ export function saltelliDesign(n: number, d: number, r: Random, base: "random" |
  * This function gives a design of one dimension at a time: one block of `n` points for each dimension, in the order of the
  * dimensions. In the block of a dimension, the dimension takes the values of a Latin column of `n` strata. Each other
  * dimension keeps its value in `base`. The column of a dimension comes from `r.fork("column:" + name)`, and the map comes
- * from `familyMap(family, r)`. Thus a new dimension does not change the blocks of the others. A base that does not give
- * each dimension one value of its range is a `RangeError`. A base value with no dimension is also a `RangeError`.
+ * from `familyMap(family, r)`. Thus a new dimension does not change the blocks of the others. A base value can be out of
+ * the range of its dimension, for example 0 for a log dimension. A base with no finite value for a dimension is a `RangeError`.
+ * A fraction for an integer dimension and a base value with no dimension are also a `RangeError`.
  */
 export function oneAtATimePoints(family: InputFamily, n: number, base: Point, r: Random): Point[] {
   count("oneAtATimePoints", "n", n);
@@ -215,7 +216,7 @@ export function oneAtATimePoints(family: InputFamily, n: number, base: Point, r:
   if (extra !== undefined) throw new RangeError(`${family.name}: the base gives "${extra}", and the family has no dimension with this name.`);
   for (const dim of family.dimensions) {
     const value = base[dim.name];
-    if (value === undefined || !(value >= dim.min && value <= dim.max) || (dim.integer === true && !Number.isInteger(value))) {
+    if (value === undefined || !Number.isFinite(value) || (dim.integer === true && !Number.isInteger(value))) {
       throw new RangeError(`${family.name}.${dim.name}: the base value ${value} is not a value of the dimension.`);
     }
   }
