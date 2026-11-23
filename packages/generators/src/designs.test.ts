@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { familyMap, familyPoints, latinHypercube, randomDesign, saltelliDesign, stratifiedDesign, type InputFamily } from "./designs.ts";
+import { familyMap, familyPoints, latinHypercube, oneAtATimePoints, randomDesign, saltelliDesign, stratifiedDesign, type InputFamily } from "./designs.ts";
 import { canonicalHash } from "./hash.ts";
 import { distributionOf } from "./quantiles.ts";
 import { random } from "./random.ts";
@@ -156,5 +156,58 @@ describe("the map to a family", () => {
     const map = familyMap(family, random(1));
     expect(() => map([0, 0, 0])).toThrow(/4 coordinates/);
     expect(() => map([0, 0, 1, 0])).toThrow(/below 1/);
+  });
+});
+
+describe("the design of one dimension at a time", () => {
+  const family: InputFamily = {
+    name: "load",
+    dimensions: [
+      { name: "rate", min: 0, max: 1 },
+      { name: "bytes", min: 0, max: 65_536, integer: true },
+      { name: "wait", min: 1, max: 1000, scale: "log" },
+    ],
+  };
+  const base = { rate: 0.5, bytes: 0, wait: 1 };
+
+  it("gives one block for each dimension: the dimension moves, and each other dimension keeps its base value", () => {
+    const points = oneAtATimePoints(family, 8, base, random("oat"));
+    expect(points).toHaveLength(24);
+    family.dimensions.forEach((dim, i) => {
+      const block = points.slice(i * 8, i * 8 + 8);
+      for (const point of block) {
+        expect(Object.keys(point)).toEqual(["rate", "bytes", "wait"]);
+        for (const other of family.dimensions) if (other !== dim) expect(point[other.name]).toBe(base[other.name as keyof typeof base]);
+        expect(point[dim.name]).toBeGreaterThanOrEqual(dim.min);
+        expect(point[dim.name]).toBeLessThanOrEqual(dim.max);
+      }
+    });
+    expect(points.slice(8, 16).every((point) => Number.isInteger(point["bytes"]))).toBe(true);
+  });
+
+  it("puts one value of each block in each of the n strata of the dimension", () => {
+    const points = oneAtATimePoints(family, 10, base, random("strata"));
+    const rates = points.slice(0, 10).map((point) => Math.floor(point["rate"]! * 10)).sort((a, b) => a - b);
+    expect(rates).toEqual(Array.from({ length: 10 }, (_, k) => k));
+    const waits = points.slice(20, 30).map((point) => Math.floor(Math.log(point["wait"]!) / Math.log(1000) * 10)).sort((a, b) => a - b);
+    expect(waits).toEqual(Array.from({ length: 10 }, (_, k) => k));
+  });
+
+  it("gives the same points for the same seed, and a new dimension does not change the blocks of the others", () => {
+    const points = oneAtATimePoints(family, 6, base, random("same"));
+    expect(canonicalHash(oneAtATimePoints(family, 6, base, random("same")))).toBe(canonicalHash(points));
+    expect(oneAtATimePoints(family, 6, base, random("other"))).not.toEqual(points);
+    const wider: InputFamily = { name: "load", dimensions: [...family.dimensions, { name: "age", min: 0, max: 3600 }] };
+    const more = oneAtATimePoints(wider, 6, { ...base, age: 0 }, random("same"));
+    expect(more.slice(0, 18).map(({ age, ...rest }) => (expect(age).toBe(0), rest))).toEqual(points);
+  });
+
+  it("refuses a base with a missing value, a value out of the range, a fraction of an integer dimension or an unknown name", () => {
+    const r = random(1);
+    expect(() => oneAtATimePoints(family, 4, { rate: 0.5, bytes: 0 }, r)).toThrow(/wait: the base value undefined/);
+    expect(() => oneAtATimePoints(family, 4, { ...base, rate: 2 }, r)).toThrow(RangeError);
+    expect(() => oneAtATimePoints(family, 4, { ...base, bytes: 1.5 }, r)).toThrow(RangeError);
+    expect(() => oneAtATimePoints(family, 4, { ...base, size: 1 }, r)).toThrow(/no dimension with this name/);
+    expect(() => oneAtATimePoints(family, 0, base, r)).toThrow(RangeError);
   });
 });

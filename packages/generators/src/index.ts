@@ -6,6 +6,7 @@ export {
   familyMap,
   familyPoints,
   latinHypercube,
+  oneAtATimePoints,
   randomDesign,
   saltelliDesign,
   stratifiedDesign,
