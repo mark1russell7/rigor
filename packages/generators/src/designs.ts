@@ -199,3 +199,33 @@ export function saltelliDesign(n: number, d: number, r: Random, base: "random" |
   const ab = Array.from({ length: d }, (_, i) => a.map((row, k) => row.map((x, j) => (j === i ? b[k]![j]! : x))));
   return { a, b, ab };
 }
+
+/**
+ * This function gives a design of one dimension at a time: one block of `n` points for each dimension, in the order of the
+ * dimensions. In the block of a dimension, the dimension takes the values of a Latin column of `n` strata. Each other
+ * dimension keeps its value in `base`. The column of a dimension comes from `r.fork("column:" + name)`, and the map comes
+ * from `familyMap(family, r)`. Thus a new dimension does not change the blocks of the others. A base value can be out of
+ * the range of its dimension, for example 0 for a log dimension. A base with no finite value for a dimension is a `RangeError`.
+ * A fraction for an integer dimension and a base value with no dimension are also a `RangeError`.
+ */
+export function oneAtATimePoints(family: InputFamily, n: number, base: Point, r: Random): Point[] {
+  count("oneAtATimePoints", "n", n);
+  const map = familyMap(family, r);
+  const names = familyNames(family);
+  const extra = Object.keys(base).find((name) => !names.includes(name));
+  if (extra !== undefined) throw new RangeError(`${family.name}: the base gives "${extra}", and the family has no dimension with this name.`);
+  for (const dim of family.dimensions) {
+    const value = base[dim.name];
+    if (value === undefined || !Number.isFinite(value) || (dim.integer === true && !Number.isInteger(value))) {
+      throw new RangeError(`${family.name}.${dim.name}: the base value ${value} is not a value of the dimension.`);
+    }
+  }
+  return names.flatMap((name, i) =>
+    latinHypercube(n, 1, r.fork(`column:${name}`)).map(([u]) => {
+      const unit = names.map(() => 0);
+      unit[i] = u!;
+      const moved = map(unit)[name]!;
+      return Object.fromEntries(names.map((each) => [each, each === name ? moved : base[each]!]));
+    }),
+  );
+}

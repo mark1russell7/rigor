@@ -45,6 +45,7 @@ latinHypercube: build/designs.d.ts#latinHypercube
 mulberry32: build/random.d.ts#mulberry32
 normalCdf: build/normal.d.ts#normalCdf
 normalQuantile: build/normal.d.ts#normalQuantile
+oneAtATimePoints: build/designs.d.ts#oneAtATimePoints
 plackettLuceOrder: build/random.d.ts#plackettLuceOrder
 random: build/random.d.ts#random
 randomDesign: build/designs.d.ts#randomDesign
@@ -127,6 +128,9 @@ export declare function familyPoints(family: InputFamily, unit: readonly (readon
 
 ### build/designs.d.ts#latinHypercube
 export declare function latinHypercube(n: number, d: number, r: Random): number[][];
+
+### build/designs.d.ts#oneAtATimePoints
+export declare function oneAtATimePoints(family: InputFamily, n: number, base: Point, r: Random): Point[];
 
 ### build/designs.d.ts#randomDesign
 export declare function randomDesign(n: number, d: number, r: Random): number[][];

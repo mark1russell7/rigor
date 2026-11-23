@@ -139,6 +139,8 @@ const points = familyPoints(family, latinHypercube(200, 3, random("design")), ra
 
 A distribution of a dimension uses its `cdf` and its `quantile`, from `distributionOf`. The value of a coordinate `u` is the quantile of `u` in the probability of the range. Thus a Latin hypercube also gives one value in each stratum of the probability.
 
+`oneAtATimePoints(family, n, base, r)` gives points of the family, not of the unit cube. It gives one block of `n` points for each dimension. In a block, one dimension takes one value in each of `n` strata, and each other dimension keeps its value in `base`. A base value can be out of the range, for example 0 for a log dimension. Thus each block gives the law of one dimension, with the others held. The column of a dimension comes from `r.fork("column:" + name)`, thus a new dimension does not change the blocks of the others.
+
 The parameters of a dimension come from `r.fork("dimension:" + name)`. The same seed gives the same points, and a new dimension does not change the values of the others.
 
 For the mean of a sum of 3 inputs from 50 points, the Latin hypercube gives 0.00042 of the variance of the random design. A test holds the ratio below 1/1000.
