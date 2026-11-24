@@ -201,6 +201,17 @@ export {
 export { type OptionFloorOptions, optionFloor, tQuantile } from "./power.ts";
 export { DISPERSION_MAX_WORK, type DispersionOptions, type DispersionTest, dispersionTest } from "./dispersion.ts";
 export { type GammaRates, type GammaRatesOptions, type RateUnit, fitGammaRates, gammaPoissonLogLikelihood, pooledRate } from "./gamma-rates.ts";
+export {
+  type GroupLaw,
+  type GroupedRateUnit,
+  type ThinningHoldout,
+  type ThinningHoldoutOptions,
+  type ThinningScore,
+  type TwoLevelRates,
+  fitTwoLevelGammaRates,
+  thinUnits,
+  thinningHoldout,
+} from "./two-level-rates.ts";
 export { type MeanInterval, meanInterval } from "./mean-interval.ts";
 export { normalCdf, normalQuantile } from "./normal.ts";
 export { type ModifiedZ, type ModifiedZOptions, type OutlierSide, MODIFIED_Z_CUT, modifiedZ } from "./outlier.ts";
