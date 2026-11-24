@@ -75,9 +75,10 @@ describe("dispersionTest", () => {
   });
 
   it("refuses more steps than maxWork before the work starts, and needs no check of the work for a total of 0", () => {
-    // 1000 draws of 30 events in 3 cells: 90000 steps.
-    expect(() => dispersionTest([10, 10, 10], { draws: 1000, maxWork: 89_999 })).toThrow(/maxWork/u);
-    expect(dispersionTest([10, 10, 10], { draws: 1000, maxWork: 90_000 }).draws).toBe(1000);
+    // 1000 draws of 30 events: 30000 uniform draws, for each number of cells.
+    expect(() => dispersionTest([10, 10, 10], { draws: 1000, maxWork: 29_999 })).toThrow(/maxWork/u);
+    expect(dispersionTest([10, 10, 10], { draws: 1000, maxWork: 30_000 }).draws).toBe(1000);
+    expect(dispersionTest([15, 15], { draws: 1000, maxWork: 30_000 }).draws).toBe(1000);
     expect(() => dispersionTest(new Array<number>(10).fill(100_000))).toThrow(RangeError);
     expect(() => dispersionTest([1, 2], { maxWork: 0 })).toThrow(/maxWork/u);
     expect(dispersionTest([0, 0], { maxWork: 1 }).p).toBe(1);

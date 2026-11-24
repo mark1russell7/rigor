@@ -8,9 +8,9 @@
  * - The p value is `(hits + 1) / (draws + 1)`, where `hits` is the count of the draws with a statistic at or above the
  *   statistic of the counts. It is more than 0, and it is an exact level of the test for each number of draws.
  * - The test has one side: it finds more spread than one rate gives. Counts that are too even give a p value near 1.
- * - The work is `draws` times the total times the number of cells, in steps of a short scan. Each event of each draw is one
- *   uniform draw. A total of 66 in 10 cells with 100000 draws takes approximately 0.1 s. An input of more than `maxWork` steps
- *   throws a `RangeError` before the work starts.
+ * - The work is `draws` times the total: one uniform draw for each event of each draw. The scan of the cells is small next to it.
+ *   Each uniform draw takes approximately 20 ns, so a total of 66 with 100000 draws takes approximately 0.1 s.
+ *   An input of more than `maxWork` uniform draws throws a `RangeError` before the work starts.
  */
 
 import { random } from "@mark1russell7/rigor-generators";
@@ -23,12 +23,12 @@ export interface DispersionOptions {
   readonly draws?: number | undefined;
   /** The seed of the draws. The default is 1. */
   readonly seed?: number | string | undefined;
-  /** The most steps: `draws` times the total times the number of cells, a whole number of 1 or more. The default is `DISPERSION_MAX_WORK`. */
+  /** The most uniform draws: `draws` times the total, a whole number of 1 or more. The default is `DISPERSION_MAX_WORK`. */
   readonly maxWork?: number | undefined;
 }
 
-/** The default most steps of `dispersionTest`: 2^30, approximately 1 to 2 s. A caller with a larger input gives fewer draws or a higher `maxWork`. */
-export const DISPERSION_MAX_WORK: number = 2 ** 30;
+/** The default most uniform draws of `dispersionTest`: 2^26, approximately 1.2 s. A caller with a larger input gives fewer draws or a higher `maxWork`. */
+export const DISPERSION_MAX_WORK: number = 2 ** 26;
 
 /** The result of `dispersionTest`. */
 export interface DispersionTest {
@@ -77,9 +77,9 @@ export function dispersionTest(counts: readonly number[], options: DispersionOpt
   const expected = shares.map((share) => share * total);
   const pearson = (cells: readonly number[]): number => cells.reduce((sum, count, index) => sum + (count - (expected[index] as number)) ** 2 / (expected[index] as number), 0);
   if (total === 0 || counts.length === 1) return { statistic: 0, p: 1, hits: 0, draws: 0, seed: r.seed, total };
-  const work = draws * total * counts.length;
+  const work = draws * total;
   if (work > maxWork) {
-    throw new RangeError(`dispersionTest: ${draws} draws of ${total} events in ${counts.length} cells need about ${work} steps, more than maxWork ${maxWork}. Give fewer draws or a higher maxWork.`);
+    throw new RangeError(`dispersionTest: ${draws} draws of ${total} events need ${work} uniform draws, more than maxWork ${maxWork}. Give fewer draws or a higher maxWork.`);
   }
   const statistic = pearson(counts);
   const bar = statistic - TIE * Math.max(1, statistic);
