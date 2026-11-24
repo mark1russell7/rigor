@@ -56,6 +56,19 @@ describe("fitGammaRates", () => {
     expect(fitGammaRates(Array.from({ length: 8 }, () => ({ count: 5, exposure: 10 })))).toEqual({ shape: Number.POSITIVE_INFINITY, mean: 0.5 });
     expect(fitGammaRates([{ count: 3, exposure: 2 }, { count: 6, exposure: 4 }])).toEqual({ shape: Number.POSITIVE_INFINITY, mean: 1.5 });
     expect(fitGammaRates([{ count: 0, exposure: 2 }, { count: 0, exposure: 9 }])).toEqual({ shape: Number.POSITIVE_INFINITY, mean: 0 });
+    // One unit shows no spread: its rate is count / exposure.
+    expect(fitGammaRates([{ count: 7, exposure: 2 }])).toEqual({ shape: Number.POSITIVE_INFINITY, mean: 3.5 });
+  });
+
+  it("gives a shape at the limit low when the peak is below it, and a smaller shape with a wider range", () => {
+    // One unit with 40 events and 2999 units with none, in 10 years each: the peak of the shape is below 0.001.
+    const units: RateUnit[] = [{ count: 40, exposure: 10 }, ...Array.from({ length: 2999 }, () => ({ count: 0, exposure: 10 }))];
+    const law = fitGammaRates(units);
+    expect(Math.abs(Math.log(law.shape / 0.001))).toBeLessThan(1e-6);
+    const wide = fitGammaRates(units, { low: 1e-6 });
+    expect(wide.shape).toBeLessThan(0.0005);
+    expect(wide.shape).toBeGreaterThan(1e-6);
+    expect(gammaPoissonLogLikelihood(units, wide.shape, wide.mean)).toBeGreaterThan(gammaPoissonLogLikelihood(units, law.shape, law.mean));
   });
 
   it("is a peak of the likelihood for any units, and the order of the units does not change it", () => {
@@ -67,6 +80,8 @@ describe("fitGammaRates", () => {
         const tolerance = 1e-7 * Math.max(1, Math.abs(total));
         if (law.mean > 0) for (const factor of [0.9, 1.1]) expect(gammaPoissonLogLikelihood(units, law.shape, law.mean * factor)).toBeLessThanOrEqual(total + tolerance);
         if (Number.isFinite(law.shape)) for (const factor of [0.5, 2]) expect(gammaPoissonLogLikelihood(units, law.shape * factor, law.mean)).toBeLessThanOrEqual(total + tolerance);
+        // A result of Infinity is not worse than a finite shape at the mean of the result.
+        else if (law.mean > 0) for (const shape of [0.1, 1, 10, 100]) expect(gammaPoissonLogLikelihood(units, shape, law.mean)).toBeLessThanOrEqual(total + tolerance);
         const reversed = fitGammaRates([...units].reverse());
         expect(reversed.shape === law.shape || Math.abs(Math.log(reversed.shape / law.shape)) < 1e-6).toBe(true);
         expect(Math.abs(reversed.mean - law.mean)).toBeLessThanOrEqual(1e-7 * law.mean);

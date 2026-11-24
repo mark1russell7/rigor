@@ -120,7 +120,8 @@ function meanFor(units: readonly RateUnit[], shape: number, count: number, expos
  *   refines the best point between its neighbors.
  * - It gives the shape `Infinity` and the mean `total count / total exposure` when one rate explains the units equally well or better.
  * - Units with no count give the shape `Infinity` and the mean 0.
- * - The order of the units does not change the result.
+ * - A shape at `low` or at `high` tells that the search stopped at that limit. The peak can be outside the range, so give a wider range.
+ * - The order of the units changes the result only by rounding.
  */
 export function fitGammaRates(units: readonly RateUnit[], options: GammaRatesOptions = {}): GammaRates {
   const low = options.low ?? 0.001;
