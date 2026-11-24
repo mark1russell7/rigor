@@ -10,6 +10,7 @@ import { GCProfiler, getHeapStatistics, setFlagsFromString } from "node:v8";
 import type { ArmProcess } from "./arm-times.ts";
 import type { SidecarEnd } from "./container.ts";
 import { type FixtureFile, type FixtureHash, checkFixtures } from "./fixtures.ts";
+import { type BenchMachine, cpuInfoMachine } from "./machine.ts";
 import { type Arm, type PairedTime, armOrder, balancedRounds, firstArm } from "./paired.ts";
 import { startProcess, stderrTail } from "./start.ts";
 
@@ -31,6 +32,7 @@ export {
 } from "./container.ts";
 export { type FixtureFile, type FixtureHash, type FixtureOptions, checkFixtures, fixtureDifferences } from "./fixtures.ts";
 export { type CgroupSample, type IoOptions, type IoSample, type IoWatch, processIo, watchIo } from "./process-io.ts";
+export { type BenchMachine, cpuInfoMachine } from "./machine.ts";
 export { startProcess } from "./start.ts";
 
 /** The computer of a run. The `cpu` is the model of the first CPU. */
@@ -42,14 +44,30 @@ export interface BenchEnv {
   readonly node: string;
   /** The name of the runner, from `BENCH_RUNNER` or else `RUNNER_NAME`. An empty value is absent. */
   readonly runner?: string;
+  /** The kind of the machine inside its CPU model, from `/proc/cpuinfo`. It is absent on a system with no such file. */
+  readonly machine?: BenchMachine;
 }
 
-/** This function gives the computer of this process. The runner comes from `BENCH_RUNNER`, or else from `RUNNER_NAME`. */
+/** This function gives the kind of the machine on Linux, or `undefined`. A read that fails gives `undefined`. */
+function readMachine(): BenchMachine | undefined {
+  if (platform() !== "linux") return undefined;
+  try {
+    return cpuInfoMachine(readFileSync("/proc/cpuinfo", "utf8"));
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * This function gives the computer of this process. The runner comes from `BENCH_RUNNER`, or else from `RUNNER_NAME`.
+ * On Linux, the field `machine` comes from `/proc/cpuinfo`.
+ */
 export function benchEnv(): BenchEnv {
   const all = cpus();
-  const env = { cpu: all[0]?.model.trim() || "unknown", cores: all.length, os: platform(), arch: arch(), node: process.version };
+  const base: BenchEnv = { cpu: all[0]?.model.trim() || "unknown", cores: all.length, os: platform(), arch: arch(), node: process.version };
   const runner = process.env["BENCH_RUNNER"] || process.env["RUNNER_NAME"];
-  return runner === undefined || runner === "" ? env : { ...env, runner };
+  const machine = readMachine();
+  return { ...base, ...(runner === undefined || runner === "" ? {} : { runner }), ...(machine === undefined ? {} : { machine }) };
 }
 
 /** The JSON line of a child: its time in milliseconds, the hash of its output, and the reason of a skip. */

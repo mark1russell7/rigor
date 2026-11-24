@@ -51,6 +51,7 @@ export {
   writeGateLine,
   writeGateVerdict,
 } from "./gate-line.ts";
+export { type BenchMachine, cpuInfoMachine } from "./machine.ts";
 export { GATE_LINE_HELP, type GateLineCliIo, gateLineCli } from "./gate-line-cli.ts";
 export { type ControlFactors, type ControlOptions, type ControlRow, type GroupCounts, type GroupFactor, type MeasuredFactor, type NoFactor, controlFactor } from "./control.ts";
 export {
