@@ -39,6 +39,12 @@
       "unreleased-change": {
         "versionEachChange": true,
         "reason": "each pull request of rigor sets its own version, so a change of the shipped files without a new version never gets to npm (rigor #18 and #20, 2026-11-02)"
+      },
+      "gate-trigger": {
+        "allow": [
+          "bench-sha256.yml"
+        ],
+        "reason": "bench-sha256.yml is a bench, not a gate: it reports the speed of sha256Hex on the pull requests that change it, and it holds no limit"
       }
     }
   }

@@ -1,8 +1,8 @@
 /**
  * The content hash of a document: SHA-256 of a string, and a canonical JSON form of a value.
  *
- * The hash is the same on each platform. On Node, `sha256Hex` of UTF-8 input uses `node:crypto` for speed: it reads the same bytes
- * as the portable code, which runs in browsers and for the input `"wtf8"`.
+ * The hash is the same on each platform. On Node, `sha256Hex` of UTF-8 input uses `node:crypto` for speed.
+ * It reads the same bytes as the portable code. The portable code runs in browsers and for the input `"wtf8"`.
  * `canonicalHash(value)` is `sha256Hex(canonicalJson(value))`: equal values give equal hashes, also when their keys have another order.
  */
 
