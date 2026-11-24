@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { runInNewContext } from "node:vm";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { canonicalHash, canonicalJson, sha256Hex } from "./hash.ts";
 import { random, type Random } from "./random.ts";
 
@@ -48,6 +48,49 @@ describe("sha256Hex", () => {
 
   it("refuses an unknown input", () => {
     expect(() => sha256Hex("a", { input: "latin1" as "utf8" })).toThrow(RangeError);
+  });
+});
+
+describe("sha256Hex with no node:crypto, as in a browser", () => {
+  /** This function loads a fresh copy of the module while `process.getBuiltinModule` gives nothing, so the portable code runs. */
+  async function portable(): Promise<typeof sha256Hex> {
+    vi.resetModules();
+    const spy = vi.spyOn(process, "getBuiltinModule").mockReturnValue(undefined as never);
+    try {
+      const mod = await import("./hash.ts");
+      const hash = mod.sha256Hex;
+      hash("");
+      expect(spy).toHaveBeenCalledWith("node:crypto");
+      return hash;
+    } finally {
+      spy.mockRestore();
+    }
+  }
+
+  it("gives the same digest as node:crypto for the test vectors, the block edges, lone surrogates and 300 seeded strings", async () => {
+    const hash = await portable();
+    expect(hash("abc")).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    for (const n of [0, 55, 56, 57, 63, 64, 65, 119, 120, 128, 1000]) expect(hash("x".repeat(n)), String(n)).toBe(sha256Hex("x".repeat(n)));
+    for (const s of ["�", "a�b", "�", "x�😀"]) expect(hash(s), JSON.stringify(s)).toBe(sha256Hex(s));
+    const r = random("sha256Hex portable");
+    for (let i = 0; i < 300; i++) {
+      const s = textOf(r, r.int(0, 200));
+      expect(hash(s)).toBe(sha256Hex(s));
+      expect(hash(s, { input: "wtf8" })).toBe(sha256Hex(s, { input: "wtf8" }));
+    }
+  });
+
+  it("uses the portable code when getBuiltinModule throws", async () => {
+    vi.resetModules();
+    const spy = vi.spyOn(process, "getBuiltinModule").mockImplementation(() => {
+      throw new Error("no builtins here");
+    });
+    try {
+      const mod = await import("./hash.ts");
+      expect(mod.sha256Hex("abc")).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 

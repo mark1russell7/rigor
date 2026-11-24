@@ -1,7 +1,8 @@
 /**
  * The content hash of a document: SHA-256 of a string, and a canonical JSON form of a value.
  *
- * The two functions use no API of Node or of the browser, so a hash is the same on each platform.
+ * The hash is the same on each platform. On Node, `sha256Hex` of UTF-8 input uses `node:crypto` for speed: it reads the same bytes
+ * as the portable code, which runs in browsers and for the input `"wtf8"`.
  * `canonicalHash(value)` is `sha256Hex(canonicalJson(value))`: equal values give equal hashes, also when their keys have another order.
  */
 
@@ -71,14 +72,52 @@ function writeBytes(text: string, wtf8: boolean, out?: Uint8Array): number {
   return n;
 }
 
+/** The part of `node:crypto` that `sha256Hex` uses. */
+interface NodeCrypto {
+  createHash(algorithm: "sha256"): { update(data: string, encoding: "utf8"): { digest(encoding: "hex"): string } };
+}
+
+/** The `node:crypto` module, `null` where the platform has none, or `undefined` before the first look. */
+let nodeCrypto: NodeCrypto | null | undefined;
+
+/**
+ * This function gives `node:crypto` through `process.getBuiltinModule` (Node 22.3 and later), or `null` in a browser or on an older
+ * Node. It needs no import, so the module still loads in a browser.
+ */
+function builtinCrypto(): NodeCrypto | null {
+  if (nodeCrypto === undefined) {
+    nodeCrypto = null;
+    try {
+      const proc = (globalThis as { process?: { getBuiltinModule?: (id: string) => unknown } }).process;
+      const found = typeof proc?.getBuiltinModule === "function" ? (proc.getBuiltinModule("node:crypto") as NodeCrypto | undefined) : undefined;
+      if (typeof found?.createHash === "function") nodeCrypto = found;
+    } catch {
+      nodeCrypto = null;
+    }
+  }
+  return nodeCrypto;
+}
+
 /**
  * This function gives the SHA-256 digest of the bytes of a string, as 64 lowercase hex characters.
  * The option `input` selects the bytes of a lone surrogate. It is not for passwords: it has no salt and no cost.
+ *
+ * On Node, the input `"utf8"` goes through `node:crypto`. Node writes a lone surrogate as the bytes of U+FFFD, as `TextEncoder`
+ * does, so the hash is the hash of the portable code.
  */
 export function sha256Hex(text: string, options?: Sha256Options): string {
   const input = options?.input ?? "utf8";
   if (input !== "utf8" && input !== "wtf8") throw new RangeError(`sha256Hex: input is "utf8" or "wtf8", not ${String(input)}.`);
   const wtf8 = input === "wtf8";
+  if (!wtf8) {
+    const crypto = builtinCrypto();
+    if (crypto !== null) return crypto.createHash("sha256").update(text, "utf8").digest("hex");
+  }
+  return portableSha256(text, wtf8);
+}
+
+/** This function gives the SHA-256 digest of the bytes of a string with no API of the platform. */
+function portableSha256(text: string, wtf8: boolean): string {
   // The bytes go straight into the padded buffer, so the digest makes one array, not a list of the bytes and a copy.
   const length = writeBytes(text, wtf8);
   const bits = length * 8;
