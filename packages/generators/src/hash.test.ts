@@ -692,6 +692,57 @@ describe("canonicalJson against version 0.2.3", () => {
     );
   });
 
+  it("finds a cycle at each depth, also past the 32 objects of the array of the path", () => {
+    for (const depth of [1, 2, 31, 32, 33, 34, 100]) {
+      for (const back of [0, Math.floor(depth / 2), depth - 1]) {
+        const nodes: Record<string, unknown>[] = Array.from({ length: depth }, (_, i) => ({ i }));
+        nodes.forEach((node, i) => {
+          if (i + 1 < depth) node["next"] = nodes[i + 1];
+        });
+        const shared = { s: 1 };
+        nodes[depth - 1]!["leaf"] = [shared, shared, { shared }];
+        expect(outcome(() => canonicalJson(nodes[0])), `${depth} with no cycle`).toBe(outcome(() => canonicalJsonV023(nodes[0])));
+        expect(canonicalJson(nodes[0])).not.toMatch(/^TypeError/);
+        nodes[depth - 1]!["back"] = nodes[back];
+        const now = outcome(() => canonicalJson(nodes[0]));
+        expect(now, `${depth} back to ${back}`).toBe(outcome(() => canonicalJsonV023(nodes[0])));
+        expect(now).toBe("TypeError: canonicalJson: the value has a cycle.");
+      }
+    }
+    // A Map in a deep path, with the option tags.
+    const deepMap: Record<string, unknown> = { v: 0 };
+    let tail = deepMap;
+    for (let i = 0; i < 40; i++) tail = (tail["next"] = { v: i + 1 }) as Record<string, unknown>;
+    const map = new Map<unknown, unknown>([["root", deepMap]]);
+    tail["map"] = map;
+    expect(outcome(() => canonicalJson(map, { tags: "typed" }))).toBe(outcome(() => canonicalJsonV023(map, { tags: "typed" })));
+    expect(outcome(() => canonicalJson(map, { tags: "typed" }))).toMatch(/has a cycle/);
+  });
+
+  it("gives the same text for the edges of the numbers", () => {
+    const numbers = [0, -0, 1, -1, 0.1, 1e21, 1e-7, 5e-7, 123456789012345680000, 2 ** 53, -(2 ** 53) - 2, Number.MIN_VALUE, Number.MAX_VALUE, -1.5e-300, 1 / 3];
+    for (const options of optionSets) {
+      expect(canonicalJson(numbers, options)).toBe(canonicalJsonV023(numbers, options));
+      expect(canonicalJson(numbers.map((n) => Object(n) as object), options)).toBe(canonicalJsonV023(numbers.map((n) => Object(n) as object), options));
+    }
+    expect(canonicalJson(numbers)).toBe(JSON.stringify(numbers));
+  });
+
+  it("sorts the keys as version 0.2.3 for each count of keys, with short and long lists", () => {
+    const r = random("canonicalJson key order");
+    const parts = ["a", "B", "z", "0", "9", "_", "-", "é", "ß", "€", "中", "😀", "𝄞", String.fromCharCode(0xffff), String.fromCharCode(0)];
+    for (let i = 0; i < 300; i++) {
+      const record: Record<string, number> = {};
+      const count = r.int(0, 40);
+      for (let j = 0; j < count; j++) {
+        let key = "";
+        for (let c = r.int(0, 4); c > 0; c--) key += r.pick(parts);
+        record[key] = j;
+      }
+      expect(canonicalJson(record)).toBe(canonicalJsonV023(record));
+    }
+  });
+
   it("gives the same text for nested plain records from object literals and from JSON.parse", () => {
     const r = random("canonicalJson nested records");
     for (let i = 0; i < 200; i++) {

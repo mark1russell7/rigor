@@ -231,6 +231,26 @@ function unboxed(o: object, brand: string): unknown {
 }
 
 /**
+ * This function sorts the keys of an object in the order of their UTF-16 code units, as `Array.prototype.sort` does with no compare function.
+ * The keys are different strings, so each correct sort gives the same order. For a short list, an insertion sort does less work.
+ */
+function sortKeys(keys: string[]): void {
+  if (keys.length > 16) {
+    keys.sort();
+    return;
+  }
+  for (let i = 1; i < keys.length; i++) {
+    const k = keys[i]!;
+    let j = i - 1;
+    while (j >= 0 && keys[j]! > k) {
+      keys[j + 1] = keys[j]!;
+      j--;
+    }
+    keys[j + 1] = k;
+  }
+}
+
+/**
  * This function gives the canonical form of a value. The default form is RFC 8785 (JCS):
  *
  * - The keys of each object are in the order of their UTF-16 code units, with no whitespace.
@@ -258,7 +278,21 @@ export function canonicalJson(value: unknown, options?: CanonicalOptions): strin
   if (form !== "jcs" && form !== "json") throw new RangeError(`canonicalJson: form is "jcs" or "json", not ${String(form)}.`);
   if (bigint !== "error" && bigint !== "suffix") throw new RangeError(`canonicalJson: bigint is "error" or "suffix", not ${String(bigint)}.`);
   const jcs = form === "jcs";
-  const open = new Set<object>();
+  // The open objects are the objects on the path from the value to the current object. An object on the path again is a cycle.
+  // The first objects of the path are in an array, so that a plain object needs no hash of its identity. The deep part is in a set.
+  const path: object[] = [];
+  const deep = new Set<object>();
+  const enter = (o: object): void => {
+    for (let i = 0; i < path.length; i++) if (path[i] === o) throw new TypeError("canonicalJson: the value has a cycle.");
+    if (deep.size > 0 && deep.has(o)) throw new TypeError("canonicalJson: the value has a cycle.");
+    if (path.length < 32) path.push(o);
+    else deep.add(o);
+  };
+  // The objects leave in the reverse order of their entry. Thus the last object is in the set when the set is not empty.
+  const leave = (o: object): void => {
+    if (deep.size > 0) deep.delete(o);
+    else path.pop();
+  };
   const text = (s: string): string => {
     if (jcs && !(s as string & { isWellFormed(): boolean }).isWellFormed()) throw new RangeError(`canonicalJson: the string ${JSON.stringify(s)} has a lone surrogate, which RFC 8785 does not allow.`);
     return JSON.stringify(s);
@@ -271,12 +305,11 @@ export function canonicalJson(value: unknown, options?: CanonicalOptions): strin
     if (brand === "RegExp" && hasSlot(sourceOf, o)) return `RegExp(${text(RegExp.prototype.toString.call(o))})`;
     const map = brand === "Map" && hasSlot(Map.prototype.has, o);
     if (!map && !(brand === "Set" && hasSlot(Set.prototype.has, o))) return undefined;
-    if (open.has(o)) throw new TypeError("canonicalJson: the value has a cycle.");
-    open.add(o);
+    enter(o);
     const parts: string[] = [];
     if (map) for (const [k, item] of Map.prototype.entries.call(o) as Iterable<[unknown, unknown]>) parts.push(`[${write(k, "")},${write(item, "")}]`);
     else for (const item of Set.prototype.values.call(o) as Iterable<unknown>) parts.push(write(item, ""));
-    open.delete(o);
+    leave(o);
     return `${map ? "Map" : "Set"}(${parts.sort().join(",")})`;
   };
   // This function gives the text of the TypeError for an object that keeps its content out of its own keys.
@@ -291,7 +324,8 @@ export function canonicalJson(value: unknown, options?: CanonicalOptions): strin
       case "boolean":
         return v ? "true" : "false";
       case "number":
-        if (Number.isFinite(v)) return JSON.stringify(v);
+        // For a finite number, String gives the text of JSON.stringify, with less work.
+        if (Number.isFinite(v)) return String(v);
         if (jcs) throw new RangeError(`canonicalJson: ${String(v)} is not a JSON number.`);
         return "null";
       case "string":
@@ -340,8 +374,7 @@ export function canonicalJson(value: unknown, options?: CanonicalOptions): strin
       isArray = Array.isArray(o);
       if (!isArray && typedArrayName.call(o) === undefined) throw new TypeError(lost(brand));
     }
-    if (open.has(o)) throw new TypeError("canonicalJson: the value has a cycle.");
-    open.add(o);
+    enter(o);
     if (!checked) isArray = Array.isArray(o);
     let out: string;
     if (isArray) out = `[${(o as unknown[]).map((item: unknown, i) => write(item, String(i))).join(",")}]`;
@@ -355,7 +388,7 @@ export function canonicalJson(value: unknown, options?: CanonicalOptions): strin
         if (r[k] !== undefined) keys[n++] = k;
       }
       keys.length = n;
-      keys.sort();
+      sortKeys(keys);
       out = "{";
       for (let i = 0; i < n; i++) {
         const k = keys[i]!;
@@ -363,7 +396,7 @@ export function canonicalJson(value: unknown, options?: CanonicalOptions): strin
       }
       out += "}";
     }
-    open.delete(o);
+    leave(o);
     return out;
   };
   return write(value, "");
