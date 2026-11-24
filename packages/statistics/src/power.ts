@@ -3,8 +3,8 @@
  * normal formula is too low at a small count. These functions make no draws, so a caller reads the count with no bench.
  */
 
-/** The log of the gamma function, by the form of Lanczos with 6 terms. The argument is above 0. */
-function logGamma(x: number): number {
+/** The log of the gamma function, by the form of Lanczos with 6 terms. The argument is above 0. `gamma-rates.ts` also uses it. */
+export function logGamma(x: number): number {
   const terms = [76.18009172947146, -86.50532032941677, 24.01409824083091, -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
   const base = x + 5.5 - (x + 0.5) * Math.log(x + 5.5);
   let series = 1.000000000190015;
