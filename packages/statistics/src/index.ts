@@ -204,11 +204,13 @@ export { type GammaRates, type GammaRatesOptions, type RateUnit, fitGammaRates, 
 export {
   type GroupLaw,
   type GroupedRateUnit,
+  type SplitHoldout,
   type ThinningHoldout,
   type ThinningHoldoutOptions,
   type ThinningScore,
   type TwoLevelRates,
   fitTwoLevelGammaRates,
+  splitHoldout,
   thinUnits,
   thinningHoldout,
 } from "./two-level-rates.ts";

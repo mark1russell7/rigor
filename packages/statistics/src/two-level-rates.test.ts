@@ -1,7 +1,7 @@
 import { random } from "@mark1russell7/rigor-generators";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { fitGammaRates, fitTwoLevelGammaRates, pooledRate, thinningHoldout, thinUnits, type GroupedRateUnit, type RateUnit } from "./index.ts";
+import { fitGammaRates, fitTwoLevelGammaRates, gammaPoissonLogLikelihood, pooledRate, splitHoldout, thinningHoldout, thinUnits, type GroupedRateUnit, type RateUnit } from "./index.ts";
 
 // The group "a" has two units with events. The group "b" has two units with no event.
 const UNITS: GroupedRateUnit[] = [
@@ -142,5 +142,55 @@ describe("thinningHoldout", () => {
     expect(() => thinningHoldout(units, { bad: () => [-1] }, { draw })).toThrow(RangeError);
     expect(() => thinningHoldout(units, { bad: () => [Number.NaN] }, { draw })).toThrow(RangeError);
     expect(() => thinningHoldout(units, { bad: () => [1, 2] }, { draw })).toThrow(RangeError);
+  });
+});
+
+describe("splitHoldout", () => {
+  // Each unit: a fit part (for example the early years) and a score part (the later years), each in its own exposure.
+  const fit: RateUnit[] = [
+    { count: 6, exposure: 3 },
+    { count: 0, exposure: 2 },
+    { count: 2, exposure: 4 },
+  ];
+  const score: RateUnit[] = [
+    { count: 4, exposure: 2 },
+    { count: 1, exposure: 1 },
+    { count: 0, exposure: 1 },
+  ];
+  const raw = (units: readonly RateUnit[]) => units.map((unit) => unit.count / unit.exposure);
+
+  it("scores each count of the score part in its own exposure, with the scores of thinningHoldout", () => {
+    const one = (units: readonly RateUnit[]) => units.map(() => 8 / 9);
+    const result = splitHoldout(fit, score, { raw, one });
+    expect(result.seenUnits).toBe(2);
+    expect(Object.keys(result.methods)).toEqual(["one", "raw"]);
+    // The raw rate of the first unit is 2 a year: 4 expected events in 2 years, and 4 events.
+    const first = gammaPoissonLogLikelihood([{ count: 4, exposure: 2 }], Number.POSITIVE_INFINITY, 2);
+    // The second unit has the raw rate 0 and 1 event, so it is lost. The third unit has the raw rate 0.5 and no event in 1 year.
+    const third = gammaPoissonLogLikelihood([{ count: 0, exposure: 1 }], Number.POSITIVE_INFINITY, 0.5);
+    expect(result.methods["raw"]).toEqual({ logLikelihood: Number.NEGATIVE_INFINITY, squared: 0 + 1 + 0.25, seen: first + third, lost: 1 });
+    expect(result.methods["one"]?.lost).toBe(0);
+    expect(Number.isFinite(result.methods["one"]?.logLikelihood)).toBe(true);
+  });
+
+  it("gives the scores of one round of thinningHoldout on the same split", () => {
+    const units: RateUnit[] = [
+      { count: 7, exposure: 2 },
+      { count: 3, exposure: 5 },
+    ];
+    const draws = random(11);
+    const thinned = thinningHoldout(units, { raw }, { draw: () => draws.chance(0.5), rounds: 1 });
+    const again = random(11);
+    const [half, rest] = thinUnits(units, () => again.chance(0.5));
+    expect(splitHoldout(half, rest, { raw })).toEqual({ seenUnits: thinned.seenUnits, methods: thinned.methods });
+  });
+
+  it("refuses an empty list, parts of different lengths, a bad score part and a bad method", () => {
+    expect(() => splitHoldout([], [], { raw })).toThrow(RangeError);
+    expect(() => splitHoldout(fit, score.slice(1), { raw })).toThrow(/score part has 2 units/u);
+    expect(() => splitHoldout(fit, [{ count: 1.5, exposure: 1 }, ...score.slice(1)], { raw })).toThrow(RangeError);
+    expect(() => splitHoldout(fit, [{ count: 1, exposure: 0 }, ...score.slice(1)], { raw })).toThrow(/exposure of the score part/u);
+    expect(() => splitHoldout(fit, score, { bad: () => [1, -1, 1] })).toThrow(/splitHoldout: the method "bad"/u);
+    expect(() => splitHoldout(fit, score, { short: () => [1] })).toThrow(/gives 1 rates for 3 units/u);
   });
 });

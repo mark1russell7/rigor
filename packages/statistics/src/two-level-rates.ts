@@ -5,6 +5,8 @@
  *   A group with no event has no law of its own. It gets the shape `Infinity` and its pooled mean toward the law of the groups.
  * - The thinning holdout splits each count into two halves. Each event goes to the fit half or to the score half with a chance that the caller gives.
  *   Each half of a Poisson count is then an independent Poisson count with a part of the rate. A method fits its rates on the fit half, and the score half scores them.
+ * - The split holdout scores a split that the caller gives: each unit has a fit part and a score part, each with its own exposure.
+ *   An example is a split over time: the fit part has the early years, and the score part has the later years.
  */
 
 import { fitGammaRates, gammaPoissonLogLikelihood, pooledRate, type GammaRates, type GammaRatesOptions, type RateUnit } from "./gamma-rates.ts";
@@ -152,27 +154,87 @@ export function thinningHoldout<U extends RateUnit>(
   let seenUnits = 0;
   for (let round = 0; round < rounds; round++) {
     const [fit, score] = thinUnits(units, options.draw);
-    seenUnits += fit.filter((unit) => unit.count > 0).length;
-    for (const name of names) {
-      const rates = (methods[name] as (fit: readonly U[]) => readonly number[])(fit);
-      if (rates.length !== units.length) throw new RangeError(`thinningHoldout: the method "${name}" gives ${rates.length} rates for ${units.length} units.`);
-      const sum = sums[name] as { logLikelihood: number; squared: number; seen: number; lost: number };
-      score.forEach((unit, index) => {
-        const rate = rates[index] as number;
-        if (!Number.isFinite(rate) || rate < 0) throw new RangeError(`thinningHoldout: the method "${name}" gives the rate ${rate}. It is a finite number of 0 or more.`);
-        const value = gammaPoissonLogLikelihood([{ count: unit.count, exposure: unit.exposure }], Number.POSITIVE_INFINITY, rate);
-        sum.logLikelihood += value;
-        sum.squared += (unit.count - rate * unit.exposure) ** 2;
-        if ((fit[index] as U).count > 0) sum.seen += value;
-        if (rate === 0 && unit.count > 0) sum.lost += 1;
-      });
-    }
+    seenUnits += scoreSplit("thinningHoldout", fit, score, methods, sums);
   }
   const mean = (value: number): number => value / rounds;
   const scores: Record<string, ThinningScore> = {};
   for (const name of names) {
-    const sum = sums[name] as { logLikelihood: number; squared: number; seen: number; lost: number };
+    const sum = sums[name] as ScoreSums;
     scores[name] = { logLikelihood: mean(sum.logLikelihood), squared: mean(sum.squared), seen: mean(sum.seen), lost: mean(sum.lost) };
   }
   return { rounds, seenUnits: mean(seenUnits), methods: scores };
+}
+
+/** The result of `splitHoldout`. */
+export interface SplitHoldout {
+  /** The count of the units with one event or more in the fit part. */
+  readonly seenUnits: number;
+  /** The scores of each method, by its name. Each score is a sum over the units. */
+  readonly methods: Readonly<Record<string, ThinningScore>>;
+}
+
+/**
+ * This function gives a holdout of some methods of rates on a split that the caller gives.
+ *
+ * - The unit at each index of `fit` and of `score` is one unit. Each part has its own count and its own exposure.
+ * - Each method gives a rate for each unit from the fit part. The expected count of a unit in the score part is its rate times its exposure in that part.
+ * - The scores are those of `thinningHoldout`: the Poisson log-likelihood, the squared error, `seen` and `lost`.
+ * - For a split over time, the fit part has the counts of the early periods. The score part has the counts of the later periods.
+ *   Then the events of one cluster stay in one part, and a change of the rates over time lowers the scores. A thinning split tests neither of these.
+ *
+ * @param fit - The fit part of each unit
+ * @param score - The score part of each unit, in the order of `fit`
+ * @param methods - The methods by their names. Each method gives a rate of 0 or more for each unit of the fit part, in the order of the units.
+ * @throws RangeError when the list is empty or the two parts have different lengths
+ * @throws RangeError when a score part has a bad count, or an exposure of 0 or less
+ * @throws RangeError when a method gives a bad rate, or a list with a different length
+ */
+export function splitHoldout<U extends RateUnit>(
+  fit: readonly U[],
+  score: readonly RateUnit[],
+  methods: Readonly<Record<string, (fit: readonly U[]) => readonly number[]>>,
+): SplitHoldout {
+  if (fit.length === 0) throw new RangeError("splitHoldout: the list of units is empty.");
+  if (score.length !== fit.length) throw new RangeError(`splitHoldout: the score part has ${score.length} units, and the fit part has ${fit.length}.`);
+  for (const unit of score) {
+    if (!Number.isInteger(unit.count) || unit.count < 0) throw new RangeError(`splitHoldout: a count of the score part is ${unit.count}. It is a whole number of 0 or more.`);
+    if (!Number.isFinite(unit.exposure) || unit.exposure <= 0) throw new RangeError(`splitHoldout: an exposure of the score part is ${unit.exposure}. It is a finite number of more than 0.`);
+  }
+  const names = Object.keys(methods).sort();
+  const sums = Object.fromEntries(names.map((name) => [name, { logLikelihood: 0, squared: 0, seen: 0, lost: 0 }]));
+  const seenUnits = scoreSplit("splitHoldout", fit, score, methods, sums);
+  return { seenUnits, methods: Object.fromEntries(names.map((name) => [name, { ...(sums[name] as ScoreSums) }])) };
+}
+
+/** The sums of the scores of one method. */
+interface ScoreSums {
+  logLikelihood: number;
+  squared: number;
+  seen: number;
+  lost: number;
+}
+
+/** This function adds the scores of each method on one split to its sums. It gives the count of the units with events in the fit part. */
+function scoreSplit<U extends RateUnit>(
+  caller: string,
+  fit: readonly U[],
+  score: readonly RateUnit[],
+  methods: Readonly<Record<string, (fit: readonly U[]) => readonly number[]>>,
+  sums: Readonly<Record<string, ScoreSums>>,
+): number {
+  for (const name of Object.keys(sums)) {
+    const rates = (methods[name] as (fit: readonly U[]) => readonly number[])(fit);
+    if (rates.length !== fit.length) throw new RangeError(`${caller}: the method "${name}" gives ${rates.length} rates for ${fit.length} units.`);
+    const sum = sums[name] as ScoreSums;
+    score.forEach((unit, index) => {
+      const rate = rates[index] as number;
+      if (!Number.isFinite(rate) || rate < 0) throw new RangeError(`${caller}: the method "${name}" gives the rate ${rate}. It is a finite number of 0 or more.`);
+      const value = gammaPoissonLogLikelihood([{ count: unit.count, exposure: unit.exposure }], Number.POSITIVE_INFINITY, rate);
+      sum.logLikelihood += value;
+      sum.squared += (unit.count - rate * unit.exposure) ** 2;
+      if ((fit[index] as U).count > 0) sum.seen += value;
+      if (rate === 0 && unit.count > 0) sum.lost += 1;
+    });
+  }
+  return fit.filter((unit) => unit.count > 0).length;
 }

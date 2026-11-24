@@ -178,6 +178,7 @@ type SmoothLawScore: build/index.d.ts#SmoothLawScore
 type SobolIndex: build/index.d.ts#SobolIndex
 type SobolIndices: build/index.d.ts#SobolIndices
 type SobolOptions: build/index.d.ts#SobolOptions
+type SplitHoldout: build/index.d.ts#SplitHoldout
 type Summary: build/index.d.ts#Summary
 type SurvivalCurve: build/index.d.ts#SurvivalCurve
 type SurvivalStep: build/index.d.ts#SurvivalStep
@@ -322,6 +323,7 @@ smoothLawScores: build/index.d.ts#smoothLawScores
 sobolIndices: build/index.d.ts#sobolIndices
 sorted: build/index.d.ts#sorted
 spearman: build/index.d.ts#spearman
+splitHoldout: build/index.d.ts#splitHoldout
 strengthToRating: build/index.d.ts#strengthToRating
 summarize: build/index.d.ts#summarize
 surfaceResponse: build/index.d.ts#surfaceResponse
@@ -1469,6 +1471,12 @@ interface SobolOptions {
   readonly interval?: BootstrapOptions;
 }
 
+### build/index.d.ts#SplitHoldout
+interface SplitHoldout {
+  readonly seenUnits: number;
+  readonly methods: Readonly<Record<string, ThinningScore>>;
+}
+
 ### build/index.d.ts#Summary
 interface Summary {
   readonly n: number;
@@ -2006,6 +2014,9 @@ export declare function sorted(values: readonly number[]): number[];
 
 ### build/index.d.ts#spearman
 export declare function spearman(a: readonly number[], b: readonly number[]): number;
+
+### build/index.d.ts#splitHoldout
+export declare function splitHoldout<U extends RateUnit>(fit: readonly U[], score: readonly RateUnit[], methods: Readonly<Record<string, (fit: readonly U[]) => readonly number[]>>): SplitHoldout;
 
 ### build/index.d.ts#strengthToRating
 export declare function strengthToRating(strength: number, options?: RatingScale): number;
