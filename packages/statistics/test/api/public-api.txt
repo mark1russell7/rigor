@@ -48,6 +48,8 @@ type FoldRuleOptions: build/index.d.ts#FoldRuleOptions
 type FoldVerdict: build/index.d.ts#FoldVerdict
 type FoldVerdictKind: build/index.d.ts#FoldVerdictKind
 type Forecast: build/index.d.ts#Forecast
+type GammaRates: build/index.d.ts#GammaRates
+type GammaRatesOptions: build/index.d.ts#GammaRatesOptions
 type Glicko2Game: build/index.d.ts#Glicko2Game
 type Glicko2Options: build/index.d.ts#Glicko2Options
 type Glicko2Rating: build/index.d.ts#Glicko2Rating
@@ -94,6 +96,7 @@ RESPONSE_MAX_TERMS: build/index.d.ts#RESPONSE_MAX_TERMS
 RESPONSE_RECORDS_SCHEMA: build/index.d.ts#RESPONSE_RECORDS_SCHEMA
 type RankSeparableOptions: build/index.d.ts#RankSeparableOptions
 type RateInterval: build/index.d.ts#RateInterval
+type RateUnit: build/index.d.ts#RateUnit
 type RatedItem: build/index.d.ts#RatedItem
 type RatingFit: build/index.d.ts#RatingFit
 type RatingFitOptions: build/index.d.ts#RatingFitOptions
@@ -227,11 +230,13 @@ emptyHistogram: build/index.d.ts#emptyHistogram
 entropy: build/index.d.ts#entropy
 fitConcentration: build/index.d.ts#fitConcentration
 fitError: build/index.d.ts#fitError
+fitGammaRates: build/index.d.ts#fitGammaRates
 fitRatings: build/index.d.ts#fitRatings
 fitResponse: build/index.d.ts#fitResponse
 fitSeparable: build/index.d.ts#fitSeparable
 foldRule: build/index.d.ts#foldRule
 foldSkills: build/index.d.ts#foldSkills
+gammaPoissonLogLikelihood: build/index.d.ts#gammaPoissonLogLikelihood
 glicko2Idle: build/index.d.ts#glicko2Idle
 glicko2Replay: build/index.d.ts#glicko2Replay
 glicko2Update: build/index.d.ts#glicko2Update
@@ -272,6 +277,7 @@ poissonBinomialTest: build/index.d.ts#poissonBinomialTest
 poissonInterval: build/index.d.ts#poissonInterval
 polyaLogLikelihood: build/index.d.ts#polyaLogLikelihood
 polyaPredictive: build/index.d.ts#polyaPredictive
+pooledRate: build/index.d.ts#pooledRate
 predictResponse: build/index.d.ts#predictResponse
 quantile: build/index.d.ts#quantile
 quantileInterval: build/index.d.ts#quantileInterval
@@ -602,6 +608,18 @@ interface Forecast {
   readonly hit: boolean;
 }
 
+### build/index.d.ts#GammaRates
+interface GammaRates {
+  readonly shape: number;
+  readonly mean: number;
+}
+
+### build/index.d.ts#GammaRatesOptions
+interface GammaRatesOptions {
+  readonly low?: number | undefined;
+  readonly high?: number | undefined;
+}
+
 ### build/index.d.ts#Glicko2Game
 interface Glicko2Game {
   readonly rating: number;
@@ -885,6 +903,12 @@ interface RankSeparableOptions extends HeldOutSeparableOptions {
 interface RateInterval {
   readonly low: number;
   readonly high: number;
+}
+
+### build/index.d.ts#RateUnit
+interface RateUnit {
+  readonly count: number;
+  readonly exposure: number;
 }
 
 ### build/index.d.ts#RatedItem
@@ -1652,6 +1676,9 @@ export declare function fitConcentration(units: readonly PolyaUnit[], options?: 
 ### build/index.d.ts#fitError
 export declare function fitError(residuals: readonly number[]): FitError;
 
+### build/index.d.ts#fitGammaRates
+export declare function fitGammaRates(units: readonly RateUnit[], options?: GammaRatesOptions): GammaRates;
+
 ### build/index.d.ts#fitRatings
 export declare function fitRatings(model: RatingModel, items: number, comparisons: readonly PairComparison[], options?: RatingFitOptions): RatingFit;
 
@@ -1666,6 +1693,9 @@ export declare function foldRule(skills: readonly number[], options?: FoldRuleOp
 
 ### build/index.d.ts#foldSkills
 export declare function foldSkills(record: Pick<ResponseRecord, "folds">, measure: string): number[];
+
+### build/index.d.ts#gammaPoissonLogLikelihood
+export declare function gammaPoissonLogLikelihood(units: readonly RateUnit[], shape: number, mean: number): number;
 
 ### build/index.d.ts#glicko2Idle
 export declare function glicko2Idle(player: Glicko2Rating): Glicko2Rating;
@@ -1782,6 +1812,9 @@ export declare function polyaLogLikelihood(observations: readonly string[], base
 
 ### build/index.d.ts#polyaPredictive
 export declare function polyaPredictive(base: number, concentration: number, same: number, earlier: number): number;
+
+### build/index.d.ts#pooledRate
+export declare function pooledRate(unit: RateUnit, law: GammaRates): number;
 
 ### build/index.d.ts#predictResponse
 export declare function predictResponse(model: ResponseModel, inputs: Readonly<Record<string, ResponseInputValue>>): number;
