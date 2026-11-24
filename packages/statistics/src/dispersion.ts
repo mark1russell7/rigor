@@ -7,6 +7,10 @@
  *   from that law with seeded draws, and does not use the chi-square law of a large sample. Thus it holds for small counts.
  * - The p value is `(hits + 1) / (draws + 1)`, where `hits` is the count of the draws with a statistic at or above the
  *   statistic of the counts. It is more than 0, and it is an exact level of the test for each number of draws.
+ * - The test has one side: it finds more spread than one rate gives. Counts that are too even give a p value near 1.
+ * - The work is `draws` times the total times the number of cells, in steps of a short scan. Each event of each draw is one
+ *   uniform draw. A total of 66 in 10 cells with 100000 draws takes approximately 0.1 s. An input of more than `maxWork` steps
+ *   throws a `RangeError` before the work starts.
  */
 
 import { random } from "@mark1russell7/rigor-generators";
@@ -19,7 +23,12 @@ export interface DispersionOptions {
   readonly draws?: number | undefined;
   /** The seed of the draws. The default is 1. */
   readonly seed?: number | string | undefined;
+  /** The most steps: `draws` times the total times the number of cells, a whole number of 1 or more. The default is `DISPERSION_MAX_WORK`. */
+  readonly maxWork?: number | undefined;
 }
+
+/** The default most steps of `dispersionTest`: 2^30, approximately 1 to 2 s. A caller with a larger input gives fewer draws or a higher `maxWork`. */
+export const DISPERSION_MAX_WORK: number = 2 ** 30;
 
 /** The result of `dispersionTest`. */
 export interface DispersionTest {
@@ -59,6 +68,8 @@ export function dispersionTest(counts: readonly number[], options: DispersionOpt
   }
   const draws = options.draws ?? 10_000;
   if (!Number.isSafeInteger(draws) || draws < 1) throw new RangeError(`dispersionTest: draws is a whole number from 1, not ${draws}.`);
+  const maxWork = options.maxWork ?? DISPERSION_MAX_WORK;
+  if (!Number.isSafeInteger(maxWork) || maxWork < 1) throw new RangeError(`dispersionTest: maxWork is a whole number of 1 or more, not ${maxWork}.`);
   const r = random(options.seed ?? 1);
   const total = counts.reduce((sum, count) => sum + count, 0);
   const weight = exposures.reduce((sum, exposure) => sum + exposure, 0);
@@ -66,6 +77,10 @@ export function dispersionTest(counts: readonly number[], options: DispersionOpt
   const expected = shares.map((share) => share * total);
   const pearson = (cells: readonly number[]): number => cells.reduce((sum, count, index) => sum + (count - (expected[index] as number)) ** 2 / (expected[index] as number), 0);
   if (total === 0 || counts.length === 1) return { statistic: 0, p: 1, hits: 0, draws: 0, seed: r.seed, total };
+  const work = draws * total * counts.length;
+  if (work > maxWork) {
+    throw new RangeError(`dispersionTest: ${draws} draws of ${total} events in ${counts.length} cells need about ${work} steps, more than maxWork ${maxWork}. Give fewer draws or a higher maxWork.`);
+  }
   const statistic = pearson(counts);
   const bar = statistic - TIE * Math.max(1, statistic);
   // The upper end of each share, for one uniform draw for each event.
