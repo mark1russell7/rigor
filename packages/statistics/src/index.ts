@@ -270,3 +270,4 @@ export {
   pairInformation,
   ratingUncertainty,
 } from "./pair-choice.ts";
+export { type WeightedTail, type WeightedTailOptions, WEIGHTED_TAIL_CELLS, WEIGHTED_TAIL_TOLERANCE, weightedBernoulliTest } from "./weighted-bernoulli.ts";
