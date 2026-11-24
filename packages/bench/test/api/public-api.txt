@@ -22,6 +22,7 @@ type Band: build/index.d.ts#Band
 type BandKind: build/index.d.ts#BandKind
 type BandOptions: build/index.d.ts#BandOptions
 type BatchSpan: build/index.d.ts#BatchSpan
+type BenchMachine: build/paired.d.ts#BenchMachine
 type Better: build/index.d.ts#Better
 type BudgetLook: build/index.d.ts#BudgetLook
 type BudgetLooksOptions: build/index.d.ts#BudgetLooksOptions
@@ -261,6 +262,7 @@ childRecords: build/index.d.ts#childRecords
 childTimes: build/index.d.ts#childTimes
 controlFactor: build/index.d.ts#controlFactor
 cpuEntry: build/index.d.ts#cpuEntry
+cpuInfoMachine: build/paired.d.ts#cpuInfoMachine
 familyPower: build/index.d.ts#familyPower
 familyRead: build/index.d.ts#familyRead
 firstAgainstSecond: build/index.d.ts#firstAgainstSecond
@@ -344,6 +346,7 @@ type Ballast: build/fresh.d.ts#Ballast
 type BallastOptions: build/fresh.d.ts#BallastOptions
 BeforeChild: build/fresh.d.ts#BeforeChild
 BenchEnv: build/fresh.d.ts#BenchEnv
+type BenchMachine: build/paired.d.ts#BenchMachine
 CaseArm: build/fresh.d.ts#CaseArm
 CaseOrder: build/fresh.d.ts#CaseOrder
 type CgroupSample: build/fresh.d.ts#CgroupSample
@@ -404,6 +407,7 @@ checkoutArm: build/fresh.d.ts#checkoutArm
 childLine: build/fresh.d.ts#childLine
 containerArgv: build/fresh.d.ts#containerArgv
 containerStart: build/fresh.d.ts#containerStart
+cpuInfoMachine: build/paired.d.ts#cpuInfoMachine
 diskOf: build/fresh.d.ts#diskOf
 dropPageCache: build/fresh.d.ts#dropPageCache
 eventProbe: build/fresh.d.ts#eventProbe
@@ -549,6 +553,7 @@ export interface BenchEnv {
   readonly arch: string;
   readonly node: string;
   readonly runner?: string;
+  readonly machine?: BenchMachine;
 }
 
 ### build/fresh.d.ts#CaseArm
@@ -3042,6 +3047,15 @@ export declare function writeGateVerdict(outcome: GateOutcome, file?: string | u
 ### build/paired.d.ts#Arm
 type Arm = "a" | "b";
 
+### build/paired.d.ts#BenchMachine
+interface BenchMachine {
+  readonly family?: string;
+  readonly model?: string;
+  readonly stepping?: string;
+  readonly microcode?: string;
+  readonly cacheKb?: number;
+}
+
 ### build/paired.d.ts#CaseRatio
 interface CaseRatio {
   readonly case: string;
@@ -3079,6 +3093,9 @@ declare function caseRatios(records: readonly PairedTime[]): CaseRatio[];
 
 ### build/paired.d.ts#checkPairedTime
 declare function checkPairedTime(record: PairedTime): PairedTime;
+
+### build/paired.d.ts#cpuInfoMachine
+declare function cpuInfoMachine(text: string): BenchMachine | undefined;
 
 ### build/paired.d.ts#firstArm
 declare function firstArm(round: number, offset?: number): Arm;
