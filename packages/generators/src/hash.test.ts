@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 import { runInNewContext } from "node:vm";
+import fc from "fast-check";
 import { describe, expect, it, vi } from "vitest";
-import { canonicalHash, canonicalJson, sha256Hex } from "./hash.ts";
+import { canonicalJsonV023 } from "./canonical-0.2.3.fixture.ts";
+import { type CanonicalOptions, canonicalHash, canonicalJson, sha256Hex } from "./hash.ts";
 import { random, type Random } from "./random.ts";
 
 const nodeSha = (bytes: Uint8Array | string): string => createHash("sha256").update(bytes).digest("hex");
@@ -451,6 +453,257 @@ describe("canonicalJson by default, for an object that keeps its content out of 
     expect(() => canonicalJson(spoof, { tags: "typed" })).toThrow(TypeError);
     const named = { x: 1, [Symbol.toStringTag]: "Point", toJSON: () => ({ x: 1 }) };
     expect(canonicalJson(named)).toBe('{"x":1}');
+  });
+});
+
+/** The result of one call: the text, or the type and the text of the error. */
+function outcome(f: () => string): string {
+  try {
+    return `ok ${f()}`;
+  } catch (e) {
+    return `${(e as Error).name}: ${(e as Error).message}`;
+  }
+}
+
+/** The options that each comparison with version 0.2.3 uses. */
+const optionSets: readonly (CanonicalOptions | undefined)[] = [
+  undefined,
+  { form: "json" },
+  { tags: "typed" },
+  { bigint: "suffix" },
+  { form: "json", tags: "typed", bigint: "error" },
+];
+
+/** This function makes an object of `make`, and then gives it the prototype `Object.prototype`. Its brand stays the same. */
+const plainProto = (make: () => object) => (): object => Object.setPrototypeOf(make(), Object.prototype) as object;
+
+/** This function gives the `arguments` object of a call with `1` and `"a"`. */
+function argumentsOf(..._: unknown[]): IArguments {
+  return arguments;
+}
+
+/** The values with an edge of the brand path. Each value is a function, so that each call gets a new value. */
+const edges: readonly (readonly [string, () => unknown])[] = [
+  ["Date with the prototype Object.prototype", plainProto(() => new Date(5))],
+  ["boxed Number with the prototype Object.prototype", plainProto(() => Object(3) as object)],
+  ["boxed String with the prototype Object.prototype", plainProto(() => Object("ab") as object)],
+  ["boxed Boolean with the prototype Object.prototype", plainProto(() => Object(true) as object)],
+  ["boxed BigInt with the prototype Object.prototype", plainProto(() => Object(7n) as object)],
+  ["Error with the prototype Object.prototype", plainProto(() => new Error("e"))],
+  ["RegExp with the prototype Object.prototype", plainProto(() => /a/g)],
+  ["Map with the prototype Object.prototype", plainProto(() => new Map([[1, 2]]))],
+  ["array with the prototype Object.prototype", plainProto(() => [1, { b: 2 }])],
+  ["Date with the prototype null", () => Object.setPrototypeOf(new Date(5), null) as object],
+  ["Date with its own toJSON", () => Object.assign(new Date(5), { toJSON: () => ({ d: 1 }) })],
+  ["plain object with its own tag Object", () => ({ a: 1, [Symbol.toStringTag]: "Object" })],
+  ["plain object with its own tag Array", () => ({ a: 1, [Symbol.toStringTag]: "Array" })],
+  ["plain object with its own tag Arguments", () => ({ a: 1, [Symbol.toStringTag]: "Arguments" })],
+  ["plain object with its own tag Number", () => ({ a: 1, [Symbol.toStringTag]: "Number" })],
+  ["plain object with its own tag Date", () => ({ a: 1, [Symbol.toStringTag]: "Date" })],
+  ["plain object with a tag that is not a string", () => ({ a: 1, [Symbol.toStringTag]: 5 })],
+  ["array with its own tag Object", () => Object.assign([1, 2], { [Symbol.toStringTag]: "Object" })],
+  ["array with its own tag Arguments", () => Object.assign([1, 2], { [Symbol.toStringTag]: "Arguments" })],
+  ["array with its own tag Map", () => Object.assign([1, 2], { [Symbol.toStringTag]: "Map" })],
+  ["boxed Number with its own tag Object", () => Object.assign(Object(3) as object, { [Symbol.toStringTag]: "Object" })],
+  ["Date with its own tag Object and no toJSON", () => Object.setPrototypeOf(Object.assign(new Date(5), { [Symbol.toStringTag]: "Object" }), null) as object],
+  [
+    "class instance with a tag on its prototype",
+    () =>
+      new (class Tagged {
+        a = 1;
+        get [Symbol.toStringTag](): string {
+          return "Tagged";
+        }
+      })(),
+  ],
+  ["Uint8Array with the prototype Object.prototype", plainProto(() => new Uint8Array([1, 2]))],
+  ["arguments object", () => argumentsOf(1, "a")],
+  ["array with a hole", () => [1, , 3]],
+  ["array subclass", () => new (class List extends Array<number> {})(3)],
+  ["object with no prototype", () => Object.assign(Object.create(null) as object, { b: 1, a: [null] })],
+  ["object with a symbol key and an undefined key", () => ({ [Symbol("s")]: 1, u: undefined, a: 2 })],
+  [
+    "getter that gives undefined at the first read",
+    () => {
+      let reads = 0;
+      return {
+        get a() {
+          reads += 1;
+          return reads === 1 ? undefined : reads;
+        },
+        b: 1,
+      };
+    },
+  ],
+  [
+    "getter that gives a value at the first read only",
+    () => {
+      let reads = 0;
+      return {
+        get a() {
+          reads += 1;
+          return reads === 1 ? 1 : undefined;
+        },
+      };
+    },
+  ],
+  ["foreign plain object, array, Date and boxed values", () => runInNewContext('[{ b: 1, a: [2] }, [3], new Date(5), new Number(3), new String("s")]')],
+  ["foreign Date with the prototype Object.prototype", () => Object.setPrototypeOf(runInNewContext("new Date(5)") as object, Object.prototype) as object],
+  ["foreign Error", () => runInNewContext('new Error("e")')],
+  ["foreign Map", () => runInNewContext("new Map([[1, 2]])")],
+  ["foreign object with a tag", () => runInNewContext('({ a: 1, [Symbol.toStringTag]: "Date" })')],
+  ["foreign arguments object and typed array", () => runInNewContext("[(function () { return arguments; })(1), new Int8Array([-1])]")],
+  [
+    "cycle",
+    () => {
+      const a: Record<string, unknown> = { b: 1 };
+      a["self"] = a;
+      return a;
+    },
+  ],
+  [
+    "value that is used two times, with no cycle",
+    () => {
+      const shared = { x: 1 };
+      return [shared, { s: shared }];
+    },
+  ],
+];
+
+/** This function gives a proxy of `target` and the log of the calls of its traps. */
+function logged(target: object): { proxy: object; log: string[] } {
+  const log: string[] = [];
+  const proxy = new Proxy(target, {
+    get(t, k, r) {
+      log.push(`get ${String(k)}`);
+      return Reflect.get(t, k, r) as unknown;
+    },
+    ownKeys(t) {
+      log.push("ownKeys");
+      return Reflect.ownKeys(t);
+    },
+    getOwnPropertyDescriptor(t, k) {
+      log.push(`getOwnPropertyDescriptor ${String(k)}`);
+      return Reflect.getOwnPropertyDescriptor(t, k);
+    },
+    getPrototypeOf(t) {
+      log.push("getPrototypeOf");
+      return Reflect.getPrototypeOf(t);
+    },
+    has(t, k) {
+      log.push(`has ${String(k)}`);
+      return Reflect.has(t, k);
+    },
+  });
+  return { proxy, log };
+}
+
+describe("canonicalJson against version 0.2.3", () => {
+  it("gives the same text or the same error for each edge of the brand path, with each set of options", () => {
+    for (const [name, make] of edges) {
+      for (const options of optionSets) {
+        const now = outcome(() => canonicalJson(make(), options));
+        expect(now, `${name} ${JSON.stringify(options)}`).toBe(outcome(() => canonicalJsonV023(make(), options)));
+      }
+    }
+  });
+
+  it("keeps the brand of a Date, a boxed Number and an Error with the prototype Object.prototype", () => {
+    // The Date has no toJSON on Object.prototype, but its brand stays Date. Thus it is not an empty plain object.
+    expect(() => canonicalJson({ v: plainProto(() => new Date(5))() })).toThrow("the type Date has no JSON form");
+    expect(canonicalJson({ v: plainProto(() => new Date(5))() }, { tags: "typed" })).toBe('{"v":Date(5)}');
+    // The boxed Number keeps its brand, so it is unboxed with Number(). Without Number.prototype, Number() of it gives NaN.
+    expect(() => canonicalJson(plainProto(() => Object(3) as object)())).toThrow("NaN is not a JSON number");
+    expect(canonicalJson(plainProto(() => Object(3) as object)(), { form: "json" })).toBe("null");
+    expect(() => canonicalJson(plainProto(() => new Error("e"))())).toThrow("the type Error has no JSON form");
+    expect(() => canonicalJson(Object.setPrototypeOf(new Date(5), null) as object)).toThrow("the type Date has no JSON form");
+    expect(() => canonicalJson({ a: 1, [Symbol.toStringTag]: "Array" })).toThrow("the type Array has no JSON form");
+    expect(canonicalJson(Object.assign([1], { [Symbol.toStringTag]: "Object" }))).toBe("[1]");
+    expect(canonicalJson(runInNewContext("new Number(4)"))).toBe("4");
+  });
+
+  it("gives the same calls to the traps of a proxy, and the same text or error", () => {
+    const targets: readonly (() => object)[] = [
+      () => ({ b: 1, a: { c: [2, 3] }, u: undefined }),
+      () => [1, { a: 2 }, , 4],
+      () => ({ toJSON: () => ({ z: 1 }) }),
+      () => Object.assign(Object(3) as object, { k: 1 }),
+      () => ({ a: 1, [Symbol.toStringTag]: "Map" }),
+      () => new Date(5),
+      () => new Map([[1, 2]]),
+    ];
+    for (const make of targets) {
+      for (const options of optionSets) {
+        const now = logged(make());
+        const old = logged(make());
+        const text = outcome(() => canonicalJson({ p: now.proxy }, options));
+        expect(text, JSON.stringify(options)).toBe(outcome(() => canonicalJsonV023({ p: old.proxy }, options)));
+        expect(now.log, `${text} ${JSON.stringify(options)}`).toEqual(old.log);
+      }
+    }
+  });
+
+  it("gives the same error for a revoked proxy, and for a proxy that revokes itself in the read of its tag", () => {
+    const revoked = (): object => {
+      const { proxy, revoke } = Proxy.revocable({ a: 1 }, {});
+      revoke();
+      return proxy;
+    };
+    expect(outcome(() => canonicalJson({ p: revoked() }))).toBe(outcome(() => canonicalJsonV023({ p: revoked() })));
+    // The proxy gets the brand Object, and then the test of an array throws.
+    const selfRevoking = (): object => {
+      const box: { revoke?: () => void } = {};
+      const { proxy, revoke } = Proxy.revocable(
+        { a: 1 },
+        {
+          get(t, k, r) {
+            if (k === Symbol.toStringTag) box.revoke?.();
+            return Reflect.get(t, k, r) as unknown;
+          },
+        },
+      );
+      box.revoke = revoke;
+      return proxy;
+    };
+    const now = outcome(() => canonicalJson({ p: selfRevoking() }));
+    expect(now).toBe(outcome(() => canonicalJsonV023({ p: selfRevoking() })));
+    expect(now).toMatch(/^TypeError/);
+  });
+
+  it("gives the same text or error for 400 values of fast-check, with each set of options", () => {
+    const values = fc.anything({
+      maxDepth: 4,
+      withBigInt: true,
+      withBoxedValues: true,
+      withDate: true,
+      withMap: true,
+      withSet: true,
+      withNullPrototype: true,
+      withObjectString: true,
+      withTypedArray: true,
+      withSparseArray: true,
+      withUnicodeString: true,
+    });
+    fc.assert(
+      fc.property(values, (v) => {
+        for (const options of optionSets) expect(outcome(() => canonicalJson(v, options))).toBe(outcome(() => canonicalJsonV023(v, options)));
+      }),
+      { numRuns: 400, seed: 8785 },
+    );
+  });
+
+  it("gives the same text for nested plain records from object literals and from JSON.parse", () => {
+    const r = random("canonicalJson nested records");
+    for (let i = 0; i < 200; i++) {
+      const record = {
+        id: `r-${i}`,
+        meta: { at: r.int(0, 1e9), tags: [r.int(0, 9), "t"], geo: { lat: r.int(-90, 90) / 3, box: [1, 2, { z: null }] } },
+        parts: Array.from({ length: r.int(0, 5) }, (_, j) => ({ name: `p${j}`, value: r.int(-50, 50) / 7, flags: { on: j % 2 === 0 } })),
+        empty: {},
+        list: [],
+      };
+      for (const v of [record, JSON.parse(JSON.stringify(record)) as unknown]) expect(canonicalJson(v)).toBe(canonicalJsonV023(v));
+    }
   });
 });
 

@@ -205,9 +205,6 @@ const typedArrayName = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uin
 /** The types that the option `tags: "typed"` writes with a tag. */
 const tagged: ReadonlySet<string> = new Set(["Date", "RegExp", "Map", "Set"]);
 
-/** This function is true for an object, and false for `null` and each primitive. */
-const isObject = (v: unknown): v is object => v !== null && typeof v === "object";
-
 /** This function gives the brand of an object: the tag of `Object.prototype.toString`. The brand is the same in each realm. */
 const brandOf = (o: object): string => Object.prototype.toString.call(o).slice(8, -1);
 
@@ -287,24 +284,8 @@ export function canonicalJson(value: unknown, options?: CanonicalOptions): strin
     const fix = !typed && tagged.has(brand) ? 'Use the option tags: "typed", or give the object a method toJSON.' : "Give the object a method toJSON.";
     return `canonicalJson: the type ${brand} has no JSON form. JSON.stringify keeps only its own keys, so two of them with other contents can get the same hash. ${fix}`;
   };
-  const write = (v: unknown, key: string): string => {
-    if (typed && isObject(v)) {
-      const tag = tagOf(v);
-      if (tag !== undefined) return tag;
-    }
-    if (isObject(v) && typeof (v as { toJSON?: unknown }).toJSON === "function") {
-      v = (v as { toJSON(key: string): unknown }).toJSON(key);
-      // A method toJSON can give a Map or a Set. With tags, it gets its tag.
-      if (typed && isObject(v)) {
-        const tag = tagOf(v);
-        if (tag !== undefined) return tag;
-      }
-    }
-    let brand = "Object";
-    if (isObject(v)) {
-      brand = brandOf(v);
-      if (brand !== "Object") v = unboxed(v, brand);
-    }
+  // This function gives the text of a value that is not an object.
+  const scalar = (v: unknown): string => {
     if (v === undefined || v === null) return "null";
     switch (typeof v) {
       case "boolean":
@@ -318,21 +299,69 @@ export function canonicalJson(value: unknown, options?: CanonicalOptions): strin
       case "bigint":
         if (bigint === "suffix") return `${v}n`;
         throw new TypeError(`canonicalJson: the bigint ${v}n has no JSON form. Use the option bigint: "suffix" for a key.`);
-      case "object":
-        break;
       default:
         throw new TypeError(`canonicalJson: a ${typeof v} has no JSON form.`);
     }
+  };
+  const write = (v: unknown, key: string): string => {
+    let isObj = v !== null && typeof v === "object";
+    if (isObj) {
+      if (typed) {
+        const tag = tagOf(v as object);
+        if (tag !== undefined) return tag;
+      }
+      if (typeof (v as { toJSON?: unknown }).toJSON === "function") {
+        v = (v as { toJSON(key: string): unknown }).toJSON(key);
+        isObj = v !== null && typeof v === "object";
+        // A method toJSON can give a Map or a Set. With tags, it gets its tag.
+        if (typed && isObj) {
+          const tag = tagOf(v as object);
+          if (tag !== undefined) return tag;
+        }
+      }
+    }
+    if (!isObj) return scalar(v);
     const o = v as object;
-    if (brand !== "Object" && brand !== "Arguments" && !Array.isArray(o) && typedArrayName.call(o) === undefined) throw new TypeError(lost(brand));
+    // The brand comes from Object.prototype.toString, as in brandOf. A plain object and an array do not need the slice or unboxed.
+    // The prototype does not decide the brand: a Date with the prototype Object.prototype still has the brand Date.
+    const toStringTag = Object.prototype.toString.call(o);
+    let brand: string;
+    if (toStringTag === "[object Object]") brand = "Object";
+    else if (toStringTag === "[object Array]") brand = "Array";
+    else {
+      brand = toStringTag.slice(8, -1);
+      const primitive = unboxed(o, brand);
+      if (primitive !== o) return scalar(primitive);
+    }
+    // The checks come in the order of version 0.2.3. Thus a proxy gets the same calls of its traps and the same errors.
+    let isArray = false;
+    const checked = brand !== "Object" && brand !== "Arguments";
+    if (checked) {
+      isArray = Array.isArray(o);
+      if (!isArray && typedArrayName.call(o) === undefined) throw new TypeError(lost(brand));
+    }
     if (open.has(o)) throw new TypeError("canonicalJson: the value has a cycle.");
     open.add(o);
+    if (!checked) isArray = Array.isArray(o);
     let out: string;
-    if (Array.isArray(o)) out = `[${o.map((item: unknown, i) => write(item, String(i))).join(",")}]`;
+    if (isArray) out = `[${(o as unknown[]).map((item: unknown, i) => write(item, String(i))).join(",")}]`;
     else {
+      // The keys get the same reads as in version 0.2.3: one read for the filter, and one read for the text, in the sorted order.
       const r = o as Record<string, unknown>;
-      const keys = Object.keys(r).filter((k) => r[k] !== undefined).sort();
-      out = `{${keys.map((k) => `${text(k)}:${write(r[k], k)}`).join(",")}}`;
+      const keys = Object.keys(r);
+      let n = 0;
+      for (let i = 0; i < keys.length; i++) {
+        const k = keys[i]!;
+        if (r[k] !== undefined) keys[n++] = k;
+      }
+      keys.length = n;
+      keys.sort();
+      out = "{";
+      for (let i = 0; i < n; i++) {
+        const k = keys[i]!;
+        out += `${i === 0 ? "" : ","}${text(k)}:${write(r[k], k)}`;
+      }
+      out += "}";
     }
     open.delete(o);
     return out;

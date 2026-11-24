@@ -1,0 +1,62 @@
+# The bench of canonicalJson: the frozen copy of version 0.2.3 against the new code, each arm in a fresh process with rigor-bench, and an A/A pair
+# of the main arm for the noise floor. It runs on each pull request that changes canonicalJson, and a person can start it:
+# gh workflow run bench-canonical.yml -f rounds=12
+# The artifact holds the raw time of each child and the computer, as JSON.
+name: Bench canonicalJson
+
+on:
+  pull_request:
+    paths:
+      - packages/generators/src/hash.ts
+      - packages/generators/src/canonical-0.2.3.fixture.ts
+      - scripts/bench-canonical.ts
+      - scripts/bench-canonical-child.ts
+      - .github/workflows/bench-canonical.yml
+  workflow_dispatch:
+    inputs:
+      rounds:
+        description: The count of rounds. Each round starts one child of each arm
+        type: string
+        required: true
+        default: "12"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bench-canonical-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  bench:
+    name: Bench canonicalJson
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run the bench
+        env:
+          ROUNDS: ${{ inputs.rounds || '12' }}
+        run: |
+          node scripts/bench-canonical.ts --rounds "$ROUNDS" --out bench-canonical.json | tee summary.txt
+          { echo "## Bench canonicalJson: $ROUNDS rounds"; echo '```'; cat summary.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bench-canonical-${{ github.run_id }}
+          path: bench-canonical.json
+          retention-days: 90
+          if-no-files-found: error
