@@ -192,6 +192,7 @@ type VectorScaling: build/index.d.ts#VectorScaling
 type VectorScalingFit: build/index.d.ts#VectorScalingFit
 type VectorScalingOptions: build/index.d.ts#VectorScalingOptions
 WEIGHTED_TAIL_CELLS: build/index.d.ts#WEIGHTED_TAIL_CELLS
+WEIGHTED_TAIL_MAX_WORK: build/index.d.ts#WEIGHTED_TAIL_MAX_WORK
 WEIGHTED_TAIL_TOLERANCE: build/index.d.ts#WEIGHTED_TAIL_TOLERANCE
 type WeightedTail: build/index.d.ts#WeightedTail
 type WeightedTailOptions: build/index.d.ts#WeightedTailOptions
@@ -1567,6 +1568,9 @@ interface VectorScalingOptions {
 ### build/index.d.ts#WEIGHTED_TAIL_CELLS
 export declare const WEIGHTED_TAIL_CELLS = 1024;
 
+### build/index.d.ts#WEIGHTED_TAIL_MAX_WORK
+export declare const WEIGHTED_TAIL_MAX_WORK: number;
+
 ### build/index.d.ts#WEIGHTED_TAIL_TOLERANCE
 export declare const WEIGHTED_TAIL_TOLERANCE = 1e-12;
 
@@ -1579,6 +1583,7 @@ interface WeightedTail {
 ### build/index.d.ts#WeightedTailOptions
 interface WeightedTailOptions {
   readonly cells?: number;
+  readonly maxWork?: number;
 }
 
 ### build/index.d.ts#Z95

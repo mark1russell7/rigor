@@ -25,10 +25,10 @@ export interface WeightedTailOptions {
 }
 
 /**
- * The default limit of the steps of the recursion: 2^30, about 1 s to 3 s on one core. At 1024 cells, about 1400 trials
- * reach it. A caller with more trials gives fewer cells, a higher `maxWork`, or groups its trials first.
+ * The default limit of the steps of the recursion: 2^30, approximately 1 s to 3 s on one core. At 1024 cells,
+ * approximately 1400 trials reach it. A caller with more trials gives fewer cells, a higher `maxWork`, or groups its trials first.
  */
-export const WEIGHTED_TAIL_MAX_WORK = 2 ** 30;
+export const WEIGHTED_TAIL_MAX_WORK: number = 2 ** 30;
 
 /** The default count of grid steps up to the largest weight. */
 export const WEIGHTED_TAIL_CELLS = 1024;
@@ -81,9 +81,9 @@ function stepTail(ps: readonly number[], steps: readonly number[], k: number, ma
  *   Thus `low <= P(S >= threshold) <= high`, and more cells give closer bounds.
  * - A weight equal to the largest weight is on the grid. Thus, when each weight is equal, `low` and `high` are equal to
  *   `poissonBinomialTest(k, ps, "greater")`, with k the count of weights that reach the threshold.
- * - The table has up to n times `cells` plus 1 entries, and the recursion walks it one time for each trial. Thus the
- *   work is about n times n times `cells`: at 1024 cells, 100 trials take about 10^7 steps and 10 000 trials about
- *   10^11. An input of more than `maxWork` steps throws a `RangeError` before the work starts.
+ * - The table has up to n times `cells` plus 1 entries, and the recursion walks it one time for each trial.
+ * - Thus the work is approximately n times n times `cells`. At 1024 cells, 100 trials take approximately 10^7 steps,
+ *   and 10 000 trials take approximately 10^11. An input of more than `maxWork` steps throws a `RangeError` before the work starts.
  * - A sum within the relative `WEIGHTED_TAIL_TOLERANCE` of the threshold counts as the threshold.
  * - The order of the trials does not change the result.
  *
