@@ -3,51 +3,11 @@
  * normal formula is too low at a small count. These functions make no draws, so a caller reads the count with no bench.
  */
 
-/** The log of the gamma function, by the form of Lanczos with 6 terms. The argument is above 0. `gamma-rates.ts` also uses it. */
-export function logGamma(x: number): number {
-  const terms = [76.18009172947146, -86.50532032941677, 24.01409824083091, -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
-  const base = x + 5.5 - (x + 0.5) * Math.log(x + 5.5);
-  let series = 1.000000000190015;
-  terms.forEach((term, i) => {
-    series += term / (x + i + 1);
-  });
-  return -base + Math.log((2.5066282746310007 * series) / x);
-}
-
-/** The continued fraction of the incomplete beta function, by the method of Lentz. */
-function betaFraction(x: number, a: number, b: number): number {
-  const tiny = 1e-300;
-  const guard = (value: number): number => (Math.abs(value) < tiny ? tiny : value);
-  let c = 1;
-  let d = 1 / guard(1 - ((a + b) * x) / (a + 1));
-  let h = d;
-  for (let m = 1; m <= 500; m++) {
-    const twice = 2 * m;
-    const even = (m * (b - m) * x) / ((a + twice - 1) * (a + twice));
-    d = 1 / guard(1 + even * d);
-    c = guard(1 + even / c);
-    h *= d * c;
-    const odd = (-(a + m) * (a + b + m) * x) / ((a + twice) * (a + twice + 1));
-    d = 1 / guard(1 + odd * d);
-    c = guard(1 + odd / c);
-    const step = d * c;
-    h *= step;
-    if (Math.abs(step - 1) < 1e-15) return h;
-  }
-  return h;
-}
-
-/** The regularized incomplete beta function at `x`, from 0 to 1. */
-function incompleteBeta(x: number, a: number, b: number): number {
-  if (x <= 0) return 0;
-  if (x >= 1) return 1;
-  const front = Math.exp(logGamma(a + b) - logGamma(a) - logGamma(b) + a * Math.log(x) + b * Math.log(1 - x));
-  return x < (a + 1) / (a + b + 2) ? (front * betaFraction(x, a, b)) / a : 1 - (front * betaFraction(1 - x, b, a)) / b;
-}
+import { betaCdf } from "@mark1russell7/rigor-generators";
 
 /** The share of the Student t law with `df` degrees of freedom below `t`, for `t` of 0 or more. */
 function upperHalf(t: number, df: number): number {
-  return 1 - 0.5 * incompleteBeta(df / (df + t * t), df / 2, 0.5);
+  return 1 - 0.5 * betaCdf(df / (df + t * t), df / 2, 0.5);
 }
 
 /**

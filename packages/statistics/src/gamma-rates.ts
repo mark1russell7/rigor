@@ -8,7 +8,7 @@
  * - The shape `Infinity` tells that the units show no spread of their rates. Then the pooled rate of each unit is the mean.
  */
 
-import { logGamma } from "./power.ts";
+import { logGamma } from "@mark1russell7/rigor-generators";
 
 /** One unit of a fit of rates: a count of events in an exposure, for example the events of a county in its years. */
 export interface RateUnit {

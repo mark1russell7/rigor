@@ -1,7 +1,7 @@
 export { COVERING_CANDIDATES, COVERING_LIMIT, coveringArray, coveringRows, tupleCoverage, type Coverage, type CoveringOptions } from "./covering.ts";
 export { dependsOnLibm, sampler, type DistributionSpec, type Param } from "./distributions.ts";
 export { normalCdf, normalQuantile } from "./normal.ts";
-export { betaCdf, distributionOf, type Distribution } from "./quantiles.ts";
+export { betaCdf, distributionOf, type Distribution, logGamma } from "./quantiles.ts";
 export {
   familyMap,
   familyPoints,
