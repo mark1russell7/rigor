@@ -36,6 +36,9 @@ type CoverageCell: build/index.d.ts#CoverageCell
 type CoverageMinSample: build/index.d.ts#CoverageMinSample
 type CoverageReason: build/index.d.ts#CoverageReason
 type CoverageStep: build/index.d.ts#CoverageStep
+DISPERSION_MAX_WORK: build/index.d.ts#DISPERSION_MAX_WORK
+type DispersionOptions: build/index.d.ts#DispersionOptions
+type DispersionTest: build/index.d.ts#DispersionTest
 EMPTY_RUNNING: build/index.d.ts#EMPTY_RUNNING
 type Effect: build/index.d.ts#Effect
 type EloOptions: build/index.d.ts#EloOptions
@@ -228,6 +231,7 @@ compareRatios: build/index.d.ts#compareRatios
 confusion: build/index.d.ts#confusion
 correlationPermutation: build/index.d.ts#correlationPermutation
 coverageMinSample: build/index.d.ts#coverageMinSample
+dispersionTest: build/index.d.ts#dispersionTest
 eloExpected: build/index.d.ts#eloExpected
 eloReplay: build/index.d.ts#eloReplay
 eloUpdate: build/index.d.ts#eloUpdate
@@ -545,6 +549,27 @@ interface CoverageStep {
   readonly pooled: Proportion;
   readonly qualifies: boolean;
   readonly reason: CoverageReason;
+}
+
+### build/index.d.ts#DISPERSION_MAX_WORK
+export declare const DISPERSION_MAX_WORK: number;
+
+### build/index.d.ts#DispersionOptions
+interface DispersionOptions {
+  readonly exposures?: readonly number[] | undefined;
+  readonly draws?: number | undefined;
+  readonly seed?: number | string | undefined;
+  readonly maxWork?: number | undefined;
+}
+
+### build/index.d.ts#DispersionTest
+interface DispersionTest {
+  readonly statistic: number;
+  readonly p: number;
+  readonly hits: number;
+  readonly draws: number;
+  readonly seed: number;
+  readonly total: number;
 }
 
 ### build/index.d.ts#EMPTY_RUNNING
@@ -1681,6 +1706,9 @@ export declare function correlationPermutation(a: readonly number[], b: readonly
 
 ### build/index.d.ts#coverageMinSample
 export declare function coverageMinSample(cells: readonly CoverageCell[], bar: CoverageBar): CoverageMinSample;
+
+### build/index.d.ts#dispersionTest
+export declare function dispersionTest(counts: readonly number[], options?: DispersionOptions): DispersionTest;
 
 ### build/index.d.ts#eloExpected
 export declare function eloExpected(ra: number, rb: number, options?: RatingScale): number;
