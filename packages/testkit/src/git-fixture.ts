@@ -14,8 +14,25 @@ import { dirname, join } from "node:path";
  * - `shared` builds each fixture repository one time, and gives each case its own copy.
  */
 
-/** The identity of the commits of the tests, with no signature and no hooks. */
-const GIT_OPTIONS: readonly string[] = ["-c", "user.name=test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null"];
+/**
+ * The identity of the commits of the tests, with no signature, no hooks and no automatic maintenance. After a commit, git
+ * can start `git maintenance run --auto` as a detached process. That process can still write in `.git` while `copy`
+ * reads the folder, and the copy then fails with ENOENT.
+ */
+const GIT_OPTIONS: readonly string[] = [
+  "-c",
+  "user.name=test",
+  "-c",
+  "user.email=test@example.com",
+  "-c",
+  "commit.gpgsign=false",
+  "-c",
+  "core.hooksPath=/dev/null",
+  "-c",
+  "gc.auto=0",
+  "-c",
+  "maintenance.auto=false",
+];
 
 /**
  * The environment of the git of the fixtures. A git hook sets variables, for example `GIT_DIR`, and with them git writes to
