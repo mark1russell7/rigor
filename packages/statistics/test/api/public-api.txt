@@ -57,6 +57,8 @@ type Glicko2Game: build/index.d.ts#Glicko2Game
 type Glicko2Options: build/index.d.ts#Glicko2Options
 type Glicko2Rating: build/index.d.ts#Glicko2Rating
 type Glicko2ReplayOptions: build/index.d.ts#Glicko2ReplayOptions
+type GroupLaw: build/index.d.ts#GroupLaw
+type GroupedRateUnit: build/index.d.ts#GroupedRateUnit
 HISTOGRAM_RELATIVE_ERROR: build/index.d.ts#HISTOGRAM_RELATIVE_ERROR
 type HeldOutSeparable: build/index.d.ts#HeldOutSeparable
 type HeldOutSeparableOptions: build/index.d.ts#HeldOutSeparableOptions
@@ -181,9 +183,13 @@ type SurvivalCurve: build/index.d.ts#SurvivalCurve
 type SurvivalStep: build/index.d.ts#SurvivalStep
 type TableResponseModel: build/index.d.ts#TableResponseModel
 type TestedBin: build/index.d.ts#TestedBin
+type ThinningHoldout: build/index.d.ts#ThinningHoldout
+type ThinningHoldoutOptions: build/index.d.ts#ThinningHoldoutOptions
+type ThinningScore: build/index.d.ts#ThinningScore
 type TieModel: build/index.d.ts#TieModel
 type TimeToEvent: build/index.d.ts#TimeToEvent
 type TotalCalibration: build/index.d.ts#TotalCalibration
+type TwoLevelRates: build/index.d.ts#TwoLevelRates
 type TwoSamplePermutationOptions: build/index.d.ts#TwoSamplePermutationOptions
 type TwoSamplePermutationResult: build/index.d.ts#TwoSamplePermutationResult
 type UStatisticInterval: build/index.d.ts#UStatisticInterval
@@ -243,6 +249,7 @@ fitGammaRates: build/index.d.ts#fitGammaRates
 fitRatings: build/index.d.ts#fitRatings
 fitResponse: build/index.d.ts#fitResponse
 fitSeparable: build/index.d.ts#fitSeparable
+fitTwoLevelGammaRates: build/index.d.ts#fitTwoLevelGammaRates
 foldRule: build/index.d.ts#foldRule
 foldSkills: build/index.d.ts#foldSkills
 gammaPoissonLogLikelihood: build/index.d.ts#gammaPoissonLogLikelihood
@@ -321,6 +328,8 @@ surfaceResponse: build/index.d.ts#surfaceResponse
 survivalAt: build/index.d.ts#survivalAt
 survivalQuantile: build/index.d.ts#survivalQuantile
 tQuantile: build/index.d.ts#tQuantile
+thinUnits: build/index.d.ts#thinUnits
+thinningHoldout: build/index.d.ts#thinningHoldout
 totalCalibration: build/index.d.ts#totalCalibration
 twoSamplePermutation: build/index.d.ts#twoSamplePermutation
 uStatisticInterval: build/index.d.ts#uStatisticInterval
@@ -674,6 +683,18 @@ interface Glicko2Rating {
 ### build/index.d.ts#Glicko2ReplayOptions
 interface Glicko2ReplayOptions extends Glicko2Options {
   readonly start?: Glicko2Rating;
+}
+
+### build/index.d.ts#GroupLaw
+interface GroupLaw extends GammaRates {
+  readonly units: number;
+  readonly count: number;
+  readonly from: "group" | "groups";
+}
+
+### build/index.d.ts#GroupedRateUnit
+interface GroupedRateUnit extends RateUnit {
+  readonly group: string;
 }
 
 ### build/index.d.ts#HISTOGRAM_RELATIVE_ERROR
@@ -1495,6 +1516,27 @@ interface TestedBin extends ReliabilityBin {
   readonly reject: boolean;
 }
 
+### build/index.d.ts#ThinningHoldout
+interface ThinningHoldout {
+  readonly rounds: number;
+  readonly seenUnits: number;
+  readonly methods: Readonly<Record<string, ThinningScore>>;
+}
+
+### build/index.d.ts#ThinningHoldoutOptions
+interface ThinningHoldoutOptions {
+  readonly draw: () => boolean;
+  readonly rounds?: number | undefined;
+}
+
+### build/index.d.ts#ThinningScore
+interface ThinningScore {
+  readonly logLikelihood: number;
+  readonly squared: number;
+  readonly seen: number;
+  readonly lost: number;
+}
+
 ### build/index.d.ts#TieModel
 type TieModel = "davidson" | "half";
 
@@ -1516,6 +1558,13 @@ interface TotalCalibration {
   readonly pLess: number;
   readonly pGreater: number;
   readonly pTwoSided: number;
+}
+
+### build/index.d.ts#TwoLevelRates
+interface TwoLevelRates {
+  readonly groups: GammaRates;
+  readonly laws: Readonly<Record<string, GroupLaw>>;
+  readonly rates: readonly number[];
 }
 
 ### build/index.d.ts#TwoSamplePermutationOptions
@@ -1742,6 +1791,9 @@ export declare function fitResponse(data: ResponseData, options?: ResponseFitOpt
 
 ### build/index.d.ts#fitSeparable
 export declare function fitSeparable<X>(model: SeparableModel<X>, xs: readonly X[], y: readonly number[], options?: SeparableOptions): SeparableFit | null;
+
+### build/index.d.ts#fitTwoLevelGammaRates
+export declare function fitTwoLevelGammaRates(units: readonly GroupedRateUnit[], options?: GammaRatesOptions): TwoLevelRates;
 
 ### build/index.d.ts#foldRule
 export declare function foldRule(skills: readonly number[], options?: FoldRuleOptions): FoldVerdict;
@@ -1972,6 +2024,12 @@ export declare function survivalQuantile(curve: SurvivalCurve, p: number): numbe
 
 ### build/index.d.ts#tQuantile
 export declare function tQuantile(p: number, df: number): number;
+
+### build/index.d.ts#thinUnits
+export declare function thinUnits<U extends RateUnit>(units: readonly U[], draw: () => boolean): readonly [U[], U[]];
+
+### build/index.d.ts#thinningHoldout
+export declare function thinningHoldout<U extends RateUnit>(units: readonly U[], methods: Readonly<Record<string, (fit: readonly U[]) => readonly number[]>>, options: ThinningHoldoutOptions): ThinningHoldout;
 
 ### build/index.d.ts#totalCalibration
 export declare function totalCalibration(forecasts: readonly Forecast[]): TotalCalibration;
