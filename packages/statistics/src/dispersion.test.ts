@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { dispersionTest } from "./dispersion.ts";
-import { logGamma } from "./power.ts";
+import { logGamma } from "@mark1russell7/rigor-generators";
 
 /** The exact p value of the Pearson statistic: a sum over each split of the total into the cells, with its multinomial chance. */
 function exactP(counts: readonly number[], shares: readonly number[]): number {

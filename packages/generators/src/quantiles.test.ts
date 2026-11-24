@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { sampler, type DistributionSpec } from "./distributions.ts";
-import { betaCdf, distributionOf } from "./quantiles.ts";
+import { betaCdf, distributionOf, logGamma } from "./quantiles.ts";
 import { random } from "./random.ts";
 
 const relative = (got: number, want: number): number => Math.abs(got - want) / Math.abs(want);
@@ -16,6 +16,26 @@ const CONTINUOUS: readonly DistributionSpec[] = [
   { family: "beta", a: 0.3, b: 4 },
   { family: "mixture", parts: [{ weight: 3, part: { family: "lognormal", mu: 0, sigma: 1 } }, { weight: 1, part: { family: "pareto", scale: 5, shape: 2 } }] },
 ];
+
+describe("the log of the gamma function", () => {
+  it("equals the log of a factorial at each whole number, to a relative error of 1e-14", () => {
+    let factorial = 1;
+    for (let n = 1; n <= 30; n++) {
+      if (n > 1) factorial *= n - 1;
+      const got = logGamma(n);
+      const want = Math.log(factorial);
+      expect(want === 0 ? Math.abs(got) : relative(got, want), String(n)).toBeLessThan(1e-14);
+    }
+  });
+
+  it("equals the closed forms at one half, and the reflection formula below one half", () => {
+    expect(relative(logGamma(0.5), 0.5 * Math.log(Math.PI))).toBeLessThan(1e-14);
+    expect(relative(logGamma(1.5), Math.log(Math.sqrt(Math.PI) / 2))).toBeLessThan(1e-13);
+    // Gamma(1/4) Gamma(3/4) = pi times the square root of 2.
+    expect(relative(logGamma(0.25) + logGamma(0.75), Math.log(Math.PI * Math.SQRT2))).toBeLessThan(1e-14);
+    expect(relative(logGamma(100), 359.13420536957539878)).toBeLessThan(1e-14);
+  });
+});
 
 describe("the beta cumulative distribution", () => {
   it("equals the closed forms", () => {

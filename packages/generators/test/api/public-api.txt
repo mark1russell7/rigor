@@ -42,6 +42,7 @@ familyMap: build/designs.d.ts#familyMap
 familyPoints: build/designs.d.ts#familyPoints
 fnv1a32: build/random.d.ts#fnv1a32
 latinHypercube: build/designs.d.ts#latinHypercube
+logGamma: build/quantiles.d.ts#logGamma
 mulberry32: build/random.d.ts#mulberry32
 normalCdf: build/normal.d.ts#normalCdf
 normalQuantile: build/normal.d.ts#normalQuantile
@@ -218,6 +219,9 @@ export declare function betaCdf(x: number, a: number, b: number): number;
 
 ### build/quantiles.d.ts#distributionOf
 export declare function distributionOf(spec: DistributionSpec, r: Random): Distribution;
+
+### build/quantiles.d.ts#logGamma
+export declare function logGamma(x: number): number;
 
 ### build/random.d.ts#Random
 export interface Random {

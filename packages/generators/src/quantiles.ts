@@ -21,8 +21,11 @@ const LANCZOS = [
   9.9843695780195716e-6, 1.5056327351493116e-7,
 ];
 
-/** This function gives the logarithm of the gamma function for `x` above 0 (Lanczos, g 7). */
-function logGamma(x: number): number {
+/**
+ * This function gives the logarithm of the gamma function for `x` above 0 (Lanczos, g 7, 9 terms).
+ * The relative error is below 1e-14, away from the zeros at 1 and 2. Below 0.5, the reflection formula gives the value.
+ */
+export function logGamma(x: number): number {
   if (x < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * x)) - logGamma(1 - x);
   const y = x - 1;
   let sum = LANCZOS[0]!;
