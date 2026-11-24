@@ -1,9 +1,9 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { uniformDouble } from "@mark1russell7/rigor-testkit/arbitrary";
-import { poissonBinomialTest, weightedBernoulliTest } from "./index.ts";
+import { poissonBinomialTest, WEIGHTED_TAIL_TOLERANCE, weightedBernoulliTest } from "./index.ts";
 
-/** The chance `P(S >= threshold)`, from a sum over each of the 2^n outcomes of the trials. */
+/** The chance `P(S >= threshold)` with the tolerance of the threshold, from a sum over each of the 2^n outcomes of the trials. */
 function tailOfEachOutcome(threshold: number, ps: readonly number[], weights: readonly number[]): number {
   let tail = 0;
   for (let outcome = 0; outcome < 2 ** ps.length; outcome++) {
@@ -14,7 +14,7 @@ function tailOfEachOutcome(threshold: number, ps: readonly number[], weights: re
         sum += weights[i] ?? 0;
       } else chance *= 1 - p;
     });
-    if (sum >= threshold) tail += chance;
+    if (sum >= threshold * (1 - WEIGHTED_TAIL_TOLERANCE)) tail += chance;
   }
   return tail;
 }
@@ -28,6 +28,11 @@ const cases = fc
 
 describe("weightedBernoulliTest", () => {
   it("bounds the sum over each outcome of up to 10 trials", () => {
+    // A counterexample of an oracle with no tolerance: the threshold is 2e-15 over the largest weight.
+    const ps = [0.8357973102966515, 0.6573055439801069, 1.332267629550188e-15];
+    const weights = [1.4432899320127038e-14, 9.181450859258245, 3.441691376337986e-14];
+    const near = weightedBernoulliTest(9.181450859258247, ps, weights);
+    expect(near.low).toBeLessThanOrEqual(tailOfEachOutcome(9.181450859258247, ps, weights));
     fc.assert(
       fc.property(cases, ([trials, threshold]) => {
         const ps = trials.map(([p]) => p);
@@ -82,6 +87,15 @@ describe("weightedBernoulliTest", () => {
     expect(weightedBernoulliTest(1, [0.5], [0])).toEqual({ low: 0, high: 0 });
     // Both trials succeed: 0.5 x 0.25.
     expect(weightedBernoulliTest(3, [0.5, 0.25], [1, 2])).toEqual({ low: 0.125, high: 0.125 });
+  });
+
+  it("refuses an input of more steps than maxWork, before the work starts", () => {
+    const ps = Array.from({ length: 2000 }, () => 0.01);
+    const weights = ps.map((_, i) => 1 + (i % 7) / 7);
+    expect(() => weightedBernoulliTest(10, ps, weights)).toThrow(/maxWork/u);
+    expect(() => weightedBernoulliTest(10, ps.slice(0, 20), weights.slice(0, 20), { maxWork: 1000 })).toThrow(RangeError);
+    expect(weightedBernoulliTest(10, ps.slice(0, 20), weights.slice(0, 20)).high).toBeGreaterThan(0);
+    expect(() => weightedBernoulliTest(1, [0.5], [1], { maxWork: 0 })).toThrow(RangeError);
   });
 
   it("refuses bad inputs", () => {
