@@ -205,9 +205,6 @@ const typedArrayName = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uin
 /** The types that the option `tags: "typed"` writes with a tag. */
 const tagged: ReadonlySet<string> = new Set(["Date", "RegExp", "Map", "Set"]);
 
-/** This function is true for an object, and false for `null` and each primitive. */
-const isObject = (v: unknown): v is object => v !== null && typeof v === "object";
-
 /** This function gives the brand of an object: the tag of `Object.prototype.toString`. The brand is the same in each realm. */
 const brandOf = (o: object): string => Object.prototype.toString.call(o).slice(8, -1);
 
@@ -231,6 +228,26 @@ function unboxed(o: object, brand: string): unknown {
   if (brand === "Boolean" && hasSlot(Boolean.prototype.valueOf, o)) return Boolean.prototype.valueOf.call(o);
   if (brand === "BigInt" && hasSlot(BigInt.prototype.valueOf, o)) return BigInt.prototype.valueOf.call(o);
   return o;
+}
+
+/**
+ * This function sorts the keys of an object in the order of their UTF-16 code units, as `Array.prototype.sort` does with no compare function.
+ * The keys are different strings, so each correct sort gives the same order. For a short list, an insertion sort does less work.
+ */
+function sortKeys(keys: string[]): void {
+  if (keys.length > 16) {
+    keys.sort();
+    return;
+  }
+  for (let i = 1; i < keys.length; i++) {
+    const k = keys[i]!;
+    let j = i - 1;
+    while (j >= 0 && keys[j]! > k) {
+      keys[j + 1] = keys[j]!;
+      j--;
+    }
+    keys[j + 1] = k;
+  }
 }
 
 /**
@@ -261,7 +278,21 @@ export function canonicalJson(value: unknown, options?: CanonicalOptions): strin
   if (form !== "jcs" && form !== "json") throw new RangeError(`canonicalJson: form is "jcs" or "json", not ${String(form)}.`);
   if (bigint !== "error" && bigint !== "suffix") throw new RangeError(`canonicalJson: bigint is "error" or "suffix", not ${String(bigint)}.`);
   const jcs = form === "jcs";
-  const open = new Set<object>();
+  // The open objects are the objects on the path from the value to the current object. An object on the path again is a cycle.
+  // The first objects of the path are in an array, so that a plain object needs no hash of its identity. The deep part is in a set.
+  const path: object[] = [];
+  const deep = new Set<object>();
+  const enter = (o: object): void => {
+    for (let i = 0; i < path.length; i++) if (path[i] === o) throw new TypeError("canonicalJson: the value has a cycle.");
+    if (deep.size > 0 && deep.has(o)) throw new TypeError("canonicalJson: the value has a cycle.");
+    if (path.length < 32) path.push(o);
+    else deep.add(o);
+  };
+  // The objects leave in the reverse order of their entry. Thus the last object is in the set when the set is not empty.
+  const leave = (o: object): void => {
+    if (deep.size > 0) deep.delete(o);
+    else path.pop();
+  };
   const text = (s: string): string => {
     if (jcs && !(s as string & { isWellFormed(): boolean }).isWellFormed()) throw new RangeError(`canonicalJson: the string ${JSON.stringify(s)} has a lone surrogate, which RFC 8785 does not allow.`);
     return JSON.stringify(s);
@@ -274,12 +305,11 @@ export function canonicalJson(value: unknown, options?: CanonicalOptions): strin
     if (brand === "RegExp" && hasSlot(sourceOf, o)) return `RegExp(${text(RegExp.prototype.toString.call(o))})`;
     const map = brand === "Map" && hasSlot(Map.prototype.has, o);
     if (!map && !(brand === "Set" && hasSlot(Set.prototype.has, o))) return undefined;
-    if (open.has(o)) throw new TypeError("canonicalJson: the value has a cycle.");
-    open.add(o);
+    enter(o);
     const parts: string[] = [];
     if (map) for (const [k, item] of Map.prototype.entries.call(o) as Iterable<[unknown, unknown]>) parts.push(`[${write(k, "")},${write(item, "")}]`);
     else for (const item of Set.prototype.values.call(o) as Iterable<unknown>) parts.push(write(item, ""));
-    open.delete(o);
+    leave(o);
     return `${map ? "Map" : "Set"}(${parts.sort().join(",")})`;
   };
   // This function gives the text of the TypeError for an object that keeps its content out of its own keys.
@@ -287,30 +317,15 @@ export function canonicalJson(value: unknown, options?: CanonicalOptions): strin
     const fix = !typed && tagged.has(brand) ? 'Use the option tags: "typed", or give the object a method toJSON.' : "Give the object a method toJSON.";
     return `canonicalJson: the type ${brand} has no JSON form. JSON.stringify keeps only its own keys, so two of them with other contents can get the same hash. ${fix}`;
   };
-  const write = (v: unknown, key: string): string => {
-    if (typed && isObject(v)) {
-      const tag = tagOf(v);
-      if (tag !== undefined) return tag;
-    }
-    if (isObject(v) && typeof (v as { toJSON?: unknown }).toJSON === "function") {
-      v = (v as { toJSON(key: string): unknown }).toJSON(key);
-      // A method toJSON can give a Map or a Set. With tags, it gets its tag.
-      if (typed && isObject(v)) {
-        const tag = tagOf(v);
-        if (tag !== undefined) return tag;
-      }
-    }
-    let brand = "Object";
-    if (isObject(v)) {
-      brand = brandOf(v);
-      if (brand !== "Object") v = unboxed(v, brand);
-    }
+  // This function gives the text of a value that is not an object.
+  const scalar = (v: unknown): string => {
     if (v === undefined || v === null) return "null";
     switch (typeof v) {
       case "boolean":
         return v ? "true" : "false";
       case "number":
-        if (Number.isFinite(v)) return JSON.stringify(v);
+        // For a finite number, String gives the text of JSON.stringify, with less work.
+        if (Number.isFinite(v)) return String(v);
         if (jcs) throw new RangeError(`canonicalJson: ${String(v)} is not a JSON number.`);
         return "null";
       case "string":
@@ -318,23 +333,70 @@ export function canonicalJson(value: unknown, options?: CanonicalOptions): strin
       case "bigint":
         if (bigint === "suffix") return `${v}n`;
         throw new TypeError(`canonicalJson: the bigint ${v}n has no JSON form. Use the option bigint: "suffix" for a key.`);
-      case "object":
-        break;
       default:
         throw new TypeError(`canonicalJson: a ${typeof v} has no JSON form.`);
     }
-    const o = v as object;
-    if (brand !== "Object" && brand !== "Arguments" && !Array.isArray(o) && typedArrayName.call(o) === undefined) throw new TypeError(lost(brand));
-    if (open.has(o)) throw new TypeError("canonicalJson: the value has a cycle.");
-    open.add(o);
-    let out: string;
-    if (Array.isArray(o)) out = `[${o.map((item: unknown, i) => write(item, String(i))).join(",")}]`;
-    else {
-      const r = o as Record<string, unknown>;
-      const keys = Object.keys(r).filter((k) => r[k] !== undefined).sort();
-      out = `{${keys.map((k) => `${text(k)}:${write(r[k], k)}`).join(",")}}`;
+  };
+  const write = (v: unknown, key: string): string => {
+    let isObj = v !== null && typeof v === "object";
+    if (isObj) {
+      if (typed) {
+        const tag = tagOf(v as object);
+        if (tag !== undefined) return tag;
+      }
+      if (typeof (v as { toJSON?: unknown }).toJSON === "function") {
+        v = (v as { toJSON(key: string): unknown }).toJSON(key);
+        isObj = v !== null && typeof v === "object";
+        // A method toJSON can give a Map or a Set. With tags, it gets its tag.
+        if (typed && isObj) {
+          const tag = tagOf(v as object);
+          if (tag !== undefined) return tag;
+        }
+      }
     }
-    open.delete(o);
+    if (!isObj) return scalar(v);
+    const o = v as object;
+    // The brand comes from Object.prototype.toString, as in brandOf. A plain object and an array do not need the slice or unboxed.
+    // The prototype does not decide the brand: a Date with the prototype Object.prototype still has the brand Date.
+    const toStringTag = Object.prototype.toString.call(o);
+    let brand: string;
+    if (toStringTag === "[object Object]") brand = "Object";
+    else if (toStringTag === "[object Array]") brand = "Array";
+    else {
+      brand = toStringTag.slice(8, -1);
+      const primitive = unboxed(o, brand);
+      if (primitive !== o) return scalar(primitive);
+    }
+    // The checks come in the order of version 0.2.3. Thus a proxy gets the same calls of its traps and the same errors.
+    let isArray = false;
+    const checked = brand !== "Object" && brand !== "Arguments";
+    if (checked) {
+      isArray = Array.isArray(o);
+      if (!isArray && typedArrayName.call(o) === undefined) throw new TypeError(lost(brand));
+    }
+    enter(o);
+    if (!checked) isArray = Array.isArray(o);
+    let out: string;
+    if (isArray) out = `[${(o as unknown[]).map((item: unknown, i) => write(item, String(i))).join(",")}]`;
+    else {
+      // The keys get the same reads as in version 0.2.3: one read for the filter, and one read for the text, in the sorted order.
+      const r = o as Record<string, unknown>;
+      const keys = Object.keys(r);
+      let n = 0;
+      for (let i = 0; i < keys.length; i++) {
+        const k = keys[i]!;
+        if (r[k] !== undefined) keys[n++] = k;
+      }
+      keys.length = n;
+      sortKeys(keys);
+      out = "{";
+      for (let i = 0; i < n; i++) {
+        const k = keys[i]!;
+        out += `${i === 0 ? "" : ","}${text(k)}:${write(r[k], k)}`;
+      }
+      out += "}";
+    }
+    leave(o);
     return out;
   };
   return write(value, "");

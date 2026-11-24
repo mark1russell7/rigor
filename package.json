@@ -42,9 +42,10 @@
       },
       "gate-trigger": {
         "allow": [
-          "bench-sha256.yml"
+          "bench-sha256.yml",
+          "bench-canonical.yml"
         ],
-        "reason": "bench-sha256.yml is a bench, not a gate: it reports the speed of sha256Hex on the pull requests that change it, and it holds no limit"
+        "reason": "bench-sha256.yml and bench-canonical.yml are benches, not gates: they report the speed of sha256Hex and canonicalJson on the pull requests that change them, and they hold no limit"
       }
     }
   }
