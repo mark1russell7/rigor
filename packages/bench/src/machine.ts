@@ -5,6 +5,7 @@
 
 /**
  * The kind of the machine of a job, from the first processor of `/proc/cpuinfo`. Each field is absent when the file does not give it.
+ * An x86 file gives the first five fields, and an ARM file gives the last four.
  * Two jobs on one CPU model can have two levels of time. These fields can tell the two kinds apart.
  * The record has no clock speed. The `cpu MHz` of the file is the speed at the time of the read, so it changes in one job.
  */
@@ -19,6 +20,14 @@ export interface BenchMachine {
   readonly microcode?: string;
   /** The cache size of the line `cache size`, in KB. */
   readonly cacheKb?: number;
+  /** The implementer of an ARM CPU, for example `"0x41"`. An x86 file has no such line. */
+  readonly implementer?: string;
+  /** The part number of an ARM CPU, for example `"0xd0c"`. */
+  readonly part?: string;
+  /** The variant of an ARM CPU, for example `"0x3"`. */
+  readonly variant?: string;
+  /** The revision of an ARM CPU, for example `"1"`. */
+  readonly revision?: string;
 }
 
 /** The fields of the file, by their names in it. */
@@ -27,6 +36,10 @@ const TEXT_FIELDS = [
   ["model", "model"],
   ["stepping", "stepping"],
   ["microcode", "microcode"],
+  ["CPU implementer", "implementer"],
+  ["CPU part", "part"],
+  ["CPU variant", "variant"],
+  ["CPU revision", "revision"],
 ] as const;
 
 /**

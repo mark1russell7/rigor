@@ -104,7 +104,7 @@ v.comparison;                                     // the cases that gain and dro
 | `pooledLimitVerdict(jobs, options)` | The limit verdict of the merged records of all jobs, with the limit verdict of each job alone as a guard. |
 | `armVerdicts(run, aaPair, options)` | The verdict of each candidate pair of a run against its A/A pair. |
 | `benchEnv()` | From `/fresh`: the computer of this process, with the CPU model, the runner and the kind of the machine (`machine`, on Linux). |
-| `cpuInfoMachine(text)` | The kind of the machine from the text of `/proc/cpuinfo`: the family, the model number, the stepping, the microcode and the cache size of the first processor. Two levels of time on one CPU model can come from two kinds of machine. The record has no clock speed, because the speed of the file changes in one job. |
+| `cpuInfoMachine(text)` | The kind of the machine from the text of `/proc/cpuinfo`: the family, the model number, the stepping, the microcode and the cache size of the first processor. For an ARM CPU, it gives the implementer, the part, the variant and the revision. Two levels of time on one CPU model can come from two kinds of machine. The record has no clock speed, because the speed of the file changes in one job. |
 | `childLine(stdout)` | From `/fresh`: the last JSON line of a child, with its time `ms`, its `hash` and the reason of a skip. |
 | `pairOrder(pairs, round, caseIndex)` | From `/fresh`: the order of the pairs of one case in one round, and the first arm of each pair. |
 | `startProcess(argv, options)` | From `/fresh`: the default start of a child, with no shell, and a stop at the time limit or the output limit. |

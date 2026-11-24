@@ -33,6 +33,24 @@ describe("cpuInfoMachine", () => {
     expect(cpuInfoMachine(`\r\n\r\n${CPUINFO.replaceAll("\n", "\r\n")}`)).toEqual({ family: "25", model: "17", stepping: "1", microcode: "0xa101144", cacheKb: 1024 });
   });
 
+  it("gives the four fields of an ARM CPU", () => {
+    const arm = [
+      "processor\t: 0",
+      "BogoMIPS\t: 2000.00",
+      "Features\t: fp asimd",
+      "CPU implementer\t: 0x41",
+      "CPU architecture: 8",
+      "CPU variant\t: 0x3",
+      "CPU part\t: 0xd0c",
+      "CPU revision\t: 1",
+      "",
+      "processor\t: 1",
+      "CPU part\t: 0xd40",
+      "",
+    ].join("\n");
+    expect(cpuInfoMachine(arm)).toEqual({ implementer: "0x41", part: "0xd0c", variant: "0x3", revision: "1" });
+  });
+
   it("gives no clock speed, because the speed of the file changes in one job", () => {
     expect(Object.keys(cpuInfoMachine(CPUINFO) ?? {})).not.toContain("mhz");
   });

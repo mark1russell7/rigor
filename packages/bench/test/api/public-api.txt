@@ -3054,6 +3054,10 @@ interface BenchMachine {
   readonly stepping?: string;
   readonly microcode?: string;
   readonly cacheKb?: number;
+  readonly implementer?: string;
+  readonly part?: string;
+  readonly variant?: string;
+  readonly revision?: string;
 }
 
 ### build/paired.d.ts#CaseRatio
