@@ -261,6 +261,69 @@ export function cpuEntry<T>(table: Readonly<Record<string, T>> & { readonly othe
   return known === undefined ? { model: "other", value: table.other } : { model: known[0], value: known[1] };
 }
 
+/** One value of one CPU model in one CI run. Since 0.3.6. */
+export interface RunValue {
+  /** The full name of the CPU model. `UNKNOWN_MODEL` and `other` get no entry of their own in `modelTable`. */
+  readonly model: string;
+  /** The CI run of the value. */
+  readonly run: string;
+  readonly value: number;
+}
+
+/** The options of `modelTable`. Since 0.3.6. */
+export interface ModelTableOptions {
+  /** The fewest CI runs of a model that give the model its own entry. The default is 5. */
+  readonly minimumRuns?: number;
+}
+
+/** A table of `modelTable`: an entry for each CPU model with enough runs, and the pooled entry `other`. `cpuEntry` reads it. Since 0.3.6. */
+export type ModelTable<T> = Readonly<Record<string, T>> & { readonly other: T };
+
+/**
+ * This function groups values by CPU model and by CI run. The result keeps the models with `minimumRuns` runs or more.
+ * - The models and the runs are in the order of their first value. The values of a run are in their order.
+ * - The models `UNKNOWN_MODEL` and `other` are not in the result.
+ * Since 0.3.6.
+ */
+export function modelRuns(values: readonly RunValue[], options: ModelTableOptions = {}): Map<string, number[][]> {
+  const minimumRuns = minimumRunsOf(options);
+  const models = new Map<string, Map<string, number[]>>();
+  for (const { model, run, value } of values) {
+    if (model === UNKNOWN_MODEL || model === "other") continue;
+    const runs = models.get(model) ?? new Map<string, number[]>();
+    runs.set(run, [...(runs.get(run) ?? []), value]);
+    models.set(model, runs);
+  }
+  return new Map([...models].filter(([, runs]) => runs.size >= minimumRuns).map(([model, runs]) => [model, [...runs.values()]]));
+}
+
+/**
+ * This function gives a limit for each CPU model with `minimumRuns` CI runs or more, and the pooled limit `other`.
+ *
+ * - `limit` gets the values of one model, grouped by run. For example, `(runs) => runLimit(runs.flat())` gives the limit of one value,
+ *   and `(runs) => runLimit(runs.map((run) => Math.min(...run)))` gives the limit of the lowest value of a run.
+ * - The entry `other` is `limit` of all the values, with one group for each model in each run. A model with too few runs reads against it.
+ * - A table of runners with mixed CPU models needs this. A limit from all the models is too wide for a fast model, and too narrow for a slow one.
+ * - The function refuses a bad `minimumRuns` and a value that is not finite. `limit` can refuse too few values.
+ * Since 0.3.6.
+ */
+export function modelTable<T>(values: readonly RunValue[], limit: (runs: readonly (readonly number[])[]) => T, options: ModelTableOptions = {}): ModelTable<T> {
+  for (const { value } of values) if (!Number.isFinite(value)) throw new RangeError(`modelTable: each value is a finite number, not ${value}.`);
+  const groups = new Map<string, number[]>();
+  for (const { model, run, value } of values) {
+    const key = JSON.stringify([model, run]);
+    groups.set(key, [...(groups.get(key) ?? []), value]);
+  }
+  const own = [...modelRuns(values, options)].map(([model, runs]) => [model, limit(runs)] as const);
+  return { ...Object.fromEntries(own), other: limit([...groups.values()]) };
+}
+
+function minimumRunsOf(options: ModelTableOptions): number {
+  const minimumRuns = options.minimumRuns ?? 5;
+  if (!(Number.isSafeInteger(minimumRuns) && minimumRuns >= 1)) throw new RangeError(`modelTable: the minimum of runs is a whole number of 1 or more, not ${minimumRuns}.`);
+  return minimumRuns;
+}
+
 /** One pair of reads, with the CPU model of each arm. A record with no model has `undefined`. */
 export interface ArmPair {
   readonly a: string | undefined;

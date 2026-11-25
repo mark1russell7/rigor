@@ -37,6 +37,23 @@ describe("runLimit", () => {
     expect(() => runLimit([1, 2, 3, 4, 5], { minimum: 0 })).toThrow(/minimum/);
     expect(() => runLimit([1, 2, 3, 4, 5], { digits: 1.5 })).toThrow(/digits/);
     expect(() => runLimit([1, 2, 3, 4, 5], { bound: Infinity })).toThrow(/bound/);
+    expect(() => runLimit([1, 2, 3, 4, 5], { spread: "half" as "range" })).toThrow(/spread/);
+  });
+
+  it("adds only the worse half of the spread with the option worse-half", () => {
+    // The median is 0.02 and the worst value is 0.05, so the limit is 0.05 + 0.03.
+    const cap = runLimit([0.02, 0.01, 0.05, 0.02, 0.03], { spread: "worse-half" });
+    expect(cap).toMatchObject({ limit: 0.08, worst: 0.05 });
+    expect(cap.spread).toBeCloseTo(0.03, 12);
+    expect(runLimit([100, 102, 105, 101, 103], { better: "higher", digits: 0, spread: "worse-half" })).toMatchObject({ limit: 98, worst: 100, spread: 2 });
+    expect(runLimit([1, 1, 1, 1, 1], { spread: "worse-half" }).limit).toBe(1);
+  });
+
+  it("does not widen a worse-half limit for a value on the better side of the median, as a range limit does", () => {
+    const spreads = [0.02, 0.025, 0.03, 0.035, 0.04];
+    const quieter = [0.001, 0.025, 0.03, 0.035, 0.04];
+    expect(runLimit(quieter, { spread: "worse-half" }).limit).toBe(runLimit(spreads, { spread: "worse-half" }).limit);
+    expect(runLimit(quieter).limit).toBeGreaterThan(runLimit(spreads).limit);
   });
 });
 

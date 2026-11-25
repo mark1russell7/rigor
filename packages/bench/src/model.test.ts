@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { median, twoSamplePermutation } from "@mark1russell7/rigor-statistics";
 import { describe, expect, it } from "vitest";
-import { type ModelRead, type ModelRow, type ModelTest, CEILING_ONLY, UNKNOWN_MODEL, armModels, limitOnModel, modelRowText, modelTest, visibleShift } from "./model.ts";
+import { type ModelRead, type ModelRow, type ModelTest, type RunValue, CEILING_ONLY, UNKNOWN_MODEL, armModels, cpuEntry, limitOnModel, modelRowText, modelRuns, modelTable, modelTest, visibleShift } from "./model.ts";
+import { runLimit } from "./run-limit.ts";
 
 /** This function gives one read for each value. */
 function readsOf(model: string, values: readonly number[], caseName = "build"): ModelRead[] {
@@ -368,5 +369,43 @@ describe("armModels", () => {
 
   it("gives no models for no pairs, and no pairs are not one model", () => {
     expect(armModels([])).toEqual({ a: [], b: [], one: false });
+  });
+});
+
+describe("modelTable", () => {
+  /** This function gives one value for each run, of one model, with made-up run names. */
+  const runsOf = (model: string, values: readonly number[], from = 0): RunValue[] => values.map((value, i) => ({ model, run: `r${String(from + i)}`, value }));
+  const fast = runsOf("Fast CPU A", [1, 1.01, 1.02, 1.01, 1.03]);
+  const slow = runsOf("Slow CPU B", [2, 2.05, 2.1, 2.02, 2.04]);
+  const few = runsOf("Rare CPU C", [3, 3.1]);
+  const oneValue = (runs: readonly (readonly number[])[]) => runLimit(runs.flat());
+
+  it("gives a limit to each model with 5 runs or more, and a pooled limit to the other models", () => {
+    const table = modelTable([...fast, ...slow, ...few], oneValue);
+    expect(Object.keys(table)).toEqual(["Fast CPU A", "Slow CPU B", "other"]);
+    expect(table["Fast CPU A"]).toEqual(runLimit([1, 1.01, 1.02, 1.01, 1.03]));
+    expect(table.other.worst).toBe(3.1);
+    expect(cpuEntry(table, "Rare CPU C").model).toBe("other");
+    expect(cpuEntry(table, "SLOW CPU B").value.limit).toBe(table["Slow CPU B"]!.limit);
+  });
+
+  it("gives the values of a model to the limit by run, so a limit can take the lowest value of each run", () => {
+    const twoJobs = [...fast, ...runsOf("Fast CPU A", [1.5, 1.6, 1.01, 1.02, 1.04])];
+    const lowest = modelTable(twoJobs, (runs) => runLimit(runs.map((run) => Math.min(...run))));
+    expect(lowest["Fast CPU A"]!.values).toEqual([1, 1.01, 1.01, 1.01, 1.03]);
+    expect(modelRuns(twoJobs).get("Fast CPU A")).toEqual([[1, 1.5], [1.01, 1.6], [1.02, 1.01], [1.01, 1.02], [1.03, 1.04]]);
+  });
+
+  it("keeps the unknown model and the name other out of the entries of the models, and in the pooled limit", () => {
+    const table = modelTable([...runsOf(UNKNOWN_MODEL, [5, 5, 5, 5, 5]), ...runsOf("other", [6, 6, 6, 6, 6]), ...fast], oneValue);
+    expect(Object.keys(table)).toEqual(["Fast CPU A", "other"]);
+    expect(table.other.worst).toBe(6);
+  });
+
+  it("follows the option minimumRuns, and refuses a bad option and a value that is not finite", () => {
+    expect(Object.keys(modelTable([...fast, ...few], (runs) => runLimit(runs.flat(), { minimum: 2 }), { minimumRuns: 2 }))).toEqual(["Fast CPU A", "Rare CPU C", "other"]);
+    expect(() => modelTable(fast, oneValue, { minimumRuns: 0 })).toThrow(/minimum of runs/);
+    expect(() => modelTable([...fast, { model: "Fast CPU A", run: "r9", value: Number.NaN }], oneValue)).toThrow(/finite/);
+    expect(() => modelTable(few, oneValue)).toThrow(/5 values or more/);
   });
 });

@@ -149,6 +149,8 @@ type ModelLimitsFile: build/index.d.ts#ModelLimitsFile
 type ModelRead: build/index.d.ts#ModelRead
 type ModelRow: build/index.d.ts#ModelRow
 type ModelStatus: build/index.d.ts#ModelStatus
+type ModelTable: build/index.d.ts#ModelTable
+type ModelTableOptions: build/index.d.ts#ModelTableOptions
 type ModelTest: build/index.d.ts#ModelTest
 type ModelTestOptions: build/index.d.ts#ModelTestOptions
 type ModuleListGaps: build/index.d.ts#ModuleListGaps
@@ -199,6 +201,8 @@ type RunLimitOptions: build/index.d.ts#RunLimitOptions
 type RunMethod: build/index.d.ts#RunMethod
 type RunMethodOptions: build/index.d.ts#RunMethodOptions
 type RunPairs: build/index.d.ts#RunPairs
+type RunSpread: build/index.d.ts#RunSpread
+type RunValue: build/index.d.ts#RunValue
 type Rung: build/index.d.ts#Rung
 type RungBudget: build/index.d.ts#RungBudget
 type RungEvidence: build/index.d.ts#RungEvidence
@@ -286,6 +290,8 @@ limitVerdict: build/index.d.ts#limitVerdict
 mergeCaseModules: build/index.d.ts#mergeCaseModules
 modelLimitRead: build/index.d.ts#modelLimitRead
 modelRowText: build/index.d.ts#modelRowText
+modelRuns: build/index.d.ts#modelRuns
+modelTable: build/index.d.ts#modelTable
 modelTest: build/index.d.ts#modelTest
 moduleListGaps: build/index.d.ts#moduleListGaps
 notSlowerVerdict: build/index.d.ts#notSlowerVerdict
@@ -2094,6 +2100,16 @@ interface ModelRow {
 ### build/index.d.ts#ModelStatus
 type ModelStatus = "differs" | "no read" | "too-few" | "not asked";
 
+### build/index.d.ts#ModelTable
+type ModelTable<T> = Readonly<Record<string, T>> & {
+  readonly other: T;
+};
+
+### build/index.d.ts#ModelTableOptions
+interface ModelTableOptions {
+  readonly minimumRuns?: number;
+}
+
 ### build/index.d.ts#ModelTest
 interface ModelTest {
   readonly rows: readonly ModelRow[];
@@ -2464,6 +2480,7 @@ interface RunLimitOptions {
   readonly digits?: number;
   readonly better?: Better;
   readonly bound?: number;
+  readonly spread?: RunSpread;
 }
 
 ### build/index.d.ts#RunMethod
@@ -2478,6 +2495,16 @@ interface RunMethodOptions {
 ### build/index.d.ts#RunPairs
 interface RunPairs {
   readonly pairs: Readonly<Record<string, readonly PairedTime[]>>;
+}
+
+### build/index.d.ts#RunSpread
+type RunSpread = "range" | "worse-half";
+
+### build/index.d.ts#RunValue
+interface RunValue {
+  readonly model: string;
+  readonly run: string;
+  readonly value: number;
 }
 
 ### build/index.d.ts#Rung
@@ -2929,6 +2956,12 @@ export declare function modelLimitRead(file: ModelLimitsFile, read: ModelRead): 
 
 ### build/index.d.ts#modelRowText
 export declare function modelRowText(row: ModelRow, family: number): string;
+
+### build/index.d.ts#modelRuns
+export declare function modelRuns(values: readonly RunValue[], options?: ModelTableOptions): Map<string, number[][]>;
+
+### build/index.d.ts#modelTable
+export declare function modelTable<T>(values: readonly RunValue[], limit: (runs: readonly (readonly number[])[]) => T, options?: ModelTableOptions): ModelTable<T>;
 
 ### build/index.d.ts#modelTest
 export declare function modelTest(reads: readonly ModelRead[], options?: ModelTestOptions): ModelTest;
