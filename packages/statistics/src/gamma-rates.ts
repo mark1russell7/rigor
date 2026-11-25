@@ -9,6 +9,7 @@
  */
 
 import { logGamma } from "@mark1russell7/rigor-generators";
+import { gammaQuantile } from "./gamma.ts";
 
 /** One unit of a fit of rates: a count of events in an exposure, for example the events of a county in its years. */
 export interface RateUnit {
@@ -184,4 +185,22 @@ export function pooledRate(unit: RateUnit, law: GammaRates): number {
   if (!Number.isFinite(law.mean) || law.mean < 0) throw new RangeError(`pooledRate: the mean is ${law.mean}. It is a finite number of 0 or more.`);
   if (law.shape === Number.POSITIVE_INFINITY || law.mean === 0) return law.mean;
   return (unit.count + law.shape) / (unit.exposure + law.shape / law.mean);
+}
+
+/**
+ * This function gives an upper bound of the rate of a unit: the quantile `level` of the gamma law of its rate after its count.
+ *
+ * - That law has the shape `shape + count` and the rate `shape / mean + exposure`. Its mean is `pooledRate`.
+ * - A pooled rate is a mean, so a plan for a bad case can take this bound in place of it. The default level is 0.95.
+ * - The shape `Infinity` gives the mean of the law, because the rates show no spread. The mean 0 gives 0.
+ *
+ * @throws RangeError when the level is not in (0, 1), or the unit or the law is not valid
+ */
+export function pooledRateUpper(unit: RateUnit, law: GammaRates, level = 0.95): number {
+  unitProblem("pooledRateUpper", unit);
+  if (Number.isNaN(law.shape) || law.shape <= 0) throw new RangeError(`pooledRateUpper: the shape is ${law.shape}. It is more than 0, or Infinity.`);
+  if (!Number.isFinite(law.mean) || law.mean < 0) throw new RangeError(`pooledRateUpper: the mean is ${law.mean}. It is a finite number of 0 or more.`);
+  if (!(level > 0 && level < 1)) throw new RangeError(`pooledRateUpper: the level is ${level}. It is in (0, 1).`);
+  if (law.shape === Number.POSITIVE_INFINITY || law.mean === 0) return law.mean;
+  return gammaQuantile(level, law.shape + unit.count, law.shape / law.mean + unit.exposure);
 }
