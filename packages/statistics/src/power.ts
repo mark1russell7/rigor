@@ -7,7 +7,7 @@ import { betaShares, normalQuantile } from "@mark1russell7/rigor-generators";
 
 /**
  * From this count of degrees of freedom, `tQuantile` uses the Cornish-Fisher series. Below it, the bisection of the beta shares has a relative error below 1e-12.
- * Above it, the continued fraction of the shares loses digits in proportion to `df` (approximately 4e-6 at 1e12).
+ * Above it, the series needs no bisection, and its error is not more than the error of the bisection.
  * The series term that the sum omits is below 1e-16 at this count, for `p` from 1e-12 to 1 - 1e-12.
  */
 const T_SERIES_DF = 1e5;

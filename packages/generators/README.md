@@ -112,6 +112,7 @@ The npm package holds the notice of the Ptolemy II license, because the field `n
 
 - `logBeta` keeps the digits of its value when a parameter is near 1e13. There, the sum of `logGamma` loses all of them.
 - `betaShares` takes the point `x` and its distance `y = 1 - x` from 1. Thus a point near 1 keeps its digits. The function gives the shares of the law below and above the point.
+- `betaShares` uses the methods of TOMS 708 (as `pbeta` does in R). With two large parameters near the mean, it uses the asymptotic expansion. Elsewhere, it uses the continued fraction. The relative error of each share is below 1e-12 for parameters up to 1e13.
 
 The Student t law with `df` degrees of freedom has its shares between `-t` and `t` and above `|t|` in `betaShares(t^2 / (df + t^2), df / (df + t^2), 0.5, df / 2)`.
 

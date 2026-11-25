@@ -38,11 +38,20 @@ export function normalCdf(x: number): number {
     }
     return 0.5 + density * sum;
   }
-  // The fraction has `1000 / x^2 + 50` terms. This count converges to the last bit from 0.75.
+  const tail = density * millsRatio(z);
+  return x > 0 ? 1 - tail : tail;
+}
+
+/**
+ * This function gives the Mills ratio `P(Z > z) / phi(z)` for a `z` of 0 or more. It does not underflow for a large `z`.
+ * From 0.75, it is the continued fraction `1 / (z + 1 / (z + 2 / (z + ...)))`. The fraction has `1000 / z^2 + 50` terms. This count converges to the last bit.
+ * Below 0.75, it is `normalCdf(-z) / phi(z)`.
+ */
+export function millsRatio(z: number): number {
+  if (z < 0.75) return normalCdf(-z) / (halfSquareExp(z) / SQRT_2PI);
   let fraction = z;
   for (let k = Math.ceil(1000 / (z * z)) + 50; k >= 1; k--) fraction = z + k / fraction;
-  const tail = density / fraction;
-  return x > 0 ? 1 - tail : tail;
+  return 1 / fraction;
 }
 
 // The coefficients of PPND16 of Wichura (1988), algorithm AS 241. The first set is for |p - 0.5| <= 0.425.
