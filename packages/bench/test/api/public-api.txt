@@ -101,6 +101,10 @@ type GrowthRound: build/index.d.ts#GrowthRound
 type GrowthStep: build/index.d.ts#GrowthStep
 type GrowthVerdict: build/index.d.ts#GrowthVerdict
 type GuardRead: build/index.d.ts#GuardRead
+type HoldAcceptance: build/index.d.ts#HoldAcceptance
+type HoldAcceptanceRead: build/index.d.ts#HoldAcceptanceRead
+type HoldGate: build/index.d.ts#HoldGate
+type HoldOutcome: build/index.d.ts#HoldOutcome
 type JobAaStats: build/index.d.ts#JobAaStats
 type JobCost: build/index.d.ts#JobCost
 type JobDecide: build/index.d.ts#JobDecide
@@ -279,6 +283,10 @@ gateLineCli: build/index.d.ts#gateLineCli
 gateOf: build/index.d.ts#gateOf
 gateVerdictWord: build/index.d.ts#gateVerdictWord
 growthVerdict: build/index.d.ts#growthVerdict
+holdAcceptances: build/index.d.ts#holdAcceptances
+holdGate: build/index.d.ts#holdGate
+holdPasses: build/index.d.ts#holdPasses
+holdVerdictWord: build/index.d.ts#holdVerdictWord
 isBlock: build/index.d.ts#isBlock
 isNoRead: build/index.d.ts#isNoRead
 isValidRead: build/index.d.ts#isValidRead
@@ -308,6 +316,7 @@ processCaseLine: build/index.d.ts#processCaseLine
 processLimits: build/index.d.ts#processLimits
 processNoiseCap: build/index.d.ts#processNoiseCap
 processVerdict: build/index.d.ts#processVerdict
+readHoldAcceptances: build/index.d.ts#readHoldAcceptances
 readNoise: build/index.d.ts#readNoise
 recentRuns: build/index.d.ts#recentRuns
 resultRows: build/index.d.ts#resultRows
@@ -1736,6 +1745,34 @@ interface GuardRead {
   readonly partners: readonly PartnerRead[];
 }
 
+### build/index.d.ts#HoldAcceptance
+interface HoldAcceptance {
+  readonly case: string;
+  readonly head: string;
+  readonly cost: string;
+  readonly reason: string;
+  readonly owner: string;
+  readonly file: string;
+}
+
+### build/index.d.ts#HoldAcceptanceRead
+interface HoldAcceptanceRead {
+  readonly records: readonly HoldAcceptance[];
+  readonly faults: readonly string[];
+}
+
+### build/index.d.ts#HoldGate
+interface HoldGate {
+  readonly outcome: HoldOutcome;
+  readonly reason: string;
+  readonly accepted: readonly HoldAcceptance[];
+  readonly held: readonly string[];
+  readonly lines: readonly string[];
+}
+
+### build/index.d.ts#HoldOutcome
+type HoldOutcome = "pass" | "held" | "accepted" | "no read";
+
 ### build/index.d.ts#JobAaStats
 interface JobAaStats {
   readonly job: string;
@@ -2930,6 +2967,21 @@ export declare function gateVerdictWord(outcome: GateOutcome): GateVerdictWord;
 ### build/index.d.ts#growthVerdict
 export declare function growthVerdict(rounds: readonly GrowthRound[], options: GrowthOptions): GrowthVerdict;
 
+### build/index.d.ts#holdAcceptances
+export declare function holdAcceptances(files: readonly {
+  readonly name: string;
+  readonly text: string;
+}[]): HoldAcceptanceRead;
+
+### build/index.d.ts#holdGate
+export declare function holdGate(gate: Gate, heads: readonly (string | undefined)[], read: HoldAcceptanceRead): HoldGate;
+
+### build/index.d.ts#holdPasses
+export declare function holdPasses(outcome: HoldOutcome): boolean;
+
+### build/index.d.ts#holdVerdictWord
+export declare function holdVerdictWord(outcome: HoldOutcome): GateVerdictWord;
+
 ### build/index.d.ts#isBlock
 export declare function isBlock(outcome: string): boolean;
 
@@ -3013,6 +3065,9 @@ export declare function processNoiseCap(jobs: readonly JobReads[], options: Nois
 
 ### build/index.d.ts#processVerdict
 export declare function processVerdict(reads: readonly ProcessRead[], options: ProcessOptions): ProcessVerdict;
+
+### build/index.d.ts#readHoldAcceptances
+export declare function readHoldAcceptances(dir: string): HoldAcceptanceRead;
 
 ### build/index.d.ts#readNoise
 export declare function readNoise(read: ProcessRead): number | undefined;
