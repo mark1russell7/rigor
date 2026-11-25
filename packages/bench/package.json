@@ -82,7 +82,7 @@
   "dependencies": {
     "@mark1russell7/rigor-generators": "workspace:^",
     "@mark1russell7/rigor-statistics": "workspace:^",
-    "@mark1russell7/text": "^0.0.17"
+    "@mark1russell7/text": "^0.0.18"
   },
   "peerDependencies": {
     "esbuild": "^0.28.2"
