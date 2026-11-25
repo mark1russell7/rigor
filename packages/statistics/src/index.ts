@@ -199,7 +199,7 @@ export {
   noiseVerdict,
 } from "./compare.ts";
 export { type OptionFloorOptions, optionFloor, tQuantile } from "./power.ts";
-export { DISPERSION_MAX_WORK, type DispersionOptions, type DispersionTest, dispersionTest } from "./dispersion.ts";
+export { DISPERSION_MAX_PARTITIONS, DISPERSION_MAX_WORK, type DispersionOptions, type DispersionTest, dispersionTest } from "./dispersion.ts";
 export { type GammaRates, type GammaRatesOptions, type RateUnit, fitGammaRates, gammaPoissonLogLikelihood, pooledRate } from "./gamma-rates.ts";
 export {
   type GroupLaw,
