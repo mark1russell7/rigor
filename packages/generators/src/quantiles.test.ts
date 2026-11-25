@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { sampler, type DistributionSpec } from "./distributions.ts";
 import { normalQuantile } from "./normal.ts";
-import { betaCdf, betaShares, distributionOf, logBeta, logGamma } from "./quantiles.ts";
+import { betaCdf, betaShares, type BetaShares, distributionOf, logBeta, logGamma } from "./quantiles.ts";
 import { random } from "./random.ts";
 
 const relative = (got: number, want: number): number => Math.abs(got - want) / Math.abs(want);
@@ -113,15 +113,78 @@ describe("the shares of the beta law", () => {
   };
 
   // The beta law of t^2 / (df + t^2), with a of 0.5 and b of df / 2, gives the shares of the Student t law.
-  // The share between -t and t keeps its digits at each df. The share above, from the swapped fraction, loses digits in proportion to df.
-  it.each([1e6, 1e7, 1e8, 1e9])("gives the shares of the Student t law at df %s, against the Cornish-Fisher series", (df) => {
+  // Before the fraction of TOMS 708, the share above lost digits in proportion to df (5.5e-8 at df 1e9).
+  it.each([1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12])("gives the shares of the Student t law at df %s, against the Cornish-Fisher series", (df) => {
     for (const p of [0.5 + 1e-9, 0.5 + 1e-7, 0.6, 0.7]) {
       const square = tSeries(p, df) ** 2;
       expect(relative(betaShares(square / (df + square), df / (df + square), 0.5, df / 2).below, 2 * p - 1)).toBeLessThan(1e-13);
     }
     for (const p of [0.9, 0.975, 0.999, 1 - 1e-6, 1 - 1e-9]) {
       const square = tSeries(p, df) ** 2;
-      expect(relative(betaShares(square / (df + square), df / (df + square), 0.5, df / 2).above, 2 * (1 - p))).toBeLessThan(1e-16 * df);
+      expect(relative(betaShares(square / (df + square), df / (df + square), 0.5, df / 2).above, 2 * (1 - p))).toBeLessThan(1e-13);
+    }
+  });
+
+  // For an integer a, the share above x is y^b times a finite sum of positive terms: sum over k below a of Gamma(b + k) / (Gamma(b) k!) x^k.
+  it.each([1, 2, 5, 20, 100])("gives the share above at a of %s and a large b, against the finite sum", (a) => {
+    for (const b of [1e5, 1e7, 1e9, 1e11]) {
+      for (const spread of [0.5, 2, 8, 32]) {
+        const x = (a + spread * Math.sqrt(a)) / b;
+        let term = 1;
+        let sum = 1;
+        for (let k = 1; k < a; k++) {
+          term *= ((b + k - 1) * x) / k;
+          sum += term;
+        }
+        expect(relative(betaShares(x, 1 - x, a, b).above, Math.exp(b * Math.log1p(-x)) * sum)).toBeLessThan(1e-12);
+      }
+    }
+  });
+
+  // For integers a and b, the share below x is P(K >= a) for K of the binomial law of a + b - 1 trials.
+  // The terms of the binomial law come from their ratios, from the mode, and the sum of all terms divides them. Thus the reference needs no front factor.
+  const binomialShares = (a: number, b: number, x: number): BetaShares => {
+    const n = a + b - 1;
+    const odds = x / (1 - x);
+    const mode = Math.floor((n + 1) * x);
+    const terms = new Float64Array(n + 1);
+    terms[mode] = 1;
+    for (let k = mode; k < n; k++) terms[k + 1] = terms[k]! * ((n - k) / (k + 1)) * odds;
+    for (let k = mode; k > 0; k--) terms[k - 1] = terms[k]! * (k / (n - k + 1)) / odds;
+    let below = 0;
+    let above = 0;
+    for (let k = 0; k <= n; k++) {
+      if (k >= a) below += terms[k]!;
+      else above += terms[k]!;
+    }
+    return { below: below / (below + above), above: above / (below + above) };
+  };
+
+  it.each([[150, 150], [200, 300], [500, 2000], [1000, 1000], [3000, 700], [5000, 20000]] as const)(
+    "gives both shares of the law of a %s and b %s near the mean and in the tails, against the binomial law",
+    (a, b) => {
+      const mean = a / (a + b);
+      const deviation = Math.sqrt((a * b) / ((a + b) ** 2 * (a + b + 1)));
+      for (const k of [-8, -4, -2, -1, -0.3, 0, 0.3, 1, 2, 4, 8]) {
+        const x = mean + k * deviation;
+        const shares = betaShares(x, 1 - x, a, b);
+        const reference = binomialShares(a, b, x);
+        expect(relative(shares.below, reference.below)).toBeLessThan(1e-12);
+        expect(relative(shares.above, reference.above)).toBeLessThan(1e-12);
+      }
+    },
+  );
+
+  // The symmetric law has I_x(a, a) = I_{4xy}(a, 1/2) / 2 for x below 1/2. The right side has a small parameter, so it uses the continued fraction.
+  // The point 1 - 2x is exact for x from 1/4 to 1/2. Thus both sides get the same point.
+  it.each([150, 1e3, 1e5, 1e7, 1e9, 1e11, 1e13])("gives the shares of the symmetric law of a %s, against the law of a and 1/2", (a) => {
+    expect(relative(betaShares(0.5, 0.5, a, a).below, 0.5)).toBeLessThan(1e-15);
+    const deviation = 0.5 / Math.sqrt(2 * a + 1);
+    for (const k of [30, 8, 3, 1, 0.1]) {
+      const x = 0.5 - k * deviation;
+      if (!(x > 0.25)) continue;
+      const reference = betaShares(4 * x * (1 - x), (1 - 2 * x) ** 2, a, 0.5).below / 2;
+      expect(relative(betaShares(x, 1 - x, a, a).below, reference)).toBeLessThan(1e-12);
     }
   });
 });
