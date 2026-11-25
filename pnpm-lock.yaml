@@ -191,8 +191,8 @@ importers:
         specifier: ^2.0.0
         version: 2.1.4
       '@mark1russell7/ste-lint':
-        specifier: ^0.4.0
-        version: 0.4.0
+        specifier: ^0.6.0
+        version: 0.6.0
       '@mark1russell7/template-cli':
         specifier: ^0.1.3
         version: 0.1.9
@@ -227,8 +227,8 @@ importers:
         specifier: workspace:^
         version: link:../statistics
       '@mark1russell7/text':
-        specifier: ^0.0.17
-        version: 0.0.17
+        specifier: ^0.0.18
+        version: 0.0.18
     devDependencies:
       '@mark1russell7/cue':
         specifier: ^2.0.0
@@ -310,8 +310,8 @@ importers:
         specifier: workspace:^
         version: link:../statistics
       '@mark1russell7/text':
-        specifier: ^0.0.17
-        version: 0.0.17
+        specifier: ^0.0.18
+        version: 0.0.18
     devDependencies:
       '@mark1russell7/cue':
         specifier: ^2.0.0
@@ -342,7 +342,7 @@ importers:
     dependencies:
       '@mark1russell7/algebra':
         specifier: ^0.9.5
-        version: 0.9.10(zod@4.6.7)
+        version: 0.9.11(zod@4.6.7)
       '@mark1russell7/rigor-chaos':
         specifier: workspace:^
         version: link:../chaos
@@ -384,8 +384,8 @@ importers:
         specifier: workspace:*
         version: link:../statistics
       '@mark1russell7/text':
-        specifier: ^0.0.17
-        version: 0.0.17
+        specifier: ^0.0.18
+        version: 0.0.18
       tsdown:
         specifier: ^0.23.1
         version: 0.23.7(publint@0.3.25)(tsx@4.23.15)(typescript@7.0.2)
@@ -395,7 +395,7 @@ importers:
         version: 2.1.4
       '@mark1russell7/site-pages':
         specifier: ^0.8.1
-        version: 0.8.2
+        version: 0.8.4
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.6
@@ -1041,8 +1041,8 @@ packages:
       zod:
         optional: true
 
-  '@mark1russell7/algebra@0.9.10':
-    resolution: {integrity: sha512-PRLI84T/sJhOdddwAyTKJR8Mv3r1ux57xXIEH2zg+K7CUHTDRkuPuYT9byPy1KGfbR1dNviRHNgDM7OmesHbWw==}
+  '@mark1russell7/algebra@0.9.11':
+    resolution: {integrity: sha512-zaaSfjiUu+5fnwfQeJg3LusRc/1oumZ7ofQhH+3v+rjHKP5xxYb6xGAA76P8gRVEbFTyzQOzpIOCvOJe74NyxQ==}
     engines: {node: '>=22.19'}
     peerDependencies:
       zod: ^4.1.0
@@ -1081,8 +1081,8 @@ packages:
     engines: {node: '>=22'}
     hasBin: true
 
-  '@mark1russell7/files@0.0.4':
-    resolution: {integrity: sha512-Pb978ZnvlAxzcdWtRtqTGb7mZFCvlNrdKnpZqhxQ7gafzeNGf1JqYFuB4RWiLbJzRuFUWjEoAVG5f2TndCIlSg==}
+  '@mark1russell7/files@0.0.6':
+    resolution: {integrity: sha512-VLsy9pwIP1LuDEOkzVpUKU/SOTw+/d3F/IYjSp0Fj+Cqfl440Qs/ad5islvClQEKPNmiDp5Zs+VraNO2QQ/MkQ==}
     engines: {node: '>=22'}
 
   '@mark1russell7/optional@1.2.0':
@@ -1098,8 +1098,8 @@ packages:
       zod:
         optional: true
 
-  '@mark1russell7/quantity@0.4.3':
-    resolution: {integrity: sha512-XtD9tiGDit51uR5ATtCHarXCfAS6004slKst+AGcAPVxd1wcIpi+OVlsxb/PIkkr2NOFL/oG3QCF0kdEWHhu/w==}
+  '@mark1russell7/quantity@0.4.8':
+    resolution: {integrity: sha512-E0R4RoDMdNN+oqSCGsWXVIUo/RCGJozvumrBSoBlWcooJ7ALgW3+OxJ3B2PyrMkvBDNSBBEL7jTZ5I53xkaOrQ==}
     engines: {node: '>=22.19'}
     peerDependencies:
       zod: ^4.1.0
@@ -1127,13 +1127,13 @@ packages:
     resolution: {integrity: sha512-jaUqrz8FmsUoR9n0MeRUIk9UTpG5QL+dF/moh+C23fyihb00LgOD42Up//1piIPVZZDiq6lua0sBcSKMwh5IFg==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/site-pages@0.8.2':
-    resolution: {integrity: sha512-WMErq1NBREuaBOn28Vg+7LMJSTou8+O27qNRoaRt11h+r3j9muf4jFmuwGazDOSS+Cf32gxDT1/IpXbAz2h/Vg==}
+  '@mark1russell7/site-pages@0.8.4':
+    resolution: {integrity: sha512-pC0qcQqIsfQg5jTg+peUP/DGBXb4d1PQYiu6TCeCE1ALc5X8nyGhj9vMYKBCdhK7uHm8Chtx7INLKPWPmxpK3w==}
     engines: {node: '>=22'}
     hasBin: true
 
-  '@mark1russell7/ste-lint@0.4.0':
-    resolution: {integrity: sha512-V58Mtpt7WOW2wRBreSuuIO4am0WOdrJq8603+NNtqyI5EY0/LpPiQFxEDx+yNOgkN5ddnpPTkjalRTmBF+9GXQ==}
+  '@mark1russell7/ste-lint@0.6.0':
+    resolution: {integrity: sha512-4jt/c/n4hKa3Y32/iqbCrNk4MShb9ECxedm5WG28RYpYm0eCCxkn10wn00hzRKxvFtFe9qKDS0b5XGhfSuvTWQ==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -1144,6 +1144,10 @@ packages:
 
   '@mark1russell7/text@0.0.17':
     resolution: {integrity: sha512-jFqqVfCTQ0N65qvMP/gANAbnqB7ewpA3IeNxPeQTuF3IoSZkTgTl92PE47F5IOOfgz0Q0dF723crrYB8T6pR3g==}
+    engines: {node: '>=22.12'}
+
+  '@mark1russell7/text@0.0.18':
+    resolution: {integrity: sha512-sIOsTkBOhWLSDyE4qKyiokUT84NPJgPuhLPDyh2Y+mjGnNbGhF9Q6dt9NnSBtSW8C1D0rZfx8fPJ53g0gQGWfQ==}
     engines: {node: '>=22.12'}
 
   '@napi-rs/wasm-runtime@1.2.6':
@@ -3197,9 +3201,9 @@ snapshots:
     optionalDependencies:
       zod: 4.6.7
 
-  '@mark1russell7/algebra@0.9.10(zod@4.6.7)':
+  '@mark1russell7/algebra@0.9.11(zod@4.6.7)':
     dependencies:
-      '@mark1russell7/quantity': 0.4.3(zod@4.6.7)
+      '@mark1russell7/quantity': 0.4.8(zod@4.6.7)
       '@mark1russell7/rigor-statistics': 0.2.17
     optionalDependencies:
       zod: 4.6.7
@@ -3228,7 +3232,7 @@ snapshots:
 
   '@mark1russell7/cue@2.1.4': {}
 
-  '@mark1russell7/files@0.0.4': {}
+  '@mark1russell7/files@0.0.6': {}
 
   '@mark1russell7/optional@1.2.0': {}
 
@@ -3238,7 +3242,7 @@ snapshots:
     optionalDependencies:
       zod: 4.6.7
 
-  '@mark1russell7/quantity@0.4.3(zod@4.6.7)':
+  '@mark1russell7/quantity@0.4.8(zod@4.6.7)':
     dependencies:
       '@mark1russell7/rational': 0.1.2
     optionalDependencies:
@@ -3258,13 +3262,13 @@ snapshots:
     dependencies:
       '@mark1russell7/rigor-generators': 0.1.16
 
-  '@mark1russell7/site-pages@0.8.2':
+  '@mark1russell7/site-pages@0.8.4':
     dependencies:
       '@mark1russell7/rigor-statistics': 0.2.17
 
-  '@mark1russell7/ste-lint@0.4.0':
+  '@mark1russell7/ste-lint@0.6.0':
     dependencies:
-      '@mark1russell7/files': 0.0.4
+      '@mark1russell7/files': 0.0.6
       typescript: 6.0.3
 
   '@mark1russell7/template-cli@0.1.9':
@@ -3272,6 +3276,8 @@ snapshots:
       '@clack/prompts': 1.8.1
 
   '@mark1russell7/text@0.0.17': {}
+
+  '@mark1russell7/text@0.0.18': {}
 
   '@napi-rs/wasm-runtime@1.2.6(@emnapi/core@2.0.0-beta.2)(@emnapi/runtime@2.0.0-beta.2)':
     dependencies:
