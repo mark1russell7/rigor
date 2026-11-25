@@ -261,7 +261,7 @@ export function cpuEntry<T>(table: Readonly<Record<string, T>> & { readonly othe
   return known === undefined ? { model: "other", value: table.other } : { model: known[0], value: known[1] };
 }
 
-/** One value of one CPU model in one CI run. Since 0.3.5. */
+/** One value of one CPU model in one CI run. Since 0.3.6. */
 export interface RunValue {
   /** The full name of the CPU model. `UNKNOWN_MODEL` and `other` get no entry of their own in `modelTable`. */
   readonly model: string;
@@ -270,20 +270,20 @@ export interface RunValue {
   readonly value: number;
 }
 
-/** The options of `modelTable`. Since 0.3.5. */
+/** The options of `modelTable`. Since 0.3.6. */
 export interface ModelTableOptions {
   /** The fewest CI runs of a model that give the model its own entry. The default is 5. */
   readonly minimumRuns?: number;
 }
 
-/** A table of `modelTable`: an entry for each CPU model with enough runs, and the pooled entry `other`. `cpuEntry` reads it. Since 0.3.5. */
+/** A table of `modelTable`: an entry for each CPU model with enough runs, and the pooled entry `other`. `cpuEntry` reads it. Since 0.3.6. */
 export type ModelTable<T> = Readonly<Record<string, T>> & { readonly other: T };
 
 /**
  * This function groups values by CPU model and by CI run. The result keeps the models with `minimumRuns` runs or more.
  * - The models and the runs are in the order of their first value. The values of a run are in their order.
  * - The models `UNKNOWN_MODEL` and `other` are not in the result.
- * Since 0.3.5.
+ * Since 0.3.6.
  */
 export function modelRuns(values: readonly RunValue[], options: ModelTableOptions = {}): Map<string, number[][]> {
   const minimumRuns = minimumRunsOf(options);
@@ -305,7 +305,7 @@ export function modelRuns(values: readonly RunValue[], options: ModelTableOption
  * - The entry `other` is `limit` of all the values, with one group for each model in each run. A model with too few runs reads against it.
  * - A table of runners with mixed CPU models needs this. A limit from all the models is too wide for a fast model, and too narrow for a slow one.
  * - The function refuses a bad `minimumRuns` and a value that is not finite. `limit` can refuse too few values.
- * Since 0.3.5.
+ * Since 0.3.6.
  */
 export function modelTable<T>(values: readonly RunValue[], limit: (runs: readonly (readonly number[])[]) => T, options: ModelTableOptions = {}): ModelTable<T> {
   for (const { value } of values) if (!Number.isFinite(value)) throw new RangeError(`modelTable: each value is a finite number, not ${value}.`);

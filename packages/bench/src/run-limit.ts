@@ -20,7 +20,7 @@ export interface RunLimitOptions {
   readonly better?: Better;
   /** The limit is at least `bound` for `lower`, and at most `bound` for `higher`. The default is no bound. */
   readonly bound?: number;
-  /** The spread that the limit adds to the worst value (`RunSpread`). The default is `range`. Since 0.3.5. */
+  /** The spread that the limit adds to the worst value (`RunSpread`). The default is `range`. Since 0.3.6. */
   readonly spread?: RunSpread;
 }
 
