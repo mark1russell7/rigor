@@ -6,7 +6,7 @@
  * `aaLimits` gives the margin and the noise cap of `timeVerdict` for each family of cases from the A/A records of the jobs.
  * A job whose A/A spread is far above the other jobs goes out by the robust z-score, and the result names it.
  */
-import { modifiedZ, quantile } from "@mark1russell7/rigor-statistics";
+import { median, modifiedZ, quantile } from "@mark1russell7/rigor-statistics";
 import type { Better } from "./model-limit.ts";
 import { type PairedTime, caseRatios } from "./paired.ts";
 
@@ -20,14 +20,25 @@ export interface RunLimitOptions {
   readonly better?: Better;
   /** The limit is at least `bound` for `lower`, and at most `bound` for `higher`. The default is no bound. */
   readonly bound?: number;
+  /** The spread that the limit adds to the worst value (`RunSpread`). The default is `range`. Since 0.3.5. */
+  readonly spread?: RunSpread;
 }
+
+/**
+ * The spread of the values that `runLimit` adds to the worst value.
+ *
+ * - `range`: max - min. A value far on the better side makes the limit larger.
+ * - `worse-half`: the distance from the median to the worst value. A value on the better side of the median does not change the limit.
+ *   Use it for a measure of noise, for example an A/A spread. With `range`, a job with less noise makes the cap larger.
+ */
+export type RunSpread = "range" | "worse-half";
 
 /** A limit from the values of the runs, with its derivation. A later run gives `runLimit(values)` again and compares. */
 export interface RunLimit {
   readonly limit: number;
   /** The worst value: the largest value for `lower`, the smallest value for `higher`. */
   readonly worst: number;
-  /** The spread of the values: max - min. */
+  /** The spread of the values: max - min for `range`, and the distance from the median to the worst value for `worse-half`. */
   readonly spread: number;
   readonly values: readonly number[];
 }
@@ -36,6 +47,7 @@ export interface RunLimit {
  * This function gives the limit of the rule of the gate limits. For `lower`, the limit is the worst value plus the spread.
  * For `higher`, it is the worst value minus the spread. It rounds the limit away from the values to `digits` decimals.
  * It refuses fewer values than `minimum` and a value that is not finite.
+ * With the option `spread` set to `worse-half`, the spread is the distance from the median to the worst value.
  */
 export function runLimit(values: readonly number[], options: RunLimitOptions = {}): RunLimit {
   const minimum = options.minimum ?? 5;
@@ -44,11 +56,14 @@ export function runLimit(values: readonly number[], options: RunLimitOptions = {
   if (!(Number.isSafeInteger(minimum) && minimum >= 1)) throw new RangeError(`runLimit: the minimum is a whole number of 1 or more, not ${minimum}.`);
   if (!(Number.isSafeInteger(digits) && digits >= 0 && digits <= 12)) throw new RangeError(`runLimit: the digits are a whole number from 0 to 12, not ${digits}.`);
   if (options.bound !== undefined && !Number.isFinite(options.bound)) throw new RangeError(`runLimit: the bound is a finite number, not ${options.bound}.`);
+  const rule = options.spread ?? "range";
+  if (rule !== "range" && rule !== "worse-half") throw new RangeError(`runLimit: the spread is "range" or "worse-half", not ${String(rule)}.`);
   for (const v of values) if (!Number.isFinite(v)) throw new RangeError(`runLimit: each value is a finite number, not ${v}.`);
   if (values.length < minimum) throw new RangeError(`runLimit: a limit needs ${minimum} values or more, not ${values.length}.`);
   const high = Math.max(...values);
   const low = Math.min(...values);
-  const spread = high - low;
+  const center = rule === "range" ? undefined : median(values);
+  const spread = center === undefined ? high - low : better === "lower" ? high - center : center - low;
   const scale = 10 ** digits;
   if (better === "lower") {
     const raw = Math.max(high + spread, options.bound ?? -Infinity);
