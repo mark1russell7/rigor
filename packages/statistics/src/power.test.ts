@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { random } from "@mark1russell7/rigor-generators";
+import { normalQuantile, random } from "@mark1russell7/rigor-generators";
 import { optionFloor, tQuantile } from "./power.ts";
 
 // Values of a published table of the Student t law, to 5 places.
@@ -33,6 +33,37 @@ describe("tQuantile", () => {
         expect(tQuantile(p, df + 1)).toBeLessThan(tQuantile(p, df));
       }),
     );
+  });
+
+  /** The closed forms of the quantile at df 1 and 2. Each form uses `p - 0.5` or `1 - p`, which are exact, so the form keeps its digits. */
+  const closed = (p: number, df: 1 | 2): number => {
+    if (df === 2) return (p - 0.5) * Math.sqrt(2 / (p * (1 - p)));
+    return p < 0.75 ? Math.tan(Math.PI * (p - 0.5)) : 1 / Math.tan(Math.PI * (1 - p));
+  };
+  const relative = (got: number, want: number): number => Math.abs(got / want - 1);
+  const LEVELS = [0.5 + 1e-9, 0.5 + 1e-7, 0.5 + 1e-4, 0.6, 0.9, 0.975, 0.999, 1 - 1e-6, 1 - 1e-9, 1 - 1e-12];
+
+  it("equals the closed forms at df 1 and 2, near p of 0.5 and in the far tail", () => {
+    for (const df of [1, 2] as const) {
+      for (const p of LEVELS) {
+        expect(relative(tQuantile(p, df), closed(p, df))).toBeLessThan(1e-10);
+        expect(tQuantile(1 - p, df)).toBe(-tQuantile(p, df));
+      }
+    }
+  });
+
+  it("gives the same quantile from the bisection and from the series at the switch to the series", () => {
+    // Below 1e5 degrees of freedom the function bisects the shares of the law. From 1e5, it uses the Cornish-Fisher series.
+    for (const p of LEVELS) expect(relative(tQuantile(p, 1e5 - 1e-4), tQuantile(p, 1e5))).toBeLessThan(1e-11);
+  });
+
+  it("goes to the normal quantile as 1 / df at a large df", () => {
+    for (const p of [0.6, 0.975, 1 - 1e-9]) {
+      const z = normalQuantile(p);
+      expect(relative((tQuantile(p, 1e6) - z) * 1e6, (z ** 3 + z) / 4)).toBeLessThan(1e-5);
+      for (const df of [1e6, 1e8, 1e10]) expect(tQuantile(p, df * 100)).toBeLessThan(tQuantile(p, df));
+      expect(relative(tQuantile(p, 1e15), z)).toBeLessThan(1e-14);
+    }
   });
 
   it("refuses a p out of the open interval and a bad df", () => {

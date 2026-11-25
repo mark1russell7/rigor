@@ -34,6 +34,41 @@ export function logGamma(x: number): number {
   return 0.5 * Math.log(2 * Math.PI) + (y + 0.5) * Math.log(t) - t + Math.log(sum);
 }
 
+/** The coefficients of the Stirling series of the log of the gamma function: B(2k) / (2k (2k - 1)) for k from 1 to 8. */
+const STIRLING = [1 / 12, -1 / 360, 1 / 1260, -1 / 1680, 1 / 1188, -691 / 360360, 1 / 156, -3617 / 122400];
+
+/**
+ * This function gives the Stirling correction: `logGamma(x)` less `(x - 0.5) log x - x + log(2 pi) / 2`, for `x` of 10 or more.
+ * At 10, the first term that the series omits is below 2e-18.
+ */
+function stirlingCorrection(x: number): number {
+  const square = 1 / (x * x);
+  let sum = 0;
+  for (let i = STIRLING.length - 1; i >= 0; i--) sum = sum * square + STIRLING[i]!;
+  return sum / x;
+}
+
+/**
+ * This function gives the logarithm of the beta function, `logGamma(a) + logGamma(b) - logGamma(a + b)`, for `a` and `b` above 0.
+ * - When an argument is 10 or more, the Stirling series gives the difference of the large terms (as `lbeta` of R).
+ *   Thus the value is accurate also when `a + b` is near 1e13. There, the sum of `logGamma` loses all digits of the difference.
+ * - When both arguments are below 10, the value is the sum of `logGamma`.
+ */
+export function logBeta(a: number, b: number): number {
+  const p = Math.min(a, b);
+  const q = Math.max(a, b);
+  const share = p / (p + q);
+  if (p >= 10) {
+    const correction = stirlingCorrection(p) + stirlingCorrection(q) - stirlingCorrection(p + q);
+    return -0.5 * Math.log(q) + 0.5 * Math.log(2 * Math.PI) + correction + (p - 0.5) * Math.log(share) + q * Math.log1p(-share);
+  }
+  if (q >= 10) {
+    const correction = stirlingCorrection(q) - stirlingCorrection(p + q);
+    return logGamma(p) + correction + p - p * Math.log(p + q) + (q - 0.5) * Math.log1p(-share);
+  }
+  return logGamma(p) + logGamma(q) - logGamma(p + q);
+}
+
 /** This function gives the continued fraction of the incomplete beta function (the method of Lentz). */
 function betaFraction(a: number, b: number, x: number): number {
   const tiny = 1e-300;
@@ -64,14 +99,48 @@ function betaFraction(a: number, b: number, x: number): number {
   return h;
 }
 
-/** This function gives the regularized incomplete beta function: the beta cumulative distribution at `x`. */
+/** The shares of a beta law below and above a point. */
+export interface BetaShares {
+  /** The share of the law below the point: the regularized incomplete beta function. */
+  readonly below: number;
+  /** The share of the law above the point. */
+  readonly above: number;
+}
+
+/**
+ * This function gives the shares of the beta law with the parameters `a` and `b` below and above `x`.
+ * - The caller gives `x` and `y = 1 - x`, each with its full digits. Thus a point near 1 keeps the digits of its distance from 1.
+ *   For example, `df / (df + t^2)` and `t^2 / (df + t^2)` give both shares of the Student t law with no rounding near 1.
+ * - The continued fraction gives the smaller share with its relative digits. The other share is 1 less that share.
+ * - The fraction loses digits when its point is near 1 and its first parameter is large. This is the share above `x` when `x` is above `(a + 1) / (a + b + 2)`.
+ *   The tests hold the relative error of that share below `2e-16 * b`, for `b` from 5e5 to 5e8.
+ * - The logs of the front factor use the smaller of `x` and `y`, and the factor uses `logBeta`. Thus a parameter near 1e13 keeps the digits of the shares.
+ *
+ * @throws RangeError when `x` or `y` is not from 0 to 1, or when `x + y` is not 1
+ */
+export function betaShares(x: number, y: number, a: number, b: number): BetaShares {
+  if (!(x >= 0 && x <= 1 && y >= 0 && y <= 1 && Math.abs(x + y - 1) <= 1e-12)) {
+    throw new RangeError(`betaShares: x and y are from 0 to 1 and their sum is 1, not ${x} and ${y}.`);
+  }
+  if (x === 0) return { below: 0, above: 1 };
+  if (y === 0) return { below: 1, above: 0 };
+  const logX = x < 0.5 ? Math.log(x) : Math.log1p(-y);
+  const logY = y < 0.5 ? Math.log(y) : Math.log1p(-x);
+  const front = Math.exp(a * logX + b * logY - logBeta(a, b));
+  if (x < (a + 1) / (a + b + 2)) {
+    const below = (front * betaFraction(a, b, x)) / a;
+    return { below, above: 1 - below };
+  }
+  const above = (front * betaFraction(b, a, y)) / b;
+  return { below: 1 - above, above };
+}
+
+/** This function gives the regularized incomplete beta function: the beta cumulative distribution at `x` (`betaShares` with `1 - x`). */
 export function betaCdf(x: number, a: number, b: number): number {
   if (Number.isNaN(x)) return Number.NaN;
   if (x <= 0) return 0;
   if (x >= 1) return 1;
-  const front = Math.exp(logGamma(a + b) - logGamma(a) - logGamma(b) + a * Math.log(x) + b * Math.log1p(-x));
-  if (x < (a + 1) / (a + b + 2)) return (front * betaFraction(a, b, x)) / a;
-  return 1 - (front * betaFraction(b, a, 1 - x)) / b;
+  return betaShares(x, 1 - x, a, b).below;
 }
 
 /**

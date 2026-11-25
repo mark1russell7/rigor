@@ -6,6 +6,7 @@
 
 ## . (build/index.d.ts): names
 
+type BetaShares: build/quantiles.d.ts#BetaShares
 COVERING_CANDIDATES: build/covering.d.ts#COVERING_CANDIDATES
 COVERING_LIMIT: build/covering.d.ts#COVERING_LIMIT
 type CanonicalOptions: build/hash.d.ts#CanonicalOptions
@@ -31,6 +32,7 @@ type ShrinkStep: build/shrink.d.ts#ShrinkStep
 type Shrunk: build/shrink.d.ts#Shrunk
 type Source: build/random.d.ts#Source
 betaCdf: build/quantiles.d.ts#betaCdf
+betaShares: build/quantiles.d.ts#betaShares
 canonicalHash: build/hash.d.ts#canonicalHash
 canonicalJson: build/hash.d.ts#canonicalJson
 coveringArray: build/covering.d.ts#coveringArray
@@ -42,6 +44,7 @@ familyMap: build/designs.d.ts#familyMap
 familyPoints: build/designs.d.ts#familyPoints
 fnv1a32: build/random.d.ts#fnv1a32
 latinHypercube: build/designs.d.ts#latinHypercube
+logBeta: build/quantiles.d.ts#logBeta
 logGamma: build/quantiles.d.ts#logGamma
 mulberry32: build/random.d.ts#mulberry32
 normalCdf: build/normal.d.ts#normalCdf
@@ -206,6 +209,12 @@ export declare function normalCdf(x: number): number;
 ### build/normal.d.ts#normalQuantile
 export declare function normalQuantile(p: number): number;
 
+### build/quantiles.d.ts#BetaShares
+export interface BetaShares {
+  readonly below: number;
+  readonly above: number;
+}
+
 ### build/quantiles.d.ts#Distribution
 export interface Distribution {
   readonly family: DistributionSpec["family"];
@@ -217,8 +226,14 @@ export interface Distribution {
 ### build/quantiles.d.ts#betaCdf
 export declare function betaCdf(x: number, a: number, b: number): number;
 
+### build/quantiles.d.ts#betaShares
+export declare function betaShares(x: number, y: number, a: number, b: number): BetaShares;
+
 ### build/quantiles.d.ts#distributionOf
 export declare function distributionOf(spec: DistributionSpec, r: Random): Distribution;
+
+### build/quantiles.d.ts#logBeta
+export declare function logBeta(a: number, b: number): number;
 
 ### build/quantiles.d.ts#logGamma
 export declare function logGamma(x: number): number;
