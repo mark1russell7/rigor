@@ -254,7 +254,9 @@ fitSeparable: build/index.d.ts#fitSeparable
 fitTwoLevelGammaRates: build/index.d.ts#fitTwoLevelGammaRates
 foldRule: build/index.d.ts#foldRule
 foldSkills: build/index.d.ts#foldSkills
+gammaCdf: build/index.d.ts#gammaCdf
 gammaPoissonLogLikelihood: build/index.d.ts#gammaPoissonLogLikelihood
+gammaQuantile: build/index.d.ts#gammaQuantile
 glicko2Idle: build/index.d.ts#glicko2Idle
 glicko2Replay: build/index.d.ts#glicko2Replay
 glicko2Update: build/index.d.ts#glicko2Update
@@ -296,6 +298,7 @@ poissonInterval: build/index.d.ts#poissonInterval
 polyaLogLikelihood: build/index.d.ts#polyaLogLikelihood
 polyaPredictive: build/index.d.ts#polyaPredictive
 pooledRate: build/index.d.ts#pooledRate
+pooledRateUpper: build/index.d.ts#pooledRateUpper
 predictResponse: build/index.d.ts#predictResponse
 quantile: build/index.d.ts#quantile
 quantileInterval: build/index.d.ts#quantileInterval
@@ -1816,8 +1819,14 @@ export declare function foldRule(skills: readonly number[], options?: FoldRuleOp
 ### build/index.d.ts#foldSkills
 export declare function foldSkills(record: Pick<ResponseRecord, "folds">, measure: string): number[];
 
+### build/index.d.ts#gammaCdf
+export declare function gammaCdf(x: number, shape: number, rate: number): number;
+
 ### build/index.d.ts#gammaPoissonLogLikelihood
 export declare function gammaPoissonLogLikelihood(units: readonly RateUnit[], shape: number, mean: number): number;
+
+### build/index.d.ts#gammaQuantile
+export declare function gammaQuantile(p: number, shape: number, rate: number): number;
 
 ### build/index.d.ts#glicko2Idle
 export declare function glicko2Idle(player: Glicko2Rating): Glicko2Rating;
@@ -1937,6 +1946,9 @@ export declare function polyaPredictive(base: number, concentration: number, sam
 
 ### build/index.d.ts#pooledRate
 export declare function pooledRate(unit: RateUnit, law: GammaRates): number;
+
+### build/index.d.ts#pooledRateUpper
+export declare function pooledRateUpper(unit: RateUnit, law: GammaRates, level?: number): number;
 
 ### build/index.d.ts#predictResponse
 export declare function predictResponse(model: ResponseModel, inputs: Readonly<Record<string, ResponseInputValue>>): number;
