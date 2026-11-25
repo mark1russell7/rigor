@@ -144,6 +144,9 @@ v.comparison;                                     // the cases that gain and dro
 | `childRecords(case, round, offset, order, times)` | The `PairedTime` of the candidate pair and of the A/A pair of a paired child, from the medians. |
 | `codeStamp(options)` | From `/code-stamp`: the stamp of the code of a run, from the code that its entries reach, the lock closure of its engines and its data files. |
 | `lockClosure(text, importer, names)` | From `/code-stamp`: each package that an engine pulls in, from a pnpm lock file. |
+| `configStamp(root, config)` | From `/stamp-gate`: the stamp of the timed code of a bench in a checkout, from a config file. |
+| `stampChanges(base, head)` | From `/stamp-gate`: the parts of two stamp records that differ. No part means the same timed code. |
+| `stampCli(argv, io)` | From `/stamp-gate`: the command of the bin `rigor-stamp`. |
 | `superviseCases(options)` | From `/supervise`: each case in a child process, held to a time budget, with a hard stop and a resume. |
 | `caseProgress(file)` | From `/supervise`: the writer of the progress file of a child. |
 | `startSupervisedProcess(argv, options)` | From `/supervise`: a child process that `superviseCases` can stop with its tree. |
@@ -1227,6 +1230,28 @@ A workspace package is not an engine: `lockClosure` refuses it, because its code
 - A rename of an identifier moves the stamp, and so does the rename of an entry file. This gives a false rerun, not a false keep.
 - A top-level statement with an effect stays in the bundle when its module has no `"sideEffects": false`. A change of that statement moves the stamp, also when no result depends on it.
 - A new version of the bundler that gives an equal bundle keeps the stamp and the records. A new version that gives another bundle moves `code`, so it keeps no record, also when no result can change. This gives a false rerun, not a false keep. The field `bundler` of `parts` tells the cause. A caller with long runs holds automatic updates of the bundler in its own update settings. It merges an update when its next full run starts. The read of 2026-11-05 stamped 2 real entries (17 inputs) with 8 versions of the bundler, 0.27.2 to 0.28.2. Each of the 7 steps gave an equal bundle, so 0 of 7 steps gave a false rerun. The true rate is at most approximately 35 % at 95 %, and this read is of one tree only. Also, esbuild 0.27.4 crashed on a failed build of an entry in that read. That version is outside the peer range, so the read does not count it as a false rerun.
+
+## The stamp gate of a bench
+
+The entry `@mark1russell7/rigor-bench/stamp-gate` and the bin `rigor-stamp` start the bench of a pull request only when the timed code changes. They are for Node only, and they use the optional peer `esbuild`, as `/code-stamp` does.
+
+A config file names the timed code of a bench. Each path uses forward slashes. `package` starts at the root of the checkout, and `entries` and `dataFiles` start at the package folder.
+
+```json
+{ "schema": "stamp-config/1", "package": "packages/joint", "entries": ["bench/child.ts"], "reads": [], "dataFiles": [] }
+```
+
+The fields `lockFile` (the default is `pnpm-lock.yaml` at the root) and `importer` (the default is the package folder) are optional.
+
+`configStamp` makes the stamp in two passes. The first pass keeps each dependency of the package outside the bundle, and it gives the source files of the bundle. The second pass keeps only the packages that these files import. So a lock change of a package that the timed code does not import keeps the stamp. A workspace package enters the bundle, and its code is in the stamp.
+
+```sh
+rigor-stamp stamp --config bench/stamp.json --out head.json
+rigor-stamp stamp --config bench/stamp.json --root ../base --out base.json   # the merge base, installed in ../base
+rigor-stamp changed --base base.json --head head.json                         # match=true or match=false to GITHUB_OUTPUT
+```
+
+A record that `changed` cannot read gives `match=true`, so the bench runs. A stamp that fails gives the exit code 1. The workflow then runs the bench too. Thus a fault can skip no bench. The action `stamp-gate` of the shared CI actions runs these steps for a pull request.
 
 ## Run cases with a time budget
 

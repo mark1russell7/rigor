@@ -345,14 +345,14 @@ writeGateVerdict: build/index.d.ts#writeGateVerdict
 
 ## ./code-stamp (build/code-stamp.d.ts): names
 
-CODE_STAMP_READ_WORDS: build/code-stamp.d.ts#CODE_STAMP_READ_WORDS
-CodeStamp: build/code-stamp.d.ts#CodeStamp
-CodeStampEngines: build/code-stamp.d.ts#CodeStampEngines
-CodeStampOptions: build/code-stamp.d.ts#CodeStampOptions
-CodeStampParts: build/code-stamp.d.ts#CodeStampParts
-EngineClosure: build/code-stamp.d.ts#EngineClosure
-codeStamp: build/code-stamp.d.ts#codeStamp
-lockClosure: build/code-stamp.d.ts#lockClosure
+CODE_STAMP_READ_WORDS: build/code-stamp2.d.ts#CODE_STAMP_READ_WORDS
+CodeStamp: build/code-stamp2.d.ts#CodeStamp
+CodeStampEngines: build/code-stamp2.d.ts#CodeStampEngines
+CodeStampOptions: build/code-stamp2.d.ts#CodeStampOptions
+CodeStampParts: build/code-stamp2.d.ts#CodeStampParts
+EngineClosure: build/code-stamp2.d.ts#EngineClosure
+codeStamp: build/code-stamp2.d.ts#codeStamp
+lockClosure: build/code-stamp2.d.ts#lockClosure
 
 ## ./fresh (build/fresh.d.ts): names
 
@@ -459,17 +459,36 @@ caseProgress: build/supervise.d.ts#caseProgress
 startSupervisedProcess: build/supervise.d.ts#startSupervisedProcess
 superviseCases: build/supervise.d.ts#superviseCases
 
-## bin: 1 commands
+## ./stamp-gate (build/stamp-gate.d.ts): names
+
+STAMP_CONFIG_SCHEMA: build/stamp-gate.d.ts#STAMP_CONFIG_SCHEMA
+STAMP_HELP: build/stamp-gate.d.ts#STAMP_HELP
+STAMP_RECORD_SCHEMA: build/stamp-gate.d.ts#STAMP_RECORD_SCHEMA
+StampCliIo: build/stamp-gate.d.ts#StampCliIo
+StampConfig: build/stamp-gate.d.ts#StampConfig
+StampManifest: build/stamp-gate.d.ts#StampManifest
+StampRecord: build/stamp-gate.d.ts#StampRecord
+configStamp: build/stamp-gate.d.ts#configStamp
+enginesOf: build/stamp-gate.d.ts#enginesOf
+importSpecifiers: build/stamp-gate.d.ts#importSpecifiers
+packageOf: build/stamp-gate.d.ts#packageOf
+stampChanges: build/stamp-gate.d.ts#stampChanges
+stampCli: build/stamp-gate.d.ts#stampCli
+stampConfig: build/stamp-gate.d.ts#stampConfig
+stampRecord: build/stamp-gate.d.ts#stampRecord
+
+## bin: 2 commands
 
 rigor-gate-line: ./build/cli.js
+rigor-stamp: ./build/stamp-bin.js
 
 ## Declarations
 
-### build/code-stamp.d.ts#CODE_STAMP_READ_WORDS
-export declare const CODE_STAMP_READ_WORDS: readonly string[];
+### build/code-stamp2.d.ts#CODE_STAMP_READ_WORDS
+declare const CODE_STAMP_READ_WORDS: readonly string[];
 
-### build/code-stamp.d.ts#CodeStamp
-export interface CodeStamp {
+### build/code-stamp2.d.ts#CodeStamp
+interface CodeStamp {
   readonly hash: string;
   readonly parts: CodeStampParts;
   readonly inputs: readonly string[];
@@ -477,15 +496,15 @@ export interface CodeStamp {
   readonly engines: readonly EngineClosure[];
 }
 
-### build/code-stamp.d.ts#CodeStampEngines
-export interface CodeStampEngines {
+### build/code-stamp2.d.ts#CodeStampEngines
+interface CodeStampEngines {
   readonly names: readonly string[];
   readonly lockFile: string;
   readonly importer: string;
 }
 
-### build/code-stamp.d.ts#CodeStampOptions
-export interface CodeStampOptions {
+### build/code-stamp2.d.ts#CodeStampOptions
+interface CodeStampOptions {
   readonly cwd: string;
   readonly entries: readonly string[];
   readonly engines?: CodeStampEngines;
@@ -494,8 +513,8 @@ export interface CodeStampOptions {
   readonly node?: string;
 }
 
-### build/code-stamp.d.ts#CodeStampParts
-export interface CodeStampParts {
+### build/code-stamp2.d.ts#CodeStampParts
+interface CodeStampParts {
   readonly code: string;
   readonly engines: string;
   readonly data: string;
@@ -503,18 +522,18 @@ export interface CodeStampParts {
   readonly node: string;
 }
 
-### build/code-stamp.d.ts#EngineClosure
-export interface EngineClosure {
+### build/code-stamp2.d.ts#EngineClosure
+interface EngineClosure {
   readonly name: string;
   readonly version: string;
   readonly closure: readonly string[];
 }
 
-### build/code-stamp.d.ts#codeStamp
-export declare function codeStamp(options: CodeStampOptions): Promise<CodeStamp>;
+### build/code-stamp2.d.ts#codeStamp
+declare function codeStamp(options: CodeStampOptions): Promise<CodeStamp>;
 
-### build/code-stamp.d.ts#lockClosure
-export declare function lockClosure(lockText: string, importer: string, names: readonly string[]): readonly EngineClosure[];
+### build/code-stamp2.d.ts#lockClosure
+declare function lockClosure(lockText: string, importer: string, names: readonly string[]): readonly EngineClosure[];
 
 ### build/fresh.d.ts#ArmProcess
 interface ArmProcess {
@@ -3209,6 +3228,77 @@ declare function firstArm(round: number, offset?: number): Arm;
 
 ### build/paired.d.ts#orderSize
 declare function orderSize(records: readonly PairedTime[]): OrderSize;
+
+### build/stamp-gate.d.ts#STAMP_CONFIG_SCHEMA
+export declare const STAMP_CONFIG_SCHEMA = "stamp-config/1";
+
+### build/stamp-gate.d.ts#STAMP_HELP
+export declare const STAMP_HELP: string;
+
+### build/stamp-gate.d.ts#STAMP_RECORD_SCHEMA
+export declare const STAMP_RECORD_SCHEMA = "bench-stamp/1";
+
+### build/stamp-gate.d.ts#StampCliIo
+export interface StampCliIo {
+  readonly readFile: (path: string) => string;
+  readonly writeFile: (path: string, text: string) => void;
+  readonly appendFile: (path: string, text: string) => void;
+  readonly stdout: (text: string) => void;
+  readonly stderr: (text: string) => void;
+  readonly env: Readonly<Record<string, string | undefined>>;
+  readonly cwd: string;
+  readonly stamp?: (root: string, config: StampConfig) => Promise<CodeStamp>;
+}
+
+### build/stamp-gate.d.ts#StampConfig
+export interface StampConfig {
+  readonly schema: typeof STAMP_CONFIG_SCHEMA;
+  readonly package: string;
+  readonly entries: readonly string[];
+  readonly reads?: readonly string[];
+  readonly dataFiles?: readonly string[];
+  readonly lockFile?: string;
+  readonly importer?: string;
+}
+
+### build/stamp-gate.d.ts#StampManifest
+export interface StampManifest {
+  readonly dependencies?: Readonly<Record<string, string>>;
+  readonly devDependencies?: Readonly<Record<string, string>>;
+}
+
+### build/stamp-gate.d.ts#StampRecord
+export interface StampRecord {
+  readonly schema: typeof STAMP_RECORD_SCHEMA;
+  readonly hash: string;
+  readonly parts: CodeStamp["parts"];
+  readonly inputs: readonly string[];
+  readonly engines: readonly string[];
+}
+
+### build/stamp-gate.d.ts#configStamp
+export declare function configStamp(root: string, config: StampConfig): Promise<CodeStamp>;
+
+### build/stamp-gate.d.ts#enginesOf
+export declare function enginesOf(manifest: StampManifest, sources: readonly string[]): string[];
+
+### build/stamp-gate.d.ts#importSpecifiers
+export declare function importSpecifiers(text: string): string[];
+
+### build/stamp-gate.d.ts#packageOf
+export declare function packageOf(specifier: string): string | undefined;
+
+### build/stamp-gate.d.ts#stampChanges
+export declare function stampChanges(base: unknown, head: unknown): string[];
+
+### build/stamp-gate.d.ts#stampCli
+export declare function stampCli(argv: readonly string[], io: StampCliIo): Promise<number>;
+
+### build/stamp-gate.d.ts#stampConfig
+export declare function stampConfig(value: unknown): StampConfig;
+
+### build/stamp-gate.d.ts#stampRecord
+export declare function stampRecord(stamp: CodeStamp): StampRecord;
 
 ### build/supervise.d.ts#CaseProgress
 export interface CaseProgress {
