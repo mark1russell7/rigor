@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { sampler, type DistributionSpec } from "./distributions.ts";
-import { betaCdf, distributionOf, logGamma } from "./quantiles.ts";
+import { normalQuantile } from "./normal.ts";
+import { betaCdf, betaShares, distributionOf, logBeta, logGamma } from "./quantiles.ts";
 import { random } from "./random.ts";
 
 const relative = (got: number, want: number): number => Math.abs(got - want) / Math.abs(want);
@@ -47,6 +48,81 @@ describe("the beta cumulative distribution", () => {
     }
     expect(betaCdf(0, 2, 3)).toBe(0);
     expect(betaCdf(1, 2, 3)).toBe(1);
+  });
+});
+
+describe("the log of the beta function", () => {
+  it("equals the closed forms and the sum of logGamma at small arguments, and is symmetric", () => {
+    expect(relative(logBeta(2, 3), Math.log(1 / 12))).toBeLessThan(1e-14);
+    expect(relative(logBeta(0.5, 0.5), Math.log(Math.PI))).toBeLessThan(1e-14);
+    expect(relative(logBeta(10, 20), logGamma(10) + logGamma(20) - logGamma(30))).toBeLessThan(1e-13);
+    expect(relative(logBeta(12.5, 300), logGamma(12.5) + logGamma(300) - logGamma(312.5))).toBeLessThan(1e-13);
+    expect(logBeta(3, 40)).toBe(logBeta(40, 3));
+  });
+
+  // B(a, b + 1) = B(a, b) b / (a + b), and B(1, b) = 1 / b. The sum of logGamma loses all digits of these steps near 1e12.
+  it.each([10, 1e3, 1e6, 1e9, 1e12, 1e13])("keeps the digits of the steps at b of %s", (b) => {
+    expect(relative(logBeta(1, b), -Math.log(b))).toBeLessThan(1e-15);
+    for (const a of [0.5, 20, 1e4]) {
+      const step = logBeta(a, b + 1) - logBeta(a, b);
+      expect(Math.abs(step - Math.log1p(-a / (a + b)))).toBeLessThan(1e-15 * Math.max(1, Math.abs(logBeta(a, b))));
+    }
+  });
+});
+
+describe("the shares of the beta law", () => {
+  it("gives the two shares, betaCdf as the share below, and the shares of the swapped law", () => {
+    for (const [a, b] of [[2, 3], [0.5, 7], [40, 0.3]] as const) {
+      for (const x of [0.01, 0.3, 0.5, 0.9, 0.999]) {
+        const shares = betaShares(x, 1 - x, a, b);
+        expect(shares.below).toBe(betaCdf(x, a, b));
+        expect(shares.below + shares.above).toBeCloseTo(1, 15);
+        expect(relative(betaShares(1 - x, x, b, a).above, shares.below)).toBeLessThan(1e-13);
+      }
+    }
+    expect(betaShares(0, 1, 2, 3)).toEqual({ below: 0, above: 1 });
+    expect(betaShares(1, 0, 2, 3)).toEqual({ below: 1, above: 0 });
+  });
+
+  it("keeps the digits of the distance of a point near 1", () => {
+    // The law with b of 1 has the share x^a below x. Thus the share above is -expm1(a log1p(-y)).
+    for (const y of [1e-9, 1e-15, 1e-20]) {
+      expect(relative(betaShares(1 - y, y, 3, 1).above, -Math.expm1(3 * Math.log1p(-y)))).toBeLessThan(1e-12);
+      expect(relative(betaShares(y, 1 - y, 1, 2.5).below, -Math.expm1(2.5 * Math.log1p(-y)))).toBeLessThan(1e-12);
+    }
+    // betaCdf gets only x, so it cannot keep these digits.
+    expect(1 - betaCdf(1 - 1e-20, 3, 1)).toBe(0);
+  });
+
+  it("refuses a point out of the law and a pair whose sum is not 1", () => {
+    expect(() => betaShares(-0.1, 1.1, 2, 3)).toThrow(RangeError);
+    expect(() => betaShares(0.3, 0.6, 2, 3)).toThrow(RangeError);
+    expect(() => betaShares(Number.NaN, 0.5, 2, 3)).toThrow(RangeError);
+  });
+
+  /** The Cornish-Fisher series of the quantile of the Student t law, to the power -4 of the degrees of freedom. */
+  const tSeries = (p: number, df: number): number => {
+    const z = normalQuantile(p);
+    const terms = [
+      (z ** 3 + z) / 4,
+      (5 * z ** 5 + 16 * z ** 3 + 3 * z) / 96,
+      (3 * z ** 7 + 19 * z ** 5 + 17 * z ** 3 - 15 * z) / 384,
+      (79 * z ** 9 + 776 * z ** 7 + 1482 * z ** 5 - 1920 * z ** 3 - 945 * z) / 92160,
+    ];
+    return terms.reduce((sum, term, at) => sum + term / df ** (at + 1), z);
+  };
+
+  // The beta law of t^2 / (df + t^2), with a of 0.5 and b of df / 2, gives the shares of the Student t law.
+  // The share between -t and t keeps its digits at each df. The share above, from the swapped fraction, loses digits in proportion to df.
+  it.each([1e6, 1e7, 1e8, 1e9])("gives the shares of the Student t law at df %s, against the Cornish-Fisher series", (df) => {
+    for (const p of [0.5 + 1e-9, 0.5 + 1e-7, 0.6, 0.7]) {
+      const square = tSeries(p, df) ** 2;
+      expect(relative(betaShares(square / (df + square), df / (df + square), 0.5, df / 2).below, 2 * p - 1)).toBeLessThan(1e-13);
+    }
+    for (const p of [0.9, 0.975, 0.999, 1 - 1e-6, 1 - 1e-9]) {
+      const square = tSeries(p, df) ** 2;
+      expect(relative(betaShares(square / (df + square), df / (df + square), 0.5, df / 2).above, 2 * (1 - p))).toBeLessThan(1e-16 * df);
+    }
   });
 });
 

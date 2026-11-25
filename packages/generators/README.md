@@ -106,6 +106,15 @@ Each table is a sample, and it does not show a general law:
 
 The npm package holds the notice of the Ptolemy II license, because the field `notice` is part of the build.
 
+### The beta and gamma functions
+
+`logGamma(x)`, `logBeta(a, b)`, `betaCdf(x, a, b)` and `betaShares(x, y, a, b)` give the special functions of the families.
+
+- `logBeta` keeps the digits of its value when a parameter is near 1e13. There, the sum of `logGamma` loses all of them.
+- `betaShares` takes the point `x` and its distance `y = 1 - x` from 1. Thus a point near 1 keeps its digits. The function gives the shares of the law below and above the point.
+
+The Student t law with `df` degrees of freedom has its shares between `-t` and `t` and above `|t|` in `betaShares(t^2 / (df + t^2), df / (df + t^2), 0.5, df / 2)`.
+
 ## Input families and designs
 
 An input family has named dimensions. Each dimension has a range from `min` to `max`. It can also have one of these:
