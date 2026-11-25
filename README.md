@@ -2,7 +2,7 @@
 
 Shared libraries for measured work: seeded generators, statistics, gates, test generation, chaos and load.
 
-Many engines make their own copies of these tools. The duplication atlas ([codeatlas](https://mark1russell7.github.io/codeatlas/)) found the same seeded generator written by hand approximately 40 times, in more than 10 repositories. This monorepo keeps one tested copy of each tool. Each engine moves to it one function at a time, and its records stay byte-equal.
+Many engines make their own copies of these tools. The duplication atlas ([codeatlas](https://metrograph-labs.github.io/codeatlas/)) found the same seeded generator written by hand approximately 40 times, in more than 10 repositories. This monorepo keeps one tested copy of each tool. Each engine moves to it one function at a time, and its records stay byte-equal.
 
 **Site:** https://mark1russell7.github.io/rigor/ (try the generator in the browser, the status and the releases).
 
