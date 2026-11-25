@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { median, twoSamplePermutation } from "@mark1russell7/rigor-statistics";
 import { describe, expect, it } from "vitest";
-import { type ModelRead, type ModelRow, type ModelTest, type RunValue, CEILING_ONLY, UNKNOWN_MODEL, armModels, cpuEntry, limitOnModel, modelRowText, modelRuns, modelTable, modelTest, visibleShift } from "./model.ts";
+import { type ModelRead, type ModelRow, type ModelTest, type RunValue, CEILING_ONLY, UNKNOWN_MODEL, armModels, cpuEntry, limitOnModel, modelRowText, modelRuns, modelTable, modelTest, recentRuns, visibleShift } from "./model.ts";
 import { runLimit } from "./run-limit.ts";
 
 /** This function gives one read for each value. */
@@ -407,5 +407,42 @@ describe("modelTable", () => {
     expect(() => modelTable(fast, oneValue, { minimumRuns: 0 })).toThrow(/minimum of runs/);
     expect(() => modelTable([...fast, { model: "Fast CPU A", run: "r9", value: Number.NaN }], oneValue)).toThrow(/finite/);
     expect(() => modelTable(few, oneValue)).toThrow(/5 values or more/);
+  });
+});
+
+describe("recentRuns", () => {
+  const value = (model: string, run: string, x = 1): RunValue => ({ model, run, value: x });
+  const key = (item: RunValue) => item;
+  it("keeps the last runs of each CPU model, so a rare model keeps its old runs", () => {
+    const fast = ["r1", "r2", "r3", "r4", "r5", "r6", "r7"].map((run) => value("Fast CPU A", run));
+    const rare = ["r1", "r2", "r3"].map((run) => value("Rare CPU C", run));
+    const kept = recentRuns([...fast, ...rare], key, { perModel: 5 });
+    expect(kept.filter((item) => item.model === "Fast CPU A").map((item) => item.run)).toEqual(["r3", "r4", "r5", "r6", "r7"]);
+    expect(kept.filter((item) => item.model === "Rare CPU C").map((item) => item.run)).toEqual(["r1", "r2", "r3"]);
+  });
+  it("keeps each item of a kept run, in the order of the items", () => {
+    const items = [value("A", "r2", 1), value("A", "r1", 2), value("A", "r2", 3), value("A", "r3", 4)];
+    expect(recentRuns(items, key, { perModel: 2, minimumRuns: 2, order: ["r1", "r2", "r3"] }).map((item) => item.value)).toEqual([1, 3, 4]);
+    // With no order, the order of the runs is the order of their first item: r2, r1, r3.
+    expect(recentRuns(items, key, { perModel: 2, minimumRuns: 2 }).map((item) => item.value)).toEqual([2, 4]);
+  });
+  it("reads the age of a run from the order, not from the order of the items", () => {
+    const items = ["r3", "r1", "r2"].map((run) => value("A", run));
+    expect(recentRuns(items, key, { perModel: 2, minimumRuns: 1, order: ["r1", "r2", "r3"] }).map((item) => item.run)).toEqual(["r3", "r2"]);
+    expect(recentRuns(items, key, { perModel: 2, minimumRuns: 1 }).map((item) => item.run)).toEqual(["r1", "r2"]);
+  });
+  it("lets a limit go down again when a slow run leaves the window", () => {
+    const runs = [2, 1, 1.02, 1.01, 1.03, 1.02, 1.01].map((x, i) => value("Fast CPU A", `r${String(i)}`, x));
+    const limit = (items: readonly RunValue[]) => modelTable(items, (groups) => runLimit(groups.flat()))["Fast CPU A"]?.limit ?? Number.NaN;
+    expect(limit(recentRuns(runs, key, { perModel: 5 }))).toBeLessThan(limit(runs));
+    expect(limit(recentRuns(runs, key, { perModel: 7 }))).toBe(limit(runs));
+  });
+  it("keeps the entry of each model of modelTable, and refuses a window of fewer runs", () => {
+    const runs = [1, 1.02, 1.01, 1.03, 1.02, 1.01].map((x, i) => value("Fast CPU A", `r${String(i)}`, x));
+    expect(Object.keys(modelTable(recentRuns(runs, key, { perModel: 5 }), (groups) => runLimit(groups.flat())))).toEqual(["Fast CPU A", "other"]);
+    expect(() => recentRuns(runs, key, { perModel: 4 })).toThrow(/5 or more/);
+    expect(() => recentRuns(runs, key, { perModel: 2.5, minimumRuns: 1 })).toThrow(/whole number/);
+    expect(() => recentRuns(runs, key, { perModel: 5, order: ["r0"] })).toThrow(/not in the order/);
+    expect(() => recentRuns(runs, key, { perModel: 5, order: ["r0", "r0"] })).toThrow(/two times/);
   });
 });

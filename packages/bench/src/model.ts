@@ -318,6 +318,44 @@ export function modelTable<T>(values: readonly RunValue[], limit: (runs: readonl
   return { ...Object.fromEntries(own), other: limit([...groups.values()]) };
 }
 
+/** The options of `recentRuns`. Since 0.3.7. */
+export interface RecentRunsOptions {
+  /** The count of the last CI runs that each CPU model keeps. It is `minimumRuns` or more. */
+  readonly perModel: number;
+  /** The fewest CI runs of a model that give the model its own entry in `modelTable`. The default is 5. A window of fewer runs can take away the entry of a model, so the function refuses it. */
+  readonly minimumRuns?: number;
+  /** The CI runs from the oldest to the newest. Each run of an item is in it. The default is the order of the first item of each run. */
+  readonly order?: readonly string[];
+}
+
+/**
+ * This function keeps the items of the last `perModel` CI runs of each CPU model, in their order.
+ * - A limit from all the runs can only grow when new runs come in, because the worst run stays. A window of recent runs lets a limit go down again when the runners get faster.
+ * - Each model keeps its own last runs. So a model that is rare in the new runs keeps its old runs, up to `perModel`.
+ * - A model with `minimumRuns` runs or more keeps `minimumRuns` runs or more, so it keeps its entry of `modelTable`.
+ * - An item with the model `UNKNOWN_MODEL` is in the window of that name, as for each other name.
+ * Since 0.3.7.
+ */
+export function recentRuns<T>(items: readonly T[], read: (item: T) => { readonly model: string; readonly run: string }, options: RecentRunsOptions): T[] {
+  const minimumRuns = minimumRunsOf(options);
+  const { perModel } = options;
+  if (!(Number.isSafeInteger(perModel) && perModel >= minimumRuns)) throw new RangeError(`recentRuns: the runs of each model are a whole number of ${String(minimumRuns)} or more (the minimum of runs), not ${String(perModel)}.`);
+  const keys = items.map(read);
+  const order = options.order ?? [...new Set(keys.map((key) => key.run))];
+  const place = new Map(order.map((run, index) => [run, index] as const));
+  if (place.size !== order.length) throw new RangeError("recentRuns: a run is in the order two times.");
+  const runs = new Map<string, Set<string>>();
+  for (const { model, run } of keys) {
+    if (!place.has(run)) throw new RangeError(`recentRuns: the run ${run} is not in the order.`);
+    runs.set(model, (runs.get(model) ?? new Set()).add(run));
+  }
+  const kept = new Map([...runs].map(([model, set]) => [model, new Set([...set].sort((a, b) => (place.get(a) ?? 0) - (place.get(b) ?? 0)).slice(-perModel))] as const));
+  return items.filter((_, index) => {
+    const key = keys[index];
+    return key !== undefined && (kept.get(key.model)?.has(key.run) ?? false);
+  });
+}
+
 function minimumRunsOf(options: ModelTableOptions): number {
   const minimumRuns = options.minimumRuns ?? 5;
   if (!(Number.isSafeInteger(minimumRuns) && minimumRuns >= 1)) throw new RangeError(`modelTable: the minimum of runs is a whole number of 1 or more, not ${minimumRuns}.`);
