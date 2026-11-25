@@ -84,3 +84,66 @@ describe("dispersionTest", () => {
     expect(dispersionTest([0, 0], { maxWork: 1 }).p).toBe(1);
   });
 });
+
+describe("dispersionTest with the method exact", () => {
+  /** The exact p by a sum over each vector of counts with the total: the check of the sum over the partitions. */
+  const brute = (counts: readonly number[]): number => {
+    const total = counts.reduce((sum, count) => sum + count, 0);
+    const cells = counts.length;
+    const pearson = (cellCounts: readonly number[]): number => cellCounts.reduce((sum, count) => sum + (count - total / cells) ** 2 / (total / cells), 0);
+    const statistic = pearson(counts);
+    const bar = statistic - 1e-9 * Math.max(1, statistic);
+    let hit = 0;
+    const place = (cell: number, left: number, chosen: number[]): void => {
+      if (cell === cells - 1) {
+        const all = [...chosen, left];
+        if (pearson(all) >= bar) hit += Math.exp(logGamma(total + 1) - all.reduce((sum, count) => sum + logGamma(count + 1), 0) - total * Math.log(cells));
+        return;
+      }
+      for (let count = 0; count <= left; count++) place(cell + 1, left - count, [...chosen, count]);
+    };
+    place(0, total, []);
+    return hit;
+  };
+
+  it("gives the p of a sum over each vector of counts", () => {
+    for (const counts of [[1, 0, 3], [5, 0, 0, 1], [2, 2, 2, 2], [7, 1, 0, 2, 3], [0, 9], [3, 3, 0, 1, 1, 4]]) {
+      const test = dispersionTest(counts, { method: "exact" });
+      expect(test.p, JSON.stringify(counts)).toBeCloseTo(brute(counts), 12);
+      expect(test).toMatchObject({ exact: true, draws: 0, hits: 0 });
+    }
+  });
+
+  it("gives the exact p values of the yearly counts of an example, with no draws and no seed", () => {
+    // These are the yearly counts of an example from 2014 and from 2015. The two exact p values are 0.0447 and 0.3526.
+    expect(dispersionTest([0, 4, 6, 6, 5, 8, 8, 7, 14, 8], { method: "exact" }).p).toBeCloseTo(0.0447, 4);
+    expect(dispersionTest([4, 6, 6, 5, 8, 8, 7, 14, 8], { method: "exact" }).p).toBeCloseTo(0.3526, 4);
+    expect(dispersionTest([4, 6, 6, 5, 8, 8, 7, 14, 8], { method: "exact", seed: 7 }).p).toBe(dispersionTest([4, 6, 6, 5, 8, 8, 7, 14, 8], { method: "exact" }).p);
+  });
+
+  it("gives a p near the p of the draws", () => {
+    const counts = [4, 9, 2, 6, 1];
+    const exact = dispersionTest(counts, { method: "exact" }).p;
+    const drawn = dispersionTest(counts, { draws: 20_000, seed: "near" });
+    expect(drawn.exact).toBe(false);
+    expect(Math.abs(drawn.p - exact)).toBeLessThan(4 * Math.sqrt((exact * (1 - exact)) / 20_000) + 1e-4);
+  });
+
+  it("uses the draws with the method auto when the exact sum cannot run", () => {
+    expect(dispersionTest([4, 9, 2], { method: "auto" }).exact).toBe(true);
+    expect(dispersionTest([4, 9, 2], { method: "auto", exposures: [1, 2, 1] })).toMatchObject({ exact: false, draws: 10_000 });
+    expect(dispersionTest([4, 9, 2], { method: "auto", maxPartitions: 3 })).toMatchObject({ exact: false, draws: 10_000 });
+    expect(dispersionTest([4, 9, 2], { method: "auto", exposures: [2, 2, 2] }).exact).toBe(true);
+  });
+
+  it("refuses the method exact when the sum cannot run, and a bad option", () => {
+    expect(() => dispersionTest([4, 9, 2], { method: "exact", exposures: [1, 2, 1] })).toThrow(/equal exposures/);
+    expect(() => dispersionTest([4, 9, 2], { method: "exact", maxPartitions: 3 })).toThrow(/more than maxPartitions 3/);
+    expect(() => dispersionTest([4, 9, 2], { method: "exact", maxPartitions: 0 })).toThrow(/maxPartitions is a whole number/);
+    expect(() => dispersionTest([4, 9, 2], { method: "other" as "exact" })).toThrow(/draws, exact or auto/);
+  });
+
+  it("keeps the draws as the default method", () => {
+    expect(dispersionTest([4, 9, 2])).toMatchObject({ exact: false, draws: 10_000 });
+  });
+});

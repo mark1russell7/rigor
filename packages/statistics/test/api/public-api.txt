@@ -36,6 +36,7 @@ type CoverageCell: build/index.d.ts#CoverageCell
 type CoverageMinSample: build/index.d.ts#CoverageMinSample
 type CoverageReason: build/index.d.ts#CoverageReason
 type CoverageStep: build/index.d.ts#CoverageStep
+DISPERSION_MAX_PARTITIONS: build/index.d.ts#DISPERSION_MAX_PARTITIONS
 DISPERSION_MAX_WORK: build/index.d.ts#DISPERSION_MAX_WORK
 type DispersionOptions: build/index.d.ts#DispersionOptions
 type DispersionTest: build/index.d.ts#DispersionTest
@@ -562,6 +563,9 @@ interface CoverageStep {
   readonly reason: CoverageReason;
 }
 
+### build/index.d.ts#DISPERSION_MAX_PARTITIONS
+export declare const DISPERSION_MAX_PARTITIONS: number;
+
 ### build/index.d.ts#DISPERSION_MAX_WORK
 export declare const DISPERSION_MAX_WORK: number;
 
@@ -571,6 +575,8 @@ interface DispersionOptions {
   readonly draws?: number | undefined;
   readonly seed?: number | string | undefined;
   readonly maxWork?: number | undefined;
+  readonly method?: "draws" | "exact" | "auto" | undefined;
+  readonly maxPartitions?: number | undefined;
 }
 
 ### build/index.d.ts#DispersionTest
@@ -581,6 +587,7 @@ interface DispersionTest {
   readonly draws: number;
   readonly seed: number;
   readonly total: number;
+  readonly exact: boolean;
 }
 
 ### build/index.d.ts#EMPTY_RUNNING
