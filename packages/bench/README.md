@@ -63,6 +63,9 @@ v.comparison;                                     // the cases that gain and dro
 | `modelRowText(row, family)` | The words of one row. No word says that a model is the same as the rest. |
 | `limitOnModel(limits, model)` | The limit of a gain on one CPU model: the gain limit, or the ceiling with its words. |
 | `cpuEntry(table, cpu)` | The entry of a table whose key is a part of the CPU name, with the case ignored, or the entry `other`. |
+| `modelRuns(values, options)` | The values of each CPU model grouped by CI run, for each model with `minimumRuns` runs or more. Since 0.3.6. |
+| `modelTable(values, limit, options)` | A limit for each CPU model with `minimumRuns` runs or more, and the pooled limit `other`. Since 0.3.6. |
+| `recentRuns(items, read, options)` | The items of the last `perModel` CI runs of each CPU model. A limit from a window of recent runs can go down again, and a limit from all the runs can only grow. Since 0.3.7. |
 | `armModels(pairs)` | The CPU models of each arm of a set of pairs, and if all the reads come from one known model. |
 | `candidateLimits(reads, rule)` | The candidate limit of each case on each CPU model: the mean plus k standard deviations, from 5 reads or more. |
 | `freezeLimits(measure, candidates, stamp, rule)` | A file of frozen limits, with the values, the commit and the date of each limit. |

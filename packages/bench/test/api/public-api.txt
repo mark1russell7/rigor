@@ -187,6 +187,7 @@ type ProcessRead: build/index.d.ts#ProcessRead
 type ProcessVerdict: build/index.d.ts#ProcessVerdict
 type QuantileBudget: build/index.d.ts#QuantileBudget
 type RateBudget: build/index.d.ts#RateBudget
+type RecentRunsOptions: build/index.d.ts#RecentRunsOptions
 type ResultRead: build/index.d.ts#ResultRead
 type ResultRow: build/index.d.ts#ResultRow
 type ResultRows: build/index.d.ts#ResultRows
@@ -308,6 +309,7 @@ processLimits: build/index.d.ts#processLimits
 processNoiseCap: build/index.d.ts#processNoiseCap
 processVerdict: build/index.d.ts#processVerdict
 readNoise: build/index.d.ts#readNoise
+recentRuns: build/index.d.ts#recentRuns
 resultRows: build/index.d.ts#resultRows
 resultVerdict: build/index.d.ts#resultVerdict
 roundSlope: build/index.d.ts#roundSlope
@@ -2393,6 +2395,13 @@ interface RateBudget {
   readonly limit: number;
 }
 
+### build/index.d.ts#RecentRunsOptions
+interface RecentRunsOptions {
+  readonly perModel: number;
+  readonly minimumRuns?: number;
+  readonly order?: readonly string[];
+}
+
 ### build/index.d.ts#ResultRead
 interface ResultRead extends CaseResults {
   readonly outcome: "accepted" | "refused";
@@ -3007,6 +3016,12 @@ export declare function processVerdict(reads: readonly ProcessRead[], options: P
 
 ### build/index.d.ts#readNoise
 export declare function readNoise(read: ProcessRead): number | undefined;
+
+### build/index.d.ts#recentRuns
+export declare function recentRuns<T>(items: readonly T[], read: (item: T) => {
+  readonly model: string;
+  readonly run: string;
+}, options: RecentRunsOptions): T[];
 
 ### build/index.d.ts#resultRows
 export declare function resultRows(content: unknown): ResultRow[];
