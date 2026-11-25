@@ -85,6 +85,9 @@ v.comparison;                                     // the cases that gain and dro
 | `gateLineCli(argv, io)` | The command of the bin `rigor-gate-line`: a gate line from a JSON document of a shell step. |
 | `gateVerdictWord(outcome)` | The word of a gate outcome in the verdict file of a gate job: `pass`, `block` or `no-read`. |
 | `writeGateVerdict(outcome, file)` | The word of a gate outcome as one line of the verdict file. The default file is the variable `GATE_VERDICT_FILE`. |
+| `holdGate(gate, heads, read)` | The hold of a gate: `pass`, `held`, `accepted` or `no read`. A record accepts the cost of a slower case on one head arm. |
+| `holdAcceptances(files)`, `readHoldAcceptances(dir)` | The records that accept the cost of a hold, and the faults of the files that are not correct. |
+| `holdPasses(outcome)`, `holdVerdictWord(outcome)` | Only `pass` and `accepted` pass. The verdict word of `accepted` is `pass`, and of `held` is `block`. |
 | `notSlowerVerdict(jobs, options)` | The gate of the claim "not slower by more than the margin", with looks and a family level. |
 | `budgetVerdict(rounds, aa, options)` | The verdict of the claim "the median of each case is at most `limit`", for one build: `within`, `beyond` or `cannot decide`. |
 | `budgetLooksVerdict(rounds, aa, options)` | The budget verdict of a run that adds rounds to the cases with no outcome, up to a stated budget. |
@@ -369,6 +372,25 @@ gate.more;                                        // the next look of each case 
 - `no read` is not a pass. A caller adds the rounds of `more`, then more jobs. A job that it adds after the last look is one more look, and the level does not count it.
 
 The level needs independent rounds. Rounds with a shared cause, for example a slow computer for one job, do not have it.
+
+## A hold that a record accepts
+
+A gate that blocks a merge holds it. The summary check fails under the hold, unless the pull request has a record that accepts the cost of each slower case.
+
+```ts
+const hold = holdGate(gate, heads, readHoldAcceptances("bench/accepted"));
+
+hold.outcome;                                     // "pass", "held", "accepted" or "no read"
+hold.lines;                                       // one line for each slower case, and one for each fault of the records
+holdVerdictWord(hold.outcome);                    // "pass", "block" or "no-read" for the verdict file
+```
+
+- A record is `{ "case", "head", "cost", "reason", "owner" }`, in a JSON list. Each field is a text that is not empty.
+- The field `head` has 12 to 64 characters of the hash of the head arm, in lower case. `heads` gives the hash of the head arm of each run.
+- A record matches only when each run has the same head arm, and its hash starts with the hash of the record. Thus a record accepts nothing after the code changes, and runs of two heads accept nothing.
+- Each slower case needs its own record. A record for another case or another head does not count.
+- A file with one record that is not valid gives `no read`, also when the gate passes. `no read` is not a pass.
+- The first form of this gate is K239 of coeval.
 
 ## Show a gate read on the check
 
