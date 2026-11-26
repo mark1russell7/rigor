@@ -82,7 +82,7 @@ describe("survivalBand", () => {
   const curve = kaplanMeier(observations);
 
   it("gives the log-log interval of the 6-MP group", () => {
-    // The 95% log-log intervals of the 6-MP group (Freireich et al. 1963), as R survival gives them with conf.type "log-log".
+    // The 95% log-log intervals of the 6-MP group (Freireich and others, 1963), as R survival gives them with conf.type "log-log".
     const expected: [number, number, number][] = [
       [6, 0.62, 0.952],
       [10, 0.503, 0.889],
