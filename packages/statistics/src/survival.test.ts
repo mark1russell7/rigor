@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { kaplanMeier, survivalAt, survivalQuantile, type TimeToEvent } from "./survival.ts";
+import { kaplanMeier, survivalAt, survivalBand, survivalQuantile, type TimeToEvent } from "./survival.ts";
 
 // The remission times in weeks of the 6-MP group of Freireich and others (1963). A `+` time is censored.
 const SIX_MP = "6 6 6 6+ 7 9+ 10 10+ 11+ 13 16 17+ 19+ 20+ 22 23 25+ 32+ 32+ 34+ 35+";
@@ -75,5 +75,57 @@ describe("survivalAt and survivalQuantile", () => {
     expect(survivalQuantile(curve, 0.4)).toBeUndefined();
     expect(survivalQuantile(kaplanMeier([1, 2, 3, 4].map((time) => ({ time }))), 0.5)).toBe(2);
     expect(() => survivalQuantile(curve, 1)).toThrow(RangeError);
+  });
+});
+
+describe("survivalBand", () => {
+  const curve = kaplanMeier(observations);
+
+  it("gives the log-log interval of the 6-MP group", () => {
+    // The 95% log-log intervals of the 6-MP group (Freireich et al. 1963), as R survival gives them with conf.type "log-log".
+    const expected: [number, number, number][] = [
+      [6, 0.62, 0.952],
+      [10, 0.503, 0.889],
+      [23, 0.188, 0.68],
+    ];
+    for (const [time, low, high] of expected) {
+      const band = survivalBand(curve, time);
+      expect(band?.low).toBeCloseTo(low, 2);
+      expect(band?.high).toBeCloseTo(high, 2);
+      expect(band?.chance).toBe(survivalAt(curve, time));
+    }
+  });
+
+  it("holds the chance in the interval, and the interval in the range 0 to 1", () => {
+    for (let time = 0; time <= curve.last; time += 0.5) {
+      const band = survivalBand(curve, time);
+      if (band === undefined) throw new Error(`no read at ${time}`);
+      expect(band.low).toBeGreaterThanOrEqual(0);
+      expect(band.low).toBeLessThanOrEqual(band.chance);
+      expect(band.chance).toBeLessThanOrEqual(band.high);
+      expect(band.high).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("gives a narrower interval with more observations of the same form, and no width at z 0", () => {
+    const many = kaplanMeier(observations.map((item) => ({ ...item, count: 100 })));
+    const few = survivalBand(curve, 16);
+    const more = survivalBand(many, 16);
+    expect(more?.chance).toBeCloseTo(few?.chance ?? 0, 12);
+    expect((more?.high ?? 1) - (more?.low ?? 0)).toBeLessThan(((few?.high ?? 1) - (few?.low ?? 0)) / 5);
+    expect(survivalBand(curve, 16, 0)).toEqual({ low: few?.chance, chance: few?.chance, high: few?.chance });
+  });
+
+  it("gives 1 to 1 before the first step, 0 to 0 at a chance of 0, and no read after an open end", () => {
+    expect(survivalBand(curve, 1)).toEqual({ low: 1, chance: 1, high: 1 });
+    expect(survivalBand(curve, curve.last + 1)).toBeUndefined();
+    const closed = kaplanMeier([{ time: 1 }, { time: 2 }]);
+    expect(survivalBand(closed, 3)).toEqual({ low: 0, chance: 0, high: 0 });
+  });
+
+  it("refuses a bad z and a bad time", () => {
+    expect(() => survivalBand(curve, 6, -1)).toThrow(RangeError);
+    expect(() => survivalBand(curve, 6, Number.NaN)).toThrow(RangeError);
+    expect(() => survivalBand(curve, -1)).toThrow(RangeError);
   });
 });

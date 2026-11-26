@@ -34,7 +34,7 @@ export {
   bootstrapMovingBlockLeastSquares,
 } from "./moving-block.ts";
 export { type ModeOptions, type SmoothLaw, type SmoothLawScore, bestSmoothLaw, modeCount, smoothLawScores } from "./distribution.ts";
-export { type SurvivalCurve, type SurvivalStep, type TimeToEvent, kaplanMeier, survivalAt, survivalQuantile } from "./survival.ts";
+export { type SurvivalBand, type SurvivalCurve, type SurvivalStep, type TimeToEvent, kaplanMeier, survivalAt, survivalBand, survivalQuantile } from "./survival.ts";
 export { type LeastSquaresFit, type LeastSquaresOptions, leastSquares, leaveOneOutResiduals } from "./regression.ts";
 export {
   type FitError,

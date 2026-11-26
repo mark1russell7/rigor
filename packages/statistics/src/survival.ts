@@ -5,6 +5,8 @@
  * It also throws a RangeError for a count that is not a whole number of 1 or more.
  */
 
+import { Z95 } from "./tests.ts";
+
 /** One observed time, or a group of equal observed times. */
 export interface TimeToEvent {
   /** The time from the start to the event, or to the end of the observation. */
@@ -113,4 +115,40 @@ export function survivalAt(curve: SurvivalCurve, time: number): number | undefin
 export function survivalQuantile(curve: SurvivalCurve, p: number): number | undefined {
   if (!(p > 0 && p < 1)) throw new RangeError("survivalQuantile: p is not more than 0 and less than 1.");
   return curve.steps.find((step) => step.chance - p <= 1e-12)?.time;
+}
+
+/** A pointwise interval of the chance of a survival curve at one time. */
+export interface SurvivalBand {
+  readonly low: number;
+  readonly chance: number;
+  readonly high: number;
+}
+
+/**
+ * This function gives the pointwise interval of the chance of a curve at `time`, from the Greenwood standard error.
+ *
+ * - The interval is on the scale `log(-log(chance))` (Kalbfleisch and Prentice), so its ends are in the range 0 to 1.
+ * - At this scale, the standard error is `sqrt(g) / |log(chance)|`, with `g = (se / chance)^2` the Greenwood sum of the step.
+ * - Thus `low = chance^exp(w)` and `high = chance^exp(-w)`, with `w = z * sqrt(g) / |log(chance)|`.
+ * - Before the first step, the chance is 1 and the interval is 1 to 1. A chance of 0 gives 0 to 0.
+ * - After the last observed time, the chance has no read when it is more than 0 (`survivalAt`), so the function gives `undefined`.
+ * - The interval is for one time. A band of each time with the same `z` holds each time only pointwise, not all times together.
+ *
+ * @param curve - The curve, for example of `kaplanMeier`
+ * @param time - The time, a finite number of 0 or more
+ * @param z - The normal quantile of the level. The default `Z95` gives a 95% interval
+ * @returns The interval, or `undefined` for no read
+ */
+export function survivalBand(curve: SurvivalCurve, time: number, z: number = Z95): SurvivalBand | undefined {
+  if (!(Number.isFinite(z) && z >= 0)) throw new RangeError("survivalBand: z is not a finite number of 0 or more.");
+  const chance = survivalAt(curve, time);
+  if (chance === undefined) return undefined;
+  if (chance === 0 || chance === 1) return { low: chance, chance, high: chance };
+  let se = 0;
+  for (const step of curve.steps) {
+    if (step.time > time) break;
+    se = step.se;
+  }
+  const width = (z * (se / chance)) / Math.abs(Math.log(chance));
+  return { low: chance ** Math.exp(width), chance, high: chance ** Math.exp(-width) };
 }
