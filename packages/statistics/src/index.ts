@@ -152,7 +152,7 @@ export {
   wilsonSampleSize,
 } from "./tests.ts";
 export { type ClassScore, type Confusion, type Kappa, classScores, cohenKappa, confusion } from "./agreement.ts";
-export { entropy, informationGain } from "./information.ts";
+export { answerValue, bayesRisk, entropy, informationGain, rankQuestions, VALUE_RESOLUTION, type Loss, type Question, type QuestionValue } from "./information.ts";
 export { type ConcentrationOptions, type PolyaUnit, fitConcentration, polyaLogLikelihood, polyaPredictive } from "./polya.ts";
 export { pearson } from "./correlation.ts";
 export { KENDALL_EXACT, kendallTau, ranks, spearman } from "./rank.ts";

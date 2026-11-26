@@ -70,6 +70,7 @@ KENDALL_EXACT: build/index.d.ts#KENDALL_EXACT
 type Kappa: build/index.d.ts#Kappa
 type LeastSquaresFit: build/index.d.ts#LeastSquaresFit
 type LeastSquaresOptions: build/index.d.ts#LeastSquaresOptions
+type Loss: build/index.d.ts#Loss
 MODIFIED_Z_CUT: build/index.d.ts#MODIFIED_Z_CUT
 type MeanInterval: build/index.d.ts#MeanInterval
 type MedianInterval: build/index.d.ts#MedianInterval
@@ -96,6 +97,8 @@ type Proportion: build/index.d.ts#Proportion
 type ProportionPrior: build/index.d.ts#ProportionPrior
 type QuantileInterval: build/index.d.ts#QuantileInterval
 type QuantileMethod: build/index.d.ts#QuantileMethod
+type Question: build/index.d.ts#Question
+type QuestionValue: build/index.d.ts#QuestionValue
 RATING_START_UNCERTAINTY: build/index.d.ts#RATING_START_UNCERTAINTY
 RESPONSE_LAMBDAS: build/index.d.ts#RESPONSE_LAMBDAS
 RESPONSE_MAX_POWER: build/index.d.ts#RESPONSE_MAX_POWER
@@ -201,6 +204,7 @@ type UStatisticMean: build/index.d.ts#UStatisticMean
 type UStatisticMethod: build/index.d.ts#UStatisticMethod
 type UStatisticOptions: build/index.d.ts#UStatisticOptions
 U_STATISTIC_TIGHT_MIN_SAMPLE: build/index.d.ts#U_STATISTIC_TIGHT_MIN_SAMPLE
+VALUE_RESOLUTION: build/index.d.ts#VALUE_RESOLUTION
 type VectorScaling: build/index.d.ts#VectorScaling
 type VectorScalingFit: build/index.d.ts#VectorScalingFit
 type VectorScalingOptions: build/index.d.ts#VectorScalingOptions
@@ -213,6 +217,8 @@ Z95: build/index.d.ts#Z95
 addAllToHistogram: build/index.d.ts#addAllToHistogram
 addToHistogram: build/index.d.ts#addToHistogram
 addToRunning: build/index.d.ts#addToRunning
+answerValue: build/index.d.ts#answerValue
+bayesRisk: build/index.d.ts#bayesRisk
 bestSmoothLaw: build/index.d.ts#bestSmoothLaw
 binomialInterval: build/index.d.ts#binomialInterval
 binomialTest: build/index.d.ts#binomialTest
@@ -307,6 +313,7 @@ quantile: build/index.d.ts#quantile
 quantileInterval: build/index.d.ts#quantileInterval
 quantileSamples: build/index.d.ts#quantileSamples
 quantileSorted: build/index.d.ts#quantileSorted
+rankQuestions: build/index.d.ts#rankQuestions
 rankSeparable: build/index.d.ts#rankSeparable
 ranks: build/index.d.ts#ranks
 ratingToStrength: build/index.d.ts#ratingToStrength
@@ -782,6 +789,9 @@ interface LeastSquaresOptions {
   readonly intercept?: boolean;
 }
 
+### build/index.d.ts#Loss
+type Loss = "log" | readonly (readonly number[])[];
+
 ### build/index.d.ts#MODIFIED_Z_CUT
 export declare const MODIFIED_Z_CUT = 3.5;
 
@@ -949,6 +959,19 @@ interface QuantileInterval {
 
 ### build/index.d.ts#QuantileMethod
 type QuantileMethod = "linear" | "nearest-rank" | "higher";
+
+### build/index.d.ts#Question
+interface Question {
+  readonly id: string;
+  readonly likelihood: readonly (readonly number[])[];
+  readonly cost?: number | undefined;
+}
+
+### build/index.d.ts#QuestionValue
+interface QuestionValue {
+  readonly question: Question;
+  readonly value: number;
+}
 
 ### build/index.d.ts#RATING_START_UNCERTAINTY
 export declare const RATING_START_UNCERTAINTY = 350;
@@ -1647,6 +1670,9 @@ interface UStatisticOptions {
 ### build/index.d.ts#U_STATISTIC_TIGHT_MIN_SAMPLE
 export declare const U_STATISTIC_TIGHT_MIN_SAMPLE: number;
 
+### build/index.d.ts#VALUE_RESOLUTION
+export declare const VALUE_RESOLUTION = 1e-9;
+
 ### build/index.d.ts#VectorScaling
 interface VectorScaling {
   readonly slopes: readonly number[];
@@ -1703,6 +1729,12 @@ export declare function addToHistogram(h: Histogram, value: number): Histogram;
 
 ### build/index.d.ts#addToRunning
 export declare function addToRunning(s: RunningSummary, value: number): RunningSummary;
+
+### build/index.d.ts#answerValue
+export declare function answerValue(prior: readonly number[], likelihood: readonly (readonly number[])[], loss: Loss): number;
+
+### build/index.d.ts#bayesRisk
+export declare function bayesRisk(probabilities: readonly number[], loss: Loss): number;
 
 ### build/index.d.ts#bestSmoothLaw
 export declare function bestSmoothLaw(values: readonly number[]): SmoothLaw;
@@ -1981,6 +2013,9 @@ export declare function quantileSamples(p: number, level?: number): number;
 
 ### build/index.d.ts#quantileSorted
 export declare function quantileSorted(sortedValues: readonly number[], p: number, method?: QuantileMethod): number;
+
+### build/index.d.ts#rankQuestions
+export declare function rankQuestions(candidates: readonly Question[], outcomes: readonly number[], loss: Loss): QuestionValue[];
 
 ### build/index.d.ts#rankSeparable
 export declare function rankSeparable<X>(models: Readonly<Record<string, SeparableModel<X>>>, xs: readonly X[], y: readonly number[], options?: RankSeparableOptions): SeparableRank[];
