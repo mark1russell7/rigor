@@ -124,6 +124,7 @@ v.comparison;                                     // the cases that gain and dro
 | `processMemory(options)` | From `/fresh`: the memory of this process at the time of the call: the resident set, its peak, its anonymous part and its file part from `/proc/self/status`, and the heap. |
 | `statusMemory(text)` | From `/fresh`: the fields of the resident set in bytes from the text of `/proc/<pid>/status`, or `null`. |
 | `heapAfterGc()` | From `/fresh`: the used heap after a full garbage collection, in a child with the Node flag `--expose-gc`. |
+| `HEAP_READ_FLAGS` | From `/fresh`: the Node flags of a child that reads its heap, `--expose-gc` and `--single-threaded`. With background threads, the heap of equal children can differ by some KiB. `freshArms` warns on an arm with `--expose-gc` only. |
 | `memoryPeak(a, b)` | From `/fresh`: the larger value of each field of two memory readings. |
 | `watchMemory(options)` | From `/fresh`: a reading of the memory at an interval, with the peak of each field. |
 | `watchHeap(options)` | From `/fresh`: the peaks of the used heap and of the live heap, and the GC time, over the GC events of a watch. |

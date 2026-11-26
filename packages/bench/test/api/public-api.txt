@@ -392,6 +392,7 @@ FreshRun: build/fresh.d.ts#FreshRun
 FreshSkip: build/fresh.d.ts#FreshSkip
 GcProfile: build/fresh.d.ts#GcProfile
 GcSide: build/fresh.d.ts#GcSide
+HEAP_READ_FLAGS: build/fresh.d.ts#HEAP_READ_FLAGS
 HalfCounts: build/fresh.d.ts#HalfCounts
 HalfTimes: build/fresh.d.ts#HalfTimes
 HeapPeaks: build/fresh.d.ts#HeapPeaks
@@ -857,6 +858,9 @@ export interface GcSide {
     readonly usedHeapSize: number;
   };
 }
+
+### build/fresh.d.ts#HEAP_READ_FLAGS
+export declare const HEAP_READ_FLAGS: readonly ["--expose-gc", "--single-threaded"];
 
 ### build/fresh.d.ts#HalfCounts
 export type HalfCounts = readonly [early: number, late: number];
