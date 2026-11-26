@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { COVERING_LIMIT, coveringArray, coveringRows, tupleCoverage } from "./covering.ts";
+import { COVERING_LIMIT, MATRIX_FULL_LIMIT, coveringArray, coveringRows, matrixRows, productRows, tupleCoverage } from "./covering.ts";
 import { random } from "./random.ts";
 
 /** The rows of named dimensions from the level indices of `coveringArray`. */
@@ -82,6 +82,51 @@ describe("coveringRows", () => {
     expect(rows).toHaveLength(6);
     expect(tupleCoverage(rows, { on: [true, false], n: [1, 2, 3] }).share).toBe(1);
     expect(rows.every((row) => typeof row["on"] === "boolean" && typeof row["n"] === "number")).toBe(true);
+  });
+});
+
+describe("productRows", () => {
+  it("gives each combination once, with the last dimension changing first", () => {
+    const rows = productRows({ on: [true, false], n: [1, 2, 3] });
+    expect(rows).toEqual([
+      { on: true, n: 1 },
+      { on: true, n: 2 },
+      { on: true, n: 3 },
+      { on: false, n: 1 },
+      { on: false, n: 2 },
+      { on: false, n: 3 },
+    ]);
+    expect(tupleCoverage(rows, { on: [true, false], n: [1, 2, 3] }, 2).share).toBe(1);
+  });
+
+  it("gives one empty row for no dimensions, and no rows for a dimension with no level", () => {
+    expect(productRows({})).toEqual([{}]);
+    expect(productRows({ a: ["x"], b: [] })).toEqual([]);
+  });
+
+  it("refuses more than COVERING_LIMIT combinations", () => {
+    const big = Array.from({ length: 1000 }, (_, i) => i);
+    expect(() => productRows({ a: big, b: big, c: big })).toThrow(/more than/);
+  });
+});
+
+describe("matrixRows", () => {
+  it("gives the full product up to the limit, and a covering array above it", () => {
+    const small = { a: ["x", "y"], b: [1, 2, 3] };
+    expect(matrixRows(small, random(1))).toEqual(productRows(small));
+    const wide = { a: [1, 2, 3, 4], b: [1, 2, 3, 4], c: [1, 2, 3, 4], d: [1, 2, 3, 4], e: [1, 2] };
+    expect(MATRIX_FULL_LIMIT).toBe(256);
+    // The product of wide has 512 combinations, more than the limit.
+    const rows = matrixRows(wide, random(1));
+    expect(rows).toEqual(coveringRows(wide, random(1)));
+    expect(rows.length).toBeLessThan(512);
+    expect(tupleCoverage(rows, wide).share).toBe(1);
+    expect(matrixRows(small, random(1), { limit: 5 })).toEqual(coveringRows(small, random(1)));
+  });
+
+  it("refuses a limit that is not a whole number of 1 or more", () => {
+    expect(() => matrixRows({ a: [1] }, random(1), { limit: 0 })).toThrow(RangeError);
+    expect(() => matrixRows({ a: [1] }, random(1), { limit: 2.5 })).toThrow(RangeError);
   });
 });
 

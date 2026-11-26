@@ -1,4 +1,4 @@
-export { COVERING_CANDIDATES, COVERING_LIMIT, coveringArray, coveringRows, tupleCoverage, type Coverage, type CoveringOptions } from "./covering.ts";
+export { COVERING_CANDIDATES, COVERING_LIMIT, MATRIX_FULL_LIMIT, coveringArray, coveringRows, matrixRows, productRows, tupleCoverage, type Coverage, type CoveringOptions, type MatrixOptions } from "./covering.ts";
 export { dependsOnLibm, sampler, type DistributionSpec, type Param } from "./distributions.ts";
 export { normalCdf, normalQuantile } from "./normal.ts";
 export { betaCdf, betaShares, type BetaShares, distributionOf, type Distribution, logBeta, logGamma } from "./quantiles.ts";

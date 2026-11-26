@@ -190,6 +190,47 @@ export function coveringRows<D extends Readonly<Record<string, readonly unknown[
   ).map((row) => Object.fromEntries(names.map((name, i) => [name, levels[name]![row[i]!]])) as { [K in keyof D]: D[K][number] });
 }
 
+/** This function gives the count of the combinations of the values of named dimensions: the product of their counts of levels. */
+function productCount(dimensions: Readonly<Record<string, readonly unknown[]>>): number {
+  return Object.values(dimensions).reduce((count, levels) => count * levels.length, 1);
+}
+
+/**
+ * This function gives each combination of the values of named dimensions: the full product. The last dimension changes
+ * first, and the values of a dimension keep their order. No dimensions give one empty row, and a dimension with no level
+ * gives no rows. More than `COVERING_LIMIT` combinations is a `RangeError`, not a long run.
+ */
+export function productRows<D extends Readonly<Record<string, readonly unknown[]>>>(dimensions: D): { [K in keyof D]: D[K][number] }[] {
+  const levels: Readonly<Record<string, readonly unknown[]>> = dimensions;
+  const total = productCount(levels);
+  if (total > COVERING_LIMIT) throw new RangeError(`productRows: ${total} combinations of values, more than ${COVERING_LIMIT}.`);
+  let rows: Record<string, unknown>[] = [{}];
+  for (const name of Object.keys(levels)) {
+    rows = rows.flatMap((row) => levels[name]!.map((value) => ({ ...row, [name]: value })));
+  }
+  return rows as { [K in keyof D]: D[K][number] }[];
+}
+
+/** The default largest count of combinations for which `matrixRows` gives the full product. */
+export const MATRIX_FULL_LIMIT = 256;
+
+/** The options of `matrixRows`: the options of a covering array, and the limit of the full product. */
+export interface MatrixOptions extends CoveringOptions {
+  /** Up to this count of combinations, the matrix is the full product. The default is `MATRIX_FULL_LIMIT`. */
+  readonly limit?: number;
+}
+
+/**
+ * This function gives the rows of a test matrix over named dimensions. Up to `limit` combinations, it gives the full
+ * product of `productRows`. Above it, it gives the covering array of `coveringRows` with the same options. Thus a small
+ * matrix tests each combination, and a large matrix stays small. Only a covering array uses the draws of `r`.
+ */
+export function matrixRows<D extends Readonly<Record<string, readonly unknown[]>>>(dimensions: D, r: Random, options: MatrixOptions = {}): { [K in keyof D]: D[K][number] }[] {
+  const limit = options.limit ?? MATRIX_FULL_LIMIT;
+  if (!isWhole(limit, 1)) throw new RangeError(`matrixRows: the limit is a whole number of 1 or more, not ${String(limit)}.`);
+  return productCount(dimensions) <= limit ? productRows(dimensions) : coveringRows(dimensions, r, options);
+}
+
 /**
  * This function gives the coverage of some rows over named dimensions, with the strength `t` (the default is 2). A row holds a
  * combination when it has each of its values. The function compares the values as text with `String`, and it ignores the

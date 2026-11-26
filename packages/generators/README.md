@@ -197,6 +197,8 @@ tupleCoverage(rows, dimensions).share; // 1
 - The draws come from `r`. The same dimensions, options and seed give the same rows.
 - `tupleCoverage(rows, dimensions, t)` gives the share of the combinations that some rows hold, and the list of the missing combinations. It compares the values as text.
 - More than `COVERING_LIMIT` (10 million) combinations is a `RangeError`, not a long run.
+- `productRows(dimensions)` gives each combination: the full product. The last dimension changes first.
+- `matrixRows(dimensions, r, options)` gives the full product up to `limit` combinations (the default is 256). Above the limit, it gives the covering array of `coveringRows`.
 
 ### Moves from the copies
 
