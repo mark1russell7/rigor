@@ -267,8 +267,17 @@ export function processMemory(options: MemoryOptions = {}): ProcessMemory {
 }
 
 /**
+ * The Node flags of a child that reads its heap with `heapAfterGc()`. `--expose-gc` gives the function `gc`.
+ * `--single-threaded` stops the background threads of V8. With them, a compile task or a GC task ends before the read
+ * in some children and after it in others. Then the heap of two equal children can differ by some KiB, and a memory gate
+ * has no read. `freshArms` warns on an arm with `--expose-gc` and without `--single-threaded`.
+ */
+export const HEAP_READ_FLAGS: readonly ["--expose-gc", "--single-threaded"] = ["--expose-gc", "--single-threaded"];
+
+/**
  * This function starts a full garbage collection, and it gives the used heap of V8 after it, in bytes. Thus the value
  * is the live heap, with no garbage. The child needs the Node flag `--expose-gc`. With no such flag, the function throws.
+ * For a value that repeats from child to child, start the child with each flag of `HEAP_READ_FLAGS`.
  */
 export function heapAfterGc(): number {
   const gc = (globalThis as { gc?: () => void }).gc;
@@ -1043,6 +1052,7 @@ function armsCommands(options: FreshArmsOptions): Map<string, readonly string[]>
  * - With `warmUp`, each different child of the arms starts that count of times before the first round. The result lists them in `warmUp`.
  * - A child that exits with an error, takes too long, prints no JSON line or skips its case is an error. A run of arms has no skips.
  * - Two different hashes from children with the same argv and folder are an error.
+ * - An arm with the Node flag `--expose-gc` and without `--single-threaded` gives a warning (`HEAP_READ_FLAGS`).
  */
 export async function freshArms(options: FreshArmsOptions): Promise<FreshArms> {
   const commands = armsCommands(options);
@@ -1060,9 +1070,17 @@ export async function freshArms(options: FreshArmsOptions): Promise<FreshArms> {
   if (!Number.isSafeInteger(roundOffset) || roundOffset < 0) throw new RangeError(`freshArms: the round offset is a whole number of 0 or more, not ${roundOffset}.`);
   if (!(timeoutMs > 0) || !(maxBuffer > 0)) throw new RangeError("freshArms: the time limit and the output limit are above 0.");
   const balanced = rounds % period === 0;
-  const warnings = balanced
+  const warnings: string[] = balanced
     ? []
     : [`${rounds} rounds is not a multiple of ${period} (2 times the ${arms.length} arms), so the order of the arms is not balanced. The A/A pair can show a bias of order.`];
+  const threaded = arms.filter((arm) => {
+    const command = commands.get(arm.id)!;
+    return command.includes("--expose-gc") && !command.includes("--single-threaded");
+  });
+  if (threaded.length > 0) {
+    const ids = threaded.map((arm) => JSON.stringify(arm.id)).join(", ");
+    warnings.push(`The arms ${ids} have --expose-gc and not --single-threaded. The background threads of V8 can change a heap read by some KiB from child to child. Start the children with HEAP_READ_FLAGS.`);
+  }
   const fixtures = options.fixtures === undefined ? undefined : checkFixtures(options.fixtures.folder, options.fixtures.files, options.fixtures.read === undefined ? {} : { read: options.fixtures.read });
 
   const env = options.env ?? benchEnv();

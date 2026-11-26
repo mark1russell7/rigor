@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type ArmProcess, type BenchEnv, type ChildExit, type ChildTurn, type FreshArmsOptions, type StartChild, type StartOptions, armTimes, freshArms } from "./fresh.ts";
+import { type ArmProcess, type BenchEnv, type ChildExit, type ChildTurn, type FreshArmsOptions, type StartChild, type StartOptions, armTimes, freshArms, HEAP_READ_FLAGS } from "./fresh.ts";
 import { aaOrders, armOrder, balancedRounds } from "./index.ts";
 
 const ENV: BenchEnv = { cpu: "test cpu", cores: 4, os: "linux", arch: "x64", node: "v24.0.0" };
@@ -92,6 +92,13 @@ describe("freshArms", () => {
     const result = await run({ start: fake().start, rounds: 6 });
     expect(result.balanced).toBe(false);
     expect(result.warnings).toEqual([expect.stringMatching(/^6 rounds is not a multiple of 8 \(2 times the 4 arms\)/)]);
+  });
+
+  it("warns on an arm that reads its heap with the background threads of V8", async () => {
+    const threaded = await run({ start: fake().start, command: ["node", "--expose-gc", "child.ts"] });
+    expect(threaded.warnings).toEqual([expect.stringMatching(/^The arms "slow", "fast", "same", "same#aa" have --expose-gc and not --single-threaded./)]);
+    const single = await run({ start: fake().start, command: ["node", ...HEAP_READ_FLAGS, "child.ts"] });
+    expect(single.warnings).toEqual([]);
   });
 
   it("checks the fixture files before the first child, and keeps their hashes", async () => {
