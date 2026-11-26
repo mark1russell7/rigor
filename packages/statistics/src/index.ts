@@ -160,6 +160,7 @@ export {
   type BinomialSide,
   type CountInterval,
   type MedianInterval,
+  type ProportionPrior,
   type QuantileInterval,
   type RateInterval,
   binomialInterval,
@@ -170,6 +171,7 @@ export {
   poissonBinomial,
   poissonBinomialTest,
   poissonInterval,
+  proportionMean,
   quantileInterval,
   quantileSamples,
 } from "./discrete.ts";

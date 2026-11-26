@@ -7,9 +7,11 @@ import {
   medianInterval,
   negativeBinomialInterval,
   poissonInterval,
+  proportionMean,
   quantileInterval,
   quantileSamples,
   signTest,
+  wilson,
 } from "./index.ts";
 
 /* ---------- The copies in the engines, word for word, as the references of the moves ---------- */
@@ -352,6 +354,42 @@ const binomialChances = (n: number, p: number): number[] => {
   }
   return chances;
 };
+
+describe("proportionMean", () => {
+  it("gives the Jeffreys and the Laplace posterior means", () => {
+    expect(proportionMean(25, 25)).toBeCloseTo(25.5 / 26, 15);
+    expect(proportionMean(25, 25, "laplace")).toBeCloseTo(26 / 27, 15);
+    expect(proportionMean(0, 10)).toBeCloseTo(0.5 / 11, 15);
+    expect(proportionMean(3, 7, "laplace")).toBeCloseTo(4 / 9, 15);
+    expect(proportionMean(0, 0)).toBe(0.5);
+    expect(proportionMean(0, 0, "laplace")).toBe(0.5);
+  });
+
+  it("is symmetric, stays inside 0 to 1, and goes to k / n as n grows", () => {
+    for (const n of [1, 2, 5, 25, 1000]) {
+      for (let k = 0; k <= n; k += Math.max(1, Math.floor(n / 7))) {
+        for (const prior of ["jeffreys", "laplace"] as const) {
+          const mean = proportionMean(k, n, prior);
+          expect(mean).toBeGreaterThan(0);
+          expect(mean).toBeLessThan(1);
+          expect(mean + proportionMean(n - k, n, prior)).toBeCloseTo(1, 14);
+        }
+      }
+    }
+    expect(Math.abs(proportionMean(700_000, 1_000_000) - 0.7)).toBeLessThan(1e-6);
+  });
+
+  it("is above the Wilson low end of a short record with no failure", () => {
+    for (const n of [5, 25, 35, 100]) expect(proportionMean(n, n)).toBeGreaterThan(wilson(n, n).low);
+  });
+
+  it("refuses a count that is not whole, a k above n and an unknown prior", () => {
+    expect(() => proportionMean(1.5, 3)).toThrow(RangeError);
+    expect(() => proportionMean(-1, 3)).toThrow(RangeError);
+    expect(() => proportionMean(4, 3)).toThrow(RangeError);
+    expect(() => proportionMean(1, 3, "flat" as "laplace")).toThrow(RangeError);
+  });
+});
 
 describe("clopperPearson", () => {
   const levels = [0.5, 0.8, 0.9, 0.95, 0.99, 0.999] as const;
