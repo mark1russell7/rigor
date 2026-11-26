@@ -287,6 +287,7 @@ In the tests, the series are AR(1) with 200 readings and the slope 0.6. There, t
 | `wilson(k, n, z)` | The Wilson interval of a proportion. |
 | `wilsonSampleSize(target, expected, z, max)` | The smallest number of trials at which the Wilson lower end reaches the target, at the expected proportion. |
 | `clopperPearson(k, n, level)` | The exact Clopper-Pearson interval of a proportion. Each tail outside holds `(1 - level) / 2`, so the coverage is `level` or more at each proportion. It is wider than `wilson`. |
+| `proportionMean(k, n, prior)` | The posterior mean of a proportion under a Beta prior: Jeffreys (the default), (k + 1/2) / (n + 1), or Laplace, (k + 1) / (n + 2). Use it for a point value, and an interval for a bound. |
 | `cohenKappa(a, b)` | The agreement of two raters beyond chance (Cohen's kappa), with the observed and the chance agreement. |
 | `confusion(truth, predicted, labels)` | The confusion table of a classifier: the count of each pair of a true class and a predicted class. `labels` sets the first rows, also for a class with no items. |
 | `classScores(table, z)` | The support, the hits, the recall with its Wilson interval, the precision and the F1 score of each class of a confusion table. |

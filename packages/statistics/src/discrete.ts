@@ -320,6 +320,29 @@ export function clopperPearson(k: number, n: number, level = 0.95): Proportion {
   return { low, high };
 }
 
+/** The prior of the proportion mean: Jeffreys is Beta(1/2, 1/2), and Laplace is Beta(1, 1), the uniform prior. */
+export type ProportionPrior = "jeffreys" | "laplace";
+
+/**
+ * The posterior mean of a proportion after `k` successes in `n` trials, under a Beta prior. Jeffreys gives
+ * (k + 1/2) / (n + 1), and Laplace (the rule of succession) gives (k + 1) / (n + 2). Unlike k / n, it is not 0 or 1 at
+ * k = 0 or k = n. Unlike the low end of an interval, it does not fall when a record is short. Use it for a point
+ * value, and an interval for a bound. For n = 0 it is 1/2.
+ *
+ * @param k - The count of successes, a whole number from 0 to `n`.
+ * @param n - The count of trials, a whole number of 0 or more.
+ * @param prior - The prior, `jeffreys` (the default) or `laplace`.
+ * @returns The posterior mean, from 0 to 1.
+ */
+export function proportionMean(k: number, n: number, prior: ProportionPrior = "jeffreys"): number {
+  whole("proportionMean", k);
+  whole("proportionMean", n);
+  if (k > n) throw new RangeError(`proportionMean: k ${k} is more than n ${n}.`);
+  if (prior !== "jeffreys" && prior !== "laplace") throw new RangeError(`proportionMean: the prior ${String(prior)} is not jeffreys or laplace.`);
+  const a = prior === "jeffreys" ? 0.5 : 1;
+  return (k + a) / (n + 2 * a);
+}
+
 /** An interval of a rate: a count of events in an exposure, for example a count of events in 10 years. */
 export interface RateInterval {
   readonly low: number;

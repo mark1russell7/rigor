@@ -93,6 +93,7 @@ type PermutationOptions: build/index.d.ts#PermutationOptions
 type PermutationResult: build/index.d.ts#PermutationResult
 type PolyaUnit: build/index.d.ts#PolyaUnit
 type Proportion: build/index.d.ts#Proportion
+type ProportionPrior: build/index.d.ts#ProportionPrior
 type QuantileInterval: build/index.d.ts#QuantileInterval
 type QuantileMethod: build/index.d.ts#QuantileMethod
 RATING_START_UNCERTAINTY: build/index.d.ts#RATING_START_UNCERTAINTY
@@ -300,6 +301,7 @@ polyaPredictive: build/index.d.ts#polyaPredictive
 pooledRate: build/index.d.ts#pooledRate
 pooledRateUpper: build/index.d.ts#pooledRateUpper
 predictResponse: build/index.d.ts#predictResponse
+proportionMean: build/index.d.ts#proportionMean
 quantile: build/index.d.ts#quantile
 quantileInterval: build/index.d.ts#quantileInterval
 quantileSamples: build/index.d.ts#quantileSamples
@@ -930,6 +932,9 @@ interface Proportion {
   readonly low: number;
   readonly high: number;
 }
+
+### build/index.d.ts#ProportionPrior
+type ProportionPrior = "jeffreys" | "laplace";
 
 ### build/index.d.ts#QuantileInterval
 interface QuantileInterval {
@@ -1952,6 +1957,9 @@ export declare function pooledRateUpper(unit: RateUnit, law: GammaRates, level?:
 
 ### build/index.d.ts#predictResponse
 export declare function predictResponse(model: ResponseModel, inputs: Readonly<Record<string, ResponseInputValue>>): number;
+
+### build/index.d.ts#proportionMean
+export declare function proportionMean(k: number, n: number, prior?: ProportionPrior): number;
 
 ### build/index.d.ts#quantile
 export declare function quantile(values: readonly number[], p: number, method?: QuantileMethod): number;
