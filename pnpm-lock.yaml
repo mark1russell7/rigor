@@ -183,7 +183,7 @@ importers:
         version: 0.3.3(@swc/core@1.16.22)(dependency-cruiser@18.9.0)
       '@mark1russell7/collections':
         specifier: ^0.12.0
-        version: 0.12.0(zod@4.6.7)
+        version: 0.12.1(zod@4.6.7)
       '@mark1russell7/conventions':
         specifier: ^0.55.2
         version: 0.55.2
@@ -1062,8 +1062,8 @@ packages:
     resolution: {integrity: sha512-qunnV1QThYsI0rXeOFRgaXpZFFw+ZLLnIG0jYioql5WiYrqCPe+eROgLn4l/cRegXU3Y1t4OEnUfW6izovteFA==}
     engines: {node: '>=22.13'}
 
-  '@mark1russell7/collections@0.12.0':
-    resolution: {integrity: sha512-+NjFVF3LvChG2H1n24B+onQbVoETJGmQKrsvkuCGIo7vOgC5vR+8ysS4mQU8AeI/gHyWt1SZueg3o+ftdB0R2w==}
+  '@mark1russell7/collections@0.12.1':
+    resolution: {integrity: sha512-PlARqGiGhl3710Fz4UIlHcr9TDKBAiQn/3HrWhq++9bLR/jeOkxKYlxFULTyhBUy/7lOSxkYr2s222GRD9D2qg==}
     engines: {node: '>=22.12'}
 
   '@mark1russell7/conventions@0.55.2':
@@ -3197,7 +3197,7 @@ snapshots:
 
   '@mark1russell7/code-shape@0.0.1': {}
 
-  '@mark1russell7/collections@0.12.0(zod@4.6.7)':
+  '@mark1russell7/collections@0.12.1(zod@4.6.7)':
     dependencies:
       '@mark1russell7/algebra': 0.9.12(zod@4.6.7)
       '@mark1russell7/optional': 1.5.1
