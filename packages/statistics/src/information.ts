@@ -146,8 +146,8 @@ export function answerValue(prior: readonly number[], likelihood: readonly (read
 }
 
 /**
- * The actions of an asker that does not take the best action after each answer, for example a card that shows the first
- * step of a fixed plan for each set of answers. Each action is a row of the loss table.
+ * The actions of an asker that does not take the best action after each answer. An example is a card that shows the
+ * first step of a fixed plan for each set of answers. Each action is a row of the loss table.
  */
 export interface FixedActions {
   /** The row of the loss table that the asker takes with no answer. */
