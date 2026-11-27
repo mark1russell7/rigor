@@ -3,7 +3,7 @@ import { runInNewContext } from "node:vm";
 import fc from "fast-check";
 import { describe, expect, it, vi } from "vitest";
 import { canonicalJsonV023 } from "./canonical-0.2.3.fixture.ts";
-import { type CanonicalOptions, canonicalHash, canonicalJson, sha256Hex } from "./hash.ts";
+import { type CanonicalOptions, canonicalHash, canonicalJson, createSha256, type Sha256, sha256Hex } from "./hash.ts";
 import { random, type Random } from "./random.ts";
 
 const nodeSha = (bytes: Uint8Array | string): string => createHash("sha256").update(bytes).digest("hex");
@@ -90,6 +90,124 @@ describe("sha256Hex with no node:crypto, as in a browser", () => {
     try {
       const mod = await import("./hash.ts");
       expect(mod.sha256Hex("abc")).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+/** The test vectors of FIPS 180-4 (the examples of NIST for SHA-256), as text and digest. */
+const FIPS_VECTORS: readonly (readonly [string, string])[] = [
+  ["", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"],
+  ["abc", "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"],
+  ["abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq", "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1"],
+  [
+    "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu",
+    "cf5b16a778af8380036ce59e7b0492370b249b11e8f07a51afac45037afee9d1",
+  ],
+];
+/** The digest of one million bytes "a", the long vector of FIPS 180-4. */
+const MILLION_A = "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0";
+
+const ascii = (text: string): Uint8Array => new TextEncoder().encode(text);
+
+/** This function cuts the bytes at the given points, in order, and gives the parts. A part can be empty. */
+function partsOf(bytes: Uint8Array, cuts: readonly number[]): Uint8Array[] {
+  const points = cuts.map((c) => c % (bytes.length + 1)).sort((a, b) => a - b);
+  const parts: Uint8Array[] = [];
+  let from = 0;
+  for (const p of points) {
+    parts.push(bytes.subarray(from, p));
+    from = p;
+  }
+  parts.push(bytes.subarray(from));
+  return parts;
+}
+
+/** This function gives the digest of the parts through one hash of parts. */
+function digestOf(make: () => Sha256, parts: readonly Uint8Array[]): string {
+  const hash = make();
+  for (const part of parts) expect(hash.update(part)).toBe(hash);
+  return hash.digest();
+}
+
+/** The tests of bytes, for the hash of node:crypto and for the portable hash. */
+function bytesSuite(load: () => Promise<{ sha256Hex: typeof sha256Hex; createSha256: typeof createSha256 }>): void {
+  it("gives the digests of the test vectors of FIPS 180-4, also in parts of 1 byte", async () => {
+    const mod = await load();
+    for (const [text, digest] of FIPS_VECTORS) {
+      expect(mod.sha256Hex(ascii(text)), text).toBe(digest);
+      expect(digestOf(mod.createSha256, partsOf(ascii(text), [...ascii(text).keys()])), text).toBe(digest);
+    }
+    const million = new Uint8Array(1_000_000).fill(0x61);
+    expect(mod.sha256Hex(million)).toBe(MILLION_A);
+    expect(digestOf(mod.createSha256, partsOf(million, [1, 63, 64, 1000, 65_537, 999_999]))).toBe(MILLION_A);
+  });
+
+  it("gives the digest of node:crypto at each length near a block edge, and for a view with an offset", async () => {
+    const mod = await load();
+    for (const n of [0, 1, 55, 56, 57, 63, 64, 65, 119, 120, 127, 128, 129, 1000]) {
+      const bytes = new Uint8Array(n).map((_, i) => (i * 31 + 7) & 0xff);
+      expect(mod.sha256Hex(bytes), String(n)).toBe(nodeSha(bytes));
+      const wide = new Uint8Array(n + 13);
+      wide.set(bytes, 5);
+      expect(mod.sha256Hex(wide.subarray(5, 5 + n)), `${n} at offset 5`).toBe(nodeSha(bytes));
+    }
+  });
+
+  it("gives the digest of the whole bytes for each cut into parts (fast-check)", async () => {
+    const mod = await load();
+    fc.assert(
+      fc.property(fc.uint8Array({ maxLength: 400 }), fc.array(fc.nat(400), { maxLength: 8 }), (bytes, cuts) => {
+        const whole = mod.sha256Hex(bytes);
+        expect(whole).toBe(nodeSha(bytes));
+        expect(digestOf(mod.createSha256, partsOf(bytes, cuts))).toBe(whole);
+      }),
+      { numRuns: 300, seed: 1804 },
+    );
+  });
+
+  it("gives the digest of the UTF-8 bytes of a string as the digest of the string", async () => {
+    const mod = await load();
+    const r = random("sha256Hex bytes");
+    for (let i = 0; i < 100; i++) {
+      const text = textOf(r, r.int(0, 90));
+      expect(mod.sha256Hex(new TextEncoder().encode(text))).toBe(mod.sha256Hex(text));
+    }
+  });
+
+  it("accepts a Buffer and bytes from another realm, and refuses other values", async () => {
+    const mod = await load();
+    expect(mod.sha256Hex(Buffer.from("abc"))).toBe(FIPS_VECTORS[1]![1]);
+    const other = runInNewContext("new Uint8Array([0x61, 0x62, 0x63])") as Uint8Array;
+    expect(mod.sha256Hex(other)).toBe(FIPS_VECTORS[1]![1]);
+    for (const bad of [null, [1, 2], new Uint16Array(2), new ArrayBuffer(4), new DataView(new ArrayBuffer(4))]) {
+      expect(() => mod.createSha256().update(bad as never)).toThrow(TypeError);
+    }
+  });
+
+  it("refuses an update or a digest after the digest", async () => {
+    const mod = await load();
+    const hash = mod.createSha256().update(ascii("abc"));
+    expect(hash.digest()).toBe(FIPS_VECTORS[1]![1]);
+    expect(() => hash.update(ascii("d"))).toThrow(/gave its digest/);
+    expect(() => hash.digest()).toThrow(/gave its digest/);
+  });
+}
+
+describe("sha256Hex of bytes and createSha256, with node:crypto", () => {
+  bytesSuite(async () => ({ sha256Hex, createSha256 }));
+});
+
+describe("sha256Hex of bytes and createSha256 with no node:crypto, as in a browser", () => {
+  bytesSuite(async () => {
+    vi.resetModules();
+    const spy = vi.spyOn(process, "getBuiltinModule").mockReturnValue(undefined as never);
+    try {
+      const mod = await import("./hash.ts");
+      mod.createSha256();
+      expect(spy).toHaveBeenCalledWith("node:crypto");
+      return { sha256Hex: mod.sha256Hex, createSha256: mod.createSha256 };
     } finally {
       spy.mockRestore();
     }

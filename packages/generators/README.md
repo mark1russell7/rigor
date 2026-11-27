@@ -263,7 +263,24 @@ canonicalJson({ s: new Set(["b", "a"]), re: /a+/g }, typed); // '{"re":RegExp("/
 - With `"typed"`, the default of `bigint` is `"suffix"`. An explicit `bigint: "error"` keeps the `TypeError`.
 - On a value with no `Date`, `RegExp`, `Map`, `Set` or `bigint`, the two values of `tags` give the same text.
 
-The option `input` of `sha256Hex` has the values `"utf8"` and `"wtf8"` of `fnv1a32`. The two functions use no API of Node or of the browser. `sha256Hex` is not for passwords.
+The option `input` of `sha256Hex` has the values `"utf8"` and `"wtf8"` of `fnv1a32`. On Node, `sha256Hex` uses `node:crypto`. In a browser, it uses portable code with the same digests. `sha256Hex` is not for passwords.
+
+### The hash of bytes, also in parts
+
+`sha256Hex` also takes a `Uint8Array`. `createSha256()` gives a hash of bytes that come in parts, for example the chunks of an upload:
+
+```ts
+import { createSha256, sha256Hex } from "@mark1russell7/rigor-generators";
+
+sha256Hex(new TextEncoder().encode("abc")); // the digest of sha256Hex("abc")
+const hash = createSha256();
+for (const chunk of chunks) hash.update(chunk);
+hash.digest(); // the digest of all the bytes, as 64 lowercase hex characters
+```
+
+- The digest of the parts is the digest of all the bytes in one part, for each cut. A property test holds this on Node and in the portable code.
+- The hash keeps one block of 64 bytes, not the parts. Thus a large file needs little memory.
+- An `update` or a `digest` after the digest causes an `Error`. A value that is not a `Uint8Array` causes a `TypeError`. A `Buffer` is a `Uint8Array`.
 
 ## Move from a copy of mulberry32
 

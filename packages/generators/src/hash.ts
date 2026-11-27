@@ -1,7 +1,8 @@
 /**
- * The content hash of a document: SHA-256 of a string, and a canonical JSON form of a value.
+ * The content hash of a document: SHA-256 of a string or of bytes, and a canonical JSON form of a value.
  *
- * The hash is the same on each platform. On Node, `sha256Hex` of UTF-8 input uses `node:crypto` for speed.
+ * The hash is the same on each platform. On Node, `sha256Hex` of UTF-8 input or of bytes uses `node:crypto` for speed.
+ * `createSha256()` hashes bytes that come in parts, for example the chunks of a file upload. Its digest is the digest of all the bytes.
  * It reads the same bytes as the portable code. The portable code runs in browsers and for the input `"wtf8"`.
  * `canonicalHash(value)` is `sha256Hex(canonicalJson(value))`: equal values give equal hashes, also when their keys have another order.
  */
@@ -15,6 +16,9 @@ const K: readonly number[] = [
   0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
 ];
 
+/** The initial hash value of SHA-256 (FIPS 180-4, section 5.3.3). */
+const IV: readonly number[] = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+
 /** The options of `sha256Hex`. */
 export interface Sha256Options {
   /**
@@ -23,9 +27,17 @@ export interface Sha256Options {
    * - `"utf8"` (the default): the UTF-8 bytes. A lone surrogate becomes the bytes of U+FFFD, as `TextEncoder` writes them.
    * - `"wtf8"`: the UTF-8 bytes of each code point. A lone surrogate becomes its own 3 bytes (WTF-8).
    *
-   * For a string without a lone surrogate, the two inputs give the same hash.
+   * For a string without a lone surrogate, the two inputs give the same hash. The option has no effect on bytes.
    */
   readonly input?: "utf8" | "wtf8";
+}
+
+/** A SHA-256 hash of bytes that come in parts. `createSha256()` makes one. */
+export interface Sha256 {
+  /** This method adds the bytes to the hash, and gives the same hash. After `digest`, it causes an `Error`. */
+  update(bytes: Uint8Array): Sha256;
+  /** This method gives the digest of all the bytes, as 64 lowercase hex characters. A second call causes an `Error`. */
+  digest(): string;
 }
 
 /**
@@ -72,9 +84,15 @@ function writeBytes(text: string, wtf8: boolean, out?: Uint8Array): number {
   return n;
 }
 
-/** The part of `node:crypto` that `sha256Hex` uses. */
+/** The part of a hash of `node:crypto` that this module uses. */
+interface NodeHash {
+  update(data: string | Uint8Array, encoding?: "utf8"): NodeHash;
+  digest(encoding: "hex"): string;
+}
+
+/** The part of `node:crypto` that `sha256Hex` and `createSha256` use. */
 interface NodeCrypto {
-  createHash(algorithm: "sha256"): { update(data: string, encoding: "utf8"): { digest(encoding: "hex"): string } };
+  createHash(algorithm: "sha256"): NodeHash;
 }
 
 /** The `node:crypto` module, `null` where the platform has none, or `undefined` before the first look. */
@@ -99,15 +117,17 @@ function builtinCrypto(): NodeCrypto | null {
 }
 
 /**
- * This function gives the SHA-256 digest of the bytes of a string, as 64 lowercase hex characters.
- * The option `input` selects the bytes of a lone surrogate. It is not for passwords: it has no salt and no cost.
+ * This function gives the SHA-256 digest of the bytes of a string, or of a `Uint8Array`, as 64 lowercase hex characters.
+ * For a string, the option `input` selects the bytes of a lone surrogate. It is not for passwords: it has no salt and no cost.
  *
- * On Node, the input `"utf8"` goes through `node:crypto`. Node writes a lone surrogate as the bytes of U+FFFD, as `TextEncoder`
+ * On Node, the input `"utf8"` and bytes go through `node:crypto`. Node writes a lone surrogate as the bytes of U+FFFD, as `TextEncoder`
  * does, so the hash is the hash of the portable code.
  */
-export function sha256Hex(text: string, options?: Sha256Options): string {
+export function sha256Hex(value: string | Uint8Array, options?: Sha256Options): string {
   const input = options?.input ?? "utf8";
   if (input !== "utf8" && input !== "wtf8") throw new RangeError(`sha256Hex: input is "utf8" or "wtf8", not ${String(input)}.`);
+  if (typeof value !== "string") return createSha256().update(value).digest();
+  const text = value;
   const wtf8 = input === "wtf8";
   if (!wtf8) {
     const crypto = builtinCrypto();
@@ -128,45 +148,160 @@ function portableSha256(text: string, wtf8: boolean): string {
   const view = new DataView(data.buffer);
   view.setUint32(total - 8, Math.floor(bits / 0x100000000));
   view.setUint32(total - 4, bits >>> 0);
-  const h = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+  const h = Uint32Array.from(IV);
   const w = new Uint32Array(64);
-  const rotr = (x: number, n: number): number => (x >>> n) | (x << (32 - n));
-  for (let off = 0; off < total; off += 64) {
-    for (let i = 0; i < 16; i++) w[i] = view.getUint32(off + 4 * i);
-    for (let i = 16; i < 64; i++) {
-      const a = w[i - 15]!;
-      const b = w[i - 2]!;
-      const s0 = rotr(a, 7) ^ rotr(a, 18) ^ (a >>> 3);
-      const s1 = rotr(b, 17) ^ rotr(b, 19) ^ (b >>> 10);
-      w[i] = (w[i - 16]! + s0 + w[i - 7]! + s1) >>> 0;
-    }
-    let [a, b, c, d, e, f, g, k] = h as [number, number, number, number, number, number, number, number];
-    for (let i = 0; i < 64; i++) {
-      const s1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
-      const ch = (e & f) ^ (~e & g);
-      const t1 = (k + s1 + ch + K[i]! + w[i]!) >>> 0;
-      const s0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
-      const maj = (a & b) ^ (a & c) ^ (b & c);
-      const t2 = (s0 + maj) >>> 0;
-      k = g;
-      g = f;
-      f = e;
-      e = (d + t1) >>> 0;
-      d = c;
-      c = b;
-      b = a;
-      a = (t1 + t2) >>> 0;
-    }
-    h[0] = (h[0]! + a) >>> 0;
-    h[1] = (h[1]! + b) >>> 0;
-    h[2] = (h[2]! + c) >>> 0;
-    h[3] = (h[3]! + d) >>> 0;
-    h[4] = (h[4]! + e) >>> 0;
-    h[5] = (h[5]! + f) >>> 0;
-    h[6] = (h[6]! + g) >>> 0;
-    h[7] = (h[7]! + k) >>> 0;
+  for (let off = 0; off < total; off += 64) compressBlock(h, w, view, off);
+  return hexOf(h);
+}
+
+/** This function rotates the 32 bits of `x` to the right by `n`. */
+const rotr = (x: number, n: number): number => (x >>> n) | (x << (32 - n));
+
+/** This function reads the block of 64 bytes at `off` of `view` into the state `h`. The array `w` holds the 64 words of the schedule. */
+function compressBlock(h: Uint32Array, w: Uint32Array, view: DataView, off: number): void {
+  for (let i = 0; i < 16; i++) w[i] = view.getUint32(off + 4 * i);
+  for (let i = 16; i < 64; i++) {
+    const a = w[i - 15]!;
+    const b = w[i - 2]!;
+    const s0 = rotr(a, 7) ^ rotr(a, 18) ^ (a >>> 3);
+    const s1 = rotr(b, 17) ^ rotr(b, 19) ^ (b >>> 10);
+    w[i] = (w[i - 16]! + s0 + w[i - 7]! + s1) >>> 0;
   }
-  return h.map((x) => x.toString(16).padStart(8, "0")).join("");
+  let a = h[0]!;
+  let b = h[1]!;
+  let c = h[2]!;
+  let d = h[3]!;
+  let e = h[4]!;
+  let f = h[5]!;
+  let g = h[6]!;
+  let k = h[7]!;
+  for (let i = 0; i < 64; i++) {
+    const s1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+    const ch = (e & f) ^ (~e & g);
+    const t1 = (k + s1 + ch + K[i]! + w[i]!) >>> 0;
+    const s0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+    const maj = (a & b) ^ (a & c) ^ (b & c);
+    const t2 = (s0 + maj) >>> 0;
+    k = g;
+    g = f;
+    f = e;
+    e = (d + t1) >>> 0;
+    d = c;
+    c = b;
+    b = a;
+    a = (t1 + t2) >>> 0;
+  }
+  h[0] = (h[0]! + a) >>> 0;
+  h[1] = (h[1]! + b) >>> 0;
+  h[2] = (h[2]! + c) >>> 0;
+  h[3] = (h[3]! + d) >>> 0;
+  h[4] = (h[4]! + e) >>> 0;
+  h[5] = (h[5]! + f) >>> 0;
+  h[6] = (h[6]! + g) >>> 0;
+  h[7] = (h[7]! + k) >>> 0;
+}
+
+/** This function gives the state of the hash as 64 lowercase hex characters. */
+function hexOf(h: Uint32Array): string {
+  let out = "";
+  for (let i = 0; i < 8; i++) out += h[i]!.toString(16).padStart(8, "0");
+  return out;
+}
+
+/** This function causes an `Error` for a hash that gave its digest. */
+function checkOpen(done: boolean): void {
+  if (done) throw new Error("createSha256: the hash gave its digest. Make a new hash with createSha256().");
+}
+
+/** This function causes a `TypeError` for a value that is not a `Uint8Array`. A `Buffer` and a value from another realm pass. */
+function checkBytes(bytes: unknown): asserts bytes is Uint8Array {
+  if (typedArrayName.call(bytes as object) !== "Uint8Array") {
+    throw new TypeError(`createSha256: the bytes are a Uint8Array, not ${bytes === null ? "null" : typeof bytes === "object" ? brandOf(bytes) : typeof bytes}.`);
+  }
+}
+
+/**
+ * This function makes a SHA-256 hash of bytes that come in parts. The digest of the parts is the digest of all the bytes in one part.
+ * On Node, the hash goes through `node:crypto`. In a browser, the portable code reads each block of 64 bytes as it comes.
+ * The hash keeps one block of 64 bytes, not the parts.
+ */
+export function createSha256(): Sha256 {
+  const crypto = builtinCrypto();
+  return crypto === null ? portableParts() : nodeParts(crypto.createHash("sha256"));
+}
+
+/** This function gives the hash of parts over a hash of `node:crypto`, with the checks of the portable code. */
+function nodeParts(hash: NodeHash): Sha256 {
+  let done = false;
+  const self: Sha256 = {
+    update(bytes) {
+      checkOpen(done);
+      checkBytes(bytes);
+      hash.update(bytes);
+      return self;
+    },
+    digest() {
+      checkOpen(done);
+      done = true;
+      return hash.digest("hex");
+    },
+  };
+  return self;
+}
+
+/** This function gives the hash of parts with no API of the platform. */
+function portableParts(): Sha256 {
+  const h = Uint32Array.from(IV);
+  const w = new Uint32Array(64);
+  const block = new Uint8Array(64);
+  const view = new DataView(block.buffer);
+  // The bytes of the block that are not yet read, and the count of all the bytes.
+  let fill = 0;
+  let length = 0;
+  let done = false;
+  const self: Sha256 = {
+    update(bytes) {
+      checkOpen(done);
+      checkBytes(bytes);
+      length += bytes.length;
+      let i = 0;
+      if (fill > 0) {
+        i = Math.min(64 - fill, bytes.length);
+        block.set(bytes.subarray(0, i), fill);
+        fill += i;
+        if (fill < 64) return self;
+        compressBlock(h, w, view, 0);
+        fill = 0;
+      }
+      // The full blocks are read where they are, with no copy.
+      if (bytes.length - i >= 64) {
+        const from = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+        for (; bytes.length - i >= 64; i += 64) compressBlock(h, w, from, i);
+      }
+      if (i < bytes.length) {
+        block.set(bytes.subarray(i), 0);
+        fill = bytes.length - i;
+      }
+      return self;
+    },
+    digest() {
+      checkOpen(done);
+      done = true;
+      const bits = length * 8;
+      block[fill++] = 0x80;
+      if (fill > 56) {
+        block.fill(0, fill);
+        compressBlock(h, w, view, 0);
+        fill = 0;
+      }
+      block.fill(0, fill, 56);
+      view.setUint32(56, Math.floor(bits / 0x100000000));
+      view.setUint32(60, bits >>> 0);
+      compressBlock(h, w, view, 0);
+      return hexOf(h);
+    },
+  };
+  return self;
 }
 
 /** The options of `canonicalJson` and `canonicalHash`. */

@@ -28,6 +28,7 @@ type RecordedTable: build/recorded.d.ts#RecordedTable
 SHRINK_CHECKS: build/shrink.d.ts#SHRINK_CHECKS
 SHRINK_TOLERANCE: build/shrink.d.ts#SHRINK_TOLERANCE
 type SaltelliDesign: build/designs.d.ts#SaltelliDesign
+type Sha256: build/hash.d.ts#Sha256
 type Sha256Options: build/hash.d.ts#Sha256Options
 type ShrinkOptions: build/shrink.d.ts#ShrinkOptions
 type ShrinkStep: build/shrink.d.ts#ShrinkStep
@@ -39,6 +40,7 @@ canonicalHash: build/hash.d.ts#canonicalHash
 canonicalJson: build/hash.d.ts#canonicalJson
 coveringArray: build/covering.d.ts#coveringArray
 coveringRows: build/covering.d.ts#coveringRows
+createSha256: build/hash.d.ts#createSha256
 dependsOnLibm: build/distributions.d.ts#dependsOnLibm
 deriveSeed: build/random.d.ts#deriveSeed
 distributionOf: build/quantiles.d.ts#distributionOf
@@ -207,6 +209,12 @@ export interface CanonicalOptions {
   readonly tags?: "none" | "typed";
 }
 
+### build/hash.d.ts#Sha256
+export interface Sha256 {
+  update(bytes: Uint8Array): Sha256;
+  digest(): string;
+}
+
 ### build/hash.d.ts#Sha256Options
 export interface Sha256Options {
   readonly input?: "utf8" | "wtf8";
@@ -218,8 +226,11 @@ export declare function canonicalHash(value: unknown, options?: CanonicalOptions
 ### build/hash.d.ts#canonicalJson
 export declare function canonicalJson(value: unknown, options?: CanonicalOptions): string;
 
+### build/hash.d.ts#createSha256
+export declare function createSha256(): Sha256;
+
 ### build/hash.d.ts#sha256Hex
-export declare function sha256Hex(text: string, options?: Sha256Options): string;
+export declare function sha256Hex(value: string | Uint8Array, options?: Sha256Options): string;
 
 ### build/normal.d.ts#normalCdf
 export declare function normalCdf(x: number): number;
