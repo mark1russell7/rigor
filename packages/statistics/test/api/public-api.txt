@@ -48,6 +48,7 @@ type EloUpdate: build/index.d.ts#EloUpdate
 FOLD_RULE_BAR: build/index.d.ts#FOLD_RULE_BAR
 FOLD_RULE_MIN_FOLDS: build/index.d.ts#FOLD_RULE_MIN_FOLDS
 type FitError: build/index.d.ts#FitError
+type FixedActions: build/index.d.ts#FixedActions
 type FoldRuleOptions: build/index.d.ts#FoldRuleOptions
 type FoldVerdict: build/index.d.ts#FoldVerdict
 type FoldVerdictKind: build/index.d.ts#FoldVerdictKind
@@ -260,6 +261,7 @@ fitRatings: build/index.d.ts#fitRatings
 fitResponse: build/index.d.ts#fitResponse
 fitSeparable: build/index.d.ts#fitSeparable
 fitTwoLevelGammaRates: build/index.d.ts#fitTwoLevelGammaRates
+fixedAnswerValue: build/index.d.ts#fixedAnswerValue
 foldRule: build/index.d.ts#foldRule
 foldSkills: build/index.d.ts#foldSkills
 gammaCdf: build/index.d.ts#gammaCdf
@@ -646,6 +648,12 @@ interface FitError {
   readonly missing: number;
 }
 
+### build/index.d.ts#FixedActions
+interface FixedActions {
+  readonly before: number;
+  readonly after: readonly number[];
+}
+
 ### build/index.d.ts#FoldRuleOptions
 interface FoldRuleOptions {
   readonly minFolds?: number;
@@ -965,6 +973,7 @@ interface Question {
   readonly id: string;
   readonly likelihood: readonly (readonly number[])[];
   readonly cost?: number | undefined;
+  readonly fixed?: FixedActions | undefined;
 }
 
 ### build/index.d.ts#QuestionValue
@@ -1858,6 +1867,9 @@ export declare function fitSeparable<X>(model: SeparableModel<X>, xs: readonly X
 
 ### build/index.d.ts#fitTwoLevelGammaRates
 export declare function fitTwoLevelGammaRates(units: readonly GroupedRateUnit[], options?: GammaRatesOptions): TwoLevelRates;
+
+### build/index.d.ts#fixedAnswerValue
+export declare function fixedAnswerValue(prior: readonly number[], likelihood: readonly (readonly number[])[], loss: Loss, fixed: FixedActions): number;
 
 ### build/index.d.ts#foldRule
 export declare function foldRule(skills: readonly number[], options?: FoldRuleOptions): FoldVerdict;

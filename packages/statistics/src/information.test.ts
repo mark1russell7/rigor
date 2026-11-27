@@ -1,7 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { uniformDouble } from "@mark1russell7/rigor-testkit/arbitrary";
-import { answerValue, bayesRisk, entropy, informationGain, rankQuestions } from "./index.ts";
+import { answerValue, bayesRisk, entropy, fixedAnswerValue, informationGain, rankQuestions } from "./index.ts";
 
 /** A distribution with n values from positive weights. */
 const weights = (n: number): fc.Arbitrary<number[]> =>
@@ -135,6 +135,59 @@ describe("answerValue", () => {
   });
 });
 
+/** This function gives the row of the loss table with the smallest expected loss for the weights. */
+const bestRow = (weights: readonly number[], loss: readonly (readonly number[])[]): number => {
+  const expected = loss.map((row) => weights.reduce((sum, w, h) => sum + w * (row[h] ?? 0), 0));
+  return expected.indexOf(Math.min(...expected));
+};
+
+/** A prior, a likelihood and a loss table, with the best row before the answer and the best row after each answer. */
+const bestCase = table.chain(([prior, likelihood]) =>
+  fc.tuple(fc.constant(prior), fc.constant(likelihood), lossTable(prior.length)).map(([p, l, loss]) => {
+    const after = (l[0] ?? []).map((_, x) => bestRow(p.map((w, h) => w * (l[h]?.[x] ?? 0)), loss));
+    return { prior: p, likelihood: l, loss, before: bestRow(p, loss), after };
+  }),
+);
+
+describe("fixedAnswerValue", () => {
+  // A card shows one step. The loss is 0 when the shown step is the right step, and 1 when it is not.
+  const zeroOne = [[0, 1], [1, 0]];
+  const tells = [[1, 0], [0, 1]];
+
+  it("gives the gain of the shown step for each answer", () => {
+    expect(fixedAnswerValue([0.5, 0.5], tells, zeroOne, { before: 0, after: [0, 1] })).toBeCloseTo(0.5, 12);
+    expect(fixedAnswerValue([0.5, 0.5], tells, zeroOne, { before: 0, after: [0, 0] })).toBe(0);
+  });
+
+  it("gives 0 when the fixed actions are worse than the action before", () => {
+    expect(fixedAnswerValue([0.5, 0.5], tells, zeroOne, { before: 0, after: [1, 0] })).toBe(0);
+  });
+
+  it("gives answerValue when each fixed action is the best action", () => {
+    fc.assert(fc.property(bestCase, ({ prior, likelihood, loss, before, after }) => {
+      expect(fixedAnswerValue(prior, likelihood, loss, { before, after })).toBeCloseTo(answerValue(prior, likelihood, loss), 9);
+    }));
+  });
+
+  it("is at most answerValue when the action before is the best action", () => {
+    fc.assert(
+      fc.property(
+        bestCase.chain((one) => fc.tuple(fc.constant(one), fc.array(fc.nat({ max: one.loss.length - 1 }), { minLength: one.after.length, maxLength: one.after.length }))),
+        ([{ prior, likelihood, loss, before }, after]) => {
+          expect(fixedAnswerValue(prior, likelihood, loss, { before, after })).toBeLessThanOrEqual(answerValue(prior, likelihood, loss) + 1e-9);
+        },
+      ),
+    );
+  });
+
+  it("refuses the log loss and fixed actions that are not rows of the table", () => {
+    expect(() => fixedAnswerValue([0.5, 0.5], tells, "log", { before: 0, after: [0, 1] })).toThrow(/loss table/);
+    expect(() => fixedAnswerValue([0.5, 0.5], tells, zeroOne, { before: 0, after: [0] })).toThrow(/1 rows after an answer, not 2/);
+    expect(() => fixedAnswerValue([0.5, 0.5], tells, zeroOne, { before: 2, after: [0, 1] })).toThrow(/not a row/);
+    expect(() => fixedAnswerValue([0.5, 0.5], tells, zeroOne, { before: 0, after: [0, 0.5] })).toThrow(/not a row/);
+  });
+});
+
 describe("rankQuestions", () => {
   const loss = [[0, 10], [4, 4]];
   const tells = { id: "tells", likelihood: [[1, 0], [0, 1]] };
@@ -160,5 +213,13 @@ describe("rankQuestions", () => {
     const ranked = rankQuestions([nothing, hints, tells], [0.5, 0.5], "log");
     expect(ranked.map((choice) => choice.question.id)).toEqual(["tells", "hints", "nothing"]);
     expect(ranked[1]?.value).toBeCloseTo(informationGain([0.5, 0.5], hints.likelihood), 12);
+  });
+
+  it("gives a question with fixed actions the value of its fixed actions", () => {
+    // The answer of "tells" changes the best action, but the asker shows the action before for each answer.
+    const fixed = { ...tells, id: "fixed", fixed: { before: 1, after: [1, 1] } };
+    const ranked = rankQuestions([fixed, hints], [0.5, 0.5], loss);
+    expect(ranked.map((choice) => choice.question.id)).toEqual(["hints", "fixed"]);
+    expect(ranked[1]?.value).toBe(0);
   });
 });

@@ -145,6 +145,47 @@ export function answerValue(prior: readonly number[], likelihood: readonly (read
   return Math.max(0, riskOf(prior, loss) - after);
 }
 
+/**
+ * The actions of an asker that does not take the best action after each answer, for example a card that shows the first
+ * step of a fixed plan for each set of answers. Each action is a row of the loss table.
+ */
+export interface FixedActions {
+  /** The row of the loss table that the asker takes with no answer. */
+  readonly before: number;
+  /** The row that the asker takes after the answer `x`, one for each answer. */
+  readonly after: readonly number[];
+}
+
+/**
+ * The expected value of an answer for an asker with fixed actions, in the unit of the loss.
+ *
+ * - `prior[h]` and `likelihood[h][x]` have the meaning of `informationGain`. The loss is a table.
+ * - The value is the expected loss of the row `before`, minus the expected loss of the row `after[x]` over the answers.
+ * - The asker can keep the row `before` and ignore the answer. Thus a value below 0 gives 0.
+ * - When each row `after[x]` is the best row for its posterior, the value is `answerValue`.
+ */
+export function fixedAnswerValue(prior: readonly number[], likelihood: readonly (readonly number[])[], loss: Loss, fixed: FixedActions): number {
+  const name = "fixedAnswerValue";
+  const marginal = marginalOf(name, prior, likelihood);
+  if (loss === "log") throw new RangeError(`${name}: fixed actions need a loss table. With the log loss, an action is a distribution.`);
+  checkLoss(name, loss, prior.length);
+  if (fixed.after.length !== marginal.length) throw new RangeError(`${name}: the fixed actions have ${fixed.after.length} rows after an answer, not ${marginal.length}.`);
+  for (const row of [fixed.before, ...fixed.after]) {
+    if (!Number.isInteger(row) || row < 0 || row >= loss.length) throw new RangeError(`${name}: the fixed action ${row} is not a row of the loss table.`);
+  }
+  let before = 0;
+  let after = 0;
+  prior.forEach((p, h) => {
+    if (p <= 0) return;
+    before += p * (loss[fixed.before]?.[h] ?? 0);
+    // P(h and x) = P(h) P(x | h). The asker takes the row after[x] for the answer x.
+    likelihood[h]?.forEach((q, x) => {
+      if (q > 0) after += p * q * (loss[fixed.after[x] ?? 0]?.[h] ?? 0);
+    });
+  });
+  return Math.max(0, before - after);
+}
+
 /** A question that a diagnosis or a plan can ask next, with the likelihood of its answers. */
 export interface Question {
   /** The id of the question. */
@@ -153,6 +194,8 @@ export interface Question {
   readonly likelihood: readonly (readonly number[])[];
   /** The cost of the question, for example its time in seconds. When two values are equal, the lower cost comes first. The default is 0. */
   readonly cost?: number | undefined;
+  /** With fixed actions, the value of the question is `fixedAnswerValue`. With no fixed actions, the value is `answerValue`. */
+  readonly fixed?: FixedActions | undefined;
 }
 
 /** A question with the expected value of its answer. */
@@ -170,12 +213,14 @@ export const VALUE_RESOLUTION = 1e-9;
  * question to ask.
  *
  * - The list `outcomes` is the prior: the probability of each value of the variable.
- * - The value of each question is `answerValue(outcomes, question.likelihood, loss)`.
+ * - The value of each question is `answerValue(outcomes, question.likelihood, loss)`. A question with fixed actions has the
+ *   value `fixedAnswerValue(outcomes, question.likelihood, loss, question.fixed)`.
  * - With the log loss, the order is the order of the information gain.
  * - When two values are equal, the lower cost comes first, then the order of the candidates.
  */
 export function rankQuestions(candidates: readonly Question[], outcomes: readonly number[], loss: Loss): QuestionValue[] {
-  const values = candidates.map((question, order) => ({ choice: { question, value: answerValue(outcomes, question.likelihood, loss) }, order }));
+  const valueOf = (question: Question): number => (question.fixed === undefined ? answerValue(outcomes, question.likelihood, loss) : fixedAnswerValue(outcomes, question.likelihood, loss, question.fixed));
+  const values = candidates.map((question, order) => ({ choice: { question, value: valueOf(question) }, order }));
   const scale = Math.max(0, ...values.map(({ choice }) => choice.value));
   const level = (value: number): number => (scale === 0 ? 0 : Math.round(value / (scale * VALUE_RESOLUTION)));
   return values
