@@ -17,7 +17,7 @@
     "@mark1russell7/rigor-generators": "workspace:*",
     "@mark1russell7/rigor-proxy": "workspace:*",
     "@mark1russell7/rigor-statistics": "workspace:*",
-    "@mark1russell7/text": "^0.0.20",
+    "@mark1russell7/text": "^0.0.21",
     "tsdown": "^0.23.1"
   },
   "devDependencies": {
