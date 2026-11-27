@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/rigor-statistics",
-  "version": "0.2.33",
+  "version": "0.2.34",
   "description": "The statistics of measured work: quantiles, bootstrap intervals, the sign test, the paired permutation test, the sign-flip test of a weighted sum, the stratified bootstrap, the moving-block bootstrap of a series in time order, the quantile and the distribution function of the standard normal law, Wilson and Clopper-Pearson intervals, the Holm correction, the Pearson and rank correlations, the permutation test of a correlation, the comparison with a baseline beyond the noise, the Brier score and the log-loss, the binned calibration of predictions and its expected calibration error, the Dirichlet-multinomial law of repeated observations and the fit of its concentration, the gamma-Poisson fit of the rates of units and their pooled rates, the two-level fit of units in groups, the thinning holdout and the split holdout of rates, pairwise ratings (Elo, Glicko-2 and a Bradley-Terry fit with Davidson ties), fitted response records, and the Sobol indices of their models.",
   "keywords": [
     "statistics",
